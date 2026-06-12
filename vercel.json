@@ -1,0 +1,9 @@
+{
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/seo-cron",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

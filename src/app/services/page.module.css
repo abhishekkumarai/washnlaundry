@@ -1,0 +1,313 @@
+.headerSection {
+  background-color: var(--bg-white);
+  padding: 60px 0;
+  border-bottom: 1px solid var(--border-light);
+  text-align: center;
+}
+
+.title {
+  font-size: 38px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  color: var(--text-medium);
+  font-size: 16px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Service Type Tabs Selector */
+.serviceSelector {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 32px auto 0;
+  max-width: 900px;
+}
+
+.serviceTabBtn {
+  background: white;
+  border: 1px solid var(--border-light);
+  padding: 16px 20px;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--text-medium);
+}
+
+.serviceTabBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.activeServiceTabBtn {
+  border-color: var(--tab-accent);
+  color: var(--tab-accent);
+  background-color: var(--tab-accent-bg);
+  box-shadow: var(--shadow-md);
+}
+
+.tabIcon {
+  font-size: 22px;
+}
+
+/* Content Layout Grid */
+.layoutGrid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 40px;
+  margin-top: 40px;
+  margin-bottom: 80px;
+}
+
+/* Garments Section */
+.garmentsPanel {
+  background: white;
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+}
+
+.categoryNav {
+  display: flex;
+  gap: 12px;
+  border-bottom: 2px solid var(--bg-light);
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.categoryBtn {
+  background: transparent;
+  border: none;
+  padding: 8px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-medium);
+  cursor: pointer;
+  border-radius: 20px;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.categoryBtn:hover {
+  background-color: var(--bg-light);
+  color: var(--text-dark);
+}
+
+.activeCategoryBtn {
+  background-color: var(--primary-blue);
+  color: white !important;
+}
+
+/* Garment item list */
+.itemList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-light);
+  background-color: var(--bg-white);
+  transition: border-color 0.2s ease;
+}
+
+.itemRow:hover {
+  border-color: var(--border-dashed);
+}
+
+.itemName {
+  font-weight: 700;
+  color: var(--text-dark);
+  font-size: 16px;
+}
+
+.itemRate {
+  font-size: 13px;
+  color: var(--text-light);
+  font-weight: 600;
+  display: block;
+  margin-top: 2px;
+}
+
+/* Add / Quantity selector styling */
+.quantityControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.addBtn {
+  border: 2px solid var(--primary-blue);
+  background-color: transparent;
+  color: var(--primary-blue);
+  padding: 6px 18px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.addBtn:hover {
+  background-color: var(--primary-blue);
+  color: white;
+}
+
+.qtyBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border-light);
+  background-color: var(--bg-light);
+  color: var(--text-dark);
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.qtyBtn:hover {
+  background-color: var(--border-light);
+}
+
+.qtyVal {
+  font-weight: 700;
+  font-size: 15px;
+  width: 24px;
+  text-align: center;
+}
+
+/* Cart summary sidebar */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: fit-content;
+  position: sticky;
+  top: 100px;
+}
+
+.summaryBox {
+  background: white;
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+}
+
+.summaryTitle {
+  font-size: 18px;
+  font-weight: 700;
+  border-bottom: 2px solid var(--bg-light);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.summaryItemsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 250px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  padding-right: 4px;
+}
+
+.summaryItemRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.summaryItemName {
+  font-weight: 500;
+  color: var(--text-medium);
+}
+
+.summaryItemPrice {
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.emptyState {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--text-light);
+  font-size: 14px;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  border-top: 2px solid var(--bg-light);
+  padding-top: 16px;
+  margin-bottom: 20px;
+}
+
+.totalLabel {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text-dark);
+}
+
+.totalVal {
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--primary-blue);
+}
+
+.checkoutBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Responsiveness overrides */
+@media (max-width: 991px) {
+  .layoutGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .serviceSelector {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 576px) {
+  .serviceSelector {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .title {
+    font-size: 28px;
+  }
+}

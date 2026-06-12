@@ -1,0 +1,226 @@
+/* Clean design system for WashNLaundry */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300&family=Comfortaa:wght@700&display=swap');
+
+:root {
+  /* Brand Theme Colors */
+  --primary-blue: #0074bc;
+  --primary-blue-rgb: 0, 116, 188;
+  --primary-blue-light: #ebf7ff;
+  --secondary-yellow: #ffcc04;
+  --secondary-yellow-rgb: 255, 204, 4;
+  --secondary-yellow-dark: #e0b404;
+
+  /* Service Category Colors */
+  --color-wash-fold: #0074bc;
+  --color-wash-fold-rgb: 0, 116, 188;
+  --color-wash-iron: #c63e96;
+  --color-wash-iron-rgb: 198, 62, 150;
+  --color-steam-iron: #6850a1;
+  --color-steam-iron-rgb: 104, 80, 161;
+  --color-dry-clean: #009599;
+  --color-dry-clean-rgb: 0, 149, 153;
+  --color-express-sprint: #e76400;
+  --color-express-sprint-rgb: 231, 100, 0;
+
+  /* Neutrals */
+  --bg-light: #f8fafc;
+  --bg-white: #ffffff;
+  --text-dark: #0f172a;
+  --text-medium: #475569;
+  --text-light: #94a3b8;
+  --border-light: #e2e8f0;
+  --border-dashed: #cbd5e1;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-premium: 0 20px 25px -5px rgba(0, 84, 233, 0.07), 0 10px 10px -5px rgba(0, 84, 233, 0.03);
+
+  /* Typography */
+  --font-sans: 'Outfit', sans-serif;
+  --font-serif: 'Merriweather', serif;
+  --font-logo: 'Comfortaa', cursive;
+
+  /* Layout */
+  --max-width: 1200px;
+  --border-radius-sm: 8px;
+  --border-radius-md: 16px;
+  --border-radius-lg: 24px;
+}
+
+/* Dark Mode Overrides (Optional / Sleek Minimalist) */
+[data-theme='dark'] {
+  --bg-light: #0f172a;
+  --bg-white: #1e293b;
+  --text-dark: #f8fafc;
+  --text-medium: #cbd5e1;
+  --text-light: #64748b;
+  --border-light: #334155;
+  --border-dashed: #475569;
+  --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* Basic Reset & Core styles */
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--text-medium);
+  background-color: var(--bg-light);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans);
+  color: var(--text-dark);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.heading-serif {
+  font-family: var(--font-serif);
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Utility Layouts */
+.container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.section-padding {
+  padding: 80px 0;
+}
+
+@media (max-width: 768px) {
+  .section-padding {
+    padding: 60px 0;
+  }
+}
+
+/* Glassmorphism Styles */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: var(--shadow-premium);
+}
+
+[data-theme='dark'] .glass-panel {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Premium Buttons styling */
+.btn-primary {
+  background-color: var(--primary-blue);
+  color: #ffffff;
+  padding: 12px 28px;
+  border-radius: 30px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px 0 rgba(0, 116, 188, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-primary:hover {
+  background-color: #00609d;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 rgba(0, 116, 188, 0.6);
+}
+
+.btn-secondary {
+  background-color: var(--secondary-yellow);
+  color: #0f172a;
+  padding: 12px 28px;
+  border-radius: 30px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px 0 rgba(255, 204, 4, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-secondary:hover {
+  background-color: var(--secondary-yellow-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 rgba(255, 204, 4, 0.5);
+}
+
+.btn-outline {
+  background-color: transparent;
+  color: var(--primary-blue);
+  padding: 11px 26px;
+  border-radius: 30px;
+  border: 2px solid var(--primary-blue);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-outline:hover {
+  background-color: var(--primary-blue-light);
+  transform: translateY(-2px);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-light);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-medium);
+}
+
