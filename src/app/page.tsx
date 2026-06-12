@@ -17,6 +17,22 @@ export default function Home() {
   const [checkStatus, setCheckStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
+  // Enquiry form states
+  const [enquiryName, setEnquiryName] = useState('');
+  const [enquiryEmail, setEnquiryEmail] = useState('');
+  const [enquiryPhone, setEnquiryPhone] = useState('');
+  const [enquiryService, setEnquiryService] = useState('');
+  const [enquirySubmitted, setEnquirySubmitted] = useState(false);
+
+  const handleEnquirySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!enquiryName || !enquiryPhone) {
+      alert('Please enter your name and phone number.');
+      return;
+    }
+    setEnquirySubmitted(true);
+  };
+
   const toggleFaq = (index: number) => {
     setOpenFaqIndex(openFaqIndex === index ? null : index);
   };
@@ -169,74 +185,89 @@ export default function Home() {
       <section className={styles.hero}>
         <div className={`container ${styles.heroContent}`}>
           <div className={styles.heroLeft}>
-            <div className={styles.badge}>
-              <span>⚡</span> 24-Hour Doorstep Delivery
-            </div>
             <h1 className={styles.heroTitle}>
-              Your Laundry, <br />
-              <span className={styles.heroTitleHighlight}>on Autopilot</span>
+              Professional <br />
+              <span className={styles.heroTitleHighlight}>LAUNDRY & DRY</span> <br />
+              Cleaning Services
             </h1>
             <p className={styles.heroDesc}>
-              No more washing, drying, or ironing. Experience India&apos;s premium eco-friendly digital laundry service. Doorstep pickup, sustainable processing, and express delivery.
+              Reliable, hygienic, and consistent laundry solutions
             </p>
 
-            {/* Serviceability Checker */}
-            <div className={styles.checkerBox}>
-              <h3 className={styles.checkerTitle}>Check Serviceability in Your Area</h3>
-              <form onSubmit={handlePincodeSubmit} className={styles.checkerForm}>
-                <input
-                  type="text"
-                  maxLength={6}
-                  placeholder="Enter 6-digit Pincode (e.g. 800025)"
-                  className={styles.checkerInput}
-                  value={pincode}
-                  onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
-                />
-                <button type="submit" className={styles.checkerBtn} disabled={checking}>
-                  {checking ? 'Checking...' : 'Check Pincode'}
-                </button>
-              </form>
-
-              {checkStatus === 'success' && (
-                <div className={`${styles.checkerResult} ${styles.checkerSuccess}`}>
-                  🎉 We serve your location! You can schedule a pickup now.
-                </div>
-              )}
-              {checkStatus === 'error' && (
-                <div className={`${styles.checkerResult} ${styles.checkerError}`}>
-                  📍 Service not available or invalid pincode. (Try active mock codes: 800025, 801503, 800001)
-                </div>
-              )}
+            <div className={styles.heroButtons}>
+              <a href="tel:08407000048" className={styles.btnCall}>
+                <span className={styles.btnIcon}>📞</span> Call Us!
+              </a>
+              <a 
+                href="https://wa.me/9108407000048" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className={styles.btnWhatsapp}
+              >
+                <span className={styles.btnIcon}>💬</span> WhatsApp Us
+              </a>
             </div>
           </div>
 
-          {/* Hero Illustration / Statistics */}
           <div className={styles.heroRight}>
-            <div className={styles.heroIllustration}>
-              <div className={styles.statGrid}>
-                <div className={styles.statCard}>
-                  <span className={styles.statVal}>24h</span>
-                  <span className={styles.statLbl}>Standard Delivery</span>
+            <div className={styles.enquiryCard}>
+              <h3 className={styles.enquiryTitle}>Get in Touch</h3>
+              {enquirySubmitted ? (
+                <div className={styles.enquirySuccess}>
+                  <h4>🎉 Thank You!</h4>
+                  <p>Your callback request has been received. We will contact you shortly.</p>
                 </div>
-                <div className={styles.statCard}>
-                  <span className={styles.statVal}>100%</span>
-                  <span className={styles.statLbl}>EV Fleet Deliveries</span>
-                </div>
-                <div className={styles.statCard}>
-                  <span className={styles.statVal}>30L+</span>
-                  <span className={styles.statLbl}>Gallons Water Saved</span>
-                </div>
-                <div className={styles.statCard}>
-                  <span className={styles.statVal}>4.8★</span>
-                  <span className={styles.statLbl}>User App Rating</span>
-                </div>
-              </div>
+              ) : (
+                <form onSubmit={handleEnquirySubmit} className={styles.enquiryForm}>
+                  <input
+                    type="text"
+                    placeholder="Full Name"
+                    className={styles.formInput}
+                    value={enquiryName}
+                    onChange={(e) => setEnquiryName(e.target.value)}
+                    required
+                  />
+                  <input
+                    type="email"
+                    placeholder="Email address"
+                    className={styles.formInput}
+                    value={enquiryEmail}
+                    onChange={(e) => setEnquiryEmail(e.target.value)}
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Phone"
+                    className={styles.formInput}
+                    value={enquiryPhone}
+                    onChange={(e) => setEnquiryPhone(e.target.value)}
+                    required
+                  />
+                  <select
+                    className={styles.formSelect}
+                    value={enquiryService}
+                    onChange={(e) => setEnquiryService(e.target.value)}
+                    required
+                  >
+                    <option value="" disabled>Choose Service</option>
+                    <option value="wash-fold">Wash & Fold</option>
+                    <option value="wash-iron">Wash & Iron</option>
+                    <option value="steam-iron">Steam Ironing</option>
+                    <option value="dry-clean">Dry Cleaning</option>
+                  </select>
+                  <button type="submit" className={styles.formSubmitBtn}>
+                    Submit
+                  </button>
+                </form>
+              )}
+            </div>
 
-              <div className={styles.sprintPromo}>
-                <span className={styles.sprintBadge}>Sprint</span>
-                <span className={styles.sprintText}>
-                  Need it urgently? 4-Hour Express Sprint available at checkout!
-                </span>
+            {/* Bottom Indicators */}
+            <div className={styles.indicators}>
+              <div className={styles.indicatorPill}>
+                <span>📞</span> 08407000048
+              </div>
+              <div className={styles.indicatorPill}>
+                <span>🕒</span> 9am - 8pm
               </div>
             </div>
           </div>

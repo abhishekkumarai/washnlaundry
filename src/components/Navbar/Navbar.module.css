@@ -44,7 +44,7 @@
 }
 
 .logoSpan {
-  color: var(--secondary-yellow-dark);
+  color: #38bdf8;
 }
 
 .navMenu {
@@ -58,27 +58,17 @@
   font-weight: 600;
   color: var(--text-medium);
   font-size: 15px;
-  padding: 8px 4px;
-  position: relative;
+  padding: 8px 16px;
+  border-radius: 20px;
+  transition: all 0.2s ease;
 }
 
 .navLink:hover, .navLinkActive {
   color: var(--primary-blue);
 }
 
-.navLink::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 0;
-  height: 2px;
-  background-color: var(--primary-blue);
-  transition: width 0.3s ease;
-}
-
-.navLink:hover::after, .navLinkActive::after {
-  width: 100%;
+.navLinkActive {
+  background-color: var(--primary-blue-light);
 }
 
 .navActions {

@@ -4,12 +4,12 @@
 
 :root {
   /* Brand Theme Colors */
-  --primary-blue: #0074bc;
-  --primary-blue-rgb: 0, 116, 188;
-  --primary-blue-light: #ebf7ff;
-  --secondary-yellow: #ffcc04;
-  --secondary-yellow-rgb: 255, 204, 4;
-  --secondary-yellow-dark: #e0b404;
+  --primary-blue: #00aeef;
+  --primary-blue-rgb: 0, 174, 239;
+  --primary-blue-light: #e6f7fe;
+  --secondary-yellow: #ffffff;
+  --secondary-yellow-rgb: 255, 255, 255;
+  --secondary-yellow-dark: #00aeef;
 
   /* Service Category Colors */
   --color-wash-fold: #0074bc;
@@ -167,13 +167,13 @@ button, input, select, textarea {
 
 .btn-secondary {
   background-color: var(--secondary-yellow);
-  color: #0f172a;
+  color: var(--primary-blue);
   padding: 12px 28px;
   border-radius: 30px;
-  border: none;
+  border: 1px solid var(--primary-blue);
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 14px 0 rgba(255, 204, 4, 0.3);
+  box-shadow: 0 4px 14px 0 rgba(0, 174, 239, 0.15);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: inline-flex;
   align-items: center;
@@ -182,8 +182,9 @@ button, input, select, textarea {
 
 .btn-secondary:hover {
   background-color: var(--secondary-yellow-dark);
+  color: white;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px 0 rgba(255, 204, 4, 0.5);
+  box-shadow: 0 6px 20px 0 rgba(0, 174, 239, 0.3);
 }
 
 .btn-outline {
