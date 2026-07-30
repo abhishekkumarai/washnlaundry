@@ -41,6 +41,9 @@ class AppProvider extends ChangeNotifier {
   Map<String, dynamic> _stats = {};
   Map<String, dynamic> get stats => _stats;
 
+  Map<String, dynamic>? _shop;
+  Map<String, dynamic>? get shop => _shop;
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
@@ -67,6 +70,7 @@ class AppProvider extends ChangeNotifier {
     List<StaffModel>? staff,
     List<ExpenseModel>? expenses,
     Map<String, dynamic>? stats,
+    Map<String, dynamic>? shop,
   }) {
     if (orders != null) _orders = orders;
     if (garments != null) _garments = garments;
@@ -74,6 +78,17 @@ class AppProvider extends ChangeNotifier {
     if (staff != null) _staff = staff;
     if (expenses != null) _expenses = expenses;
     if (stats != null) _stats = stats;
+    if (shop != null) _shop = shop;
+    notifyListeners();
+  }
+
+  /// User's manual sidebar preference. Ignored (forced collapsed) below the
+  /// layout breakpoint — see [SidebarNavigation].
+  bool _sidebarCollapsed = false;
+  bool get sidebarCollapsed => _sidebarCollapsed;
+
+  void toggleSidebar() {
+    _sidebarCollapsed = !_sidebarCollapsed;
     notifyListeners();
   }
 
@@ -170,6 +185,7 @@ class AppProvider extends ChangeNotifier {
         ApiService.fetchTimeSlots(kind: TimeSlotModel.pickup),
         ApiService.fetchTimeSlots(kind: TimeSlotModel.delivery),
         ApiService.fetchDashboardStats(),
+        ApiService.fetchShop(),
       ]);
 
       _orders = results[0] as List<OrderModel>;
@@ -183,6 +199,7 @@ class AppProvider extends ChangeNotifier {
       _pickupSlots = results[8] as List<TimeSlotModel>;
       _deliverySlots = results[9] as List<TimeSlotModel>;
       _stats = results[10] as Map<String, dynamic>;
+      _shop = results[11] as Map<String, dynamic>?;
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {
@@ -272,6 +289,45 @@ class AppProvider extends ChangeNotifier {
     try {
       await ApiService.saveGarmentItem(payload);
       await loadDataFromBackend();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateStaff(String id, Map<String, dynamic> payload) async {
+    try {
+      final updated = await ApiService.updateStaff(id, payload);
+      final index = _staff.indexWhere((s) => s.id == updated.id);
+      if (index >= 0) {
+        _staff[index] = updated;
+      } else {
+        _staff.insert(0, updated);
+      }
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Persists the shop profile behind the Settings screen.
+  Future<bool> saveShop(Map<String, dynamic> payload) async {
+    final id = _shop?['id']?.toString();
+    if (id == null) {
+      _error = 'No shop loaded yet.';
+      notifyListeners();
+      return false;
+    }
+    try {
+      _shop = await ApiService.updateShop(id, payload);
+      _error = null;
+      notifyListeners();
       return true;
     } on ApiException catch (e) {
       _error = e.message;

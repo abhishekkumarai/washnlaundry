@@ -199,7 +199,57 @@ def dashboard_stats(request):
 
     attendance_today = Attendance.objects.filter(date=today)
 
+    # ── Store Health ──────────────────────────────────────────────────────────
+    # Each metric is a percentage or None when there's nothing to measure yet;
+    # the score is the mean of whichever metrics are available. Returning None
+    # rather than 0 matters — the live UI renders an em dash for "no data",
+    # which is very different from "0%".
+    window_start = today - timedelta(days=30)
+    recent = orders.filter(created_at__date__gte=window_start)
+
+    delivered = recent.filter(status=OrderStatus.DELIVERED, scheduled_date__isnull=False)
+    delivered_total = delivered.count()
+    on_time_delivery = None
+    if delivered_total:
+        on_time = sum(
+            1 for o in delivered
+            if o.delivered_at and o.delivered_at.date() <= o.scheduled_date
+        )
+        on_time_delivery = round((on_time / delivered_total) * 100, 1)
+
+    scheduled_active = active.filter(scheduled_date__isnull=False)
+    scheduled_active_total = scheduled_active.count()
+    on_schedule = scheduled_active.filter(scheduled_date__gte=today).count()
+    order_flow = (
+        round((on_schedule / scheduled_active_total) * 100, 1)
+        if scheduled_active_total else None
+    )
+
+    collection_rate = round((collected_month / sales_month) * 100, 1) if sales_month else 0.0
+
+    # Pickups aren't tracked as a separate milestone yet.
+    on_time_pickup = None
+
+    measured = [m for m in (on_time_delivery, order_flow, collection_rate) if m is not None]
+    health_score = round(sum(measured) / len(measured)) if measured else 0
+
+    if health_score >= 80:
+        health_verdict = 'Healthy'
+    elif health_score >= 60:
+        health_verdict = 'Fair'
+    else:
+        health_verdict = 'Needs attention'
+
     return Response({
+        'store_health': {
+            'score': health_score,
+            'verdict': health_verdict,
+            'on_time_delivery': on_time_delivery,
+            'on_time_pickup': on_time_pickup,
+            'order_flow': order_flow,
+            'collection_rate': collection_rate,
+            'active_on_schedule': on_schedule,
+        },
         'orders_today': orders_today.count(),
         'orders_today_change': pct_change(orders_today.count(), orders_yesterday.count()),
         'revenue_today': revenue_today,

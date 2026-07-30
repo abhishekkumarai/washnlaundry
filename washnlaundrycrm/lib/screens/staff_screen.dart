@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_provider.dart';
 import '../widgets/sidebar_navigation.dart';
 
 class StaffScreen extends StatefulWidget {
@@ -13,68 +15,24 @@ class _StaffScreenState extends State<StaffScreen> {
   String _searchQuery = '';
   bool _showInactive = false;
 
-  final List<Map<String, dynamic>> _staffMembers = [
-    {
-      'id': 1,
-      'name': 'Ramesh Kumar',
-      'role': 'Head Washer',
-      'phone': '+91 97112 23344',
-      'wage': 650.0,
-      'status': 'ACTIVE',
-      'isDriver': false,
-      'hasAppLogin': true,
-    },
-    {
-      'id': 2,
-      'name': 'Sunil Paswan',
-      'role': 'Steam Press Master',
-      'phone': '+91 98114 45566',
-      'wage': 600.0,
-      'status': 'ACTIVE',
-      'isDriver': false,
-      'hasAppLogin': false,
-    },
-    {
-      'id': 3,
-      'name': 'Geeta Devi',
-      'role': 'Dry Cleaning Specialist',
-      'phone': '+91 99223 34455',
-      'wage': 700.0,
-      'status': 'ACTIVE',
-      'isDriver': false,
-      'hasAppLogin': false,
-    },
-    {
-      'id': 4,
-      'name': 'Mohan Das',
-      'role': 'Delivery Driver',
-      'phone': '+91 99334 41122',
-      'wage': 580.0,
-      'status': 'ACTIVE',
-      'isDriver': true,
-      'hasAppLogin': true,
-    },
-    {
-      'id': 5,
-      'name': 'Lakshman Rao',
-      'role': 'Manager',
-      'phone': '+91 99445 56677',
-      'wage': 900.0,
-      'status': 'ACTIVE',
-      'isDriver': false,
-      'hasAppLogin': true,
-    },
-    {
-      'id': 6,
-      'name': 'Anita Sharma',
-      'role': 'Ironing Specialist',
-      'phone': '+91 99556 67788',
-      'wage': 620.0,
-      'status': 'ACTIVE',
-      'isDriver': false,
-      'hasAppLogin': false,
-    },
-  ];
+  /// Roster view-models rebuilt from the provider on each build, so adds and
+  /// edits reflect what the backend actually stored.
+  List<Map<String, dynamic>> _staffMembers = const [];
+
+  void _syncFromProvider(AppProvider provider) {
+    _staffMembers = provider.staff
+        .map((s) => <String, dynamic>{
+              'id': s.id,
+              'name': s.name,
+              'role': s.role,
+              'phone': s.phone,
+              'wage': s.dailyWage,
+              'status': s.status,
+              'isDriver': s.isDeliveryAgent,
+              'hasAppLogin': s.hasAppLogin,
+            })
+        .toList();
+  }
 
   List<Map<String, dynamic>> get _filteredStaff {
     return _staffMembers.where((s) {
@@ -87,12 +45,17 @@ class _StaffScreenState extends State<StaffScreen> {
     }).toList();
   }
 
-  void _showAddStaffModal(BuildContext context) {
-    final nameCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final roleCtrl = TextEditingController(text: 'Washer');
-    final wageCtrl = TextEditingController(text: '600');
-    bool isDeliveryAgent = false;
+  /// Add/edit dialog. Pass [existing] (a roster view-model) to edit that
+  /// member; omit it to create a new one.
+  void _showStaffModal(BuildContext context, {Map<String, dynamic>? existing}) {
+    final isEdit = existing != null;
+    final nameCtrl = TextEditingController(text: existing?['name'] as String? ?? '');
+    final phoneCtrl = TextEditingController(text: existing?['phone'] as String? ?? '');
+    final roleCtrl = TextEditingController(text: existing?['role'] as String? ?? 'Washer');
+    final wageCtrl = TextEditingController(
+      text: ((existing?['wage'] as num?) ?? 600).toStringAsFixed(0),
+    );
+    bool isDeliveryAgent = (existing?['isDriver'] as bool?) ?? false;
 
     showDialog(
       context: context,
@@ -101,7 +64,7 @@ class _StaffScreenState extends State<StaffScreen> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Add Staff Member', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            Text(isEdit ? 'Edit Staff Member' : 'Add Staff Member', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
             IconButton(
               icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
               onPressed: () => Navigator.pop(ctx),
@@ -194,7 +157,12 @@ class _StaffScreenState extends State<StaffScreen> {
                         activeColor: const Color(0xFF1A4FD6),
                         onChanged: (v) => setModalState(() => isDeliveryAgent = v ?? false),
                       ),
-                      const Text('Mark as Delivery Agent / Driver', style: TextStyle(fontSize: 13, color: Color(0xFF334155))),
+                      const Expanded(
+                        child: Text(
+                          'Mark as Delivery Agent / Driver',
+                          style: TextStyle(fontSize: 13, color: Color(0xFF334155)),
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -208,34 +176,43 @@ class _StaffScreenState extends State<StaffScreen> {
             child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (nameCtrl.text.trim().isNotEmpty) {
-                setState(() {
-                  _staffMembers.add({
-                    'id': _staffMembers.length + 1,
-                    'name': nameCtrl.text.trim(),
-                    'role': roleCtrl.text.trim(),
-                    'phone': phoneCtrl.text.trim(),
-                    'wage': double.tryParse(wageCtrl.text) ?? 600.0,
-                    'status': 'ACTIVE',
-                    'isDriver': isDeliveryAgent,
-                    'hasAppLogin': false,
-                  });
-                });
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Added staff member "${nameCtrl.text.trim()}"'),
-                    backgroundColor: const Color(0xFF10B981),
-                  ),
-                );
-              }
+            onPressed: () async {
+              final name = nameCtrl.text.trim();
+              if (name.isEmpty) return;
+
+              final messenger = ScaffoldMessenger.of(context);
+              final provider = context.read<AppProvider>();
+              final payload = {
+                'name': name,
+                'role': roleCtrl.text.trim().isEmpty ? 'Washer' : roleCtrl.text.trim(),
+                'phone': phoneCtrl.text.trim(),
+                'daily_wage': double.tryParse(wageCtrl.text) ?? 600.0,
+                'is_delivery_agent': isDeliveryAgent,
+              };
+              final ok = isEdit
+                  ? await provider.updateStaff(existing['id'] as String, payload)
+                  : await provider.addStaff({
+                      ...payload,
+                      'status': 'ACTIVE',
+                      'has_app_login': false,
+                    });
+              if (!ctx.mounted) return;
+              Navigator.pop(ctx);
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(ok
+                      ? (isEdit ? 'Updated "$name"' : 'Added staff member "$name"')
+                      : 'Could not save "$name": ${provider.error ?? 'unknown error'}'),
+                  backgroundColor:
+                      ok ? const Color(0xFF10B981) : const Color(0xFFDC2626),
+                ),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1A4FD6),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Add Staff', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: Text(isEdit ? 'Save Changes' : 'Add Staff', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -244,6 +221,8 @@ class _StaffScreenState extends State<StaffScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _syncFromProvider(context.watch<AppProvider>());
+
     final activeCount = _staffMembers.where((s) => s['status'] == 'ACTIVE').length;
     final inactiveCount = _staffMembers.length - activeCount;
     final appLoginsCount = _staffMembers.where((s) => s['hasAppLogin'] == true).length;
@@ -309,7 +288,7 @@ class _StaffScreenState extends State<StaffScreen> {
                       const SizedBox(width: 14),
 
                       ElevatedButton.icon(
-                        onPressed: () => _showAddStaffModal(context),
+                        onPressed: () => _showStaffModal(context),
                         icon: const Icon(Icons.add, size: 16, color: Colors.white),
                         label: const Text('+ Add Staff', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
                         style: ElevatedButton.styleFrom(
@@ -414,7 +393,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                     const Text('Add your first staff member to get started.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                                     const SizedBox(height: 16),
                                     ElevatedButton(
-                                      onPressed: () => _showAddStaffModal(context),
+                                      onPressed: () => _showStaffModal(context),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: const Color(0xFF1A4FD6),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -536,7 +515,8 @@ class _StaffScreenState extends State<StaffScreen> {
 
                                               IconButton(
                                                 icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
-                                                onPressed: () {},
+                                                tooltip: 'Edit',
+                                                onPressed: () => _showStaffModal(context, existing: s),
                                               ),
                                             ],
                                           ),

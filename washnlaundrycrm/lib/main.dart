@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -14,6 +15,19 @@ import 'screens/expenses_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/scan_screen.dart';
 import 'screens/settings_screen.dart';
+
+/// Flutter web excludes the mouse from [dragDevices], so any list that needs
+/// dragging — the nav rail on a short window, the horizontal activity table —
+/// is unusable with a mouse. Adding mouse and trackpad fixes that everywhere.
+class AppScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
+}
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +49,7 @@ class WashNLaundryCrmApp extends StatelessWidget {
     return MaterialApp(
       title: 'WashNLaundry CRM - Professional Laundry & Dry Cleaning',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: AppScrollBehavior(),
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(

@@ -326,6 +326,12 @@ class Staff(models.Model):
     phone = models.CharField(max_length=20)
     daily_wage = models.FloatField(default=500.0)
     status = models.CharField(max_length=20, default='ACTIVE')
+    # Drives the "Delivery agents" KPI and decides who can be assigned to an
+    # order; the Agent app is a separate portal from the Staff app.
+    is_delivery_agent = models.BooleanField(default=False)
+    # Whether this person has credentials for the Staff/Agent mobile app.
+    # Plans cap how many of these a shop gets.
+    has_app_login = models.BooleanField(default=False)
 
     class Meta:
         verbose_name_plural = 'Staff'

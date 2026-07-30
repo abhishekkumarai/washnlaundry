@@ -161,19 +161,23 @@ def seed():
     ]
 
     print('Seeding Staff...')
+    # (name, role, phone, daily wage, delivery agent, has app login)
     staff_data = [
-        ('Ramesh Kumar', 'Head Washer', '9711223344', 650.0),
-        ('Sunil Paswan', 'Steam Press', '9811445566', 600.0),
-        ('Geeta Devi', 'Dry Cleaning', '9922334455', 700.0),
-        ('Mohan Das', 'Delivery Driver', '9933441122', 580.0),
-        ('Lakshman Rao', 'Manager', '9944556677', 900.0),
-        ('Anita Sharma', 'Ironing Specialist', '9955667788', 620.0),
+        ('Ramesh Kumar', 'Head Washer', '9711223344', 650.0, False, True),
+        ('Sunil Paswan', 'Steam Press', '9811445566', 600.0, False, False),
+        ('Geeta Devi', 'Dry Cleaning', '9922334455', 700.0, False, False),
+        ('Mohan Das', 'Delivery Driver', '9933441122', 580.0, True, True),
+        ('Lakshman Rao', 'Manager', '9944556677', 900.0, False, True),
+        ('Anita Sharma', 'Ironing Specialist', '9955667788', 620.0, False, False),
     ]
     staff_objs = [
-        Staff.objects.create(name=name, role=role, phone=phone, daily_wage=wage)
-        for name, role, phone, wage in staff_data
+        Staff.objects.create(
+            name=name, role=role, phone=phone, daily_wage=wage,
+            is_delivery_agent=is_agent, has_app_login=app_login,
+        )
+        for name, role, phone, wage, is_agent, app_login in staff_data
     ]
-    drivers = [s for s in staff_objs if s.role == 'Delivery Driver']
+    drivers = [s for s in staff_objs if s.is_delivery_agent]
 
     print('Seeding Orders...')
     today = timezone.localdate()

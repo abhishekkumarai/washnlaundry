@@ -1,180 +1,142 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/app_provider.dart';
-import '../widgets/sidebar_navigation.dart';
-import '../widgets/top_header.dart';
-import '../widgets/quick_scan_card.dart';
+import '../widgets/dashboard_side_panels.dart';
 import '../widgets/kpi_cards_row.dart';
-import '../widgets/revenue_chart_card.dart';
-import '../widgets/order_pipeline_card.dart';
+import '../widgets/load_state.dart';
 import '../widgets/new_order_dialog.dart';
-import '../widgets/receipt_dialog.dart';
+import '../widgets/order_pipeline_card.dart';
+import '../widgets/quick_scan_card.dart';
+import '../widgets/recent_activity_card.dart';
+import '../widgets/revenue_analytics_card.dart';
+import '../widgets/revenue_chart_card.dart';
+import '../widgets/sidebar_navigation.dart';
+import '../widgets/store_health_card.dart';
+import '../widgets/top_header.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
+  /// Below this the two-column sections stack instead. Measured against the
+  /// content area (viewport minus the 240px rail and 24px padding), so a
+  /// ~1366px laptop still gets the two-column layout the live app uses.
+  static const double _wideBreakpoint = 990;
+
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<AppProvider>(context);
+    final provider = context.watch<AppProvider>();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Row(
         children: [
           const SidebarNavigation(),
-
           Expanded(
             child: Column(
               children: [
                 TopHeader(
-                  onNewOrderPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => const NewOrderDialog(),
-                    );
-                  },
-                ),
-
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const QuickScanCard(),
-                        const SizedBox(height: 20),
-                        const KpiCardsRow(),
-                        const SizedBox(height: 20),
-
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final isDesktop = constraints.maxWidth > 900;
-                            if (isDesktop) {
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: const [
-                                  Expanded(flex: 7, child: RevenueChartCard()),
-                                  SizedBox(width: 20),
-                                  Expanded(flex: 5, child: OrderPipelineCard()),
-                                ],
-                              );
-                            }
-                            return Column(
-                              children: const [
-                                RevenueChartCard(),
-                                SizedBox(height: 20),
-                                OrderPipelineCard(),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 24),
-
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'Recent Customer Orders',
-                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                                  ),
-                                  TextButton(
-                                    onPressed: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (_) => const NewOrderDialog(),
-                                      );
-                                    },
-                                    child: const Text('+ New Order', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-
-                              if (provider.filteredOrders.isEmpty)
-                                const Padding(
-                                  padding: EdgeInsets.all(20.0),
-                                  child: Center(child: Text('No orders found matching search criteria', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)))),
-                                )
-                              else
-                                ListView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: provider.filteredOrders.length,
-                                  itemBuilder: (context, index) {
-                                    final order = provider.filteredOrders[index];
-                                    return Container(
-                                      margin: const EdgeInsets.only(bottom: 8),
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF8FAFC),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFEEF2FF),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: Text('#${order.orderNumber}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(order.customerName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                                  Text(order.customerPhone, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                          Row(
-                                            children: [
-                                              Text('₹${order.totalAmount.toInt()}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                              const SizedBox(width: 12),
-                                              IconButton(
-                                                onPressed: () {
-                                                  showDialog(
-                                                    context: context,
-                                                    builder: (_) => ReceiptDialog(order: order),
-                                                  );
-                                                },
-                                                icon: const Icon(Icons.receipt_outlined, color: Color(0xFF1A4FD6), size: 20),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                  onNewOrderPressed: () => showDialog(
+                    context: context,
+                    builder: (_) => const NewOrderDialog(),
                   ),
                 ),
+                Expanded(child: _body(provider)),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _body(AppProvider provider) {
+    if (provider.isLoading && provider.stats.isEmpty) {
+      return const LoadingState();
+    }
+    if (provider.hasError && provider.orders.isEmpty) {
+      return ErrorState(message: provider.error!);
+    }
+
+    // LayoutBuilder wraps the scroll view rather than sitting inside it: nested
+    // in an unbounded-height context it collapses the scrollable extent and the
+    // dashboard stops scrolling entirely.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > _wideBreakpoint;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const QuickScanCard(),
+              const SizedBox(height: 20),
+              const KpiCardsRow(),
+              const SizedBox(height: 20),
+
+              // Revenue trend beside the live pipeline.
+              _twoColumn(
+                isWide: isWide,
+                leftFlex: 7,
+                rightFlex: 5,
+                left: const RevenueChartCard(),
+                right: const OrderPipelineCard(),
+              ),
+              const SizedBox(height: 20),
+
+              // Operational health beside the money view.
+              _twoColumn(
+                isWide: isWide,
+                leftFlex: 6,
+                rightFlex: 6,
+                left: const StoreHealthCard(),
+                right: const RevenueAnalyticsCard(),
+              ),
+              const SizedBox(height: 20),
+
+              // Activity table beside the action panels.
+              _twoColumn(
+                isWide: isWide,
+                leftFlex: 7,
+                rightFlex: 5,
+                left: const RecentActivityCard(),
+                right: const Column(
+                  children: [
+                    NeedsAttentionCard(),
+                    SizedBox(height: 20),
+                    OrderChannelsCard(),
+                    SizedBox(height: 20),
+                    StaffAttendanceCard(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _twoColumn({
+    required bool isWide,
+    required int leftFlex,
+    required int rightFlex,
+    required Widget left,
+    required Widget right,
+  }) {
+    if (!isWide) {
+      return Column(
+        children: [left, const SizedBox(height: 20), right],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: leftFlex, child: left),
+        const SizedBox(width: 20),
+        Expanded(flex: rightFlex, child: right),
+      ],
     );
   }
 }

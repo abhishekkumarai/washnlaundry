@@ -452,9 +452,98 @@ class DashboardStatsTests(APITestCase):
         self.assertEqual(self.stats['staff_attendance']['present'], 1)
         self.assertEqual(self.stats['staff_attendance']['total_staff'], 1)
 
+    def test_store_health_reports_a_score_and_verdict(self):
+        health = self.stats['store_health']
+        self.assertIsInstance(health['score'], int)
+        self.assertIn(health['verdict'], ['Healthy', 'Fair', 'Needs attention'])
+
+    def test_collection_rate_matches_analytics(self):
+        self.assertEqual(
+            self.stats['store_health']['collection_rate'],
+            self.stats['revenue_analytics']['collection_progress'],
+        )
+
+    def test_unmeasurable_metrics_are_null_not_zero(self):
+        # No delivered orders in this fixture, and pickups aren't tracked, so
+        # these must read as "no data" rather than "0%".
+        health = self.stats['store_health']
+        self.assertIsNone(health['on_time_delivery'])
+        self.assertIsNone(health['on_time_pickup'])
+
+    def test_order_flow_counts_active_orders_on_schedule(self):
+        # One scheduled active order, and it is overdue.
+        self.assertEqual(self.stats['store_health']['order_flow'], 0.0)
+        self.assertEqual(self.stats['store_health']['active_on_schedule'], 0)
+
     def test_legacy_keys_still_present(self):
         for key in ('total_orders', 'total_revenue', 'total_dues', 'total_expenses'):
             self.assertIn(key, self.stats)
+
+
+class ShopApiTests(APITestCase):
+    def setUp(self):
+        self.shop = Shop.objects.create(name='washing', city='Bengaluru')
+
+    def test_patch_updates_the_profile(self):
+        response = self.client.patch(
+            f'/api/shops/{self.shop.id}/',
+            {'name': 'Washing Express', 'city': 'Mysuru', 'pin_code': '570001'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.shop.refresh_from_db()
+        self.assertEqual(self.shop.name, 'Washing Express')
+        self.assertEqual(self.shop.city, 'Mysuru')
+        self.assertEqual(self.shop.pin_code, '570001')
+
+    def test_patch_leaves_untouched_fields_alone(self):
+        self.client.patch(
+            f'/api/shops/{self.shop.id}/', {'city': 'Mysuru'}, format='json'
+        )
+        self.shop.refresh_from_db()
+        self.assertEqual(self.shop.name, 'washing')
+
+    def test_shop_exposes_the_settings_fields(self):
+        data = self.client.get('/api/shops/').data[0]
+        for field in ('name', 'phone', 'whatsapp', 'email', 'address', 'city',
+                      'state', 'pin_code', 'gstin', 'pan', 'tax_rate', 'upi_id'):
+            self.assertIn(field, data)
+
+
+class StaffApiTests(APITestCase):
+    def setUp(self):
+        Staff.objects.create(
+            name='Mohan Das', role='Delivery Driver', phone='9933441122',
+            daily_wage=580, is_delivery_agent=True, has_app_login=True,
+        )
+        Staff.objects.create(name='Sunil Paswan', role='Steam Press', phone='9811445566')
+
+    def test_list_exposes_the_roster_flags(self):
+        response = self.client.get('/api/staff/')
+        by_name = {s['name']: s for s in response.data}
+        self.assertTrue(by_name['Mohan Das']['is_delivery_agent'])
+        self.assertTrue(by_name['Mohan Das']['has_app_login'])
+        self.assertFalse(by_name['Sunil Paswan']['is_delivery_agent'])
+
+    def test_create_staff_persists(self):
+        response = self.client.post('/api/staff/', {
+            'name': 'New Presser',
+            'role': 'Ironing',
+            'phone': '9000000009',
+            'daily_wage': 640,
+            'is_delivery_agent': False,
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertTrue(Staff.objects.filter(name='New Presser').exists())
+
+    def test_create_defaults_to_no_app_login(self):
+        response = self.client.post(
+            '/api/staff/',
+            {'name': 'Temp', 'role': 'Washer', 'phone': '9000000010'},
+            format='json',
+        )
+        self.assertFalse(response.data['has_app_login'])
+        self.assertEqual(response.data['status'], 'ACTIVE')
 
 
 class AttendanceTests(TestCase):

@@ -184,6 +184,8 @@ class StaffModel {
   final String phone;
   final double dailyWage;
   final String status;
+  final bool isDeliveryAgent;
+  final bool hasAppLogin;
 
   const StaffModel({
     required this.id,
@@ -192,7 +194,11 @@ class StaffModel {
     required this.phone,
     this.dailyWage = 0,
     this.status = 'ACTIVE',
+    this.isDeliveryAgent = false,
+    this.hasAppLogin = false,
   });
+
+  bool get isActive => status == 'ACTIVE';
 
   factory StaffModel.fromJson(Map<String, dynamic> json) => StaffModel(
         id: json['id'].toString(),
@@ -201,6 +207,8 @@ class StaffModel {
         phone: json['phone'] ?? '',
         dailyWage: (json['daily_wage'] ?? 0).toDouble(),
         status: json['status'] ?? 'ACTIVE',
+        isDeliveryAgent: json['is_delivery_agent'] ?? false,
+        hasAppLogin: json['has_app_login'] ?? false,
       );
 
   Map<String, dynamic> toJson() => {
@@ -209,6 +217,8 @@ class StaffModel {
         'phone': phone,
         'daily_wage': dailyWage,
         'status': status,
+        'is_delivery_agent': isDeliveryAgent,
+        'has_app_login': hasAppLogin,
       };
 }
 

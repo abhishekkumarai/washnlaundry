@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_provider.dart';
 import '../widgets/sidebar_navigation.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -11,17 +13,82 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   int _selectedTab = 0;
 
-  final TextEditingController _shopNameController = TextEditingController(text: 'washing');
-  final TextEditingController _phoneController = TextEditingController(text: '+91 7277905904');
-  final TextEditingController _whatsappController = TextEditingController(text: '+91 7277905904');
-  final TextEditingController _emailController = TextEditingController(text: 'emailabhishek2@gmail.com');
-  final TextEditingController _addressController = TextEditingController(text: 'Hbr layout');
-  final TextEditingController _cityController = TextEditingController(text: 'Bengaluru');
-  final TextEditingController _stateController = TextEditingController(text: 'Karnataka');
-  final TextEditingController _pincodeController = TextEditingController(text: '560064');
+  // Populated from the shop record once it loads — no hardcoded defaults, so
+  // the form can never show one shop's details while saving to another.
+  final TextEditingController _shopNameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _whatsappController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _cityController = TextEditingController();
+  final TextEditingController _stateController = TextEditingController();
+  final TextEditingController _pincodeController = TextEditingController();
+
+  bool _saving = false;
+
+  /// Id of the shop currently loaded into the form, so we only overwrite the
+  /// fields when a different shop arrives — never while the user is typing.
+  String? _loadedShopId;
+
+  void _hydrate(Map<String, dynamic>? shop) {
+    if (shop == null) return;
+    final id = shop['id']?.toString();
+    if (id == _loadedShopId) return;
+    _loadedShopId = id;
+
+    _shopNameController.text = shop['name'] as String? ?? '';
+    _phoneController.text = shop['phone'] as String? ?? '';
+    _whatsappController.text = shop['whatsapp'] as String? ?? '';
+    _emailController.text = shop['email'] as String? ?? '';
+    _addressController.text = shop['address'] as String? ?? '';
+    _cityController.text = shop['city'] as String? ?? '';
+    _stateController.text = shop['state'] as String? ?? '';
+    _pincodeController.text = shop['pin_code'] as String? ?? '';
+  }
+
+  @override
+  void dispose() {
+    for (final c in [
+      _shopNameController, _phoneController, _whatsappController, _emailController,
+      _addressController, _cityController, _stateController, _pincodeController,
+    ]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final provider = context.read<AppProvider>();
+
+    setState(() => _saving = true);
+    final ok = await provider.saveShop({
+      'name': _shopNameController.text.trim(),
+      'whatsapp': _whatsappController.text.trim(),
+      'address': _addressController.text.trim(),
+      'city': _cityController.text.trim(),
+      'state': _stateController.text.trim(),
+      'pin_code': _pincodeController.text.trim(),
+    });
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? 'Settings saved'
+            : 'Could not save settings: ${provider.error ?? 'unknown error'}'),
+        backgroundColor: ok ? const Color(0xFF10B981) : const Color(0xFFDC2626),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final shop = context.watch<AppProvider>().shop;
+    _hydrate(shop);
+    final shopName = (shop?['name'] as String?) ?? '';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Row(
@@ -45,15 +112,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       CircleAvatar(
                         radius: 20,
                         backgroundColor: const Color(0xFFEEF2FF),
-                        child: const Text('W', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
+                        child: Text(
+                          shopName.isEmpty ? '?' : shopName[0].toUpperCase(),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
+                        ),
                       ),
                       const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text('washing', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                          Text('Admin', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                        ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              shopName.isEmpty ? 'Your shop' : shopName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            const Text('Admin', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -79,10 +155,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _buildTabItem(6, Icons.receipt_outlined, 'Payment history', hasArrow: true),
                       _buildTabItem(7, Icons.help_outline_rounded, 'Help & support', hasArrow: true),
                       const SizedBox(height: 20),
-                      ListTile(
+                      Material(
+                        color: Colors.transparent,
+                        child: ListTile(
                         leading: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
                         title: const Text('Sign Out', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFEF4444))),
-                        onTap: () {},
+                        onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Logged out of LaundryBill'),
+                            backgroundColor: Color(0xFF64748B),
+                            duration: Duration(seconds: 2),
+                          ),
+                        ),
+                        ),
                       ),
                     ],
                   ),
@@ -108,17 +193,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const Text('Settings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                       const Spacer(),
                       ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Settings saved successfully!'), backgroundColor: Color(0xFF10B981)),
-                          );
-                        },
+                        onPressed: _saving ? null : () => _save(context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1A4FD6),
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        child: const Text('Save changes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                        child: _saving
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Save changes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
                       ),
                     ],
                   ),
@@ -385,23 +472,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final isSel = _selectedTab == index;
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
-      decoration: BoxDecoration(
+      // The selected background lives on the Material rather than a plain
+      // DecoratedBox, otherwise it hides the ListTile's own ink splashes.
+      child: Material(
         color: isSel ? const Color(0xFFEEF2FF) : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
-      ),
-      child: ListTile(
-        dense: true,
-        leading: Icon(icon, size: 18, color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-            color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF334155),
+        child: ListTile(
+          dense: true,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          leading: Icon(icon, size: 18, color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
+          title: Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+              color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF334155),
+            ),
           ),
+          trailing: hasArrow ? const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF94A3B8)) : null,
+          onTap: () => setState(() => _selectedTab = index),
         ),
-        trailing: hasArrow ? const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF94A3B8)) : null,
-        onTap: () => setState(() => _selectedTab = index),
       ),
     );
   }

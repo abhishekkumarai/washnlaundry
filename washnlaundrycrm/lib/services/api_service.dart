@@ -185,6 +185,11 @@ class ApiService {
     return StaffModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
+  static Future<StaffModel> updateStaff(String id, Map<String, dynamic> payload) async {
+    final data = await _send('PATCH', '/staff/$id/', body: payload);
+    return StaffModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
   static Future<List<ExpenseModel>> fetchExpenses() async {
     final data = await _send('GET', '/expenses/');
     return _asList(data).map(ExpenseModel.fromJson).toList();
