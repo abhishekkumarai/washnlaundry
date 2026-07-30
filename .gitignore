@@ -1,0 +1,44 @@
+# ── Python / Django ───────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+backend/db.sqlite3
+
+# ── Flutter / Dart ────────────────────────────────────────────────────────────
+washnlaundrycrm/.dart_tool/
+washnlaundrycrm/build/
+washnlaundrycrm/.flutter-plugins
+washnlaundrycrm/.flutter-plugins-dependencies
+washnlaundrycrm/android/local.properties
+washnlaundrycrm/.idea/
+*.iml
+
+# ── Node ──────────────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Captured bundles from app.laundrybill.com ─────────────────────────────────
+# Third-party minified source, kept locally as reference only (see CLAUDE.md).
+# Not ours to redistribute, and re-downloadable, so it stays out of the repo.
+app_index.js
+app_ui.js
+index_fetched.html
+
+# ── Abandoned Next.js implementation (see CLAUDE.md) ──────────────────────────
+# Left on disk for now but not tracked; the project is Flutter + Django only.
+/app/
+/components/
+/lib/
+/prisma/
+next.config.js
+package.json
+package-lock.json
+postcss.config.js
+tailwind.config.js
+tsconfig.json
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log

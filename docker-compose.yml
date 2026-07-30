@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: laundry_django_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  frontend:
+    build:
+      context: ./washnlaundrycrm
+      dockerfile: Dockerfile
+    container_name: laundry_flutter_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
