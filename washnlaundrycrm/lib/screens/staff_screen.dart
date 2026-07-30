@@ -19,6 +19,10 @@ class _StaffScreenState extends State<StaffScreen> {
   /// edits reflect what the backend actually stored.
   List<Map<String, dynamic>> _staffMembers = const [];
 
+  /// Team-login seats the current plan grants. Falls back to the Pro+ figure
+  /// if the shop hasn't loaded yet.
+  int _loginLimit = 4;
+
   void _syncFromProvider(AppProvider provider) {
     _staffMembers = provider.staff
         .map((s) => <String, dynamic>{
@@ -32,6 +36,66 @@ class _StaffScreenState extends State<StaffScreen> {
               'hasAppLogin': s.hasAppLogin,
             })
         .toList();
+    _loginLimit = (provider.shop?['team_login_limit'] as num?)?.toInt() ?? 4;
+  }
+
+  Future<void> _patchStaff(
+    BuildContext context,
+    Map<String, dynamic> member,
+    Map<String, dynamic> changes,
+    String successMessage,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final provider = context.read<AppProvider>();
+    final ok = await provider.updateStaff(member['id'] as String, changes);
+    if (!context.mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? successMessage
+            : 'Could not update ${member['name']}: ${provider.error ?? 'unknown error'}'),
+        backgroundColor: ok ? const Color(0xFF10B981) : const Color(0xFFDC2626),
+      ),
+    );
+  }
+
+  /// Grant or revoke access to the Staff / Delivery Agent app, refusing to
+  /// exceed the plan's seat count.
+  Future<void> _toggleAppLogin(BuildContext context, Map<String, dynamic> member) async {
+    final granting = !(member['hasAppLogin'] as bool);
+    final used = _staffMembers.where((m) => m['hasAppLogin'] == true).length;
+
+    if (granting && used >= _loginLimit) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Your plan includes $_loginLimit team logins. '
+              'Revoke one or upgrade to add more.'),
+          backgroundColor: const Color(0xFFD97706),
+        ),
+      );
+      return;
+    }
+
+    await _patchStaff(
+      context,
+      member,
+      {'has_app_login': granting},
+      granting
+          ? 'App access granted to ${member['name']}'
+          : 'App access revoked for ${member['name']}',
+    );
+  }
+
+  Future<void> _toggleActive(BuildContext context, Map<String, dynamic> member) async {
+    final activating = member['status'] != 'ACTIVE';
+    await _patchStaff(
+      context,
+      member,
+      {'status': activating ? 'ACTIVE' : 'INACTIVE'},
+      activating
+          ? '${member['name']} reactivated'
+          : '${member['name']} marked inactive',
+    );
   }
 
   List<Map<String, dynamic>> get _filteredStaff {
@@ -56,6 +120,7 @@ class _StaffScreenState extends State<StaffScreen> {
       text: ((existing?['wage'] as num?) ?? 600).toStringAsFixed(0),
     );
     bool isDeliveryAgent = (existing?['isDriver'] as bool?) ?? false;
+    bool isActive = (existing?['status'] as String?) != 'INACTIVE';
 
     showDialog(
       context: context,
@@ -165,6 +230,22 @@ class _StaffScreenState extends State<StaffScreen> {
                       ),
                     ],
                   ),
+                  if (isEdit)
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: isActive,
+                          activeColor: const Color(0xFF10B981),
+                          onChanged: (v) => setModalState(() => isActive = v ?? true),
+                        ),
+                        const Expanded(
+                          child: Text(
+                            'Active — uncheck to remove from the roster',
+                            style: TextStyle(fontSize: 13, color: Color(0xFF334155)),
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               );
             },
@@ -188,6 +269,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 'phone': phoneCtrl.text.trim(),
                 'daily_wage': double.tryParse(wageCtrl.text) ?? 600.0,
                 'is_delivery_agent': isDeliveryAgent,
+                if (isEdit) 'status': isActive ? 'ACTIVE' : 'INACTIVE',
               };
               final ok = isEdit
                   ? await provider.updateStaff(existing['id'] as String, payload)
@@ -337,8 +419,8 @@ class _StaffScreenState extends State<StaffScreen> {
                             Expanded(
                               child: _buildKpiCard(
                                 icon: Icons.person_off_outlined,
-                                iconBg: const Color(0xFFECFDF5),
-                                iconColor: const Color(0xFF10B981),
+                                iconBg: const Color(0xFFF1F5F9),
+                                iconColor: const Color(0xFF64748B),
                                 val: '$inactiveCount',
                                 label: 'Inactive',
                               ),
@@ -350,7 +432,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                 iconBg: const Color(0xFFF3E8FF),
                                 iconColor: const Color(0xFFA855F7),
                                 val: '$appLoginsCount',
-                                label: 'App logins · of ${_staffMembers.length} on plan',
+                                label: 'App logins · of $_loginLimit on plan',
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -367,6 +449,9 @@ class _StaffScreenState extends State<StaffScreen> {
                         ),
                         const SizedBox(height: 24),
 
+                        if (_selectedTab == 1)
+                          _buildAppLoginsTab(context)
+                        else
                         // Staff Grid / List
                         _filteredStaff.isEmpty
                             ? Container(
@@ -535,6 +620,201 @@ class _StaffScreenState extends State<StaffScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// "App Logins" tab: who can sign into the Staff / Delivery Agent apps, and
+  /// how many of the plan's seats that uses. Previously this tab rendered the
+  /// roster verbatim, so it did nothing at all.
+  Widget _buildAppLoginsTab(BuildContext context) {
+    final withAccess = _staffMembers.where((m) => m['hasAppLogin'] == true).toList();
+    final used = withAccess.length;
+    final remaining = (_loginLimit - used).clamp(0, _loginLimit);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Seat usage
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Team logins',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                        Text('Who can sign in to the Staff and Delivery Agent apps',
+                            style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8))),
+                      ],
+                    ),
+                  ),
+                  Text('$used of $_loginLimit used',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: remaining == 0 ? const Color(0xFFD97706) : const Color(0xFF0F172A),
+                      )),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: LinearProgressIndicator(
+                  value: _loginLimit == 0 ? 0 : used / _loginLimit,
+                  minHeight: 7,
+                  backgroundColor: const Color(0xFFF1F5F9),
+                  valueColor: AlwaysStoppedAnimation(
+                    remaining == 0 ? const Color(0xFFD97706) : const Color(0xFF1A4FD6),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                remaining == 0
+                    ? 'All seats in use. Revoke one to grant access to someone else.'
+                    : '$remaining seat${remaining == 1 ? '' : 's'} remaining on your plan.',
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Per-member access
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                  border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                ),
+                child: const Row(
+                  children: [
+                    Expanded(flex: 3, child: Text('STAFF MEMBER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+                    Expanded(flex: 3, child: Text('APP', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+                    Expanded(flex: 2, child: Text('ACCESS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+                  ],
+                ),
+              ),
+              if (_filteredStaff.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Text('No staff members found',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+                )
+              else
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _filteredStaff.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, idx) {
+                    final member = _filteredStaff[idx];
+                    final hasAccess = member['hasAppLogin'] == true;
+                    final isAgent = member['isDriver'] == true;
+                    final name = member['name'] as String;
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: const Color(0xFFEEF2FF),
+                                  child: Text(
+                                    name.isEmpty ? '?' : name[0].toUpperCase(),
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(name,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                      Text(member['role'] as String,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8))),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isAgent ? Icons.local_shipping_outlined : Icons.point_of_sale_outlined,
+                                  size: 15,
+                                  color: const Color(0xFF64748B),
+                                ),
+                                const SizedBox(width: 7),
+                                Flexible(
+                                  child: Text(
+                                    isAgent ? 'Delivery Agent app' : 'Staff app',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Row(
+                              children: [
+                                Switch(
+                                  value: hasAccess,
+                                  activeThumbColor: const Color(0xFF1A4FD6),
+                                  onChanged: (_) => _toggleAppLogin(context, member),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  hasAccess ? 'Enabled' : 'No access',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: hasAccess ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

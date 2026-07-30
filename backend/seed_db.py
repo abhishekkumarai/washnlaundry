@@ -115,6 +115,8 @@ def seed():
         bank_name='HDFC Bank',
         ifsc_code='HDFC0001234',
         upi_id='washing@upi',
+        plan='Pro+',
+        team_login_limit=4,
     )
 
     print('Seeding Categories & Items...')

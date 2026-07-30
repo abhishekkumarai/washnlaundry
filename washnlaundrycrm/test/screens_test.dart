@@ -123,6 +123,123 @@ void main() {
       expect(find.text('Save Changes'), findsOneWidget);
     });
 
+    testWidgets('App Logins tab shows access, not a copy of the roster',
+        (tester) async {
+      // This tab used to render the roster verbatim — it did nothing.
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: roster, shop: {'id': 1, 'team_login_limit': 4});
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('App Logins'));
+      await tester.pump();
+
+      expect(find.text('Team logins'), findsOneWidget);
+      expect(find.text('2 of 4 used'), findsOneWidget);
+      expect(find.text('Staff app'), findsOneWidget);
+      expect(find.text('Delivery Agent app'), findsOneWidget);
+      expect(find.byType(Switch), findsNWidgets(2));
+    });
+
+    testWidgets('seat usage reflects the plan, not the headcount', (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: roster, shop: {'id': 1, 'team_login_limit': 15});
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('App Logins'));
+      await tester.pump();
+
+      expect(find.text('2 of 15 used'), findsOneWidget);
+      expect(find.text('13 seats remaining on your plan.'), findsOneWidget);
+    });
+
+    testWidgets('granting a seat beyond the plan limit is refused',
+        (tester) async {
+      // One free seat, two members without access: the second must be blocked.
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(
+          staff: [
+            ...roster,
+            const StaffModel(id: '3', name: 'Geeta Devi', role: 'Dry Cleaning', phone: '9922334455'),
+          ],
+          shop: {'id': 1, 'team_login_limit': 2},
+        );
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('App Logins'));
+      await tester.pump();
+
+      expect(find.text('2 of 2 used'), findsOneWidget);
+      expect(
+        find.text('All seats in use. Revoke one to grant access to someone else.'),
+        findsOneWidget,
+      );
+
+      // Toggling the member without access warns instead of calling the API.
+      await tester.tap(find.byType(Switch).last);
+      await tester.pump();
+
+      expect(
+        find.textContaining('Your plan includes 2 team logins'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the edit dialog offers an active toggle', (tester) async {
+      // Without this, "Show Inactive" could never match anything.
+      final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.edit_outlined).first);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Active — uncheck to remove from the roster'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the add dialog has no active toggle', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('+ Add Staff'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Active — uncheck to remove from the roster'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('inactive members are hidden until Show Inactive is ticked',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: [
+          ...roster,
+          const StaffModel(
+            id: '9',
+            name: 'Retired Person',
+            role: 'Washer',
+            phone: '9000000000',
+            status: 'INACTIVE',
+          ),
+        ]);
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      expect(find.text('Retired Person'), findsNothing);
+
+      await tester.tap(find.byType(Checkbox).first);
+      await tester.pump();
+
+      expect(find.text('Retired Person'), findsOneWidget);
+    });
+
     testWidgets('the add button opens an empty dialog', (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
       await tester.pumpWidget(host(provider, const StaffScreen()));
