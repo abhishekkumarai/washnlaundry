@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../models/order_model.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/new_order_dialog.dart';
+import '../widgets/status_pill.dart';
 import '../screens/order_detail_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -15,23 +17,57 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> {
   String _selectedTab = 'All';
-  String _timeFilter = 'All time';
+  OrderDateRange _timeFilter = OrderDateRange.allTime;
   String _searchQuery = '';
   OrderModel? _selectedOrderForDetails;
 
-  final List<Map<String, dynamic>> _tabs = [
-    {'label': 'All', 'color': Color(0xFF1A4FD6)},
-    {'label': 'Placed', 'color': Color(0xFF64748B)},
-    {'label': 'Processing', 'color': Color(0xFF1A4FD6)},
-    {'label': 'Ready', 'color': Color(0xFF10B981)},
-    {'label': 'Out for delivery', 'color': Color(0xFF0284C7)},
-    {'label': 'Partial', 'color': Color(0xFFF59E0B)},
-    {'label': 'Delivered', 'color': Color(0xFF10B981)},
-    {'label': 'Cancelled', 'color': Color(0xFFEF4444)},
-    {'label': 'Overdue Orders', 'color': Color(0xFFDC2626)},
-    {'label': 'Scheduled', 'color': Color(0xFF8B5CF6)},
-    {'label': 'Unpaid Dues', 'color': Color(0xFFEA580C)},
+  /// The live app's 11 chips. 'key' is what the provider filters on — every
+  /// chip must map to one, or it silently falls through and shows every order.
+  static const List<Map<String, String>> _tabs = [
+    {'label': 'All', 'key': 'ALL'},
+    {'label': 'Placed', 'key': OrderStatus.placed},
+    {'label': 'Processing', 'key': OrderStatus.processing},
+    {'label': 'Ready', 'key': OrderStatus.ready},
+    {'label': 'Out for delivery', 'key': OrderStatus.outForDelivery},
+    {'label': 'Partial', 'key': 'PARTIAL'},
+    {'label': 'Delivered', 'key': OrderStatus.delivered},
+    {'label': 'Cancelled', 'key': OrderStatus.cancelled},
+    {'label': 'Overdue Orders', 'key': 'OVERDUE'},
+    {'label': 'Scheduled', 'key': 'SCHEDULED'},
+    {'label': 'Unpaid Dues', 'key': 'UNPAID'},
   ];
+
+  static Color _tabColor(String key) {
+    switch (key) {
+      case 'ALL':
+        return const Color(0xFF1A4FD6);
+      case 'PARTIAL':
+        return const Color(0xFFD97706);
+      case 'OVERDUE':
+        return const Color(0xFFDC2626);
+      case 'SCHEDULED':
+        return const Color(0xFF8B5CF6);
+      case 'UNPAID':
+        return const Color(0xFFEA580C);
+      default:
+        return statusColor(key);
+    }
+  }
+
+  /// True when any of the three controls is narrowing the list — including the
+  /// date range, which decides whether "no orders" means "empty shop" or
+  /// "nothing matched".
+  bool get _hasActiveFilter =>
+      _selectedTab != 'All' ||
+      _searchQuery.isNotEmpty ||
+      _timeFilter != OrderDateRange.allTime;
+
+  String get _selectedKey {
+    for (final tab in _tabs) {
+      if (tab['label'] == _selectedTab) return tab['key']!;
+    }
+    return 'ALL';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,25 +80,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
     final provider = Provider.of<AppProvider>(context);
 
-    final filteredOrders = provider.orders.where((o) {
-      final matchesSearch = _searchQuery.isEmpty ||
-          o.orderNumber.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          o.customerName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          o.customerPhone.contains(_searchQuery);
-
-      bool matchesTab = true;
-      if (_selectedTab == 'Placed' || _selectedTab == 'Processing') {
-        matchesTab = o.status.toUpperCase() == 'PENDING' || o.status.toUpperCase() == 'WASHING' || o.status.toUpperCase() == 'PROCESSING';
-      } else if (_selectedTab == 'Ready') {
-        matchesTab = o.status.toUpperCase() == 'READY';
-      } else if (_selectedTab == 'Delivered') {
-        matchesTab = o.status.toUpperCase() == 'DELIVERED';
-      } else if (_selectedTab == 'Unpaid Dues') {
-        matchesTab = o.paymentStatus.toUpperCase() != 'PAID';
-      }
-
-      return matchesSearch && matchesTab;
-    }).toList();
+    final filteredOrders = provider.ordersFor(
+      filter: _selectedKey,
+      range: _timeFilter,
+      search: _searchQuery,
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -102,12 +124,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
+                          child: DropdownButton<OrderDateRange>(
                             value: _timeFilter,
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
-                            items: ['All time', 'Today', 'This Week', 'This Month'].map((t) {
-                              return DropdownMenuItem(value: t, child: Text(t));
-                            }).toList(),
+                            items: OrderDateRange.values
+                                .map((r) => DropdownMenuItem(value: r, child: Text(r.label)))
+                                .toList(),
                             onChanged: (val) {
                               if (val != null) setState(() => _timeFilter = val);
                             },
@@ -190,10 +212,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         return ChoiceChip(
                           avatar: CircleAvatar(
                             radius: 3,
-                            backgroundColor: isSel ? Colors.white : (tab['color'] as Color),
+                            backgroundColor: isSel ? Colors.white : _tabColor(tab['key']!),
                           ),
                           label: Text(
-                            tab['label'] as String,
+                            tab['label']!,
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
@@ -205,7 +227,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           backgroundColor: Colors.white,
                           side: BorderSide(color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          onSelected: (_) => setState(() => _selectedTab = tab['label'] as String),
+                          onSelected: (_) => setState(() => _selectedTab = tab['label']!),
                         );
                       },
                     ),
@@ -251,11 +273,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 ? Center(
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
-                                      children: const [
-                                        Icon(Icons.shopping_bag_outlined, size: 40, color: Color(0xFF94A3B8)),
-                                        SizedBox(height: 12),
-                                        Text('No orders found', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                        Text('Create a new order to get started.', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                                      children: [
+                                        const Icon(Icons.shopping_bag_outlined, size: 40, color: Color(0xFF94A3B8)),
+                                        const SizedBox(height: 12),
+                                        const Text('No orders found', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                        Text(
+                                          _hasActiveFilter
+                                              ? 'No orders match "$_selectedTab"'
+                                                  '${_timeFilter == OrderDateRange.allTime ? '' : ' in ${_timeFilter.label}'}.'
+                                              : 'Create a new order to get started.',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                        ),
                                       ],
                                     ),
                                   )
@@ -264,8 +292,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                     separatorBuilder: (_, __) => const Divider(height: 1),
                                     itemBuilder: (context, idx) {
                                       final order = filteredOrders[idx];
-                                      final isDelivered = order.status.toUpperCase() == 'DELIVERED';
-                                      final isPaid = order.paymentStatus.toUpperCase() == 'PAID';
+                                      final initial = order.customerName.isEmpty
+                                          ? '?'
+                                          : order.customerName[0].toUpperCase();
 
                                       return InkWell(
                                         onTap: () => setState(() => _selectedOrderForDetails = order),
@@ -287,15 +316,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                                     CircleAvatar(
                                                       radius: 14,
                                                       backgroundColor: const Color(0xFFEEF2FF),
-                                                      child: Text(order.customerName[0], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
+                                                      child: Text(initial, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
                                                     ),
                                                     const SizedBox(width: 10),
-                                                    Column(
+                                                    Expanded(
+                                                      child: Column(
                                                       crossAxisAlignment: CrossAxisAlignment.start,
                                                       children: [
-                                                        Text(order.customerName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                                        Text(
+                                                          order.customerName,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                                        ),
                                                         Text('${order.items.length} items', style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
                                                       ],
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
@@ -304,11 +339,51 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                               // TYPE
                                               Expanded(
                                                 flex: 2,
-                                                child: Row(
-                                                  children: const [
-                                                    Icon(Icons.circle, size: 6, color: Color(0xFF10B981)),
-                                                    SizedBox(width: 6),
-                                                    Text('delivery home', style: TextStyle(fontSize: 12, color: Color(0xFF10B981))),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        const Icon(Icons.circle, size: 6, color: Color(0xFF10B981)),
+                                                        const SizedBox(width: 6),
+                                                        Flexible(
+                                                          child: Text(
+                                                            order.deliveryTypeLabel,
+                                                            overflow: TextOverflow.ellipsis,
+                                                            style: const TextStyle(fontSize: 12, color: Color(0xFF10B981)),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    if (order.scheduledDate != null)
+                                                      Padding(
+                                                        padding: const EdgeInsets.only(top: 2),
+                                                        child: Row(
+                                                          children: [
+                                                            Icon(
+                                                              Icons.event_rounded,
+                                                              size: 11,
+                                                              color: order.isOverdue
+                                                                  ? const Color(0xFFDC2626)
+                                                                  : const Color(0xFF64748B),
+                                                            ),
+                                                            const SizedBox(width: 4),
+                                                            Flexible(
+                                                              child: Text(
+                                                                DateFormat('EEE, MMM d').format(order.scheduledDate!),
+                                                                overflow: TextOverflow.ellipsis,
+                                                                style: TextStyle(
+                                                                  fontSize: 10.5,
+                                                                  fontWeight: FontWeight.w600,
+                                                                  color: order.isOverdue
+                                                                      ? const Color(0xFFDC2626)
+                                                                      : const Color(0xFF64748B),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
                                                   ],
                                                 ),
                                               ),
@@ -318,21 +393,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                                 flex: 2,
                                                 child: Align(
                                                   alignment: Alignment.centerLeft,
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                                    decoration: BoxDecoration(
-                                                      color: isDelivered ? const Color(0xFFECFDF5) : const Color(0xFFEEF2FF),
-                                                      borderRadius: BorderRadius.circular(12),
-                                                    ),
-                                                    child: Text(
-                                                      order.status,
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: isDelivered ? const Color(0xFF10B981) : const Color(0xFF1A4FD6),
-                                                      ),
-                                                    ),
-                                                  ),
+                                                  child: StatusPill(status: order.status),
                                                 ),
                                               ),
 
@@ -340,11 +401,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                               Expanded(
                                                 flex: 2,
                                                 child: Text(
-                                                  order.paymentStatus,
+                                                  order.paymentStatusLabel,
                                                   style: TextStyle(
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.bold,
-                                                    color: isPaid ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                                    color: paymentColor(order.paymentStatus),
                                                   ),
                                                 ),
                                               ),
@@ -356,9 +417,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                               ),
 
                                               // UPDATED
-                                              const Expanded(
+                                              Expanded(
                                                 flex: 1,
-                                                child: Text('7h ago', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                                                child: Text(
+                                                  relativeTime(order.createdAt),
+                                                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                                ),
                                               ),
                                             ],
                                           ),
@@ -377,7 +441,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('Showing ${filteredOrders.length}', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                                Text(
+                                  filteredOrders.length == provider.orders.length
+                                      ? 'Showing ${filteredOrders.length}'
+                                      : 'Showing ${filteredOrders.length} of ${provider.orders.length}',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                ),
                                 const Text('No more orders', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                               ],
                             ),

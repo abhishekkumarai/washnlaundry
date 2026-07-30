@@ -113,6 +113,23 @@ class AppProvider extends ChangeNotifier {
         .toList();
   }
 
+  /// Orders matching a filter chip, a date range and a search term — the three
+  /// controls on the Orders screen, applied together.
+  List<OrderModel> ordersFor({
+    String filter = 'ALL',
+    OrderDateRange range = OrderDateRange.allTime,
+    String search = '',
+  }) {
+    final query = search.trim().toLowerCase();
+    return ordersForFilter(filter).where((o) {
+      if (!range.contains(o.createdAt)) return false;
+      if (query.isEmpty) return true;
+      return o.orderNumber.toLowerCase().contains(query) ||
+          o.customerName.toLowerCase().contains(query) ||
+          o.customerPhone.contains(query);
+    }).toList();
+  }
+
   /// Orders matching one of the Orders-screen filter chips. `OVERDUE`,
   /// `SCHEDULED`, `UNPAID` and `PARTIAL` are derived, not stored statuses.
   List<OrderModel> ordersForFilter(String filter) {
@@ -358,5 +375,48 @@ class AppProvider extends ChangeNotifier {
     }
     _error = null;
     notifyListeners();
+  }
+}
+
+/// The date ranges offered by the Orders screen's dropdown, matching the live
+/// app: All time / Today / This Week / This Month / Last Month.
+enum OrderDateRange {
+  allTime('All time'),
+  today('Today'),
+  thisWeek('This Week'),
+  thisMonth('This Month'),
+  lastMonth('Last Month');
+
+  const OrderDateRange(this.label);
+
+  final String label;
+
+  static OrderDateRange fromLabel(String label) => values.firstWhere(
+        (r) => r.label == label,
+        orElse: () => OrderDateRange.allTime,
+      );
+
+  /// Whether [when] falls inside this range, relative to [now]
+  /// (injectable so the boundaries are testable).
+  bool contains(DateTime when, {DateTime? now}) {
+    final today = now ?? DateTime.now();
+    final day = DateTime(when.year, when.month, when.day);
+    final startOfToday = DateTime(today.year, today.month, today.day);
+
+    switch (this) {
+      case OrderDateRange.allTime:
+        return true;
+      case OrderDateRange.today:
+        return day == startOfToday;
+      case OrderDateRange.thisWeek:
+        // Week starts Monday, as it does on the live dashboard.
+        final startOfWeek = startOfToday.subtract(Duration(days: today.weekday - 1));
+        return !day.isBefore(startOfWeek) && !day.isAfter(startOfToday);
+      case OrderDateRange.thisMonth:
+        return when.year == today.year && when.month == today.month;
+      case OrderDateRange.lastMonth:
+        final previous = DateTime(today.year, today.month - 1);
+        return when.year == previous.year && when.month == previous.month;
+    }
   }
 }

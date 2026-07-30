@@ -5,39 +5,8 @@ import 'package:provider/provider.dart';
 import '../models/order_model.dart';
 import '../providers/app_provider.dart';
 import 'panel_card.dart';
+import 'status_pill.dart';
 import 'receipt_dialog.dart';
-
-/// Colour keys for the order and payment pills, shared with the Orders screen.
-Color statusColor(String status) {
-  switch (status) {
-    case OrderStatus.placed:
-      return const Color(0xFF64748B);
-    case OrderStatus.processing:
-    case OrderStatus.ironing:
-      return const Color(0xFF0284C7);
-    case OrderStatus.ready:
-      return const Color(0xFF1A4FD6);
-    case OrderStatus.outForDelivery:
-      return const Color(0xFFD97706);
-    case OrderStatus.delivered:
-      return const Color(0xFF10B981);
-    case OrderStatus.cancelled:
-      return const Color(0xFFDC2626);
-    default:
-      return const Color(0xFF64748B);
-  }
-}
-
-Color paymentColor(String payment) {
-  switch (payment) {
-    case PaymentStatus.paid:
-      return const Color(0xFF10B981);
-    case PaymentStatus.partial:
-      return const Color(0xFFD97706);
-    default:
-      return const Color(0xFFDC2626);
-  }
-}
 
 /// "Recent activity" — the live app renders this as a table with
 /// TIME · ORDER · CUSTOMER · TYPE · PAYMENT · STATUS.
