@@ -166,6 +166,73 @@ To inspect the live app, drive Chrome via the claude-in-chrome tools. Notes from
 
 ---
 
+## Future steps — one codebase, three form factors
+
+The target is **the same Flutter app running as an Android app, as web, and in a tablet
+layout**, each adapting to its form factor rather than being a separate build. Nothing
+here is done yet; this is the direction, not a description of the code.
+
+### Where it stands
+
+`android/`, `web/` and `windows/` are scaffolded (no `ios/`). Only web has ever been
+built or run. The one genuinely responsive piece is `SidebarNavigation`, which switches
+on `MediaQuery.sizeOf(context).width`:
+
+| Width | Rail |
+|---|---|
+| ≥ `expandedMinWidth` (1080) | 240px, label + icon, honours the collapse toggle |
+| 700–1080 | 72px icon rail, toggle ignored |
+| < `railMinWidth` (700) | 60px icon rail, tighter padding |
+
+Navigation is never hidden, so there is no width at which the app becomes unusable. But
+that is the *only* widget doing this — outside `dashboard_screen.dart`, no screen uses
+`MediaQuery` or `LayoutBuilder` at all. Everything else is a fixed desktop layout that
+merely gets narrower.
+
+### What each target needs
+
+**Tablet (~600–1080 logical px).** Cheapest of the three and the right first move,
+because it forces the layout work the other two also need. The rail already collapses;
+the content does not. Wide tables (Orders, Customers, Staff, Attendance, Payroll) need a
+card/list fallback below a breakpoint, and the dashboard's multi-column panel grid needs
+to reflow to one column. Pick the breakpoints once, put them next to
+`expandedMinWidth` / `railMinWidth`, and reuse them everywhere rather than scattering
+magic numbers.
+
+**Android.** Three things block it, in order:
+
+1. **`ApiService.baseUrl` defaults to a relative `/api`.** That is correct on web, where
+   nginx proxies same-origin, and meaningless in an APK — there is no origin. Android
+   builds need an absolute base URL via `--dart-define=API_BASE_URL=...`, and the
+   emulator reaches a host machine at `10.0.2.2`, not `localhost`.
+2. **There is no router.** `main.dart` switches on `AppProvider.currentNavIndex`, so the
+   Android system back button has nothing to pop and will exit the app from any screen.
+   This is the point at which the `go_router` migration stops being optional — see the
+   Frontend section.
+3. **Phone widths are below every breakpoint the app was designed for.** A 60px icon rail
+   is wrong on a phone; that wants a bottom navigation bar or a drawer, which is a
+   different navigation shell, not a narrower one.
+
+Also unhandled on mobile: `Scan` currently assumes a desktop webcam, and the receipt flow
+assumes browser printing.
+
+**Web.** Already the working target — keep it that way. The Docker path builds and serves
+it, and `flutter run -d chrome` is the fast loop.
+
+### Constraints to respect
+
+- **One codebase, no per-platform forks.** Branch on layout width, not on
+  `Platform.isAndroid`, except where a capability genuinely differs (camera, printing).
+- `dart:io` is unavailable on web. Anything platform-specific needs a conditional import
+  or it breaks the web build that currently works.
+- The Docker/nginx setup is web-only by nature. An Android build is a separate
+  `flutter build apk` and does not belong in `docker-compose.yml`.
+- Every layout change needs a widget test at the target width. `widget_test.dart` already
+  demonstrates the pattern — it drives `tester.view.physicalSize` to assert rail
+  behaviour at 1400 / 900 / 600 px.
+
+---
+
 ## Conventions
 
 - Indian context throughout: ₹, phone `+91`, GSTIN on the shop, `Asia/Kolkata`, Bengaluru addresses in seed data.
