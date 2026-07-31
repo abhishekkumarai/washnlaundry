@@ -14,7 +14,6 @@ import 'screens/payroll_screen.dart';
 import 'screens/expenses_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/scan_screen.dart';
-import 'screens/settings_screen.dart';
 
 /// Flutter web excludes the mouse from [dragDevices], so any list that needs
 /// dragging — the nav rail on a short window, the horizontal activity table —
@@ -78,7 +77,7 @@ class WashNLaundryCrmApp extends StatelessWidget {
             // 10 = Apps   (disabled — no screen)
             case 11: return const ScanScreen();
             // 12 = Subscription (disabled — no screen)
-            case 13: return const SettingsScreen();
+            // 13 = Settings (disabled — SettingsScreen exists but is unrouted)
             default: return const DashboardScreen();
           }
         },

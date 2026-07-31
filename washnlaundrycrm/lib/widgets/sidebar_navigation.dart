@@ -42,7 +42,7 @@ class SidebarNavigation extends StatefulWidget {
     {'label': 'Apps', 'icon': Icons.apps_rounded, 'index': 10, 'disabled': true},
     {'label': 'Scan', 'icon': Icons.qr_code_scanner_rounded, 'index': 11, 'disabled': false},
     {'label': 'Subscription', 'icon': Icons.workspace_premium_outlined, 'index': 12, 'disabled': true},
-    {'label': 'Settings', 'icon': Icons.settings_outlined, 'index': 13, 'disabled': false},
+    {'label': 'Settings', 'icon': Icons.settings_outlined, 'index': 13, 'disabled': true},
   ];
 
   @override
