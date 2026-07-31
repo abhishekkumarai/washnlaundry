@@ -1,0 +1,11 @@
+# Excluding build/ is load-bearing: it guarantees the build/web the final stage
+# copies was produced by the build stage and nowhere else. Without it a stale
+# host bundle rides along in the context and can mask uncompiled changes.
+build/
+.dart_tool/
+.git/
+.gitignore
+.idea/
+*.iml
+.flutter-plugins
+.flutter-plugins-dependencies

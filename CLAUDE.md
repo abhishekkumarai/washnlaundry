@@ -30,6 +30,15 @@ Working clone of `app.laundrybill.com` (a laundry / dry-cleaning shop CRM + POS)
 docker compose up --build          # frontend :8080, backend :8000
 ```
 
+That is genuinely the whole command — `washnlaundrycrm/Dockerfile` is multi-stage and
+compiles the Flutter bundle inside the image, so no local Flutter SDK is involved and a
+stale `build/web` can't be shipped by accident. The build stage is pinned to
+`ghcr.io/cirruslabs/flutter:3.44.0`; bump that tag when you upgrade Flutter locally.
+
+The trade-off is speed: the first build pulls a multi-GB SDK image and compiles from
+scratch. **For frontend work, use `flutter run -d chrome` below instead** — hot reload,
+seconds not minutes. Reach for Docker to verify the real artefact, not to iterate.
+
 Local dev without Docker:
 
 ```bash
@@ -69,13 +78,13 @@ Flutter Web, Material 3, `provider` for state, `fl_chart` for charts, `google_fo
 - No URLs, no deep links, no browser back button, no `/orders/:id` route.
 - `OrderDetailScreen` is reached by `OrdersScreen` swapping its own body (`orders_screen.dart:39`), not by navigation.
 - `SettingsScreen` (408 lines) exists but **is not wired into `main.dart` at all** — it is dead code today.
-- Sidebar indices are load-bearing magic numbers. Index 10 (`Apps`), 12 (`Subscription`), 13 (`Settings`) are flagged `disabled: true` and render a "Soon" chip with no screen behind them.
+- Sidebar indices are load-bearing magic numbers. Index 10 (`Apps`), 12 (`Subscription`), 13 (`Settings`) are flagged `disabled: true` and render a "Soon" chip. Apps and Subscription have no screen at all; Settings has one, deliberately left unrouted — re-enabling it means flipping `disabled` back to `false` in `sidebar_navigation.dart` and restoring `case 13` plus its import in `main.dart`.
 
 Adding a screen means: write it, add a `navItems` entry with a new index, add a `case` in `main.dart`. Moving to `go_router` would fix all of the above and is the single highest-value refactor available.
 
 ### Data flow — read this before touching a screen
 
-`ApiService` (`lib/services/api_service.dart`) exposes exactly four calls: `fetchDashboardStats`, `fetchOrders`, `fetchGarmentItems`, `createOrder`. Base URL is **hardcoded** to `http://localhost:8000/api`, which is wrong inside Docker and wrong in any deploy.
+`ApiService` (`lib/services/api_service.dart`) exposes exactly four calls: `fetchDashboardStats`, `fetchOrders`, `fetchGarmentItems`, `createOrder`. Base URL is `String.fromEnvironment('API_BASE_URL')` defaulting to a relative **`/api`** — same-origin, which is what lets one bundle work in Docker, in a deploy, and locally. `nginx.conf` proxies `/api/` to `http://backend:8000/api/`. Split-host deploys override it at build time with `flutter build web --dart-define=API_BASE_URL=...`.
 
 So only **orders** and **garment items** are real. Everything else is a hardcoded Dart literal inside the widget, despite the Django model and endpoint already existing:
 

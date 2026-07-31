@@ -1,10 +1,24 @@
-# Serve the compiled Flutter Web bundle with Nginx, proxying /api to Django.
+# Compile the Flutter Web bundle and serve it with Nginx, proxying /api to Django.
+# The build happens inside the image, so `docker compose up --build` needs no local
+# Flutter install and cannot silently ship a stale bundle.
 #
-# Build the bundle first (it is not built inside the image):
-#   flutter build web --release
+# Pinned deliberately: 3.44.0 is the closest published cirruslabs tag to the 3.44.1
+# used locally (there is no :3.44.1). Bump it when you upgrade local Flutter.
+FROM ghcr.io/cirruslabs/flutter:3.44.0 AS build
+
+WORKDIR /src
+
+# Resolve dependencies against the manifest alone so that editing lib/ does not
+# invalidate the pub layer. (There is no pubspec.lock in the repo.)
+COPY pubspec.yaml ./
+RUN flutter pub get
+
+COPY . .
+RUN flutter build web --release
+
 FROM nginx:alpine
 
-COPY build/web /usr/share/nginx/html
+COPY --from=build /src/build/web /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
