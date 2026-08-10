@@ -94,12 +94,12 @@ So only **orders** and **garment items** are real. Everything else is a hardcode
 |---|---|
 | Orders, Order detail, New Order | wired to API |
 | Customers, Customer detail | wired to API |
-| Staff | `_staffMembers` literal |
+| Services | wired to API |
+| Staff | wired to API |
+| Expenses | wired to API |
 | Attendance | `_staff` literal |
 | Payroll | `_staffPayroll` literal |
-| Expenses | `expenses` literal, built in `build()` |
-| Services | `_categories`, `_serviceAreas`, `_pickupSlots`, `_deliverySlots` literals |
-| Reports | derived from the above literals |
+| Reports | derived from the Attendance / Payroll literals |
 
 Wiring these to their existing endpoints is mostly mechanical and is the main outstanding backend-integration work.
 

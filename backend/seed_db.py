@@ -283,18 +283,26 @@ def seed():
             Attendance.objects.create(staff=staff, date=date, status=status)
 
     print('Seeding Expenses...')
+    # Trailing int is "days ago", so the log spans the current and previous
+    # month and the month-to-date totals on the dashboard mean something.
     expenses_data = [
-        ('Commercial Detergent & Liquid Soap (50L)', 'Supplies', 3500.0, 'UPI'),
-        ('Monthly Shop Rent (July)', 'Rent', 28000.0, 'BANK_TRANSFER'),
-        ('Electricity Bill - July', 'Utilities', 4200.0, 'BANK_TRANSFER'),
-        ('Steam Press Machine Servicing', 'Maintenance', 1800.0, 'CASH'),
-        ('Packaging Bags & Hangers', 'Supplies', 650.0, 'CASH'),
-        ('Water Bill - July', 'Utilities', 900.0, 'CASH'),
-        ('Staff Salary Advance - Ramesh', 'Salary', 5000.0, 'CASH'),
-        ('Diesel for Delivery Van', 'Transport', 2200.0, 'CASH'),
+        ('Commercial Detergent & Liquid Soap (50L)', 'Supplies', 3500.0, 'UPI', 3),
+        ('Monthly Shop Rent', 'Rent', 28000.0, 'BANK_TRANSFER', 9),
+        ('Electricity Bill (Commercial)', 'Utilities', 4200.0, 'BANK_TRANSFER', 12),
+        ('Steam Press Machine Servicing', 'Maintenance', 1800.0, 'CASH', 18),
+        ('Packaging Bags & Hangers', 'Supplies', 650.0, 'CASH', 22),
+        ('Water Bill', 'Utilities', 900.0, 'CASH', 27),
+        ('Staff Salary Advance - Ramesh', 'Salary', 5000.0, 'CASH', 34),
+        ('Diesel for Delivery Van', 'Transport', 2200.0, 'CASH', 41),
     ]
-    for title, cat, amount, method in expenses_data:
-        Expense.objects.create(title=title, category=cat, amount=amount, payment_method=method)
+    for title, cat, amount, method, days_ago in expenses_data:
+        Expense.objects.create(
+            title=title,
+            category=cat,
+            amount=amount,
+            payment_method=method,
+            date=timezone.now() - timedelta(days=days_ago),
+        )
 
     print('\n[SUCCESS] Database seeded.')
     print(f'   - {len(customers_data)} customers')

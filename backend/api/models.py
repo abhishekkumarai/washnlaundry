@@ -1,5 +1,6 @@
 from django.db import models
 from django.db.models import Max
+from django.utils import timezone
 import re
 import uuid
 
@@ -321,7 +322,11 @@ class Expense(models.Model):
     category = models.CharField(max_length=100, default='Supplies')
     amount = models.FloatField()
     payment_method = models.CharField(max_length=50, default='CASH')
-    date = models.DateTimeField(auto_now_add=True)
+    # Settable, not auto_now_add: an expense is logged when someone gets round
+    # to it, but it belongs to the day it was actually incurred. Stamping it
+    # with the moment of entry filed July's rent under whatever day you typed
+    # it in, and the monthly totals inherited that error.
+    date = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True, null=True)
 
     def __str__(self):

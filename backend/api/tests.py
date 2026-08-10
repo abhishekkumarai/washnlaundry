@@ -658,3 +658,50 @@ class PosCheckoutContractTests(APITestCase):
         self._checkout()
         listed = self.client.get('/api/orders/?status=PLACED').data
         self.assertEqual(len(listed), 1)
+
+
+class ExpenseDateTests(APITestCase):
+    """`date` used to be auto_now_add, so an expense could only ever be filed
+    under the day it was typed in — July's rent landed in August."""
+
+    def test_date_defaults_to_now(self):
+        expense = Expense.objects.create(title='Detergent', amount=500)
+        self.assertAlmostEqual(
+            expense.date.timestamp(), timezone.now().timestamp(), delta=5
+        )
+
+    def test_date_can_be_backdated(self):
+        when = timezone.now() - timedelta(days=30)
+        expense = Expense.objects.create(title='Shop Rent', amount=28000, date=when)
+        expense.refresh_from_db()
+        self.assertEqual(expense.date, when)
+
+    def test_api_accepts_an_explicit_date(self):
+        when = timezone.now() - timedelta(days=10)
+        response = self.client.post('/api/expenses/', {
+            'title': 'Electricity Bill',
+            'category': 'Utilities',
+            'amount': 4200,
+            'payment_method': 'BANK_TRANSFER',
+            'date': when.isoformat(),
+        }, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Expense.objects.get().date, when)
+
+    def test_api_still_works_without_a_date(self):
+        response = self.client.post('/api/expenses/', {
+            'title': 'Packaging Bags',
+            'amount': 650,
+        }, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertIsNotNone(Expense.objects.get().date)
+
+    def test_list_is_newest_first(self):
+        old = Expense.objects.create(
+            title='Old', amount=1, date=timezone.now() - timedelta(days=20)
+        )
+        new = Expense.objects.create(
+            title='New', amount=2, date=timezone.now() - timedelta(days=1)
+        )
+        titles = [e['title'] for e in self.client.get('/api/expenses/').data]
+        self.assertEqual(titles, [new.title, old.title])
