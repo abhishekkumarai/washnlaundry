@@ -25,19 +25,6 @@ app_index.js
 app_ui.js
 index_fetched.html
 
-# ── Abandoned Next.js implementation (see CLAUDE.md) ──────────────────────────
-# Left on disk for now but not tracked; the project is Flutter + Django only.
-/app/
-/components/
-/lib/
-/prisma/
-next.config.js
-package.json
-package-lock.json
-postcss.config.js
-tailwind.config.js
-tsconfig.json
-
 # ── Misc ──────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db

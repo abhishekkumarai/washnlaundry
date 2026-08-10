@@ -2,7 +2,7 @@
 
 Working clone of `app.laundrybill.com` (a laundry / dry-cleaning shop CRM + POS).
 
-**Stack is Flutter Web + Django REST Framework. Nothing else.** See [Do not use](#do-not-use).
+**Stack is Flutter Web + Django REST Framework. Nothing else.**
 
 ---
 
@@ -15,12 +15,14 @@ Working clone of `app.laundrybill.com` (a laundry / dry-cleaning shop CRM + POS)
 | `docker-compose.yml` | Runs both (frontend `:8080` via nginx, backend `:8000` via Django) |
 | `LIVE_AUDIT.md` | **Screen-by-screen spec of the real app**, captured 2026-07-30. Read this before building any screen. |
 | `screenshots/` | Reference captures of the real app + audit shots of ours |
-| `app_index.js`, `app_ui.js` | Downloaded bundles from the real app. **Reference only** — read them to learn routes/labels/behaviour. Never paste their code into ours. |
-| `*.js` at repo root | One-off Chrome-screenshot/audit scripts. Disposable. |
+| `app_index.js`, `app_ui.js`, `index_fetched.html` | Downloaded bundles from the real app. **Reference only** — read them to learn routes/labels/behaviour. Never paste their code into ours. Gitignored: third-party minified source, re-downloadable, not ours to redistribute. |
 
-### Do not use
-
-`app/`, `components/`, `lib/`, `prisma/`, `next.config.js`, `package.json`, `postcss.config.js`, `tailwind.config.js`, `tsconfig.json`, `node_modules/` are an **abandoned parallel Next.js implementation**. Do not read them for guidance, do not edit them, do not extend them. They are stale and contradict the Flutter/Django code. (They're still on disk only because nothing has deleted them yet — this is not a git repo, so there is no undo.)
+The abandoned parallel Next.js implementation (`app/`, `components/`, `lib/`, `prisma/`,
+`node_modules/` and their `package.json` / `next.config.js` / `tailwind.config.js` /
+`postcss.config.js` / `tsconfig.json`) was **deleted** on 2026-08-10, along with the
+one-off Chrome-screenshot/audit scripts that used to sit at the repo root. The tree is
+now Flutter + Django only. The audit scripts are recoverable from git history at
+`741b895~1`; the Next.js files were never tracked, so they are gone from the repo.
 
 ---
 
