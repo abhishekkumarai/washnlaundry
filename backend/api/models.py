@@ -188,6 +188,11 @@ class Order(models.Model):
     payment_method = models.CharField(max_length=50, default='CASH')
     delivery_type = models.CharField(max_length=20, choices=DeliveryType.choices, default=DeliveryType.STORE_PICKUP)
     source = models.CharField(max_length=20, choices=OrderSource.choices, default=OrderSource.WEB)
+    # Free text, not a choice: the live timeline renders "Created by abhishek
+    # kumar" for a counter order and "Created by Mobile App" for an app one, so
+    # this holds either a person or a channel. Blank falls back to the source
+    # label on the client.
+    created_by = models.CharField(max_length=180, blank=True, default='')
 
     subtotal = models.FloatField(default=0.0)
     delivery_charge = models.FloatField(default=0.0)

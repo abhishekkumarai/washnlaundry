@@ -122,8 +122,22 @@ class ApiService {
   }
 
   /// Moves the order to [status] and stamps the matching timeline field.
-  static Future<OrderModel> updateOrderStatus(String id, String status) async {
-    final data = await _send('POST', '/orders/$id/status/', body: {'status': status});
+  /// [note] is the optional free text from the Update Status dialog.
+  static Future<OrderModel> updateOrderStatus(
+    String id,
+    String status, {
+    String? note,
+  }) async {
+    final data = await _send('POST', '/orders/$id/status/', body: {
+      'status': status,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    });
+    return OrderModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  /// Edits the order header — customer, fulfilment type, expected date, notes.
+  static Future<OrderModel> updateOrder(String id, Map<String, dynamic> payload) async {
+    final data = await _send('PATCH', '/orders/$id/', body: payload);
     return OrderModel.fromJson((data as Map).cast<String, dynamic>());
   }
 

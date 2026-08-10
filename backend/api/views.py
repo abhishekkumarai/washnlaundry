@@ -91,13 +91,25 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def status(self, request, pk=None):
-        """POST /api/orders/<id>/status/ {"status": "READY"} — stamps the timeline."""
+        """POST /api/orders/<id>/status/ {"status": "READY", "note": "..."}
+
+        Stamps the timeline. `note` is the optional free-text the live Update
+        Status dialog collects; it is appended to the order's notes with the
+        stage it belongs to, so the reason for a change survives.
+        """
         order = self.get_object()
         new_status = (request.data.get('status') or '').upper()
         if new_status not in OrderStatus.values:
             return Response(
                 {'detail': f'Invalid status. Expected one of {OrderStatus.values}.'}, status=400
             )
+
+        note = (request.data.get('note') or '').strip()
+        if note:
+            label = OrderStatus(new_status).label
+            entry = f'[{label}] {note}'
+            order.notes = f'{order.notes}\n{entry}' if order.notes else entry
+
         order.mark_status(new_status)
         return Response(self.get_serializer(order).data)
 

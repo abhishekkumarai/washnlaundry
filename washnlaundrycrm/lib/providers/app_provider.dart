@@ -260,15 +260,29 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateOrderStatus(String orderId, String status) async {
+  Future<bool> updateOrderStatus(String orderId, String status, {String? note}) async {
     try {
-      final updated = await ApiService.updateOrderStatus(orderId, status);
+      final updated = await ApiService.updateOrderStatus(orderId, status, note: note);
       _replaceOrder(updated);
       return true;
     } on ApiException catch (e) {
       _error = e.message;
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Edits the order header. Returns the saved order so the detail screen can
+  /// re-render from the server's copy rather than its own optimistic guess.
+  Future<OrderModel?> updateOrder(String orderId, Map<String, dynamic> payload) async {
+    try {
+      final updated = await ApiService.updateOrder(orderId, payload);
+      _replaceOrder(updated);
+      return updated;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return null;
     }
   }
 

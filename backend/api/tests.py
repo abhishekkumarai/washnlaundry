@@ -705,3 +705,80 @@ class ExpenseDateTests(APITestCase):
         )
         titles = [e['title'] for e in self.client.get('/api/expenses/').data]
         self.assertEqual(titles, [new.title, old.title])
+
+
+class OrderProvenanceTests(APITestCase):
+    """The live timeline writes "Created by abhishek kumar" for a counter order
+    and "Created by Mobile App" for an app one, so the field holds either a
+    person or a channel and cannot be the OrderSource enum."""
+
+    def test_created_by_defaults_to_blank(self):
+        order = Order.objects.create(customer_name='Walk-in', total_amount=100)
+        self.assertEqual(order.created_by, '')
+
+    def test_created_by_holds_a_person(self):
+        order = Order.objects.create(
+            customer_name='Me', total_amount=150, created_by='abhishek kumar'
+        )
+        order.refresh_from_db()
+        self.assertEqual(order.created_by, 'abhishek kumar')
+
+    def test_created_by_is_serialised(self):
+        Order.objects.create(customer_name='Me', total_amount=150, created_by='AK')
+        listed = self.client.get('/api/orders/').data
+        self.assertEqual(listed[0]['created_by'], 'AK')
+
+
+class OrderStatusNoteTests(APITestCase):
+    def setUp(self):
+        self.order = Order.objects.create(customer_name='Me', total_amount=150)
+
+    def test_status_change_accepts_a_note(self):
+        response = self.client.post(
+            f'/api/orders/{self.order.id}/status/',
+            {'status': 'READY', 'note': 'Customer called ahead'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'READY')
+        self.assertIn('Customer called ahead', self.order.notes)
+        # The note is filed under the stage it belongs to.
+        self.assertIn('[Ready]', self.order.notes)
+
+    def test_notes_accumulate_rather_than_overwrite(self):
+        self.client.post(
+            f'/api/orders/{self.order.id}/status/',
+            {'status': 'PROCESSING', 'note': 'first'}, format='json',
+        )
+        self.client.post(
+            f'/api/orders/{self.order.id}/status/',
+            {'status': 'READY', 'note': 'second'}, format='json',
+        )
+        self.order.refresh_from_db()
+        self.assertIn('first', self.order.notes)
+        self.assertIn('second', self.order.notes)
+
+    def test_a_blank_note_writes_nothing(self):
+        self.client.post(
+            f'/api/orders/{self.order.id}/status/',
+            {'status': 'READY', 'note': '   '}, format='json',
+        )
+        self.order.refresh_from_db()
+        self.assertFalse(self.order.notes)
+
+    def test_status_change_without_a_note_still_works(self):
+        response = self.client.post(
+            f'/api/orders/{self.order.id}/status/', {'status': 'READY'}, format='json'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'READY')
+
+    def test_an_invalid_status_writes_no_note(self):
+        self.client.post(
+            f'/api/orders/{self.order.id}/status/',
+            {'status': 'BOGUS', 'note': 'should not persist'}, format='json',
+        )
+        self.order.refresh_from_db()
+        self.assertFalse(self.order.notes)

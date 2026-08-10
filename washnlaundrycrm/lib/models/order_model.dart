@@ -153,6 +153,10 @@ class OrderModel {
   final DateTime? scheduledDate;
   final String? assignedAgentName;
 
+  /// Who or what raised the order — a person for a counter sale, a channel
+  /// name otherwise. Empty falls back to [sourceLabel]; see [createdByLabel].
+  final String createdBy;
+
   final DateTime createdAt;
   final Map<String, DateTime> stageTimestamps;
   final List<OrderItemModel> items;
@@ -179,6 +183,7 @@ class OrderModel {
     this.notes,
     this.scheduledDate,
     this.assignedAgentName,
+    this.createdBy = '',
     required this.createdAt,
     this.stageTimestamps = const {},
     required this.items,
@@ -188,6 +193,51 @@ class OrderModel {
   String get paymentStatusLabel => PaymentStatus.label(paymentStatus);
   String get deliveryTypeLabel => DeliveryType.label(deliveryType);
   String get sourceLabel => OrderSource.label(source);
+
+  /// What the timeline writes after "Created by".
+  String get createdByLabel => createdBy.trim().isEmpty ? sourceLabel : createdBy.trim();
+
+  /// True when nobody delivers this order — the customer collects it.
+  /// Drives the step-bar wording and which fulfilment panel is shown.
+  bool get isCollectedInStore =>
+      deliveryType == DeliveryType.storePickup || deliveryType == DeliveryType.homePickup;
+
+  /// The four stages the live step bar shows, in order. `Out for Delivery` is
+  /// deliberately absent: the real app collapses it into the Timeline, and a
+  /// collected order never passes through it at all.
+  List<String> get stepStatuses => [
+        OrderStatus.placed,
+        OrderStatus.processing,
+        OrderStatus.ready,
+        OrderStatus.delivered,
+      ];
+
+  /// Step labels, which depend on who ends up holding the garments.
+  List<String> get stepLabels => [
+        'Order Placed',
+        'Processing',
+        isCollectedInStore ? 'Ready for Pickup' : 'Ready',
+        isCollectedInStore ? 'Picked Up' : 'Delivered',
+      ];
+
+  /// Index into [stepLabels] of the furthest stage reached. -1 for cancelled,
+  /// which sits outside the progression. `Ironing` counts as Processing and
+  /// `Out for Delivery` as Ready, since neither has its own step.
+  int get stepIndex {
+    if (isCancelled) return -1;
+    switch (status) {
+      case OrderStatus.delivered:
+        return 3;
+      case OrderStatus.outForDelivery:
+      case OrderStatus.ready:
+        return 2;
+      case OrderStatus.ironing:
+      case OrderStatus.processing:
+        return 1;
+      default:
+        return 0;
+    }
+  }
 
   bool get isCancelled => status == OrderStatus.cancelled;
 
@@ -246,6 +296,7 @@ class OrderModel {
       notes: json['notes'],
       scheduledDate: DateTime.tryParse(json['scheduled_date'] ?? ''),
       assignedAgentName: json['assigned_agent_name'],
+      createdBy: json['created_by'] ?? '',
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
       stageTimestamps: stamps,
       items: rawItems

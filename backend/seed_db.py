@@ -25,6 +25,14 @@ from api.models import (  # noqa: E402
 
 PC, KG, SQFT, SET = PricingUnit.PIECE, PricingUnit.KG, PricingUnit.SQFT, PricingUnit.SET
 
+# Order provenance, as the live timeline writes it: a counter order names the
+# person who rang it up, the other channels name themselves.
+CREATED_BY = {
+    OrderSource.WEB: 'AK',
+    OrderSource.MOBILE_APP: 'Mobile App',
+    OrderSource.PUBLIC_PAGE: 'Public Page',
+}
+
 # (category, [(name, price, unit), ...])
 CATALOGUE = [
     ('Ironing', 'Iron', [
@@ -215,6 +223,7 @@ def seed():
         customer = customers[cust_i]
         placed_at = now - timedelta(days=abs(sched_offset) + 1, hours=idx % 8)
 
+        source = random.choice(OrderSource.values)
         order = Order(
             customer=customer,
             customer_name=customer.name,
@@ -223,7 +232,8 @@ def seed():
             payment_status=pay_status,
             payment_method=method,
             delivery_type=delivery_type,
-            source=random.choice(OrderSource.values),
+            source=source,
+            created_by=CREATED_BY[source],
             express=express,
             scheduled_date=today + timedelta(days=sched_offset),
             placed_at=placed_at,
