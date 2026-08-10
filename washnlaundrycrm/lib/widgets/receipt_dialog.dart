@@ -6,10 +6,41 @@ import '../models/order_model.dart';
 class ReceiptDialog extends StatelessWidget {
   final OrderModel order;
 
-  const ReceiptDialog({Key? key, required this.order}) : super(key: key);
+  /// The shop profile from `/api/shops/`. The header used to be hardcoded to a
+  /// Noida branch that has nothing to do with the seeded shop.
+  final Map<String, dynamic>? shop;
+
+  const ReceiptDialog({Key? key, required this.order, this.shop})
+      : super(key: key);
+
+  String get _shopName => (shop?['name'] as String?)?.trim().isNotEmpty == true
+      ? shop!['name'] as String
+      : 'LaundryBill';
+
+  /// "Hbr layout, Bengaluru • +91 98765 43210" — whichever parts we have.
+  String get _shopSubtitle {
+    final address = (shop?['address'] as String?)?.trim() ?? '';
+    final city = (shop?['city'] as String?)?.trim() ?? '';
+    // The seeded address already ends in the city, which rendered as
+    // "Hbr layout, Bengaluru, Bengaluru".
+    final includeCity = city.isNotEmpty &&
+        !address.toLowerCase().contains(city.toLowerCase());
+    final where = [
+      if (address.isNotEmpty) address,
+      if (includeCity) city,
+    ].join(', ');
+
+    final phone = (shop?['phone'] as String?)?.trim() ?? '';
+    return [
+      if (where.isNotEmpty) where,
+      if (phone.isNotEmpty) phone,
+    ].join(' • ');
+  }
 
   @override
   Widget build(BuildContext context) {
+    final subtitle = _shopSubtitle;
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
@@ -19,28 +50,38 @@ class ReceiptDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Shop Header
-            const Text('LaundryBill Express', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
-            const Text('Noida Sector 18 Branch • +91 98765 43210', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+            Text(_shopName, textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
+            if (subtitle.isNotEmpty)
+              Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
             const Divider(height: 24),
 
             // Order Info
+            // Both columns flex — a long customer name used to overflow the
+            // 372px content width rather than eliding.
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('ORDER NUMBER', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                    Text('#${order.orderNumber}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                  ],
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('ORDER NUMBER', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                      Text('#${order.orderNumber}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    ],
+                  ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('CUSTOMER', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                    Text(order.customerName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    Text(order.customerPhone, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                  ],
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text('CUSTOMER', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                      Text(order.customerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      if (order.customerPhone.isNotEmpty)
+                        Text(order.customerPhone, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -96,11 +137,16 @@ class ReceiptDialog extends StatelessWidget {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _shareWhatsapp(order),
+                    // No phone means a walk-in with nothing to message. It used
+                    // to fall back to a hardcoded number and bill a stranger.
+                    onPressed: order.customerPhone.isEmpty
+                        ? null
+                        : () => _shareWhatsapp(order),
                     icon: const Icon(Icons.chat_rounded, color: Colors.white, size: 16),
                     label: const Text('WhatsApp Bill', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),
+                      disabledBackgroundColor: const Color(0xFFCBD5E1),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),

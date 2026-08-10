@@ -17,51 +17,53 @@ class _ServicesScreenState extends State<ServicesScreen> {
   String _searchQuery = '';
   bool _showInactive = false;
 
-  final List<String> _serviceAreas = [];
   final TextEditingController _areaController = TextEditingController();
 
-  // Pickup & Delivery slot state
+  // Pickup & Delivery "add slot" form state. The slots themselves live on the
+  // provider — these three fields are only the half-filled form above the list.
   String? _pickupStartTime;
   String? _pickupEndTime;
-  String _pickupCapacity = '';
+  final TextEditingController _pickupCapacityController = TextEditingController();
   int _pickupBuffer = 0;
 
   String? _deliveryStartTime;
   String? _deliveryEndTime;
-  String _deliveryCapacity = '';
+  final TextEditingController _deliveryCapacityController = TextEditingController();
   int _deliveryBuffer = 0;
 
-  final List<Map<String, dynamic>> _pickupSlots = [
-    {'time': '9:00 AM - 11:00 AM', 'enabled': true, 'capacity': 'Unlimited'},
-    {'time': '11:00 AM - 1:00 PM', 'enabled': true, 'capacity': 'Unlimited'},
-    {'time': '2:00 PM - 4:00 PM', 'enabled': true, 'capacity': 'Unlimited'},
-    {'time': '4:00 PM - 6:00 PM', 'enabled': true, 'capacity': 'Unlimited'},
-  ];
+  /// 15-minute increments from 6:00 AM to 10:00 PM, matching the live app's
+  /// start/end selects (LIVE_AUDIT.md).
+  static final List<String> _timeOptions = List.generate(
+    ((22 - 6) * 60) ~/ 15 + 1,
+    (i) => TimeSlotModel.formatTime(
+      '${(6 + (i * 15) ~/ 60).toString().padLeft(2, '0')}:'
+      '${((i * 15) % 60).toString().padLeft(2, '0')}:00',
+    ),
+  );
 
-  final List<Map<String, dynamic>> _deliverySlots = [
-    {'time': '9:00 AM - 11:00 AM', 'enabled': true, 'capacity': 'Unlimited'},
-    {'time': '11:00 AM - 1:00 PM', 'enabled': true, 'capacity': 'Unlimited'},
-    {'time': '2:00 PM - 4:00 PM', 'enabled': true, 'capacity': 'Unlimited'},
-    {'time': '4:00 PM - 6:00 PM', 'enabled': true, 'capacity': 'Unlimited'},
-  ];
-
-  final List<String> _timeOptions = [
-    '6:00 AM', '7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM',
-    '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM',
-    '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM',
-  ];
-
-  // Presentation only — the catalogue itself comes from the API. Keyed by
-  // category name so a new category added server-side still renders (with a
-  // neutral fallback style) instead of crashing.
+  // Presentation only — the catalogue itself comes from the API. Keyed by the
+  // category's `icon` string (what the seed writes, and what the New Service
+  // dialog lets you pick) so a user-created category renders with the icon it
+  // chose instead of a neutral fallback.
   static const Map<String, Map<String, dynamic>> _categoryStyles = {
-    'Ironing':       {'icon': Icons.dry_cleaning_rounded,      'color': Color(0xFF1A4FD6), 'bg': Color(0xFFEEF2FF)},
-    'Wash & Fold':   {'icon': Icons.local_laundry_service_rounded, 'color': Color(0xFF0284C7), 'bg': Color(0xFFE0F2FE)},
-    'Wash & Iron':   {'icon': Icons.iron_rounded,              'color': Color(0xFFD97706), 'bg': Color(0xFFFEF3C7)},
-    'Dry Cleaning':  {'icon': Icons.auto_awesome_rounded,      'color': Color(0xFF7C3AED), 'bg': Color(0xFFF3E8FF)},
-    'Household':     {'icon': Icons.home_work_rounded,         'color': Color(0xFFA855F7), 'bg': Color(0xFFF3E8FF)},
-    'Shoe Cleaning': {'icon': Icons.roller_skating_rounded,    'color': Color(0xFF10B981), 'bg': Color(0xFFECFDF5)},
-    'Premium':       {'icon': Icons.workspace_premium_rounded, 'color': Color(0xFFEC4899), 'bg': Color(0xFFFCE7F3)},
+    'Iron':     {'icon': Icons.dry_cleaning_rounded,           'color': Color(0xFF1A4FD6), 'bg': Color(0xFFEEF2FF)},
+    'Laundry':  {'icon': Icons.local_laundry_service_rounded,  'color': Color(0xFF0284C7), 'bg': Color(0xFFE0F2FE)},
+    'WashIron': {'icon': Icons.iron_rounded,                   'color': Color(0xFFD97706), 'bg': Color(0xFFFEF3C7)},
+    'Sparkles': {'icon': Icons.auto_awesome_rounded,           'color': Color(0xFF7C3AED), 'bg': Color(0xFFF3E8FF)},
+    'Home':     {'icon': Icons.home_work_rounded,              'color': Color(0xFFA855F7), 'bg': Color(0xFFF3E8FF)},
+    'Shoe':     {'icon': Icons.roller_skating_rounded,         'color': Color(0xFF10B981), 'bg': Color(0xFFECFDF5)},
+    'Star':     {'icon': Icons.workspace_premium_rounded,      'color': Color(0xFFEC4899), 'bg': Color(0xFFFCE7F3)},
+  };
+
+  /// Human labels for the icon picker in the New Service dialog.
+  static const Map<String, String> _iconLabels = {
+    'Iron': 'Ironing',
+    'Laundry': 'Laundry',
+    'WashIron': 'Wash & Iron',
+    'Sparkles': 'Dry Cleaning',
+    'Home': 'Household',
+    'Shoe': 'Shoe Care',
+    'Star': 'Premium',
   };
 
   static const Map<String, dynamic> _fallbackStyle = {
@@ -96,7 +98,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   void _syncFromProvider(AppProvider provider) {
     _categories = provider.categories.map((c) {
-      final style = _categoryStyles[c.name] ?? _fallbackStyle;
+      final style = _categoryStyles[c.icon] ?? _fallbackStyle;
       return <String, dynamic>{
         'id': c.id,
         'title': c.name,
@@ -124,7 +126,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
               'id': g.id,
               'name': g.name,
               'price': g.price,
-              'unit': g.unitLabel[0].toUpperCase() + g.unitLabel.substring(1),
+              'unit': g.unitLabel,
               'unitShort': g.unitShortLabel,
               'turnaround': g.turnaroundLabel,
               'active': g.isActive,
@@ -136,6 +138,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
   @override
   void dispose() {
     _areaController.dispose();
+    _pickupCapacityController.dispose();
+    _deliveryCapacityController.dispose();
     super.dispose();
   }
 
@@ -299,6 +303,10 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   // ─── TAB 1: Items ───────────────────────────────────────────────────
   Widget _buildItemsView() {
+    // A fresh database has no categories at all, and every card below indexes
+    // _categories[_selectedCategoryIndex] — so this has to come first.
+    if (_categories.isEmpty) return _buildNoCategoriesView();
+
     final cat = _categories[_selectedCategoryIndex];
     final items = _currentItems;
 
@@ -361,6 +369,28 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   },
                 ),
               ),
+              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: GestureDetector(
+                  onTap: () => _showAddCategoryModal(context),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.add, size: 15, color: Color(0xFF1A4FD6)),
+                      SizedBox(width: 6),
+                      // The rail is a fixed 264px, so the label has to be
+                      // allowed to shrink rather than overflow it.
+                      Expanded(
+                        child: Text(
+                          'New service category',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1A4FD6)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -416,6 +446,35 @@ class _ServicesScreenState extends State<ServicesScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Shown when the shop has no categories yet — the one state in which the
+  /// items grid can't render anything. Copy matches the live app's empty state.
+  Widget _buildNoCategoriesView() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.category_outlined, size: 48, color: Color(0xFFCBD5E1)),
+          const SizedBox(height: 14),
+          const Text('No services', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+          const SizedBox(height: 6),
+          const Text('Create services to organize your items.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+          const SizedBox(height: 18),
+          ElevatedButton.icon(
+            onPressed: () => _showAddCategoryModal(context),
+            icon: const Icon(Icons.add, size: 16, color: Colors.white),
+            label: const Text('New service category', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1A4FD6),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -481,22 +540,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
     );
   }
 
-  /// Maps the free-text unit field ("per kg", "Per Piece") onto a PricingUnit
-  /// code the API accepts. Anything unrecognised is treated as per-piece.
-  String _unitCodeFrom(String raw) {
-    final value = raw.toLowerCase();
-    if (value.contains('kg')) return PricingUnit.kg;
-    if (value.contains('sq')) return PricingUnit.sqft;
-    if (value.contains('set')) return PricingUnit.set;
-    return PricingUnit.piece;
-  }
-
-  /// "2d" / "2 days" / "2" -> 2.
-  int _turnaroundDaysFrom(String raw) {
-    final digits = RegExp(r'\d+').firstMatch(raw)?.group(0);
-    return int.tryParse(digits ?? '') ?? 1;
-  }
-
   Widget _itemImagePlaceholder() => Container(
         color: const Color(0xFFF1F5F9),
         child: const Center(
@@ -534,20 +577,27 @@ class _ServicesScreenState extends State<ServicesScreen> {
                           ),
                   ),
                 ),
-                // Active badge top-right
+                // Active / Inactive badge top-right
                 Positioned(
                   top: 8, right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(20)),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.circle, size: 5, color: Color(0xFF10B981)),
-                        SizedBox(width: 3),
-                        Text('Active', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
-                      ],
-                    ),
-                  ),
+                  child: Builder(builder: (_) {
+                    final active = item['active'] as bool;
+                    final fg = active ? const Color(0xFF10B981) : const Color(0xFF94A3B8);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: active ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.circle, size: 5, color: fg),
+                          const SizedBox(width: 3),
+                          Text(active ? 'Active' : 'Inactive', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: fg)),
+                        ],
+                      ),
+                    );
+                  }),
                 ),
                 // Edit button bottom-right
                 Positioned(
@@ -589,7 +639,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 Row(
                   children: [
                     Text('₹${(item['price'] as double).toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    const Text(' / pc', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                    Text(' / ${item['unitShort']}', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                   ],
                 ),
               ],
@@ -623,6 +673,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   // ─── TAB 2: Service Areas ───────────────────────────────────────────
   Widget _buildServiceAreasView() {
+    final areas = context.watch<AppProvider>().serviceAreas;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Container(
@@ -692,14 +744,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 ),
                 const SizedBox(width: 10),
                 ElevatedButton.icon(
-                  onPressed: () {
-                    if (_areaController.text.trim().isNotEmpty) {
-                      setState(() {
-                        _serviceAreas.add(_areaController.text.trim());
-                        _areaController.clear();
-                      });
-                    }
-                  },
+                  onPressed: () => _addServiceArea(areas),
                   icon: const Icon(Icons.add, size: 15, color: Colors.white),
                   label: const Text('Add', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
                   style: ElevatedButton.styleFrom(
@@ -714,7 +759,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
             const SizedBox(height: 20),
 
             // Areas list / empty state
-            if (_serviceAreas.isEmpty)
+            if (areas.isEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 48),
@@ -734,11 +779,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
-                children: _serviceAreas.map((a) => Chip(
-                  label: Text(a, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1A4FD6))),
+                children: areas.map((a) => Chip(
+                  label: Text(a.name, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1A4FD6))),
                   backgroundColor: const Color(0xFFEEF2FF),
                   deleteIcon: const Icon(Icons.close_rounded, size: 15, color: Color(0xFF1A4FD6)),
-                  onDeleted: () => setState(() => _serviceAreas.remove(a)),
+                  onDeleted: () => _deleteServiceArea(a),
                 )).toList(),
               ),
           ],
@@ -747,15 +792,62 @@ class _ServicesScreenState extends State<ServicesScreen> {
     );
   }
 
+  /// Red SnackBar carrying the provider's message. Every write on this screen
+  /// routes failures through here — the previous code closed dialogs silently.
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: const Color(0xFFDC2626)),
+    );
+  }
+
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: const Color(0xFF10B981)),
+    );
+  }
+
+  Future<void> _addServiceArea(List<ServiceAreaModel> existing) async {
+    final name = _areaController.text.trim();
+    if (name.isEmpty) {
+      _showError('Enter an area name');
+      return;
+    }
+    if (existing.any((a) => a.name.toLowerCase() == name.toLowerCase())) {
+      _showError('"$name" is already a service area');
+      return;
+    }
+
+    final provider = context.read<AppProvider>();
+    final ok = await provider.addServiceArea({
+      'name': name,
+      'pin_code': '',
+      'is_active': true,
+    });
+    if (!mounted) return;
+    if (ok) {
+      _areaController.clear();
+    } else {
+      _showError(provider.error ?? 'Could not add the service area');
+    }
+  }
+
+  Future<void> _deleteServiceArea(ServiceAreaModel area) async {
+    final provider = context.read<AppProvider>();
+    final ok = await provider.deleteServiceArea(area.id);
+    if (!ok) _showError(provider.error ?? 'Could not remove ${area.name}');
+  }
+
   // ─── TAB 3 & 4: Pickup / Delivery Schedule ───────────────────────────
   Widget _buildScheduleView({required bool isPickup}) {
     final title = isPickup ? 'Pickup Schedule' : 'Delivery Schedule';
     final subtitle = isPickup ? 'Time slots for home pickup' : 'Time slots for home delivery';
     final icon = isPickup ? Icons.access_time_rounded : Icons.local_shipping_outlined;
-    final slots = isPickup ? _pickupSlots : _deliverySlots;
+    final provider = context.watch<AppProvider>();
+    final slots = isPickup ? provider.pickupSlots : provider.deliverySlots;
     final startTime = isPickup ? _pickupStartTime : _deliveryStartTime;
     final endTime = isPickup ? _pickupEndTime : _deliveryEndTime;
-    final capacity = isPickup ? _pickupCapacity : _deliveryCapacity;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -908,6 +1000,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: TextField(
+                              controller: isPickup ? _pickupCapacityController : _deliveryCapacityController,
+                              keyboardType: TextInputType.number,
                               style: const TextStyle(fontSize: 13),
                               decoration: const InputDecoration(
                                 hintText: 'Unlimited',
@@ -915,10 +1009,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                 border: InputBorder.none,
                                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                               ),
-                              onChanged: (v) => setState(() {
-                                if (isPickup) _pickupCapacity = v;
-                                else _deliveryCapacity = v;
-                              }),
                             ),
                           ),
                         ],
@@ -927,18 +1017,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     const SizedBox(width: 12),
                     // Save button
                     ElevatedButton.icon(
-                      onPressed: () {
-                        final st = isPickup ? _pickupStartTime : _deliveryStartTime;
-                        final et = isPickup ? _pickupEndTime : _deliveryEndTime;
-                        if (st != null && et != null) {
-                          setState(() {
-                            final cap = capacity.isEmpty ? 'Unlimited' : capacity;
-                            slots.add({'time': '$st - $et', 'enabled': true, 'capacity': cap});
-                            if (isPickup) { _pickupStartTime = null; _pickupEndTime = null; _pickupCapacity = ''; }
-                            else { _deliveryStartTime = null; _deliveryEndTime = null; _deliveryCapacity = ''; }
-                          });
-                        }
-                      },
+                      onPressed: () => _addTimeSlot(isPickup: isPickup, existing: slots),
                       icon: const Icon(Icons.add, size: 15, color: Colors.white),
                       label: const Text('Save', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
                       style: ElevatedButton.styleFrom(
@@ -959,6 +1038,23 @@ class _ServicesScreenState extends State<ServicesScreen> {
           const SizedBox(height: 20),
 
           // Existing slots list
+          if (slots.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Column(
+                children: [
+                  Icon(Icons.schedule_outlined, size: 36, color: Color(0xFF94A3B8)),
+                  SizedBox(height: 10),
+                  Text('No time slots added yet', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                ],
+              ),
+            ),
           ...slots.asMap().entries.map((e) {
             final idx = e.key;
             final slot = e.value;
@@ -967,12 +1063,9 @@ class _ServicesScreenState extends State<ServicesScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border(
-                  top: BorderSide(color: const Color(0xFFE2E8F0), width: idx == 0 ? 1 : 0),
-                  bottom: const BorderSide(color: Color(0xFFE2E8F0)),
-                  left: const BorderSide(color: Color(0xFFE2E8F0)),
-                  right: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
+                // A uniform border, not a zero-width top edge on inner rows:
+                // Flutter asserts on a hairline border under a border radius.
+                border: Border.all(color: const Color(0xFFE2E8F0)),
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(idx == 0 ? 12 : 0),
                   topRight: Radius.circular(idx == 0 ? 12 : 0),
@@ -983,23 +1076,23 @@ class _ServicesScreenState extends State<ServicesScreen> {
               child: Row(
                 children: [
                   Switch(
-                    value: slot['enabled'] as bool,
+                    value: slot.isActive,
                     activeColor: const Color(0xFF1A4FD6),
-                    onChanged: (v) => setState(() => slot['enabled'] = v),
+                    onChanged: (v) => _setSlotActive(slot, v),
                   ),
                   const SizedBox(width: 10),
                   const Icon(Icons.access_time_rounded, size: 16, color: Color(0xFF64748B)),
                   const SizedBox(width: 8),
-                  Text(slot['time'] as String, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                  Text(slot.timeRangeLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
                   const SizedBox(width: 16),
                   const Text('Capacity:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                   const SizedBox(width: 4),
-                  Text(slot['capacity'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF1A4FD6))),
+                  Text(slot.capacityLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF1A4FD6))),
                   const Spacer(),
                   IconButton(icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)), onPressed: () {}),
                   IconButton(
                     icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFF64748B)),
-                    onPressed: () => setState(() => slots.removeAt(idx)),
+                    onPressed: () => _deleteTimeSlot(slot),
                   ),
                 ],
               ),
@@ -1030,172 +1123,469 @@ class _ServicesScreenState extends State<ServicesScreen> {
     );
   }
 
+  Future<void> _addTimeSlot({
+    required bool isPickup,
+    required List<TimeSlotModel> existing,
+  }) async {
+    final startLabel = isPickup ? _pickupStartTime : _deliveryStartTime;
+    final endLabel = isPickup ? _pickupEndTime : _deliveryEndTime;
+    if (startLabel == null || endLabel == null) {
+      _showError('Pick a start and an end time');
+      return;
+    }
+
+    final start = TimeSlotModel.parseTime(startLabel);
+    final end = TimeSlotModel.parseTime(endLabel);
+    // String comparison is safe here: both are zero-padded "HH:MM:SS".
+    if (start == null || end == null || end.compareTo(start) <= 0) {
+      _showError('End time must be after start time');
+      return;
+    }
+
+    final rawCapacity =
+        (isPickup ? _pickupCapacityController : _deliveryCapacityController).text.trim();
+    int? capacity;
+    if (rawCapacity.isNotEmpty) {
+      capacity = int.tryParse(rawCapacity);
+      if (capacity == null || capacity < 0) {
+        _showError('Capacity must be a whole number, or empty for unlimited');
+        return;
+      }
+      // The live app treats 0 the same as blank.
+      if (capacity == 0) capacity = null;
+    }
+
+    final kind = isPickup ? TimeSlotModel.pickup : TimeSlotModel.delivery;
+    if (existing.any((s) => s.startTime == start && s.endTime == end)) {
+      _showError('That slot already exists');
+      return;
+    }
+
+    final provider = context.read<AppProvider>();
+    final ok = await provider.addTimeSlot({
+      'kind': kind,
+      'start_time': start,
+      'end_time': end,
+      'capacity': capacity,
+      'is_active': true,
+    });
+    if (!mounted) return;
+    if (!ok) {
+      _showError(provider.error ?? 'Could not add the time slot');
+      return;
+    }
+    setState(() {
+      if (isPickup) {
+        _pickupStartTime = null;
+        _pickupEndTime = null;
+        _pickupCapacityController.clear();
+      } else {
+        _deliveryStartTime = null;
+        _deliveryEndTime = null;
+        _deliveryCapacityController.clear();
+      }
+    });
+  }
+
+  Future<void> _setSlotActive(TimeSlotModel slot, bool active) async {
+    final provider = context.read<AppProvider>();
+    final ok = await provider.updateTimeSlot(slot.id, {'is_active': active});
+    if (!ok) _showError(provider.error ?? 'Could not update the time slot');
+  }
+
+  Future<void> _deleteTimeSlot(TimeSlotModel slot) async {
+    final provider = context.read<AppProvider>();
+    final ok = await provider.deleteTimeSlot(slot.kind, slot.id);
+    if (!ok) _showError(provider.error ?? 'Could not remove the time slot');
+  }
+
+  /// The live modal — "Add New Service / Garment Item". Category, name and
+  /// price are required; unit and turnaround are selects, so nothing here has
+  /// to be guessed from free text.
   void _showAddItemModal(BuildContext context) {
+    if (_categories.isEmpty) {
+      _showError('Please select a service category first');
+      return;
+    }
+
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
-    final unitCtrl = TextEditingController(text: 'Per piece');
-    final turnaroundCtrl = TextEditingController(text: '1d');
     String selectedCat = _categories[_selectedCategoryIndex]['title'] as String;
+    String selectedUnit = PricingUnit.piece;
+    int turnaroundDays = 1;
+
+    String? nameError;
+    String? priceError;
+    String? submitError;
+    bool saving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Add New Service / Garment Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            IconButton(
-              icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
-              onPressed: () => Navigator.pop(ctx),
-            ),
-          ],
-        ),
-        content: SizedBox(
-          width: 440,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Service Category *', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-              const SizedBox(height: 6),
-              StatefulBuilder(
-                builder: (context, setModalState) {
-                  return Container(
-                    height: 42,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: selectedCat,
-                        isExpanded: true,
-                        items: _categories.map((c) => DropdownMenuItem(value: c['title'] as String, child: Text(c['title'] as String))).toList(),
-                        onChanged: (v) {
-                          if (v != null) setModalState(() => selectedCat = v);
-                        },
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 14),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          Future<void> save() async {
+            final name = nameCtrl.text.trim();
+            final price = double.tryParse(priceCtrl.text.trim());
+            final match = _categories.firstWhere(
+              (c) => c['title'] == selectedCat,
+              orElse: () => const <String, dynamic>{},
+            );
+            final categoryId = int.tryParse('${match['id']}');
 
-              const Text('Item Name *', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-              const SizedBox(height: 6),
-              TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  hintText: 'e.g. Jacket / Blazer',
-                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            setModalState(() {
+              nameError = name.isEmpty ? 'Item name is required' : null;
+              priceError = (price == null || price <= 0) ? 'Enter a valid price' : null;
+              submitError = categoryId == null ? 'Please select a service category first' : null;
+            });
+            if (nameError != null || priceError != null || submitError != null) return;
+
+            setModalState(() => saving = true);
+            final provider = context.read<AppProvider>();
+            final ok = await provider.addGarmentItem({
+              'category': categoryId,
+              'name': name,
+              'price': price,
+              'unit': selectedUnit,
+              'turnaround_days': turnaroundDays,
+            });
+            if (!ctx.mounted) return;
+
+            if (!ok) {
+              // Keep the dialog open — the old code popped it silently, which
+              // read as success.
+              setModalState(() {
+                saving = false;
+                submitError = provider.error ?? 'Could not save the item';
+              });
+              return;
+            }
+            Navigator.pop(ctx);
+            _showSuccess('Added "$name" to $selectedCat');
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Add New Service / Garment Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  onPressed: () => Navigator.pop(ctx),
                 ),
-              ),
-              const SizedBox(height: 14),
-
-              Row(
+              ],
+            ),
+            content: SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Price (₹) *', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: priceCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            hintText: 'e.g. 150',
-                            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                        ),
-                      ],
-                    ),
+                  _modalLabel('Service Category *'),
+                  _modalDropdown<String>(
+                    value: selectedCat,
+                    items: _categories
+                        .map((c) => DropdownMenuItem(value: c['title'] as String, child: Text(c['title'] as String)))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) setModalState(() => selectedCat = v);
+                    },
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Unit', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: unitCtrl,
-                          decoration: InputDecoration(
-                            hintText: 'Per piece / Per pair',
-                            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 14),
+
+                  _modalLabel('Item Name *'),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Jacket / Blazer',
+                      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                      errorText: nameError,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     ),
+                    onChanged: (_) {
+                      if (nameError != null) setModalState(() => nameError = null);
+                    },
                   ),
+                  const SizedBox(height: 14),
+
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _modalLabel('Price (₹) *'),
+                            TextField(
+                              controller: priceCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                hintText: 'e.g. 150',
+                                hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                                errorText: priceError,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onChanged: (_) {
+                                if (priceError != null) setModalState(() => priceError = null);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _modalLabel('Unit'),
+                            _modalDropdown<String>(
+                              value: selectedUnit,
+                              items: PricingUnit.all
+                                  .map((u) => DropdownMenuItem(value: u, child: Text(PricingUnit.label(u))))
+                                  .toList(),
+                              onChanged: (v) {
+                                if (v != null) setModalState(() => selectedUnit = v);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  _modalLabel('Turnaround Time'),
+                  _modalDropdown<int>(
+                    value: turnaroundDays,
+                    items: List.generate(7, (i) => i + 1)
+                        .map((d) => DropdownMenuItem(value: d, child: Text('${d}d')))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) setModalState(() => turnaroundDays = v);
+                    },
+                  ),
+
+                  if (submitError != null) ...[
+                    const SizedBox(height: 14),
+                    _modalErrorBanner(submitError!),
+                  ],
                 ],
               ),
-              const SizedBox(height: 14),
-
-              const Text('Turnaround Time', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-              const SizedBox(height: 6),
-              TextField(
-                controller: turnaroundCtrl,
-                decoration: InputDecoration(
-                  hintText: 'e.g. 1d, 2d, 3d',
-                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            actions: [
+              TextButton(
+                onPressed: saving ? null : () => Navigator.pop(ctx),
+                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+              ElevatedButton(
+                onPressed: saving ? null : save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A4FD6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
+                child: saving
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Save Item', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameCtrl.text.trim().isNotEmpty) {
-                final priceVal = double.tryParse(priceCtrl.text) ?? 50.0;
-                final match = _categories.firstWhere(
-                  (c) => c['title'] == selectedCat,
-                  orElse: () => const <String, dynamic>{},
-                );
-                final ok = await context.read<AppProvider>().addGarmentItem({
-                  'category': int.tryParse('${match['id']}'),
-                  'name': nameCtrl.text.trim(),
-                  'price': priceVal,
-                  'unit': _unitCodeFrom(unitCtrl.text),
-                  'turnaround_days': _turnaroundDaysFrom(turnaroundCtrl.text),
-                });
-                if (!ctx.mounted) return;
-                if (!ok) {
-                  Navigator.pop(ctx);
-                  return;
-                }
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Added "${nameCtrl.text.trim()}" to $selectedCat'),
-                    backgroundColor: const Color(0xFF10B981),
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1A4FD6),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Save Item', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
+
+  /// "New Service" — the category dialog reached from the sidebar. Limited to
+  /// what GarmentCategory stores: name, icon and the active flag.
+  void _showAddCategoryModal(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    String selectedIcon = _categoryStyles.keys.first;
+    bool isActive = true;
+    String? nameError;
+    String? submitError;
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          Future<void> save() async {
+            final name = nameCtrl.text.trim();
+            setModalState(() => nameError = name.isEmpty ? 'Please enter a service name.' : null);
+            if (nameError != null) return;
+
+            setModalState(() => saving = true);
+            final provider = context.read<AppProvider>();
+            final id = await provider.addCategory({
+              'name': name,
+              'icon': selectedIcon,
+              'display_order': _categories.length + 1,
+              'is_active': isActive,
+            });
+            if (!ctx.mounted) return;
+
+            if (id == null) {
+              setModalState(() {
+                saving = false;
+                submitError = provider.error ?? 'Failed to save service.';
+              });
+              return;
+            }
+            Navigator.pop(ctx);
+            // Jump to the category that was just created.
+            final index = provider.categories.indexWhere((c) => c.id == id);
+            if (index >= 0 && mounted) setState(() => _selectedCategoryIndex = index);
+            _showSuccess('Added "$name"');
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('New Service', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _modalLabel('Service Name *'),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'e.g., Dry Clean',
+                      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                      errorText: nameError,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onChanged: (_) {
+                      if (nameError != null) setModalState(() => nameError = null);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  _modalLabel('Service Icon'),
+                  _modalDropdown<String>(
+                    value: selectedIcon,
+                    items: _categoryStyles.entries.map((e) {
+                      final style = e.value;
+                      return DropdownMenuItem(
+                        value: e.key,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 26, height: 26,
+                              decoration: BoxDecoration(color: style['bg'] as Color, borderRadius: BorderRadius.circular(6)),
+                              child: Icon(style['icon'] as IconData, size: 14, color: style['color'] as Color),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(_iconLabels[e.key] ?? e.key, style: const TextStyle(fontSize: 13)),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (v) {
+                      if (v != null) setModalState(() => selectedIcon = v);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    activeColor: const Color(0xFF1A4FD6),
+                    title: const Text('Active', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                    subtitle: const Text('Show in items list', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                    value: isActive,
+                    onChanged: (v) => setModalState(() => isActive = v),
+                  ),
+
+                  if (submitError != null) ...[
+                    const SizedBox(height: 10),
+                    _modalErrorBanner(submitError!),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: saving ? null : () => Navigator.pop(ctx),
+                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+              ElevatedButton(
+                onPressed: saving ? null : save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A4FD6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: saving
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Add Service', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // ─── Shared modal chrome ────────────────────────────────────────────
+
+  Widget _modalLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+      );
+
+  Widget _modalDropdown<T>({
+    required T value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+          items: items,
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _modalErrorBanner(String message) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          border: Border.all(color: const Color(0xFFFECACA)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFDC2626)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(message, style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
+            ),
+          ],
+        ),
+      );
 }

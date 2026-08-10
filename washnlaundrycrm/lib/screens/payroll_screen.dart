@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_provider.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/top_header.dart';
-import '../widgets/new_order_dialog.dart';
 
 class PayrollScreen extends StatefulWidget {
   const PayrollScreen({super.key});
@@ -63,7 +64,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
           Expanded(
             child: Column(
               children: [
-                TopHeader(onNewOrderPressed: () => showDialog(context: context, builder: (_) => const NewOrderDialog())),
+                TopHeader(onNewOrderPressed: () => context.read<AppProvider>().setNavIndex(1)),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24.0),

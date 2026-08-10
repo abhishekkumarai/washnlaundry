@@ -554,3 +554,107 @@ class AttendanceTests(TestCase):
         Attendance.objects.create(staff=staff, date=date(2026, 7, 30))
         with self.assertRaises(IntegrityError):
             Attendance.objects.create(staff=staff, date=date(2026, 7, 30))
+
+
+class PosCheckoutContractTests(APITestCase):
+    """The exact request the Flutter New Order screen sends on Checkout.
+
+    This pins the contract that was previously broken: the client posted
+    `status: 'WASHING'` — not a member of OrderStatus — so *every* checkout
+    came back 400 and no order was ever saved. The UI showed a receipt anyway.
+    """
+
+    def setUp(self):
+        Shop.objects.create(name='washing', order_prefix='WA3P')
+        self.customer = Customer.objects.create(name='Priya Sundaram', phone='9000000002')
+
+    def _checkout(self, **overrides):
+        payload = {
+            'customer_name': 'Walk-in customer',
+            'customer_phone': '',
+            'status': OrderStatus.PLACED,
+            'payment_status': PaymentStatus.PAID,
+            'payment_method': 'CASH',
+            'delivery_type': DeliveryType.STORE_PICKUP,
+            'source': 'WEB',
+            'subtotal': 45.0,
+            'total_amount': 45.0,
+            'paid_amount': 45.0,
+            'due_amount': 0.0,
+            'express': False,
+            'items': [
+                {'item_title': 'Shirt', 'service_type': 'Ironing', 'status': OrderStatus.PLACED,
+                 'quantity': 2, 'unit': 'PC', 'unit_price': 15.0, 'total_price': 30.0},
+                {'item_title': 'T-Shirt', 'service_type': 'Wash & Iron', 'status': OrderStatus.PLACED,
+                 'quantity': 1, 'unit': 'PC', 'unit_price': 15.0, 'total_price': 15.0},
+            ],
+        }
+        payload.update(overrides)
+        return self.client.post('/api/orders/', payload, format='json')
+
+    def test_checkout_payload_is_accepted(self):
+        response = self._checkout()
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Order.objects.count(), 1)
+
+    def test_washing_is_still_rejected(self):
+        # The regression itself. If this ever passes, the vocabulary drifted back.
+        response = self._checkout(status='WASHING')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('status', response.data)
+        self.assertEqual(Order.objects.count(), 0)
+
+    def test_server_allocates_the_order_number(self):
+        # The client no longer sends one; even if it did, order_number is
+        # read-only, so the flat `LB-xxxx` scheme can never reach the database.
+        response = self._checkout(order_number='LB-2001')
+        self.assertEqual(response.data['order_number'], 'WA3P-00001')
+
+    def test_paid_checkout_clears_the_due(self):
+        response = self._checkout()
+        self.assertEqual(response.data['paid_amount'], 45.0)
+        self.assertEqual(response.data['due_amount'], 0.0)
+        self.assertEqual(response.data['payment_status'], PaymentStatus.PAID)
+
+    def test_unpaid_checkout_carries_the_full_due(self):
+        response = self._checkout(
+            payment_status=PaymentStatus.UNPAID, paid_amount=0.0, due_amount=45.0
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['due_amount'], 45.0)
+        self.assertEqual(response.data['payment_status'], PaymentStatus.UNPAID)
+
+    def test_checkout_stamps_the_timeline(self):
+        response = self._checkout()
+        self.assertIsNotNone(response.data['placed_at'])
+        self.assertEqual(response.data['status'], OrderStatus.PLACED)
+
+    def test_named_customer_is_attached(self):
+        response = self._checkout(
+            customer=str(self.customer.id),
+            customer_name=self.customer.name,
+            customer_phone=self.customer.phone,
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Order.objects.get().customer, self.customer)
+
+    def test_walk_in_needs_no_customer_record(self):
+        response = self._checkout()
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertIsNone(Order.objects.get().customer)
+
+    def test_express_flag_survives(self):
+        response = self._checkout(express=True)
+        self.assertTrue(response.data['express'])
+
+    def test_created_order_appears_in_the_list(self):
+        self._checkout()
+        listed = self.client.get('/api/orders/').data
+        self.assertEqual(len(listed), 1)
+        self.assertEqual(listed[0]['order_number'], 'WA3P-00001')
+
+    def test_created_order_matches_the_placed_filter_chip(self):
+        # The phantom `WASHING` orders matched no chip on the Orders screen.
+        self._checkout()
+        listed = self.client.get('/api/orders/?status=PLACED').data
+        self.assertEqual(len(listed), 1)

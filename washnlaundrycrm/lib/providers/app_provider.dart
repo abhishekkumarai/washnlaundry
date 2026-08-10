@@ -66,17 +66,25 @@ class AppProvider extends ChangeNotifier {
   void seedForTest({
     List<OrderModel>? orders,
     List<GarmentItemModel>? garments,
+    List<GarmentCategoryModel>? categories,
     List<CustomerModel>? customers,
     List<StaffModel>? staff,
     List<ExpenseModel>? expenses,
+    List<ServiceAreaModel>? serviceAreas,
+    List<TimeSlotModel>? pickupSlots,
+    List<TimeSlotModel>? deliverySlots,
     Map<String, dynamic>? stats,
     Map<String, dynamic>? shop,
   }) {
     if (orders != null) _orders = orders;
     if (garments != null) _garments = garments;
+    if (categories != null) _categories = categories;
     if (customers != null) _customers = customers;
     if (staff != null) _staff = staff;
     if (expenses != null) _expenses = expenses;
+    if (serviceAreas != null) _serviceAreas = serviceAreas;
+    if (pickupSlots != null) _pickupSlots = pickupSlots;
+    if (deliverySlots != null) _deliverySlots = deliverySlots;
     if (stats != null) _stats = stats;
     if (shop != null) _shop = shop;
     notifyListeners();
@@ -231,22 +239,24 @@ class AppProvider extends ChangeNotifier {
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
-  void addOrder(OrderModel newOrder) {
-    _orders.insert(0, newOrder);
-    notifyListeners();
-  }
-
-  Future<bool> createNewOrder(Map<String, dynamic> payload) async {
+  /// Creates an order and returns the server's version of it — which carries
+  /// the authoritative `order_number` (the backend allocates `WASH-000NN`;
+  /// `order_number` is read-only on the serializer, so anything the client
+  /// sends is discarded). Returns null on failure, with [error] set.
+  ///
+  /// Callers must honour the null: an order that failed to save must not be
+  /// shown as if it succeeded.
+  Future<OrderModel?> createNewOrder(Map<String, dynamic> payload) async {
     try {
       final newOrder = await ApiService.createOrder(payload);
       _orders.insert(0, newOrder);
       _error = null;
       notifyListeners();
-      return true;
+      return newOrder;
     } on ApiException catch (e) {
       _error = e.message;
       notifyListeners();
-      return false;
+      return null;
     }
   }
 
@@ -306,6 +316,118 @@ class AppProvider extends ChangeNotifier {
     try {
       await ApiService.saveGarmentItem(payload);
       await loadDataFromBackend();
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Creates a service category. Like [addGarmentItem] this reloads rather than
+  /// inserting locally, because `item_count` and `price_range` are server-side
+  /// properties the POST response can't be trusted to keep current.
+  ///
+  /// Returns the new category's id, or null on failure with [error] set.
+  Future<String?> addCategory(Map<String, dynamic> payload) async {
+    try {
+      final created = await ApiService.createCategory(payload);
+      await loadDataFromBackend();
+      _error = null;
+      notifyListeners();
+      return created.id;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  // ── Service areas ──────────────────────────────────────────────────────────
+
+  Future<bool> addServiceArea(Map<String, dynamic> payload) async {
+    try {
+      final area = await ApiService.createServiceArea(payload);
+      _serviceAreas = [..._serviceAreas, area];
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteServiceArea(String id) async {
+    try {
+      await ApiService.deleteServiceArea(id);
+      _serviceAreas = _serviceAreas.where((a) => a.id != id).toList();
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ── Time slots ─────────────────────────────────────────────────────────────
+
+  List<TimeSlotModel> _slotsFor(String kind) =>
+      kind == TimeSlotModel.delivery ? _deliverySlots : _pickupSlots;
+
+  void _setSlotsFor(String kind, List<TimeSlotModel> slots) {
+    // Kept in start_time order, matching the backend's Meta.ordering — so a
+    // slot added mid-morning lands between its neighbours, not at the end.
+    slots.sort((a, b) => a.startTime.compareTo(b.startTime));
+    if (kind == TimeSlotModel.delivery) {
+      _deliverySlots = slots;
+    } else {
+      _pickupSlots = slots;
+    }
+  }
+
+  Future<bool> addTimeSlot(Map<String, dynamic> payload) async {
+    try {
+      final slot = await ApiService.createTimeSlot(payload);
+      _setSlotsFor(slot.kind, [..._slotsFor(slot.kind), slot]);
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateTimeSlot(String id, Map<String, dynamic> payload) async {
+    try {
+      final updated = await ApiService.updateTimeSlot(id, payload);
+      _setSlotsFor(
+        updated.kind,
+        _slotsFor(updated.kind).map((s) => s.id == id ? updated : s).toList(),
+      );
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteTimeSlot(String kind, String id) async {
+    try {
+      await ApiService.deleteTimeSlot(id);
+      _setSlotsFor(kind, _slotsFor(kind).where((s) => s.id != id).toList());
+      _error = null;
+      notifyListeners();
       return true;
     } on ApiException catch (e) {
       _error = e.message;

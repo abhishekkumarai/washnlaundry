@@ -5,17 +5,22 @@ class PricingUnit {
   static const sqft = 'SQFT';
   static const set = 'SET';
 
+  /// The four codes, in the order the Add Item dropdown offers them.
+  static const List<String> all = [piece, kg, sqft, set];
+
+  /// Sentence case, exactly as the live app labels the unit — on the item card
+  /// chip ("Per piece") and as the default of the Add Item modal's Unit select.
   static String label(String unit) {
     switch (unit) {
       case kg:
-        return 'per kg';
+        return 'Per kg';
       case sqft:
-        return 'per sq.ft';
+        return 'Per sq. ft.';
       case set:
-        return 'per set';
+        return 'Per set';
       case piece:
       default:
-        return 'per pc';
+        return 'Per piece';
     }
   }
 
@@ -327,6 +332,31 @@ class TimeSlotModel {
   });
 
   String get capacityLabel => capacity == null ? 'Unlimited' : '$capacity';
+
+  /// "9:00 AM - 11:00 AM". The server's [label] can't be used for the slot row
+  /// because it carries the kind prefix ("Pickup 09:00 AM - 11:00 AM").
+  String get timeRangeLabel => '${formatTime(startTime)} - ${formatTime(endTime)}';
+
+  /// "09:00:00" (Django `TimeField`) -> "9:00 AM".
+  static String formatTime(String apiTime) {
+    final parts = apiTime.split(':');
+    final hour = int.tryParse(parts.isNotEmpty ? parts[0] : '');
+    final minute = int.tryParse(parts.length > 1 ? parts[1] : '');
+    if (hour == null || minute == null) return apiTime;
+    final suffix = hour < 12 ? 'AM' : 'PM';
+    final display = hour % 12 == 0 ? 12 : hour % 12;
+    return '$display:${minute.toString().padLeft(2, '0')} $suffix';
+  }
+
+  /// "9:00 AM" -> "09:00:00". Returns null if [display] isn't a 12-hour time.
+  static String? parseTime(String display) {
+    final match = RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$', caseSensitive: false)
+        .firstMatch(display.trim());
+    if (match == null) return null;
+    var hour = int.parse(match.group(1)!) % 12;
+    if (match.group(3)!.toUpperCase() == 'PM') hour += 12;
+    return '${hour.toString().padLeft(2, '0')}:${match.group(2)}:00';
+  }
 
   factory TimeSlotModel.fromJson(Map<String, dynamic> json) => TimeSlotModel(
         id: json['id'].toString(),

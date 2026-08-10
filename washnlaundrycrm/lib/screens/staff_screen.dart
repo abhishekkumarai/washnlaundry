@@ -330,42 +330,67 @@ class _StaffScreenState extends State<StaffScreen> {
                     children: [
                       const Text('Staff', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                       const SizedBox(width: 8),
-                      Text('${_staffMembers.length} members', style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-                      const Spacer(),
-
-                      // Search Box
-                      Container(
-                        width: 220,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                          borderRadius: BorderRadius.circular(8),
+                      Flexible(
+                        child: Text(
+                          '${_staffMembers.length} members',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                         ),
-                        child: TextField(
-                          onChanged: (v) => setState(() => _searchQuery = v),
-                          style: const TextStyle(fontSize: 13),
-                          decoration: const InputDecoration(
-                            hintText: 'Search staff...',
-                            hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                            prefixIcon: Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(vertical: 9),
+                      ),
+                      const SizedBox(width: 16),
+
+                      // Search Box — flexes so the header can't overflow on a
+                      // narrow window; the fixed 220px version used to push the
+                      // Add Staff button off the edge.
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 220),
+                            child: Container(
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: TextField(
+                                onChanged: (v) => setState(() => _searchQuery = v),
+                                style: const TextStyle(fontSize: 13),
+                                decoration: const InputDecoration(
+                                  hintText: 'Search staff...',
+                                  hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                                  prefixIcon: Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(vertical: 9),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 14),
 
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: _showInactive,
-                            activeColor: const Color(0xFF1A4FD6),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            onChanged: (v) => setState(() => _showInactive = v ?? false),
+                      // The label is part of the hit target, not just the box.
+                      InkWell(
+                        borderRadius: BorderRadius.circular(6),
+                        onTap: () => setState(() => _showInactive = !_showInactive),
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Checkbox(
+                                value: _showInactive,
+                                activeColor: const Color(0xFF1A4FD6),
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                onChanged: (v) => setState(() => _showInactive = v ?? false),
+                              ),
+                              const SizedBox(width: 6),
+                              const Text('Show Inactive', style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                            ],
                           ),
-                          const Text('Show Inactive', style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
-                        ],
+                        ),
                       ),
                       const SizedBox(width: 14),
 
@@ -525,85 +550,188 @@ class _StaffScreenState extends State<StaffScreen> {
                                       itemBuilder: (context, idx) {
                                         final s = _filteredStaff[idx];
                                         final isActive = s['status'] == 'ACTIVE';
+                                        final name = s['name'] as String;
+                                        final isLast = idx == _filteredStaff.length - 1;
 
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                                          child: Row(
-                                            children: [
-                                              // Member Name & Avatar
-                                              Expanded(
-                                                flex: 3,
-                                                child: Row(
-                                                  children: [
-                                                    CircleAvatar(
-                                                      radius: 18,
-                                                      backgroundColor: const Color(0xFFEEF2FF),
-                                                      child: Text(
-                                                        s['name'][0],
-                                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 12),
-                                                    Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                        // The whole row opens the edit sheet —
+                                        // previously only the pencil responded,
+                                        // so most of the table looked dead.
+                                        return Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: () => _showStaffModal(context, existing: s),
+                                            hoverColor: const Color(0xFFF8FAFC),
+                                            borderRadius: isLast
+                                                ? const BorderRadius.vertical(bottom: Radius.circular(16))
+                                                : BorderRadius.zero,
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                              child: Row(
+                                                children: [
+                                                  // Member Name & Avatar
+                                                  Expanded(
+                                                    flex: 3,
+                                                    child: Row(
                                                       children: [
-                                                        Text(s['name'], style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                                        if (s['isDriver'] == true)
-                                                          const Text('Delivery Agent', style: TextStyle(fontSize: 10, color: Color(0xFF0284C7), fontWeight: FontWeight.bold)),
+                                                        CircleAvatar(
+                                                          radius: 18,
+                                                          backgroundColor: isActive
+                                                              ? const Color(0xFFEEF2FF)
+                                                              : const Color(0xFFF1F5F9),
+                                                          child: Text(
+                                                            name.isEmpty ? '?' : name[0].toUpperCase(),
+                                                            style: TextStyle(
+                                                              fontSize: 13,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: isActive
+                                                                  ? const Color(0xFF1A4FD6)
+                                                                  : const Color(0xFF94A3B8),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 12),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Text(
+                                                                name,
+                                                                overflow: TextOverflow.ellipsis,
+                                                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                                              ),
+                                                              if (s['isDriver'] == true)
+                                                                const Text('Delivery Agent', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: Color(0xFF0284C7), fontWeight: FontWeight.bold)),
+                                                            ],
+                                                          ),
+                                                        ),
                                                       ],
                                                     ),
-                                                  ],
-                                                ),
-                                              ),
-
-                                              // Role
-                                              Expanded(
-                                                flex: 2,
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
-                                                  child: Text(s['role'], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
-                                                ),
-                                              ),
-
-                                              // Phone
-                                              Expanded(
-                                                flex: 2,
-                                                child: Text(s['phone'], style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                                              ),
-
-                                              // Wage
-                                              Expanded(
-                                                flex: 2,
-                                                child: Text('₹${(s['wage'] as double).toInt()} / day', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                              ),
-
-                                              // Status Badge
-                                              Expanded(
-                                                flex: 2,
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                  decoration: BoxDecoration(
-                                                    color: isActive ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
-                                                    borderRadius: BorderRadius.circular(12),
                                                   ),
-                                                  child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Icon(Icons.circle, size: 6, color: isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
-                                                      const SizedBox(width: 4),
-                                                      Text(isActive ? 'Active' : 'Inactive', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444))),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
 
-                                              IconButton(
-                                                icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
-                                                tooltip: 'Edit',
-                                                onPressed: () => _showStaffModal(context, existing: s),
+                                                  // Role — Align keeps the pill
+                                                  // hugging its label instead of
+                                                  // painting across the column.
+                                                  Expanded(
+                                                    flex: 2,
+                                                    child: Align(
+                                                      alignment: Alignment.centerLeft,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                        decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
+                                                        child: Text(
+                                                          s['role'] as String,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+
+                                                  // Phone
+                                                  Expanded(
+                                                    flex: 2,
+                                                    child: Text(
+                                                      s['phone'] as String,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                                    ),
+                                                  ),
+
+                                                  // Wage
+                                                  Expanded(
+                                                    flex: 2,
+                                                    child: Text(
+                                                      '₹${(s['wage'] as num).toInt()} / day',
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                                    ),
+                                                  ),
+
+                                                  // Status Badge — also Align'd,
+                                                  // and now the control that
+                                                  // actually flips the status.
+                                                  Expanded(
+                                                    flex: 2,
+                                                    child: Align(
+                                                      alignment: Alignment.centerLeft,
+                                                      child: Tooltip(
+                                                        message: isActive
+                                                            ? 'Mark $name inactive'
+                                                            : 'Reactivate $name',
+                                                        child: InkWell(
+                                                          onTap: () => _toggleActive(context, s),
+                                                          borderRadius: BorderRadius.circular(12),
+                                                          child: Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                                            decoration: BoxDecoration(
+                                                              color: isActive ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+                                                              borderRadius: BorderRadius.circular(12),
+                                                            ),
+                                                            child: Row(
+                                                              mainAxisSize: MainAxisSize.min,
+                                                              children: [
+                                                                Icon(Icons.circle, size: 6, color: isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+                                                                const SizedBox(width: 5),
+                                                                Flexible(
+                                                                  child: Text(
+                                                                    isActive ? 'Active' : 'Inactive',
+                                                                    overflow: TextOverflow.ellipsis,
+                                                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isActive ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+
+                                                  SizedBox(
+                                                    width: 48,
+                                                    child: PopupMenuButton<String>(
+                                                      icon: const Icon(Icons.more_horiz_rounded, size: 18, color: Color(0xFF64748B)),
+                                                      tooltip: 'Actions',
+                                                      splashRadius: 18,
+                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                      onSelected: (value) {
+                                                        if (value == 'edit') {
+                                                          _showStaffModal(context, existing: s);
+                                                        } else if (value == 'status') {
+                                                          _toggleActive(context, s);
+                                                        }
+                                                      },
+                                                      itemBuilder: (_) => [
+                                                        const PopupMenuItem(
+                                                          value: 'edit',
+                                                          child: Row(
+                                                            children: [
+                                                              Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)),
+                                                              SizedBox(width: 10),
+                                                              Text('Edit details', style: TextStyle(fontSize: 13)),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        PopupMenuItem(
+                                                          value: 'status',
+                                                          child: Row(
+                                                            children: [
+                                                              Icon(
+                                                                isActive ? Icons.person_off_outlined : Icons.person_outline,
+                                                                size: 16,
+                                                                color: const Color(0xFF64748B),
+                                                              ),
+                                                              const SizedBox(width: 10),
+                                                              Text(isActive ? 'Mark inactive' : 'Reactivate', style: const TextStyle(fontSize: 13)),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                            ],
+                                            ),
                                           ),
                                         );
                                       },
@@ -787,23 +915,37 @@ class _StaffScreenState extends State<StaffScreen> {
                           ),
                           Expanded(
                             flex: 2,
-                            child: Row(
-                              children: [
-                                Switch(
-                                  value: hasAccess,
-                                  activeThumbColor: const Color(0xFF1A4FD6),
-                                  onChanged: (_) => _toggleAppLogin(context, member),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              // The status label is part of the switch's hit
+                              // target, not decoration next to it.
+                              child: InkWell(
+                                onTap: () => _toggleAppLogin(context, member),
+                                borderRadius: BorderRadius.circular(20),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Switch(
+                                      value: hasAccess,
+                                      activeThumbColor: const Color(0xFF1A4FD6),
+                                      onChanged: (_) => _toggleAppLogin(context, member),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        hasAccess ? 'Enabled' : 'No access',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: hasAccess ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  hasAccess ? 'Enabled' : 'No access',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: hasAccess ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
                         ],
@@ -820,21 +962,28 @@ class _StaffScreenState extends State<StaffScreen> {
 
   Widget _buildSubTab(int idx, String title) {
     final isSel = _selectedTab == idx;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedTab = idx),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSel ? const Color(0xFFEEF2FF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
-        ),
-        child: Text(
-          title,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: isSel ? FontWeight.w600 : FontWeight.w500,
-            color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF334155),
+    // InkWell, not GestureDetector — the latter gives no pointer cursor or
+    // hover feedback on web, so the tabs read as static labels.
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _selectedTab = idx),
+        borderRadius: BorderRadius.circular(8),
+        hoverColor: const Color(0xFFEEF2FF),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSel ? const Color(0xFFEEF2FF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
+          ),
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isSel ? FontWeight.w600 : FontWeight.w500,
+              color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF334155),
+            ),
           ),
         ),
       ),
@@ -868,7 +1017,11 @@ class _StaffScreenState extends State<StaffScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(val, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                ),
               ],
             ),
           ),

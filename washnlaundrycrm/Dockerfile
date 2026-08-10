@@ -14,7 +14,11 @@ COPY pubspec.yaml ./
 RUN flutter pub get
 
 COPY . .
-RUN flutter build web --release
+# --no-tree-shake-icons: the New Order cards pick an icon per garment name at
+# runtime, and the shaker only kept the ones already referenced elsewhere in the
+# app — Blanket, Curtains and Carpet rendered as empty boxes. Costs ~1.5MB of
+# icon font; a silently blank product card costs more.
+RUN flutter build web --release --no-tree-shake-icons
 
 FROM nginx:alpine
 

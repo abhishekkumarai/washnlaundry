@@ -5,7 +5,6 @@ import '../providers/app_provider.dart';
 import '../widgets/dashboard_side_panels.dart';
 import '../widgets/kpi_cards_row.dart';
 import '../widgets/load_state.dart';
-import '../widgets/new_order_dialog.dart';
 import '../widgets/order_pipeline_card.dart';
 import '../widgets/quick_scan_card.dart';
 import '../widgets/recent_activity_card.dart';
@@ -36,10 +35,7 @@ class DashboardScreen extends StatelessWidget {
             child: Column(
               children: [
                 TopHeader(
-                  onNewOrderPressed: () => showDialog(
-                    context: context,
-                    builder: (_) => const NewOrderDialog(),
-                  ),
+                  onNewOrderPressed: () => provider.setNavIndex(1),
                 ),
                 Expanded(child: _body(provider)),
               ],

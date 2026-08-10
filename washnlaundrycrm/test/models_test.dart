@@ -5,14 +5,23 @@ import 'package:washnlaundrycrm/models/order_model.dart';
 void main() {
   group('PricingUnit', () {
     test('labels every unit the live catalogue uses', () {
-      expect(PricingUnit.label(PricingUnit.piece), 'per pc');
-      expect(PricingUnit.label(PricingUnit.kg), 'per kg');
-      expect(PricingUnit.label(PricingUnit.sqft), 'per sq.ft');
-      expect(PricingUnit.label(PricingUnit.set), 'per set');
+      expect(PricingUnit.label(PricingUnit.piece), 'Per piece');
+      expect(PricingUnit.label(PricingUnit.kg), 'Per kg');
+      expect(PricingUnit.label(PricingUnit.sqft), 'Per sq. ft.');
+      expect(PricingUnit.label(PricingUnit.set), 'Per set');
     });
 
-    test('falls back to per pc for unknown units', () {
-      expect(PricingUnit.label('WAT'), 'per pc');
+    test('falls back to per piece for unknown units', () {
+      expect(PricingUnit.label('WAT'), 'Per piece');
+    });
+
+    test('offers exactly the four codes the backend accepts', () {
+      expect(PricingUnit.all, [
+        PricingUnit.piece,
+        PricingUnit.kg,
+        PricingUnit.sqft,
+        PricingUnit.set,
+      ]);
     });
 
     test('short labels are used on price tags', () {
@@ -37,7 +46,7 @@ void main() {
       expect(item.id, '1');
       expect(item.categoryName, 'Ironing');
       expect(item.price, 15.0);
-      expect(item.unitLabel, 'per pc');
+      expect(item.unitLabel, 'Per piece');
       expect(item.turnaroundLabel, '2d');
     });
 
@@ -256,6 +265,43 @@ void main() {
         'capacity': 20,
       });
       expect(slot.capacityLabel, '20');
+    });
+
+    test('renders the range without the kind prefix the server label carries', () {
+      final slot = TimeSlotModel.fromJson({
+        'id': 3,
+        'kind': 'PICKUP',
+        'start_time': '09:00:00',
+        'end_time': '11:30:00',
+        'label': 'Pickup 09:00 AM - 11:30 AM',
+      });
+      expect(slot.timeRangeLabel, '9:00 AM - 11:30 AM');
+    });
+
+    test('formats midnight and noon as 12, not 0', () {
+      expect(TimeSlotModel.formatTime('00:15:00'), '12:15 AM');
+      expect(TimeSlotModel.formatTime('12:00:00'), '12:00 PM');
+      expect(TimeSlotModel.formatTime('22:45:00'), '10:45 PM');
+    });
+
+    test('parses the dropdown labels back to Django TimeField strings', () {
+      expect(TimeSlotModel.parseTime('6:00 AM'), '06:00:00');
+      expect(TimeSlotModel.parseTime('12:00 PM'), '12:00:00');
+      expect(TimeSlotModel.parseTime('12:30 AM'), '00:30:00');
+      expect(TimeSlotModel.parseTime('10:45 PM'), '22:45:00');
+    });
+
+    test('parseTime rejects anything that is not a 12-hour time', () {
+      expect(TimeSlotModel.parseTime('Select start'), isNull);
+      expect(TimeSlotModel.parseTime('25:00'), isNull);
+    });
+
+    test('parsed times sort as strings, which is what slot ordering relies on', () {
+      final start = TimeSlotModel.parseTime('9:00 AM')!;
+      final end = TimeSlotModel.parseTime('11:00 AM')!;
+      expect(end.compareTo(start) > 0, isTrue);
+      expect(TimeSlotModel.parseTime('7:00 AM')!.compareTo(
+          TimeSlotModel.parseTime('6:00 PM')!) < 0, isTrue);
     });
   });
 }

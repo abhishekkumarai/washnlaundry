@@ -159,6 +159,13 @@ class ApiService {
     return GarmentItemModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
+  static Future<GarmentCategoryModel> createCategory(
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send('POST', '/categories/', body: payload);
+    return GarmentCategoryModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
   // ── Customers ──────────────────────────────────────────────────────────────
 
   static Future<List<CustomerModel>> fetchCustomers({String? search}) async {
@@ -214,12 +221,42 @@ class ApiService {
     return _asList(data).map(ServiceAreaModel.fromJson).toList();
   }
 
+  static Future<ServiceAreaModel> createServiceArea(
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send('POST', '/service-areas/', body: payload);
+    return ServiceAreaModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  static Future<void> deleteServiceArea(String id) =>
+      _send('DELETE', '/service-areas/$id/');
+
   static Future<List<TimeSlotModel>> fetchTimeSlots({String? kind}) async {
     final data = await _send('GET', '/time-slots/', query: {
       if (kind != null && kind.isNotEmpty) 'kind': kind,
     });
     return _asList(data).map(TimeSlotModel.fromJson).toList();
   }
+
+  /// [payload] carries `start_time`/`end_time` as "HH:MM:SS" (Django `TimeField`)
+  /// and a null `capacity` for an unlimited slot.
+  static Future<TimeSlotModel> createTimeSlot(
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send('POST', '/time-slots/', body: payload);
+    return TimeSlotModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  static Future<TimeSlotModel> updateTimeSlot(
+    String id,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send('PATCH', '/time-slots/$id/', body: payload);
+    return TimeSlotModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  static Future<void> deleteTimeSlot(String id) =>
+      _send('DELETE', '/time-slots/$id/');
 
   // ── Shop ───────────────────────────────────────────────────────────────────
 

@@ -110,12 +110,15 @@ void main() {
       expect(find.text('Mohan Das'), findsOneWidget);
     });
 
-    testWidgets('the edit pencil opens a prefilled dialog', (tester) async {
+    testWidgets('the row actions menu opens a prefilled edit dialog',
+        (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
 
-      await tester.tap(find.byIcon(Icons.edit_outlined).first);
+      await tester.tap(find.byIcon(Icons.more_horiz_rounded).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit details'));
       await tester.pumpAndSettle();
 
       expect(find.text('Edit Staff Member'), findsOneWidget);
@@ -193,7 +196,9 @@ void main() {
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
 
-      await tester.tap(find.byIcon(Icons.edit_outlined).first);
+      await tester.tap(find.byIcon(Icons.more_horiz_rounded).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit details'));
       await tester.pumpAndSettle();
 
       expect(

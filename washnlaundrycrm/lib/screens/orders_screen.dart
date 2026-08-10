@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../models/order_model.dart';
 import '../widgets/sidebar_navigation.dart';
-import '../widgets/new_order_dialog.dart';
 import '../widgets/status_pill.dart';
 import '../screens/order_detail_screen.dart';
 
@@ -184,7 +183,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       const SizedBox(width: 8),
 
                       ElevatedButton.icon(
-                        onPressed: () => showDialog(context: context, builder: (_) => const NewOrderDialog()),
+                        onPressed: () => context.read<AppProvider>().setNavIndex(1),
                         icon: const Icon(Icons.add, size: 16, color: Colors.white),
                         label: const Text('New Order', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
                         style: ElevatedButton.styleFrom(

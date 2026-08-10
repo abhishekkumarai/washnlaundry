@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_provider.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/top_header.dart';
-import '../widgets/new_order_dialog.dart';
 
 class ExpensesScreen extends StatelessWidget {
   const ExpensesScreen({super.key});
@@ -25,7 +26,7 @@ class ExpensesScreen extends StatelessWidget {
           Expanded(
             child: Column(
               children: [
-                TopHeader(onNewOrderPressed: () => showDialog(context: context, builder: (_) => const NewOrderDialog())),
+                TopHeader(onNewOrderPressed: () => context.read<AppProvider>().setNavIndex(1)),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(24.0),

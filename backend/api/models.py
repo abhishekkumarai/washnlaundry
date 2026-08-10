@@ -177,7 +177,10 @@ class Order(models.Model):
 
     customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     customer_name = models.CharField(max_length=255)
-    customer_phone = models.CharField(max_length=20)
+    # Blank for a counter walk-in: the POS bills them as "Walk-in customer"
+    # with nothing to send a receipt to. Requiring a phone here forced the
+    # client to invent one, which billed a stranger over WhatsApp.
+    customer_phone = models.CharField(max_length=20, blank=True, default='')
 
     status = models.CharField(max_length=20, choices=OrderStatus.choices, default=OrderStatus.PLACED)
     payment_status = models.CharField(max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID)
