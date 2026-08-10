@@ -1,0 +1,266 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:washnlaundrycrm/models/garment_model.dart';
+import 'package:washnlaundrycrm/models/order_model.dart';
+import 'package:washnlaundrycrm/providers/app_provider.dart';
+import 'package:washnlaundrycrm/screens/customer_detail_screen.dart';
+import 'package:washnlaundrycrm/screens/customers_screen.dart';
+
+Widget host(AppProvider provider, Widget child) => ChangeNotifierProvider.value(
+      value: provider,
+      child: MaterialApp(home: child),
+    );
+
+OrderModel order({
+  required String id,
+  required String number,
+  String customerId = '',
+  String phone = '',
+  String name = 'Someone',
+  double total = 500,
+  String status = OrderStatus.delivered,
+  DateTime? createdAt,
+  int itemCount = 2,
+}) {
+  return OrderModel(
+    id: id,
+    orderNumber: number,
+    customerId: customerId,
+    customerName: name,
+    customerPhone: phone,
+    status: status,
+    paymentStatus: PaymentStatus.paid,
+    paymentMethod: 'CASH',
+    totalAmount: total,
+    paidAmount: total,
+    dueAmount: 0,
+    express: false,
+    createdAt: createdAt ?? DateTime.now().subtract(const Duration(hours: 3)),
+    items: List.generate(
+      itemCount,
+      (i) => const OrderItemModel(
+        itemTitle: 'Shirt',
+        serviceType: 'Ironing',
+        status: OrderStatus.delivered,
+        quantity: 1,
+        unit: 'PIECE',
+        unitPrice: 15,
+        totalPrice: 15,
+      ),
+    ),
+  );
+}
+
+void main() {
+  setUp(() {
+    final view =
+        TestWidgetsFlutterBinding.ensureInitialized().platformDispatcher.implicitView!;
+    view.physicalSize = const Size(1600, 1400);
+    view.devicePixelRatio = 1.0;
+  });
+
+  tearDown(() {
+    final view =
+        TestWidgetsFlutterBinding.ensureInitialized().platformDispatcher.implicitView!;
+    view.resetPhysicalSize();
+    view.resetDevicePixelRatio();
+  });
+
+  final roster = [
+    CustomerModel(
+      id: 'c1',
+      name: 'Ramesh Kumar',
+      phone: '9711223344',
+      email: 'ramesh@example.com',
+      area: 'HBR Layout',
+      totalOrders: 3,
+      totalSpent: 1500,
+      avgOrderValue: 500,
+      createdAt: DateTime(2026, 7, 4),
+    ),
+    const CustomerModel(
+      id: 'c2',
+      name: 'Geeta Devi',
+      phone: '9922334455',
+      email: 'geeta@example.com',
+      area: 'Indiranagar',
+    ),
+  ];
+
+  group('CustomersScreen', () {
+    testWidgets('renders the roster from the provider, not a literal',
+        (tester) async {
+      // The screen used to hardcode a single fake customer called "Me".
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Geeta Devi'), findsOneWidget);
+      expect(find.text('HBR Layout'), findsOneWidget);
+      expect(find.text('Me'), findsNothing);
+      expect(find.text('2 Total'), findsOneWidget);
+    });
+
+    testWidgets('KPI cards count total, active and new', (tester) async {
+      // Only Ramesh has orders, so Active is 1 — not the headcount.
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      expect(find.text('Total'), findsOneWidget);
+      expect(find.text('Active'), findsOneWidget);
+      expect(find.text('New'), findsOneWidget);
+
+      final active = tester.widget<Text>(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Active'),
+            matching: find.byType(Column),
+          ).first,
+          matching: find.byType(Text),
+        ).last,
+      );
+      expect(active.data, '1');
+    });
+
+    testWidgets('search matches name, phone and email', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField).first, 'geeta@example');
+      await tester.pump();
+      expect(find.text('Geeta Devi'), findsOneWidget);
+      expect(find.text('Ramesh Kumar'), findsNothing);
+
+      await tester.enterText(find.byType(TextField).first, '9711223344');
+      await tester.pump();
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Geeta Devi'), findsNothing);
+    });
+
+    testWidgets('a search matching nobody says so', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField).first, 'zzzz');
+      await tester.pump();
+
+      expect(find.text('No customer matches "zzzz".'), findsOneWidget);
+    });
+
+    testWidgets('an empty roster invites adding one', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: []);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      expect(find.text('No customers yet. Add one to get started.'), findsOneWidget);
+    });
+
+    testWidgets('tapping a row opens that customer\'s detail screen',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('Ramesh Kumar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CustomerDetailScreen), findsOneWidget);
+      expect(find.text('Back to Customers'), findsOneWidget);
+    });
+  });
+
+  group('CustomerDetailScreen', () {
+    testWidgets('shows the lifetime KPIs and member-since', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(
+        provider,
+        CustomerDetailScreen(customer: roster.first, onBack: () {}),
+      ));
+      await tester.pump();
+
+      expect(find.text('Lifetime value'), findsOneWidget);
+      expect(find.text('₹1500'), findsOneWidget);
+      expect(find.text('Avg order value'), findsOneWidget);
+      expect(find.text('₹500'), findsOneWidget);
+      expect(find.text('Member since Jul 2026'), findsOneWidget);
+    });
+
+    testWidgets('order history lists only this customer\'s orders',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(customers: roster, orders: [
+          order(id: 'o1', number: 'WA3P-00001', customerId: 'c1', phone: '9711223344'),
+          order(id: 'o2', number: 'WA3P-00002', customerId: 'c2', phone: '9922334455'),
+        ]);
+      await tester.pumpWidget(host(
+        provider,
+        CustomerDetailScreen(customer: roster.first, onBack: () {}),
+      ));
+      await tester.pump();
+
+      expect(find.text('#WA3P-00001'), findsOneWidget);
+      expect(find.text('#WA3P-00002'), findsNothing);
+    });
+
+    testWidgets('a counter order with no customer FK still matches on phone',
+        (tester) async {
+      // New Order can bill a walk-in before a customer record exists; those
+      // rows carry the phone but no FK.
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(customers: roster, orders: [
+          order(id: 'o3', number: 'WA3P-00009', phone: '9711223344'),
+        ]);
+      await tester.pumpWidget(host(
+        provider,
+        CustomerDetailScreen(customer: roster.first, onBack: () {}),
+      ));
+      await tester.pump();
+
+      expect(find.text('#WA3P-00009'), findsOneWidget);
+    });
+
+    testWidgets('no orders yields an empty history, not a blank table',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(
+        provider,
+        CustomerDetailScreen(customer: roster.last, onBack: () {}),
+      ));
+      await tester.pump();
+
+      expect(find.text('No orders yet for this customer.'), findsOneWidget);
+    });
+
+    testWidgets('missing contact fields read as Not provided', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(
+        provider,
+        CustomerDetailScreen(customer: roster.last, onBack: () {}),
+      ));
+      await tester.pump();
+
+      // Geeta has no address on file.
+      expect(find.text('Not provided'), findsWidgets);
+    });
+
+    testWidgets('back returns to the list', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('Ramesh Kumar'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CustomerDetailScreen), findsOneWidget);
+
+      await tester.tap(find.text('Back to Customers'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CustomerDetailScreen), findsNothing);
+      expect(find.text('All customers'), findsOneWidget);
+    });
+  });
+}

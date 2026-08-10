@@ -93,7 +93,7 @@ So only **orders** and **garment items** are real. Everything else is a hardcode
 | Screen | State |
 |---|---|
 | Orders, Order detail, New Order | wired to API |
-| Customers | `_customCustomers` literal (`customers_screen.dart:36`) |
+| Customers, Customer detail | wired to API |
 | Staff | `_staffMembers` literal |
 | Attendance | `_staff` literal |
 | Payroll | `_staffPayroll` literal |
