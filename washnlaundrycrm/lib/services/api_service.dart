@@ -228,6 +228,23 @@ class ApiService {
     return _asList(data).map(AttendanceModel.fromJson).toList();
   }
 
+  /// Saves a whole day's register in one call. [date] is `YYYY-MM-DD` and each
+  /// entry is `{'staff': id, 'status': 'PRESENT'}`. The backend upserts, so
+  /// re-saving a day already marked overwrites it instead of colliding with
+  /// the (staff, date) uniqueness constraint.
+  ///
+  /// Returns the saved register — the whole day, not just the rows sent.
+  static Future<List<AttendanceModel>> saveAttendance(
+    String date,
+    List<Map<String, dynamic>> entries,
+  ) async {
+    final data = await _send('POST', '/attendance/bulk/', body: {
+      'date': date,
+      'entries': entries,
+    });
+    return _asList(data).map(AttendanceModel.fromJson).toList();
+  }
+
   // ── Scheduling ─────────────────────────────────────────────────────────────
 
   static Future<List<ServiceAreaModel>> fetchServiceAreas() async {

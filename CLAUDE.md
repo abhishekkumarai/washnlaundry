@@ -64,6 +64,7 @@ Models (`backend/api/models.py`): `Shop`, `Customer`, `GarmentCategory`, `Garmen
 |---|---|
 | `/api/shops/` `/api/customers/` `/api/categories/` `/api/items/` `/api/orders/` `/api/expenses/` `/api/staff/` `/api/attendance/` | full CRUD |
 | `/api/dashboard/stats/` | aggregates: order counts by status, revenue, dues, expenses, net profit |
+| `/api/attendance/bulk/` | POST a whole day's register; **upserts**, because `Attendance` is unique on (staff, date) and Save Register must be pressable twice |
 
 `Customer.id` and `Order.id` are UUIDs. `GarmentItem` carries a **column per service type** (`dry_clean_price`, `wash_iron_price`, `wash_fold_price`, `steam_press_price`, `iron_price`), and the seed sets the irrelevant ones to `0` rather than null — so "price is 0" means "service not offered for this garment", not "free".
 
@@ -97,7 +98,7 @@ So only **orders** and **garment items** are real. Everything else is a hardcode
 | Services | wired to API |
 | Staff | wired to API |
 | Expenses | wired to API |
-| Attendance | `_staff` literal |
+| Attendance | wired to API |
 | Payroll | `_staffPayroll` literal |
 | Reports | derived from the Attendance / Payroll literals |
 

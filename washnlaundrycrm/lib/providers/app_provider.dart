@@ -29,6 +29,19 @@ class AppProvider extends ChangeNotifier {
   List<AttendanceModel> _attendance = [];
   List<AttendanceModel> get attendance => _attendance;
 
+  /// True while a single day's register is being fetched. Separate from
+  /// [isLoading], which covers the whole-shop load — stepping the Attendance
+  /// date picker should not blank every other screen.
+  bool _attendanceLoading = false;
+  bool get attendanceLoading => _attendanceLoading;
+
+  /// Failures from the day-scoped attendance calls, kept out of [error] on
+  /// purpose. [error] means "this shop failed to load" and blanks a screen;
+  /// a failed single-day fetch or save should surface inline while leaving the
+  /// roster on screen.
+  String? _attendanceError;
+  String? get attendanceError => _attendanceError;
+
   List<ServiceAreaModel> _serviceAreas = [];
   List<ServiceAreaModel> get serviceAreas => _serviceAreas;
 
@@ -70,6 +83,7 @@ class AppProvider extends ChangeNotifier {
     List<CustomerModel>? customers,
     List<StaffModel>? staff,
     List<ExpenseModel>? expenses,
+    List<AttendanceModel>? attendance,
     List<ServiceAreaModel>? serviceAreas,
     List<TimeSlotModel>? pickupSlots,
     List<TimeSlotModel>? deliverySlots,
@@ -82,6 +96,7 @@ class AppProvider extends ChangeNotifier {
     if (customers != null) _customers = customers;
     if (staff != null) _staff = staff;
     if (expenses != null) _expenses = expenses;
+    if (attendance != null) _attendance = attendance;
     if (serviceAreas != null) _serviceAreas = serviceAreas;
     if (pickupSlots != null) _pickupSlots = pickupSlots;
     if (deliverySlots != null) _deliverySlots = deliverySlots;
@@ -487,6 +502,73 @@ class AppProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  // ── Attendance ─────────────────────────────────────────────────────────────
+
+  /// `YYYY-MM-DD`, the shape Django's `DateField` parses. Done by hand rather
+  /// than via intl so the provider stays free of formatting dependencies.
+  static String dateKey(DateTime day) =>
+      '${day.year.toString().padLeft(4, '0')}-'
+      '${day.month.toString().padLeft(2, '0')}-'
+      '${day.day.toString().padLeft(2, '0')}';
+
+  /// The register for one day as `{staffId: status}`. A staff member with no
+  /// row is simply absent from the map — that is "not marked yet", which is a
+  /// different thing from ABSENT and the screen renders it differently.
+  Map<String, String> attendanceFor(DateTime day) {
+    final key = dateKey(day);
+    return {
+      for (final a in _attendance)
+        if (a.date != null && dateKey(a.date!) == key) a.staffId: a.status,
+    };
+  }
+
+  /// Loads one day and merges it in, replacing whatever was held for that date.
+  /// Cheaper than [loadDataFromBackend] when only the date picker moved.
+  Future<void> loadAttendanceFor(DateTime day) async {
+    _attendanceLoading = true;
+    _attendanceError = null;
+    notifyListeners();
+    try {
+      final fetched = await ApiService.fetchAttendance(date: dateKey(day));
+      _mergeAttendance(day, fetched);
+    } on ApiException catch (e) {
+      _attendanceError = e.message;
+    }
+    _attendanceLoading = false;
+    notifyListeners();
+  }
+
+  /// Saves a day's register. [marks] is `{staffId: status}`; only the staff
+  /// present in the map are written, so leaving someone unmarked leaves their
+  /// existing row alone rather than defaulting them to present.
+  Future<bool> saveAttendance(DateTime day, Map<String, String> marks) async {
+    try {
+      final saved = await ApiService.saveAttendance(
+        dateKey(day),
+        [
+          for (final entry in marks.entries)
+            {'staff': int.tryParse(entry.key) ?? entry.key, 'status': entry.value},
+        ],
+      );
+      _mergeAttendance(day, saved);
+      _attendanceError = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _attendanceError = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void _mergeAttendance(DateTime day, List<AttendanceModel> rows) {
+    final key = dateKey(day);
+    _attendance = [
+      ..._attendance.where((a) => a.date == null || dateKey(a.date!) != key),
+      ...rows,
+    ];
   }
 
   Future<bool> addExpense(Map<String, dynamic> payload) async {

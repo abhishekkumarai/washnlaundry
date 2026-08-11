@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import viewsets
 from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
@@ -160,6 +161,59 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         if date:
             qs = qs.filter(date=date)
         return qs
+
+    @action(detail=False, methods=['post'])
+    def bulk(self, request):
+        """POST /api/attendance/bulk/ — save a whole day's register at once.
+
+            {"date": "2026-08-11",
+             "entries": [{"staff": 3, "status": "PRESENT"}, ...]}
+
+        Upserts rather than creates: `unique_together = ('staff', 'date')` means
+        a plain re-POST of an already-marked day would 400, and the Attendance
+        screen's Save Register is expected to be pressable twice.
+        """
+        date = parse_date(str(request.data.get('date') or ''))
+        if date is None:
+            return Response(
+                {'detail': 'date is required, as YYYY-MM-DD.'}, status=400
+            )
+
+        entries = request.data.get('entries')
+        if not isinstance(entries, list):
+            return Response({'detail': 'entries must be a list.'}, status=400)
+
+        valid_statuses = {choice[0] for choice in Attendance.STATUS_CHOICES}
+        cleaned = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                return Response({'detail': 'Each entry must be an object.'}, status=400)
+            status_value = str(entry.get('status') or '').upper()
+            if status_value not in valid_statuses:
+                return Response(
+                    {'detail': f'Invalid status. Expected one of {sorted(valid_statuses)}.'},
+                    status=400,
+                )
+            try:
+                staff_id = int(entry.get('staff'))
+            except (TypeError, ValueError):
+                return Response({'detail': 'Each entry needs a staff id.'}, status=400)
+            cleaned.append((staff_id, status_value))
+
+        known = set(Staff.objects.filter(id__in=[s for s, _ in cleaned]).values_list('id', flat=True))
+        missing = sorted({s for s, _ in cleaned} - known)
+        if missing:
+            return Response({'detail': f'Unknown staff: {missing}.'}, status=400)
+
+        # Validate everything before writing anything — a half-saved register is
+        # worse than a rejected one, because nothing on screen says which half.
+        for staff_id, status_value in cleaned:
+            Attendance.objects.update_or_create(
+                staff_id=staff_id, date=date, defaults={'status': status_value}
+            )
+
+        saved = Attendance.objects.select_related('staff').filter(date=date)
+        return Response(AttendanceSerializer(saved, many=True).data)
 
 
 class ServiceAreaViewSet(viewsets.ModelViewSet):

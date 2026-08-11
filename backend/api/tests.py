@@ -556,6 +556,107 @@ class AttendanceTests(TestCase):
             Attendance.objects.create(staff=staff, date=date(2026, 7, 30))
 
 
+class AttendanceBulkTests(APITestCase):
+    """POST /api/attendance/bulk/ — the Attendance screen's Save Register.
+
+    Save Register has to be pressable twice. Because Attendance is unique on
+    (staff, date), a create-only endpoint would 400 the second time, so this
+    upserts and these tests pin that.
+    """
+
+    def setUp(self):
+        self.a = Staff.objects.create(name='Ramesh Kumar', role='Head Washer', phone='1')
+        self.b = Staff.objects.create(name='Geeta Devi', role='Dry Cleaning', phone='2')
+        self.day = '2026-08-11'
+
+    def post(self, payload):
+        return self.client.post('/api/attendance/bulk/', payload, format='json')
+
+    def test_creates_a_register_for_an_unmarked_day(self):
+        response = self.post({
+            'date': self.day,
+            'entries': [
+                {'staff': self.a.id, 'status': 'PRESENT'},
+                {'staff': self.b.id, 'status': 'ABSENT'},
+            ],
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Attendance.objects.filter(date=date(2026, 8, 11)).count(), 2)
+
+    def test_resaving_overwrites_rather_than_duplicating(self):
+        self.post({'date': self.day, 'entries': [{'staff': self.a.id, 'status': 'PRESENT'}]})
+        response = self.post(
+            {'date': self.day, 'entries': [{'staff': self.a.id, 'status': 'HALF_DAY'}]}
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = Attendance.objects.filter(staff=self.a, date=date(2026, 8, 11))
+        self.assertEqual(rows.count(), 1)
+        self.assertEqual(rows.first().status, Attendance.HALF_DAY)
+
+    def test_response_is_the_whole_day_not_just_the_rows_sent(self):
+        self.post({'date': self.day, 'entries': [{'staff': self.a.id, 'status': 'PRESENT'}]})
+        response = self.post({'date': self.day, 'entries': [{'staff': self.b.id, 'status': 'LEAVE'}]})
+        self.assertEqual(len(response.data), 2)
+
+    def test_staff_name_is_serialised(self):
+        response = self.post({'date': self.day, 'entries': [{'staff': self.a.id, 'status': 'PRESENT'}]})
+        self.assertEqual(response.data[0]['staff_name'], 'Ramesh Kumar')
+
+    def test_leave_is_an_accepted_status(self):
+        # LEAVE has always been stored and counted on the dashboard, but the
+        # Attendance screen only ever offered three of the four values.
+        response = self.post({'date': self.day, 'entries': [{'staff': self.a.id, 'status': 'LEAVE'}]})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Attendance.objects.get(staff=self.a).status, Attendance.LEAVE)
+
+    def test_unknown_status_is_rejected(self):
+        response = self.post({'date': self.day, 'entries': [{'staff': self.a.id, 'status': 'HOLIDAY'}]})
+        self.assertEqual(response.status_code, 400)
+
+    def test_missing_date_is_rejected(self):
+        response = self.post({'entries': [{'staff': self.a.id, 'status': 'PRESENT'}]})
+        self.assertEqual(response.status_code, 400)
+
+    def test_unparseable_date_is_rejected(self):
+        response = self.post(
+            {'date': '11/08/2026', 'entries': [{'staff': self.a.id, 'status': 'PRESENT'}]}
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_unknown_staff_is_rejected(self):
+        response = self.post({'date': self.day, 'entries': [{'staff': 9999, 'status': 'PRESENT'}]})
+        self.assertEqual(response.status_code, 400)
+
+    def test_entries_must_be_a_list(self):
+        response = self.post({'date': self.day, 'entries': {'staff': self.a.id}})
+        self.assertEqual(response.status_code, 400)
+
+    def test_a_rejected_entry_writes_nothing(self):
+        # Validation runs over the whole batch before the first write: a
+        # half-saved register is worse than a rejected one.
+        response = self.post({
+            'date': self.day,
+            'entries': [
+                {'staff': self.a.id, 'status': 'PRESENT'},
+                {'staff': self.b.id, 'status': 'HOLIDAY'},
+            ],
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Attendance.objects.count(), 0)
+
+    def test_empty_entries_is_a_no_op_not_an_error(self):
+        response = self.post({'date': self.day, 'entries': []})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Attendance.objects.count(), 0)
+
+    def test_list_filters_by_date(self):
+        self.post({'date': self.day, 'entries': [{'staff': self.a.id, 'status': 'PRESENT'}]})
+        self.post({'date': '2026-08-10', 'entries': [{'staff': self.a.id, 'status': 'ABSENT'}]})
+        response = self.client.get('/api/attendance/', {'date': self.day})
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['status'], 'PRESENT')
+
+
 class PosCheckoutContractTests(APITestCase):
     """The exact request the Flutter New Order screen sends on Checkout.
 
