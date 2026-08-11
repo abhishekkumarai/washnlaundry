@@ -137,9 +137,11 @@ Extracted from `app_index.js`. This is the authoritative feature surface.
 
 The live owner sidebar has **8** items: Dashboard, New Order, Orders, Customers, Services, Apps, Subscription, Settings.
 
-Ours has **14**, promoting Staff / Attendance / Payroll / Expenses / Reports / Scan to top level. Verified on the live Free-plan account: `/manage-staff`, `/attendance`, `/payroll`, `/expenses`, `/reports`, `/scan`, `/settings/public-page` and `/settings/offers` all **silently redirect to `/dashboard`** — they are paid-plan features. This is the biggest structural divergence in the clone.
+Ours has **14**, promoting Staff / Attendance / Payroll / Expenses / Reports / Scan to top level.
 
-Decide deliberately whether the clone targets the *Free* surface (8 items) or the *Business* surface (everything). Right now it's neither.
+**There are no plan tiers.** An earlier note here claimed `/manage-staff`, `/attendance`, `/payroll`, `/expenses`, `/reports`, `/scan`, `/settings/public-page` and `/settings/offers` redirect to `/dashboard` as *paid-plan features*, and told you to choose between a "Free surface" and a "Business surface". That was wrong: the tiers those routes were attributed to no longer exist, so there is no Free/paid split to target and the sidebar difference is not a gating question.
+
+What still needs checking against the live app: whether the owner sidebar really is 8 items today, and whether those eight routes are simply the ones with a nav entry while the rest stay reachable by URL. Do that before treating the 14-item shape as a divergence at all.
 
 ### Statuses
 
@@ -166,7 +168,7 @@ Time slots carry a **capacity** (max orders/day) and a **buffer** (minutes befor
 To inspect the live app, drive Chrome via the claude-in-chrome tools. Notes from doing this:
 
 - **The app allows one active session per account.** Signing in anywhere else — another tab, the phone app — terminates this one with *"You were signed out because your account was signed in on another device."* Close every other session first, or the crawl will drop mid-run.
-- **Gated routes redirect to `/dashboard` with no message.** Always check the URL you landed on, not just the page content, or you'll record the dashboard as if it were `/reports`.
+- **A route you can't reach redirects to `/dashboard` with no message.** Always check the URL you landed on, not just the page content, or you'll record the dashboard as if it were `/reports`. This is also how the "paid-plan gating" claim above got into these notes — a redirect was read as a plan tier. Confirm *why* a route bounced before writing down a reason.
 - **Auth restore is slow** (~20–30 s). The app renders `/login` first, then swaps to `/dashboard` once `onAuthStateChanged` fires. Screenshotting too early gives a false "logged out" reading. Wait, then re-check.
 - Watch the console for `[Auth] onAuthStateChanged fired, user: <uid>` — that's the ground truth for session state.
 - The **Poper Blocker** extension (`bkkbcggnhapdmkeljlodobbkopceiche`) injects into the page and throws `AbortError: The user aborted a request` repeatedly, which breaks the app's profile fetch and produces `Failed to load profile. Please try again.` followed by a forced sign-out. Disable it for this domain before any capture session.

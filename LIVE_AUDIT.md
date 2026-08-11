@@ -1,32 +1,55 @@
 # Live audit — app.laundrybill.com
 
-Captured 2026-07-30 from the `washing` / Admin account (plan: **Free**). Screen-by-screen spec of the real app, for building the Flutter + Django clone.
+Captured 2026-07-30 from the `washing` / Admin account. Screen-by-screen spec of the real app, for building the Flutter + Django clone.
+
+> **Superseded in part (2026-08-11): there are no plan tiers.** The "Plan gating" section below is kept as a record of what was observed on the capture date, but it is **no longer true and must not be built against**. See the section itself for what that invalidates.
 
 Real app is React + Firebase (Firestore project `laundryos`). Order and customer IDs are Firestore doc IDs (`LJfbyvJZMq2nwuT6TU2f`, `pNVvh2xjbuLX6ZcvyzJ4`).
 
 ---
 
-## Plan gating — read this first
+## ~~Plan gating~~ — OBSOLETE, do not build against this
 
-The sidebar has **8 items**, not 14. On the Free plan these routes **silently redirect to `/dashboard`**:
+**There are no plan tiers. Everything is open.** Everything in this section is a
+record of the 2026-07-30 capture only, retained so the reasoning in older
+commits still makes sense. It is struck through because it is no longer true.
 
-`/manage-staff` · `/attendance` · `/payroll` · `/expenses` · `/reports` · `/scan` · `/settings/public-page` · `/settings/offers`
+What this invalidates, wherever you find it repeated:
 
-Confirmed against the plan comparison table: Staff management, Attendance, Payroll, Expenses, Reports & analytics, QR scans, Public ordering page are all paid features.
+- Any claim that `/manage-staff`, `/attendance`, `/payroll`, `/expenses`,
+  `/reports`, `/scan`, `/settings/public-page` or `/settings/offers` are
+  **gated**. They are reachable, which means our versions of those screens can
+  finally be checked against the real thing instead of being invention.
+- Any instruction to choose between a "Free surface" and a "Business surface".
+  There is no such split.
+- `Shop.plan` and `Shop.team_login_limit`, and the Staff screen's seat meter
+  built on them — all removed 2026-08-11 (migration `0008`).
 
-Accessible on Free: `dashboard`, `new-order`, `orders`, `orders/:id`, `customers`, `customers/:id`, `inventory`, `apps`, `settings`, `shop-settings`, `delivery-settings`, `settings/subscription`, `help`.
+The redirects *were* observed. What was wrong was the **reason** recorded for
+them: a redirect was read as a plan tier. Whatever caused them, it was not
+gating.
 
-**Our clone puts Staff / Attendance / Payroll / Expenses / Reports / Scan in the top-level sidebar. The real app does not.** That's the biggest structural divergence.
+<details>
+<summary>The capture as recorded on 2026-07-30 (obsolete)</summary>
 
-### Plans
+> The sidebar has **8 items**, not 14. These routes **silently redirect to `/dashboard`**:
+>
+> `/manage-staff` · `/attendance` · `/payroll` · `/expenses` · `/reports` · `/scan` · `/settings/public-page` · `/settings/offers`
+>
+> Reachable: `dashboard`, `new-order`, `orders`, `orders/:id`, `customers`, `customers/:id`, `inventory`, `apps`, `settings`, `shop-settings`, `delivery-settings`, `settings/subscription`, `help`.
+>
+> | | Pro | Pro+ | Business | Franchise |
+> |---|---|---|---|---|
+> | Price | mobile app only | ₹799/mo | ₹1,999/mo | ₹4,999/mo |
+> | Team logins | — | 4 | 15 | 15 |
+> | Shops | 1 | 1 | 1 | 4 |
+>
+> Yearly billing = −20%. Pro purchased in the mobile app; Pro+ and above on web. Feature matrix rows: Orders/month, Customers, Team logins, Services, Order tracking, WhatsApp receipts, Staff management, Attendance, Payroll, Expenses, Reports & analytics, QR scans, Damage photos, Driver/Agent app, Plant dashboard, Public ordering page, Web dashboard.
 
-| | Pro | Pro+ | Business | Franchise |
-|---|---|---|---|---|
-| Price | mobile app only | ₹799/mo | ₹1,999/mo | ₹4,999/mo |
-| Team logins | — | 4 | 15 | 15 |
-| Shops | 1 | 1 | 1 | 4 |
+</details>
 
-Yearly billing = −20%. Pro is purchased in the mobile app (Play/App Store); Pro+ and above subscribe on web. Feature matrix rows: Orders/month, Customers, Team logins, Services, Order tracking, WhatsApp receipts, Staff management, Attendance, Payroll, Expenses, Reports & analytics, QR scans, Damage photos, Driver/Agent app, Plant dashboard, Public ordering page, Web dashboard.
+**Still worth re-capturing:** whether the owner sidebar is 8 items today, and
+whether `Subscription` is still in it.
 
 ---
 
@@ -181,13 +204,15 @@ Contact support: Call `+919666211137` · WhatsApp `919666211137` · Email `hello
 
 ## Not captured
 
-Gated on this plan or not reachable: `/reports`, `/manage-staff`, `/attendance`, `/payroll`, `/expenses`, `/scan`, `/settings/public-page`, `/settings/offers`, `/settings/payment-history`, `/shops`, `/shops/new`.
+Not reached on the capture run: `/reports`, `/manage-staff`, `/attendance`, `/payroll`, `/expenses`, `/scan`, `/settings/public-page`, `/settings/offers`, `/settings/payment-history`, `/shops`, `/shops/new`.
+
+These were written down as plan-gated. **They are not** — there are no plan tiers. Whatever bounced them, it was not a paywall, so they are capturable and this list is the highest-value thing left to fill in: our Attendance, Payroll, Expenses and Reports screens are all invention until it is.
 
 Public routes never visited: `/track`, `/track/:trackingId`, `/track/:shopId/:publicId`, `/receipt/:orderId`, `/order/:shopSlug`, `/:shopSlug`.
 
 Portals never visited: `/staff/*`, `/agent/*`, `/plant/*`, `/super-admin/*`, `/team/*`.
 
-To capture these, either upgrade the account or reason from `app_index.js`.
+To capture these, drive Chrome to each URL and check the URL you land on. No account upgrade is needed — that instruction was based on the plan-gating misreading. `app_index.js` is still the fallback for anything genuinely unreachable.
 
 ---
 
@@ -196,5 +221,5 @@ To capture these, either upgrade the account or reason from `app_index.js`.
 - **The app enforces one active session per account.** Signing in elsewhere (another tab, the phone app) kills this one with *"You were signed out because your account was signed in on another device."* Close every other session before a capture run.
 - Auth restore takes ~10–30 s; the app renders `/login` first and swaps in once `onAuthStateChanged` fires. Console line `[Auth] onAuthStateChanged fired, user: <uid>` is ground truth.
 - The **Poper Blocker** extension (`bkkbcggnhapdmkeljlodobbkopceiche`) throws repeated `AbortError: The user aborted a request` into the page and breaks the profile fetch → `Failed to load profile` → forced sign-out. Disable it for this domain.
-- Gated routes redirect to `/dashboard` **without any message**, so always check the returned URL, not just the content.
+- A route you can't reach redirects to `/dashboard` **without any message**, so always check the returned URL, not just the content. This is how the plan-gating claim got into this file: a silent redirect was read as a paywall. Record *that* a route bounced; don't infer *why*.
 - `--remote-debugging-port` is unavailable: Chrome ≥136 refuses it on the default profile dir (Chrome here is 150).

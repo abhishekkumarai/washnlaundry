@@ -158,8 +158,8 @@ void main() {
     });
 
     testWidgets('Print and Export PDF stay disabled', (tester) async {
-      // Both are paid-plan gated on the live app and were never captured, so
-      // there is nothing to clone them against. Disabled beats a dead button.
+      // Neither has been captured from the live app, so there is nothing to
+      // clone them against. Disabled beats a dead button.
       final provider = AppProvider(autoLoad: false)..seedForTest(reports: report);
       await tester.pumpWidget(host(provider, const ReportsScreen()));
       await tester.pump();

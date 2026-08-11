@@ -19,10 +19,6 @@ class _StaffScreenState extends State<StaffScreen> {
   /// edits reflect what the backend actually stored.
   List<Map<String, dynamic>> _staffMembers = const [];
 
-  /// Team-login seats the current plan grants. Falls back to the Pro+ figure
-  /// if the shop hasn't loaded yet.
-  int _loginLimit = 4;
-
   void _syncFromProvider(AppProvider provider) {
     _staffMembers = provider.staff
         .map((s) => <String, dynamic>{
@@ -36,7 +32,6 @@ class _StaffScreenState extends State<StaffScreen> {
               'hasAppLogin': s.hasAppLogin,
             })
         .toList();
-    _loginLimit = (provider.shop?['team_login_limit'] as num?)?.toInt() ?? 4;
   }
 
   Future<void> _patchStaff(
@@ -59,22 +54,13 @@ class _StaffScreenState extends State<StaffScreen> {
     );
   }
 
-  /// Grant or revoke access to the Staff / Delivery Agent app, refusing to
-  /// exceed the plan's seat count.
+  /// Grant or revoke access to the Staff / Delivery Agent app.
+  ///
+  /// There is no seat cap. This used to refuse a grant past
+  /// `Shop.team_login_limit`, but the live app has no plan tiers, so there was
+  /// nothing behind the limit it was enforcing.
   Future<void> _toggleAppLogin(BuildContext context, Map<String, dynamic> member) async {
     final granting = !(member['hasAppLogin'] as bool);
-    final used = _staffMembers.where((m) => m['hasAppLogin'] == true).length;
-
-    if (granting && used >= _loginLimit) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Your plan includes $_loginLimit team logins. '
-              'Revoke one or upgrade to add more.'),
-          backgroundColor: const Color(0xFFD97706),
-        ),
-      );
-      return;
-    }
 
     await _patchStaff(
       context,
@@ -457,7 +443,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                 iconBg: const Color(0xFFF3E8FF),
                                 iconColor: const Color(0xFFA855F7),
                                 val: '$appLoginsCount',
-                                label: 'App logins · of $_loginLimit on plan',
+                                label: 'App logins',
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -751,18 +737,20 @@ class _StaffScreenState extends State<StaffScreen> {
     );
   }
 
-  /// "App Logins" tab: who can sign into the Staff / Delivery Agent apps, and
-  /// how many of the plan's seats that uses. Previously this tab rendered the
-  /// roster verbatim, so it did nothing at all.
+  /// "App Logins" tab: who can sign into the Staff / Delivery Agent apps.
+  /// Previously this tab rendered the roster verbatim, so it did nothing at all.
+  ///
+  /// The seat-usage meter that used to head this tab is gone with
+  /// `Shop.team_login_limit` — there are no plan tiers on the live app, so
+  /// "3 seats remaining on your plan" was measuring against nothing. A plain
+  /// count of who has access is all the data actually supports.
   Widget _buildAppLoginsTab(BuildContext context) {
     final withAccess = _staffMembers.where((m) => m['hasAppLogin'] == true).toList();
     final used = withAccess.length;
-    final remaining = (_loginLimit - used).clamp(0, _loginLimit);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Seat usage
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -770,49 +758,25 @@ class _StaffScreenState extends State<StaffScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Team logins',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                        Text('Who can sign in to the Staff and Delivery Agent apps',
-                            style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8))),
-                      ],
-                    ),
-                  ),
-                  Text('$used of $_loginLimit used',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: remaining == 0 ? const Color(0xFFD97706) : const Color(0xFF0F172A),
-                      )),
-                ],
-              ),
-              const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: LinearProgressIndicator(
-                  value: _loginLimit == 0 ? 0 : used / _loginLimit,
-                  minHeight: 7,
-                  backgroundColor: const Color(0xFFF1F5F9),
-                  valueColor: AlwaysStoppedAnimation(
-                    remaining == 0 ? const Color(0xFFD97706) : const Color(0xFF1A4FD6),
-                  ),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Team logins',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    Text('Who can sign in to the Staff and Delivery Agent apps',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8))),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                remaining == 0
-                    ? 'All seats in use. Revoke one to grant access to someone else.'
-                    : '$remaining seat${remaining == 1 ? '' : 's'} remaining on your plan.',
-                style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-              ),
+              Text('$used with access',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  )),
             ],
           ),
         ),

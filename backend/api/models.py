@@ -76,11 +76,6 @@ class Shop(models.Model):
     # Order numbers are shop-prefixed and sequential, e.g. #WA3P-00001.
     order_prefix = models.CharField(max_length=8, blank=True, default='')
 
-    # Plan and the team-login cap it grants. On the live app: Pro+ 4 seats,
-    # Business and Franchise 15. The Staff screen shows usage against this.
-    plan = models.CharField(max_length=40, default='Pro+')
-    team_login_limit = models.IntegerField(default=4)
-
     # Minutes before a slot starts after which customers can no longer book it.
     pickup_buffer_minutes = models.IntegerField(default=30)
     delivery_buffer_minutes = models.IntegerField(default=30)

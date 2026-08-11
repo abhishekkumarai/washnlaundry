@@ -6,9 +6,10 @@ import '../providers/app_provider.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/top_header.dart';
 
-/// `/expenses` in the live app. Paid-plan gated there, so it was never
-/// captured — this follows our own conventions rather than cloning a
-/// screenshot. See LIVE_AUDIT.md "Not captured".
+/// `/expenses` in the live app. Not captured yet, so this follows our own
+/// conventions rather than cloning a screenshot. See LIVE_AUDIT.md
+/// "Not captured". The live route is reachable (there are no plan tiers), so
+/// it can be captured and this screen checked against it.
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
 

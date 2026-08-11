@@ -130,7 +130,7 @@ void main() {
         (tester) async {
       // This tab used to render the roster verbatim — it did nothing.
       final provider = AppProvider(autoLoad: false)
-        ..seedForTest(staff: roster, shop: {'id': 1, 'team_login_limit': 4});
+        ..seedForTest(staff: roster, shop: {'id': 1});
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
 
@@ -138,35 +138,40 @@ void main() {
       await tester.pump();
 
       expect(find.text('Team logins'), findsOneWidget);
-      expect(find.text('2 of 4 used'), findsOneWidget);
+      expect(find.text('2 with access'), findsOneWidget);
       expect(find.text('Staff app'), findsOneWidget);
       expect(find.text('Delivery Agent app'), findsOneWidget);
       expect(find.byType(Switch), findsNWidgets(2));
     });
 
-    testWidgets('seat usage reflects the plan, not the headcount', (tester) async {
+    testWidgets('there is no seat cap to measure against', (tester) async {
+      // The tab used to head itself with "N of M used" and "K seats remaining
+      // on your plan", against Shop.team_login_limit. There are no plan tiers
+      // on the live app, so the meter was measuring against nothing.
       final provider = AppProvider(autoLoad: false)
-        ..seedForTest(staff: roster, shop: {'id': 1, 'team_login_limit': 15});
+        ..seedForTest(staff: roster, shop: {'id': 1});
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
 
       await tester.tap(find.text('App Logins'));
       await tester.pump();
 
-      expect(find.text('2 of 15 used'), findsOneWidget);
-      expect(find.text('13 seats remaining on your plan.'), findsOneWidget);
+      expect(find.textContaining('used'), findsNothing);
+      expect(find.textContaining('remaining on your plan'), findsNothing);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
     });
 
-    testWidgets('granting a seat beyond the plan limit is refused',
+    testWidgets('granting app access is never refused for want of a seat',
         (tester) async {
-      // One free seat, two members without access: the second must be blocked.
+      // Two members already have access and a third does not. Under the old
+      // cap this combination was blocked outright; now it reaches the API.
       final provider = AppProvider(autoLoad: false)
         ..seedForTest(
           staff: [
             ...roster,
             const StaffModel(id: '3', name: 'Geeta Devi', role: 'Dry Cleaning', phone: '9922334455'),
           ],
-          shop: {'id': 1, 'team_login_limit': 2},
+          shop: {'id': 1},
         );
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
@@ -174,20 +179,12 @@ void main() {
       await tester.tap(find.text('App Logins'));
       await tester.pump();
 
-      expect(find.text('2 of 2 used'), findsOneWidget);
-      expect(
-        find.text('All seats in use. Revoke one to grant access to someone else.'),
-        findsOneWidget,
-      );
-
-      // Toggling the member without access warns instead of calling the API.
       await tester.tap(find.byType(Switch).last);
       await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
 
-      expect(
-        find.textContaining('Your plan includes 2 team logins'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Your plan includes'), findsNothing);
+      expect(find.textContaining('Revoke one or upgrade'), findsNothing);
     });
 
     testWidgets('the edit dialog offers an active toggle', (tester) async {

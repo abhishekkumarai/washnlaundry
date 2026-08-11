@@ -129,8 +129,8 @@ typed in as ratios (`0.25`, `0.35`, …) and a status breakdown listing
   margin, and the screen renders `—` for it.
 
 `Print` and `Export PDF` are still no-ops, now explicitly **disabled** rather
-than live buttons that do nothing. Both are paid-plan gated on the live app and
-have never been captured, so there is nothing to clone them against.
+than live buttons that do nothing. Neither has been captured from the live app,
+so there is nothing to clone them against.
 
 ---
 
@@ -163,11 +163,11 @@ analyze after a large edit re-analyses from scratch and can take 90 s+.
 
 - **Order number prefix.** Local DB generates `WASH-000NN`; the live app uses
   `WA3P-00002`, derived differently from the shop name `washing`.
-- **Sidebar shape.** Live has 8 items; ours has 14. All the extras are
-  paid-plan features that silently redirect to `/dashboard` on the live Free
-  account. `CLAUDE.md` calls this the biggest structural divergence and it is
-  still unresolved — the clone targets neither the Free surface nor the
-  Business one.
+- **Sidebar shape.** Live had 8 items at capture; ours has 14. This used to be
+  written up as paid-plan gating — see the correction below. It is now an open
+  question rather than a known divergence: re-capture whether the live owner
+  sidebar is still 8 items, and whether the other routes are reachable by URL
+  without a nav entry.
 - **No router.** `main.dart` still switches on `AppProvider.currentNavIndex`.
   `CLAUDE.md` calls the `go_router` migration the single highest-value refactor
   available, and it is the thing blocking Android (the system back button has
@@ -185,9 +185,36 @@ tests, and the payroll endpoint was checked against freshly seeded data
 end-to-end pass has not been repeated. Worth doing before trusting the Reports
 screen's layout at real widths, since it packs six metric cards into one row.
 
+### Correction landed late in the session: there are no plan tiers
+
+The docs asserted throughout that `/attendance`, `/payroll`, `/reports`,
+`/manage-staff`, `/expenses` and `/scan` were **paid-plan gated**, and that
+matching them needed a paid account. That was wrong. The tiers recorded in
+`LIVE_AUDIT.md` (Pro / Pro+ / Business / Franchise) no longer exist.
+
+The redirects to `/dashboard` were genuinely observed on 2026-07-30. What was
+wrong was the *reason* written down for them — a silent redirect was read as a
+paywall. Both `CLAUDE.md` and `LIVE_AUDIT.md` now carry a note to record that a
+route bounced without inferring why.
+
+Removed as a result:
+
+- `Shop.plan` and `Shop.team_login_limit` (migration `0008`), and their seed
+  values.
+- The Staff screen's **seat meter** — "2 of 4 used", "13 seats remaining on
+  your plan", and the progress bar — which measured against nothing. The App
+  Logins tab now shows a plain "N with access".
+- The **cap enforcement** in `_toggleAppLogin`, which refused to grant app
+  access past the limit. Granting is never refused now.
+
+The upside is the bigger half: those routes are **reachable**, so our
+Attendance, Payroll, Expenses and Reports screens can finally be checked
+against the real app instead of remaining invention. That is now the
+highest-value capture work outstanding.
+
 ### Caveats that still apply
 
-- The live account is **Free plan**. `/attendance`, `/payroll` and `/reports`
-  all redirect to `/dashboard` there, so **our versions of all three screens
-  are invention, not clones.** Matching them needs a paid account.
 - Only a human can sign in, and the app allows one active session per account.
+- Our Attendance, Payroll, Expenses and Reports screens are still **invention,
+  not clones** — not because they are gated, but because nobody has captured
+  them yet.

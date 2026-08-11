@@ -6,8 +6,10 @@ import '../providers/app_provider.dart';
 import '../widgets/load_state.dart';
 import '../widgets/sidebar_navigation.dart';
 
-/// `/reports` in the live app. Paid-plan gated there and never captured, so
-/// this follows our own conventions — see LIVE_AUDIT.md "Not captured".
+/// `/reports` in the live app. Not captured yet, so this follows our own
+/// conventions rather than cloning a screenshot — see LIVE_AUDIT.md
+/// "Not captured". The live route is reachable (there are no plan tiers), so
+/// it can be captured and this screen checked against it.
 ///
 /// Every figure comes from `/api/reports/`. The screen used to hardcode all of
 /// them, down to an eight-month bar chart whose heights were typed in by hand
@@ -180,9 +182,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
           const SizedBox(width: 14),
 
-          // Print and Export PDF are deliberately still no-ops: both are
-          // paid-plan gated on the live app and have never been captured, so
-          // there is nothing to clone them against yet.
+          // Print and Export PDF are deliberately still no-ops: neither has
+          // been captured from the live app, so there is nothing to clone them
+          // against yet. Disabled beats a button that silently does nothing.
           OutlinedButton.icon(
             onPressed: null,
             icon: const Icon(Icons.print_outlined, size: 15, color: Color(0xFF94A3B8)),

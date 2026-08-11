@@ -6,8 +6,10 @@ import '../providers/app_provider.dart';
 import '../widgets/load_state.dart';
 import '../widgets/sidebar_navigation.dart';
 
-/// `/attendance` in the live app. Paid-plan gated there and never captured, so
-/// this follows our own conventions — see LIVE_AUDIT.md "Not captured".
+/// `/attendance` in the live app. Not captured yet, so this follows our own
+/// conventions rather than cloning a screenshot — see LIVE_AUDIT.md
+/// "Not captured". The live route is reachable (there are no plan tiers), so
+/// it can be captured and this screen checked against it.
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
 
