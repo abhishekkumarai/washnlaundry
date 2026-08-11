@@ -58,13 +58,17 @@ cd washnlaundrycrm && flutter run -d chrome
 
 Django 5 / DRF / SQLite, app label `api`. Everything is a plain `ModelViewSet` on a `DefaultRouter` — no auth, no permissions, no pagination, no filtering.
 
-Models (`backend/api/models.py`): `Shop`, `Customer`, `GarmentCategory`, `GarmentItem`, `Order`, `OrderItem`, `Expense`, `Staff`, `Attendance`.
+Models (`backend/api/models.py`): `Shop`, `Customer`, `GarmentCategory`, `GarmentItem`, `Order`, `OrderItem`, `Expense`, `Staff`, `Attendance`, `SalaryPayment`.
+
+`SalaryPayment` is a payout against one staff member's wages for one month. Wages *earned* are never stored — they are derived from `Attendance` times `Staff.daily_wage`, with `Attendance.DAY_VALUE` deciding what each state is worth (`HALF_DAY` is 0.5; `LEAVE` is unpaid). It is deliberately **not** unique on `(staff, month)`: a month can be paid in instalments, which is what makes `PARTIAL` a real state.
 
 | Endpoint | |
 |---|---|
 | `/api/shops/` `/api/customers/` `/api/categories/` `/api/items/` `/api/orders/` `/api/expenses/` `/api/staff/` `/api/attendance/` | full CRUD |
 | `/api/dashboard/stats/` | aggregates: order counts by status, revenue, dues, expenses, net profit |
 | `/api/attendance/bulk/` | POST a whole day's register; **upserts**, because `Attendance` is unique on (staff, date) and Save Register must be pressable twice |
+| `/api/salary-payments/` | full CRUD, filterable by `?month=YYYY-MM` and `?staff=` |
+| `/api/payroll/?month=YYYY-MM` | the Payroll screen in one call: days worked and wages derived from the register, paid/pending from `SalaryPayment`, plus the four KPI totals |
 
 `Customer.id` and `Order.id` are UUIDs. `GarmentItem` carries a **column per service type** (`dry_clean_price`, `wash_iron_price`, `wash_fold_price`, `steam_press_price`, `iron_price`), and the seed sets the irrelevant ones to `0` rather than null — so "price is 0" means "service not offered for this garment", not "free".
 
@@ -99,7 +103,7 @@ So only **orders** and **garment items** are real. Everything else is a hardcode
 | Staff | wired to API |
 | Expenses | wired to API |
 | Attendance | wired to API |
-| Payroll | `_staffPayroll` literal |
+| Payroll | wired to API |
 | Reports | derived from the Attendance / Payroll literals |
 
 Wiring these to their existing endpoints is mostly mechanical and is the main outstanding backend-integration work.

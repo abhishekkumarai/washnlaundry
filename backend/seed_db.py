@@ -19,7 +19,7 @@ from django.utils import timezone  # noqa: E402
 
 from api.models import (  # noqa: E402
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
-    Expense, Staff, Attendance, ServiceArea, TimeSlot,
+    Expense, Staff, Attendance, SalaryPayment, ServiceArea, TimeSlot,
     OrderStatus, PaymentStatus, DeliveryType, OrderSource, PricingUnit,
 )
 
@@ -27,10 +27,16 @@ PC, KG, SQFT, SET = PricingUnit.PIECE, PricingUnit.KG, PricingUnit.SQFT, Pricing
 
 # Order provenance, as the live timeline writes it: a counter order names the
 # person who rang it up, the other channels name themselves.
+#
+# Must cover every OrderSource value — the seed picks one at random, so a gap
+# here is a KeyError that only shows up on some runs. It used to be missing
+# STAFF_APP and AGENT_APP.
 CREATED_BY = {
     OrderSource.WEB: 'AK',
     OrderSource.MOBILE_APP: 'Mobile App',
     OrderSource.PUBLIC_PAGE: 'Public Page',
+    OrderSource.STAFF_APP: 'Staff App',
+    OrderSource.AGENT_APP: 'Agent App',
 }
 
 # (category, [(name, price, unit), ...])
@@ -100,6 +106,7 @@ def seed():
     GarmentCategory.objects.all().delete()
     Expense.objects.all().delete()
     Attendance.objects.all().delete()
+    SalaryPayment.objects.all().delete()
     Staff.objects.all().delete()
     TimeSlot.objects.all().delete()
     ServiceArea.objects.all().delete()
@@ -283,14 +290,63 @@ def seed():
         order.save()
 
     print('Seeding Attendance...')
-    for days_ago in range(7):
+    # 70 days, not 7: Payroll totals a calendar month, and a week of register
+    # made everyone look like they had worked five days and earned almost
+    # nothing. This reaches back far enough that the previous month is fully
+    # covered and the month navigator has somewhere to go.
+    attendance_days = 70
+    for days_ago in range(attendance_days):
         date = today - timedelta(days=days_ago)
+        # Sunday off, which is why days worked is nearer 26 than 30.
+        if date.weekday() == 6:
+            continue
         for staff in staff_objs:
             roll = random.random()
-            status = Attendance.PRESENT if roll > 0.15 else (
-                Attendance.LEAVE if roll > 0.08 else Attendance.ABSENT
-            )
+            if roll > 0.15:
+                status = Attendance.PRESENT
+            elif roll > 0.10:
+                status = Attendance.HALF_DAY
+            elif roll > 0.05:
+                status = Attendance.LEAVE
+            else:
+                status = Attendance.ABSENT
             Attendance.objects.create(staff=staff, date=date, status=status)
+
+    print('Seeding Salary Payments...')
+    # Enough to show all three payroll states on first run: last month settled
+    # in full, this month part-paid for some and untouched for others.
+    this_month = today.replace(day=1)
+    last_month = (this_month - timedelta(days=1)).replace(day=1)
+    salary_payments = 0
+    for index, staff in enumerate(staff_objs):
+        # Last month: paid off, so the row reads PAID.
+        worked = Attendance.objects.filter(
+            staff=staff, date__gte=last_month, date__lt=this_month
+        )
+        earned = sum(a.day_value for a in worked) * staff.daily_wage
+        if earned:
+            SalaryPayment.objects.create(
+                staff=staff,
+                month=last_month,
+                amount=round(earned, 2),
+                paid_on=timezone.now() - timedelta(days=today.day + 1),
+                method='BANK_TRANSFER',
+                note='Full settlement',
+            )
+            salary_payments += 1
+
+        # This month: every third person gets nothing (UNPAID), the rest get an
+        # advance (PARTIAL).
+        if index % 3 != 0:
+            SalaryPayment.objects.create(
+                staff=staff,
+                month=this_month,
+                amount=5000.0,
+                paid_on=timezone.now() - timedelta(days=2),
+                method='CASH',
+                note='Advance',
+            )
+            salary_payments += 1
 
     print('Seeding Expenses...')
     # Trailing int is "days ago", so the log spans the current and previous
@@ -319,6 +375,8 @@ def seed():
     print(f'   - {len(orders_plan)} orders')
     print(f'   - {len(staff_data)} staff')
     print(f'   - {len(expenses_data)} expenses')
+    print(f'   - {Attendance.objects.count()} attendance records over {attendance_days} days')
+    print(f'   - {salary_payments} salary payments')
     print(f'   - {total_items} items across {len(CATALOGUE)} categories')
     print(f'   - {ServiceArea.objects.count()} service areas, {TimeSlot.objects.count()} time slots')
 

@@ -306,6 +306,88 @@ class ServiceAreaModel {
       );
 }
 
+/// One staff member's payroll for one month, as `/api/payroll/` computes it.
+///
+/// Everything here is derived server-side: wages earned come from the
+/// attendance register times the daily wage, and [paidAmount] from the month's
+/// SalaryPayment rows. Nothing is stored on the staff record, so these cannot
+/// drift out of step with the register.
+class PayrollEntryModel {
+  final String staffId;
+  final String staffName;
+  final String role;
+  final double dailyWage;
+  final double daysWorked;
+  final double totalSalary;
+  final double paidAmount;
+  final double pendingAmount;
+
+  /// PAID / PARTIAL / UNPAID — the same vocabulary orders use.
+  final String status;
+
+  const PayrollEntryModel({
+    required this.staffId,
+    required this.staffName,
+    this.role = '',
+    this.dailyWage = 0,
+    this.daysWorked = 0,
+    this.totalSalary = 0,
+    this.paidAmount = 0,
+    this.pendingAmount = 0,
+    this.status = 'UNPAID',
+  });
+
+  factory PayrollEntryModel.fromJson(Map<String, dynamic> json) => PayrollEntryModel(
+        staffId: json['staff'].toString(),
+        staffName: json['staff_name'] ?? '',
+        role: json['role'] ?? '',
+        dailyWage: (json['daily_wage'] ?? 0).toDouble(),
+        daysWorked: (json['days_worked'] ?? 0).toDouble(),
+        totalSalary: (json['total_salary'] ?? 0).toDouble(),
+        paidAmount: (json['paid_amount'] ?? 0).toDouble(),
+        pendingAmount: (json['pending_amount'] ?? 0).toDouble(),
+        status: json['status'] ?? 'UNPAID',
+      );
+
+  /// "24" or "23.5" — half-days are real, so a whole number should not gain a
+  /// misleading ".0".
+  String get daysWorkedLabel =>
+      daysWorked == daysWorked.roundToDouble() ? daysWorked.toInt().toString() : '$daysWorked';
+}
+
+/// A month of payroll: the rows plus the four KPI totals above them.
+class PayrollSummaryModel {
+  final DateTime? month;
+  final List<PayrollEntryModel> entries;
+  final double totalPayroll;
+  final double paid;
+  final double pending;
+  final int staffCount;
+
+  const PayrollSummaryModel({
+    this.month,
+    this.entries = const [],
+    this.totalPayroll = 0,
+    this.paid = 0,
+    this.pending = 0,
+    this.staffCount = 0,
+  });
+
+  factory PayrollSummaryModel.fromJson(Map<String, dynamic> json) {
+    final totals = (json['totals'] as Map?)?.cast<String, dynamic>() ?? const {};
+    return PayrollSummaryModel(
+      month: DateTime.tryParse(json['month'] ?? ''),
+      entries: ((json['entries'] as List?) ?? const [])
+          .map((e) => PayrollEntryModel.fromJson((e as Map).cast<String, dynamic>()))
+          .toList(),
+      totalPayroll: (totals['total_payroll'] ?? 0).toDouble(),
+      paid: (totals['paid'] ?? 0).toDouble(),
+      pending: (totals['pending'] ?? 0).toDouble(),
+      staffCount: (totals['staff_count'] ?? 0).toInt(),
+    );
+  }
+}
+
 /// A bookable pickup or delivery window.
 ///
 /// [capacity] is the max orders per day for the slot; null means unlimited.

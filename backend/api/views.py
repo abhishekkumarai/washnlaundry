@@ -9,14 +9,14 @@ from rest_framework.response import Response
 
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
-    Expense, Staff, Attendance, ServiceArea, TimeSlot,
+    Expense, Staff, Attendance, SalaryPayment, ServiceArea, TimeSlot,
     OrderStatus, PaymentStatus, DeliveryType,
 )
 from .serializers import (
     ShopSerializer, CustomerSerializer, GarmentCategorySerializer,
     GarmentItemSerializer, OrderSerializer, OrderItemSerializer,
     ExpenseSerializer, StaffSerializer, AttendanceSerializer,
-    ServiceAreaSerializer, TimeSlotSerializer,
+    SalaryPaymentSerializer, ServiceAreaSerializer, TimeSlotSerializer,
 )
 
 
@@ -214,6 +214,98 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         saved = Attendance.objects.select_related('staff').filter(date=date)
         return Response(AttendanceSerializer(saved, many=True).data)
+
+
+class SalaryPaymentViewSet(viewsets.ModelViewSet):
+    serializer_class = SalaryPaymentSerializer
+
+    def get_queryset(self):
+        qs = SalaryPayment.objects.select_related('staff').all()
+        month = parse_month(self.request.query_params.get('month'))
+        if month:
+            qs = qs.filter(month=month)
+        staff = self.request.query_params.get('staff')
+        if staff:
+            qs = qs.filter(staff_id=staff)
+        return qs
+
+
+def parse_month(raw):
+    """'2026-08' or '2026-08-11' -> date(2026, 8, 1). None if unparseable."""
+    if not raw:
+        return None
+    text = str(raw).strip()
+    parsed = parse_date(text if len(text) > 7 else f'{text}-01')
+    return parsed.replace(day=1) if parsed else None
+
+
+@api_view(['GET'])
+def payroll_summary(request):
+    """GET /api/payroll/?month=YYYY-MM — the Payroll screen, in one call.
+
+    Wages earned are derived from Attendance (`Attendance.DAY_VALUE` decides
+    what each state is worth) times `Staff.daily_wage`. What was actually paid
+    comes from SalaryPayment. Neither number is stored on Staff, so nothing here
+    can drift out of step with the register.
+    """
+    month = parse_month(request.query_params.get('month')) or timezone.localdate().replace(day=1)
+    # First day of the following month, without needing calendar arithmetic.
+    next_month = (month + timedelta(days=32)).replace(day=1)
+
+    roster = Staff.objects.filter(status='ACTIVE').order_by('name')
+
+    days = {}
+    attendance = Attendance.objects.filter(date__gte=month, date__lt=next_month)
+    for record in attendance:
+        days[record.staff_id] = days.get(record.staff_id, 0.0) + record.day_value
+
+    paid = {
+        row['staff_id']: row['total']
+        for row in SalaryPayment.objects.filter(month=month)
+        .values('staff_id')
+        .annotate(total=Sum('amount'))
+    }
+
+    entries = []
+    for member in roster:
+        days_worked = round(days.get(member.id, 0.0), 1)
+        total_salary = round(days_worked * member.daily_wage, 2)
+        paid_amount = round(paid.get(member.id, 0.0), 2)
+        pending = round(max(total_salary - paid_amount, 0.0), 2)
+
+        # Same three-way rule the order payment action uses, so PAID/PARTIAL/
+        # UNPAID mean the same thing everywhere in the app.
+        if total_salary <= 0:
+            status_value = PaymentStatus.UNPAID
+        elif pending <= 0:
+            status_value = PaymentStatus.PAID
+        elif paid_amount > 0:
+            status_value = PaymentStatus.PARTIAL
+        else:
+            status_value = PaymentStatus.UNPAID
+
+        entries.append({
+            'staff': member.id,
+            'staff_name': member.name,
+            'role': member.role,
+            'daily_wage': member.daily_wage,
+            'days_worked': days_worked,
+            'total_salary': total_salary,
+            'paid_amount': paid_amount,
+            'pending_amount': pending,
+            'status': status_value,
+        })
+
+    return Response({
+        'month': month.isoformat(),
+        'entries': entries,
+        'totals': {
+            'total_payroll': round(sum(e['total_salary'] for e in entries), 2),
+            'paid': round(sum(e['paid_amount'] for e in entries), 2),
+            'pending': round(sum(e['pending_amount'] for e in entries), 2),
+            'staff_count': len(entries),
+        },
+    })
 
 
 class ServiceAreaViewSet(viewsets.ModelViewSet):

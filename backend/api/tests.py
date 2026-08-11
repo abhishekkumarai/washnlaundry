@@ -13,7 +13,7 @@ from rest_framework.test import APITestCase
 
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
-    Staff, Expense, Attendance, ServiceArea, TimeSlot,
+    Staff, Expense, Attendance, SalaryPayment, ServiceArea, TimeSlot,
     OrderStatus, PaymentStatus, DeliveryType, PricingUnit,
 )
 
@@ -655,6 +655,184 @@ class AttendanceBulkTests(APITestCase):
         response = self.client.get('/api/attendance/', {'date': self.day})
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['status'], 'PRESENT')
+
+
+class PayrollTests(APITestCase):
+    """GET /api/payroll/?month=YYYY-MM.
+
+    Wages earned are derived from the attendance register, never stored, so
+    they cannot drift out of step with it. What was paid comes from
+    SalaryPayment, which is the thing the schema previously had no room for at
+    all — which is why the Payroll screen's Paid column was hardcoded.
+    """
+
+    def setUp(self):
+        self.staff = Staff.objects.create(
+            name='Ramesh Kumar', role='Head Washer', phone='1', daily_wage=600.0
+        )
+        self.month = date(2026, 7, 1)
+
+    def mark(self, day, status, staff=None):
+        Attendance.objects.create(
+            staff=staff or self.staff, date=date(2026, 7, day), status=status
+        )
+
+    def payroll(self, month='2026-07'):
+        return self.client.get('/api/payroll/', {'month': month}).data
+
+    def entry(self, month='2026-07'):
+        return self.payroll(month)['entries'][0]
+
+    def test_present_days_are_worth_a_full_day(self):
+        self.mark(1, Attendance.PRESENT)
+        self.mark(2, Attendance.PRESENT)
+        entry = self.entry()
+        self.assertEqual(entry['days_worked'], 2.0)
+        self.assertEqual(entry['total_salary'], 1200.0)
+
+    def test_half_day_is_worth_half(self):
+        # HALF_DAY is offered on the register and stored, so paying it as a
+        # whole day would quietly overpay.
+        self.mark(1, Attendance.PRESENT)
+        self.mark(2, Attendance.HALF_DAY)
+        entry = self.entry()
+        self.assertEqual(entry['days_worked'], 1.5)
+        self.assertEqual(entry['total_salary'], 900.0)
+
+    def test_absent_and_leave_are_unpaid(self):
+        self.mark(1, Attendance.PRESENT)
+        self.mark(2, Attendance.ABSENT)
+        self.mark(3, Attendance.LEAVE)
+        self.assertEqual(self.entry()['days_worked'], 1.0)
+
+    def test_no_attendance_means_no_wages(self):
+        entry = self.entry()
+        self.assertEqual(entry['days_worked'], 0.0)
+        self.assertEqual(entry['total_salary'], 0.0)
+
+    def test_a_neighbouring_month_is_excluded(self):
+        self.mark(1, Attendance.PRESENT)
+        Attendance.objects.create(
+            staff=self.staff, date=date(2026, 8, 1), status=Attendance.PRESENT
+        )
+        Attendance.objects.create(
+            staff=self.staff, date=date(2026, 6, 30), status=Attendance.PRESENT
+        )
+        self.assertEqual(self.entry()['days_worked'], 1.0)
+
+    def test_december_does_not_bleed_into_january(self):
+        # The next-month boundary is computed by adding 32 days and snapping to
+        # the 1st, so a year rollover is worth pinning.
+        member = Staff.objects.create(name='Solo', role='Washer', phone='9', daily_wage=100.0)
+        Staff.objects.filter(id=self.staff.id).delete()
+        Attendance.objects.create(staff=member, date=date(2026, 12, 31), status=Attendance.PRESENT)
+        Attendance.objects.create(staff=member, date=date(2027, 1, 1), status=Attendance.PRESENT)
+        self.assertEqual(self.entry('2026-12')['days_worked'], 1.0)
+
+    def test_unpaid_when_nothing_has_been_paid(self):
+        self.mark(1, Attendance.PRESENT)
+        entry = self.entry()
+        self.assertEqual(entry['paid_amount'], 0.0)
+        self.assertEqual(entry['pending_amount'], 600.0)
+        self.assertEqual(entry['status'], PaymentStatus.UNPAID)
+
+    def test_partial_when_part_paid(self):
+        self.mark(1, Attendance.PRESENT)
+        SalaryPayment.objects.create(staff=self.staff, month=self.month, amount=200.0)
+        entry = self.entry()
+        self.assertEqual(entry['pending_amount'], 400.0)
+        self.assertEqual(entry['status'], PaymentStatus.PARTIAL)
+
+    def test_instalments_add_up(self):
+        # Deliberately not unique on (staff, month): a month can be paid in
+        # parts, which is the whole reason PARTIAL is a real state.
+        self.mark(1, Attendance.PRESENT)
+        SalaryPayment.objects.create(staff=self.staff, month=self.month, amount=200.0)
+        SalaryPayment.objects.create(staff=self.staff, month=self.month, amount=400.0)
+        entry = self.entry()
+        self.assertEqual(entry['paid_amount'], 600.0)
+        self.assertEqual(entry['status'], PaymentStatus.PAID)
+
+    def test_overpayment_does_not_produce_negative_pending(self):
+        self.mark(1, Attendance.PRESENT)
+        SalaryPayment.objects.create(staff=self.staff, month=self.month, amount=1000.0)
+        entry = self.entry()
+        self.assertEqual(entry['pending_amount'], 0.0)
+        self.assertEqual(entry['status'], PaymentStatus.PAID)
+
+    def test_payment_in_another_month_does_not_count(self):
+        self.mark(1, Attendance.PRESENT)
+        SalaryPayment.objects.create(staff=self.staff, month=date(2026, 8, 1), amount=600.0)
+        self.assertEqual(self.entry()['paid_amount'], 0.0)
+
+    def test_month_is_normalised_to_the_first(self):
+        payment = SalaryPayment.objects.create(
+            staff=self.staff, month=date(2026, 7, 19), amount=100.0
+        )
+        payment.refresh_from_db()
+        self.assertEqual(payment.month, date(2026, 7, 1))
+
+    def test_inactive_staff_are_off_the_payroll(self):
+        Staff.objects.create(
+            name='Bhola Prasad', role='Retired', phone='2', status='INACTIVE'
+        )
+        names = [e['staff_name'] for e in self.payroll()['entries']]
+        self.assertEqual(names, ['Ramesh Kumar'])
+
+    def test_totals_sum_the_entries(self):
+        other = Staff.objects.create(
+            name='Geeta Devi', role='Dry Cleaning', phone='3', daily_wage=500.0
+        )
+        self.mark(1, Attendance.PRESENT)
+        self.mark(1, Attendance.PRESENT, staff=other)
+        SalaryPayment.objects.create(staff=self.staff, month=self.month, amount=100.0)
+
+        totals = self.payroll()['totals']
+        self.assertEqual(totals['total_payroll'], 1100.0)
+        self.assertEqual(totals['paid'], 100.0)
+        self.assertEqual(totals['pending'], 1000.0)
+        self.assertEqual(totals['staff_count'], 2)
+
+    def test_month_defaults_to_the_current_one(self):
+        response = self.client.get('/api/payroll/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data['month'], timezone.localdate().replace(day=1).isoformat()
+        )
+
+    def test_an_unparseable_month_falls_back_rather_than_500ing(self):
+        response = self.client.get('/api/payroll/', {'month': 'July'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data['month'], timezone.localdate().replace(day=1).isoformat()
+        )
+
+    def test_salary_payment_endpoint_filters_by_month(self):
+        SalaryPayment.objects.create(staff=self.staff, month=self.month, amount=100.0)
+        SalaryPayment.objects.create(staff=self.staff, month=date(2026, 8, 1), amount=200.0)
+        response = self.client.get('/api/salary-payments/', {'month': '2026-07'})
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['amount'], 100.0)
+        self.assertEqual(response.data[0]['staff_name'], 'Ramesh Kumar')
+
+    def test_recording_a_payment_moves_the_summary(self):
+        self.mark(1, Attendance.PRESENT)
+        self.client.post(
+            '/api/salary-payments/',
+            {'staff': self.staff.id, 'month': '2026-07-01', 'amount': 250.0},
+            format='json',
+        )
+        entry = self.entry()
+        self.assertEqual(entry['paid_amount'], 250.0)
+        self.assertEqual(entry['status'], PaymentStatus.PARTIAL)
+
+    def test_a_non_positive_payment_is_rejected(self):
+        response = self.client.post(
+            '/api/salary-payments/',
+            {'staff': self.staff.id, 'month': '2026-07-01', 'amount': 0},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
 
 
 class PosCheckoutContractTests(APITestCase):

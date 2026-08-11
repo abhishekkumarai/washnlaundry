@@ -42,6 +42,17 @@ class AppProvider extends ChangeNotifier {
   String? _attendanceError;
   String? get attendanceError => _attendanceError;
 
+  /// Payroll is month-scoped, so it is not part of the whole-shop load — it is
+  /// fetched when the screen opens and again whenever the month changes.
+  PayrollSummaryModel? _payroll;
+  PayrollSummaryModel? get payroll => _payroll;
+
+  bool _payrollLoading = false;
+  bool get payrollLoading => _payrollLoading;
+
+  String? _payrollError;
+  String? get payrollError => _payrollError;
+
   List<ServiceAreaModel> _serviceAreas = [];
   List<ServiceAreaModel> get serviceAreas => _serviceAreas;
 
@@ -84,6 +95,7 @@ class AppProvider extends ChangeNotifier {
     List<StaffModel>? staff,
     List<ExpenseModel>? expenses,
     List<AttendanceModel>? attendance,
+    PayrollSummaryModel? payroll,
     List<ServiceAreaModel>? serviceAreas,
     List<TimeSlotModel>? pickupSlots,
     List<TimeSlotModel>? deliverySlots,
@@ -97,6 +109,7 @@ class AppProvider extends ChangeNotifier {
     if (staff != null) _staff = staff;
     if (expenses != null) _expenses = expenses;
     if (attendance != null) _attendance = attendance;
+    if (payroll != null) _payroll = payroll;
     if (serviceAreas != null) _serviceAreas = serviceAreas;
     if (pickupSlots != null) _pickupSlots = pickupSlots;
     if (deliverySlots != null) _deliverySlots = deliverySlots;
@@ -569,6 +582,52 @@ class AppProvider extends ChangeNotifier {
       ..._attendance.where((a) => a.date == null || dateKey(a.date!) != key),
       ...rows,
     ];
+  }
+
+  // ── Payroll ────────────────────────────────────────────────────────────────
+
+  /// `YYYY-MM`, the shape `/api/payroll/` expects.
+  static String monthKey(DateTime month) =>
+      '${month.year.toString().padLeft(4, '0')}-${month.month.toString().padLeft(2, '0')}';
+
+  Future<void> loadPayrollFor(DateTime month) async {
+    _payrollLoading = true;
+    _payrollError = null;
+    notifyListeners();
+    try {
+      _payroll = await ApiService.fetchPayroll(month: monthKey(month));
+    } on ApiException catch (e) {
+      _payrollError = e.message;
+    }
+    _payrollLoading = false;
+    notifyListeners();
+  }
+
+  /// Records a payout, then reloads the month — `paid`, `pending` and the
+  /// PAID/PARTIAL/UNPAID status are all computed server-side, so a local guess
+  /// at the new totals could disagree with the next fetch.
+  Future<bool> recordSalaryPayment({
+    required String staffId,
+    required DateTime month,
+    required double amount,
+    String method = 'CASH',
+    String note = '',
+  }) async {
+    try {
+      await ApiService.recordSalaryPayment({
+        'staff': int.tryParse(staffId) ?? staffId,
+        'month': '${monthKey(month)}-01',
+        'amount': amount,
+        'method': method,
+        if (note.trim().isNotEmpty) 'note': note.trim(),
+      });
+      await loadPayrollFor(month);
+      return _payrollError == null;
+    } on ApiException catch (e) {
+      _payrollError = e.message;
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<bool> addExpense(Map<String, dynamic> payload) async {

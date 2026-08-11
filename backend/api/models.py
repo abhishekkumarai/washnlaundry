@@ -358,6 +358,45 @@ class Staff(models.Model):
         return f"{self.name} ({self.role})"
 
 
+class SalaryPayment(models.Model):
+    """A payout against one staff member's wages for one month.
+
+    Wages *earned* are derived — `Staff.daily_wage` times days worked, which
+    Attendance already records. Nothing recorded what was actually handed over,
+    so the Payroll screen's Paid / Pending columns had no possible source and
+    were hardcoded.
+
+    Deliberately not unique on (staff, month): a month can be paid in
+    instalments, which is what makes PARTIAL a real state rather than a
+    decoration.
+    """
+    staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='salary_payments')
+    # Always the 1st, so "which month" is a single comparable value.
+    month = models.DateField()
+    amount = models.FloatField()
+    # Settable, like Expense.date and for the same reason: a payout is recorded
+    # when someone gets round to it but belongs to the day it was made.
+    paid_on = models.DateTimeField(default=timezone.now)
+    method = models.CharField(max_length=50, default='CASH')
+    note = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-month', '-paid_on']
+
+    @staticmethod
+    def month_start(when):
+        """Normalise any date in a month to that month's first day."""
+        return when.replace(day=1)
+
+    def save(self, *args, **kwargs):
+        if self.month:
+            self.month = self.month_start(self.month)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.staff.name} {self.month:%b %Y} ₹{self.amount}"
+
+
 class Attendance(models.Model):
     PRESENT = 'PRESENT'
     ABSENT = 'ABSENT'
@@ -370,12 +409,26 @@ class Attendance(models.Model):
         (LEAVE, 'Leave'),
     ]
 
+    # What a day in each state is worth when payroll totals it up. HALF_DAY is
+    # offered on the register and stored, so paying it as a whole day would be
+    # wrong; LEAVE is unpaid here, matching ABSENT.
+    DAY_VALUE = {
+        PRESENT: 1.0,
+        HALF_DAY: 0.5,
+        ABSENT: 0.0,
+        LEAVE: 0.0,
+    }
+
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='attendance')
     date = models.DateField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PRESENT)
 
     class Meta:
         unique_together = ('staff', 'date')
+
+    @property
+    def day_value(self):
+        return self.DAY_VALUE.get(self.status, 0.0)
 
     def __str__(self):
         return f"{self.staff.name} {self.date} {self.status}"

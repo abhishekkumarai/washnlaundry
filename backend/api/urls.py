@@ -4,8 +4,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     ShopViewSet, CustomerViewSet, GarmentCategoryViewSet,
     GarmentItemViewSet, OrderViewSet, ExpenseViewSet,
-    StaffViewSet, AttendanceViewSet, ServiceAreaViewSet,
-    TimeSlotViewSet, dashboard_stats,
+    StaffViewSet, AttendanceViewSet, SalaryPaymentViewSet,
+    ServiceAreaViewSet, TimeSlotViewSet, dashboard_stats, payroll_summary,
 )
 
 router = DefaultRouter()
@@ -17,10 +17,12 @@ router.register(r'orders', OrderViewSet, basename='order')
 router.register(r'expenses', ExpenseViewSet)
 router.register(r'staff', StaffViewSet)
 router.register(r'attendance', AttendanceViewSet, basename='attendance')
+router.register(r'salary-payments', SalaryPaymentViewSet, basename='salarypayment')
 router.register(r'service-areas', ServiceAreaViewSet)
 router.register(r'time-slots', TimeSlotViewSet, basename='timeslot')
 
 urlpatterns = [
     path('', include(router.urls)),
     path('dashboard/stats/', dashboard_stats, name='dashboard-stats'),
+    path('payroll/', payroll_summary, name='payroll-summary'),
 ]

@@ -245,6 +245,18 @@ class ApiService {
     return _asList(data).map(AttendanceModel.fromJson).toList();
   }
 
+  // ── Payroll ────────────────────────────────────────────────────────────────
+
+  /// [month] is `YYYY-MM`. Wages are derived from the attendance register
+  /// server-side, so this is one call rather than staff + attendance + payments.
+  static Future<PayrollSummaryModel> fetchPayroll({required String month}) async {
+    final data = await _send('GET', '/payroll/', query: {'month': month});
+    return PayrollSummaryModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  static Future<void> recordSalaryPayment(Map<String, dynamic> payload) =>
+      _send('POST', '/salary-payments/', body: payload);
+
   // ── Scheduling ─────────────────────────────────────────────────────────────
 
   static Future<List<ServiceAreaModel>> fetchServiceAreas() async {

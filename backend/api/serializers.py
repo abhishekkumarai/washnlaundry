@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
-    Expense, Staff, Attendance, ServiceArea, TimeSlot,
+    Expense, Staff, Attendance, SalaryPayment, ServiceArea, TimeSlot,
 )
 
 
@@ -108,6 +108,19 @@ class AttendanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attendance
         fields = '__all__'
+
+
+class SalaryPaymentSerializer(serializers.ModelSerializer):
+    staff_name = serializers.CharField(source='staff.name', read_only=True)
+
+    class Meta:
+        model = SalaryPayment
+        fields = '__all__'
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('amount must be greater than zero.')
+        return value
 
 
 class ServiceAreaSerializer(serializers.ModelSerializer):
