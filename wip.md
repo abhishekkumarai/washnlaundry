@@ -1,220 +1,193 @@
-# WIP — session of 2026-08-10
+# WIP — session of 2026-08-11
 
-Working notes from one session on the LaundryBill CRM clone. Everything below
-is committed and pushed to `main` unless a section says otherwise.
+Working notes on the LaundryBill CRM clone. Everything below is committed to
+`main`. The previous session's notes (2026-08-10) are in git history at
+`104c315`.
 
 ---
+
+## What this session closed out
+
+The previous session's **"Open items → Still hardcoded literals"** table. All
+three screens on it are now wired:
+
+| Screen | Was | Now |
+|---|---|---|
+| Attendance | `_staff` literal | `/api/attendance/` + a new bulk upsert |
+| Payroll | `_staffPayroll` literal | `/api/payroll/` + a new `SalaryPayment` model |
+| Reports | every number inline in `build()` | `/api/reports/` |
+
+`CLAUDE.md`'s data-flow table now has no rows left in the "literal" column.
 
 ## Commits landed
 
 | SHA | What |
 |---|---|
-| `741b895` | Wire Services, Staff and New Order to the backend |
-| `f380032` | Delete the abandoned Next.js implementation and one-off audit scripts |
-| `68cf0f0` | Wire Customers to the API and add the customer detail screen |
-| `d802390` | Wire Expenses to the API and let an expense carry its own date |
-| `5d3c652` | Rework the order detail screen against the live capture |
+| `4ee573b` | Wire Attendance to the API |
+| `c19337d` | Wire Payroll to the API, and record what was actually paid |
+| _(this)_ | Wire Reports to the API |
 
-Suites at the end of the session: **Django 96 green, Flutter 164 green**,
-`flutter analyze` error-free (45 remaining issues are all `info`-level lint).
-
----
-
-## Repo cleanup
-
-The abandoned parallel Next.js implementation is **gone**: `app/`, `components/`,
-root `lib/`, `prisma/`, `node_modules/`, `next.config.js`, `package.json`,
-`postcss.config.js`, `tailwind.config.js`, `tsconfig.json`, plus the eleven
-one-off Chrome screenshot/audit scripts that sat at the repo root.
-
-Two things to know:
-
-- **The Next.js files were never tracked by git** — all gitignored — so history
-  is not an undo for them. A tar of all 53 source files was written to the
-  session scratchpad, which is session-scoped and by now likely gone. The
-  eleven audit scripts *were* tracked and are recoverable at `741b895~1`.
-- **Kept deliberately**: `app_index.js`, `app_ui.js`, `index_fetched.html` and
-  `screenshots/`. CLAUDE.md documents these as live reference material and they
-  are untracked too, so deleting them would also be unrecoverable.
-
-`gemini.md` was kept at the user's instruction. Note it has drifted: it claims
-the API base URL is `http://localhost:8000/api`, whereas `api_service.dart`
-defaults to a relative `/api`.
+Suites at the end of the session: **Django 149 green** (was 96), **Flutter 202
+green** (was 164), `flutter analyze` error- and warning-free — 37 remaining
+issues, all `info`-level lint, down from 45 because rewriting the Payroll and
+Reports screens cleared several `prefer_const_constructors`.
 
 ---
 
-## Screens wired to the API this session
+## Attendance
 
-`CLAUDE.md`'s data-flow table is now accurate. Newly real:
+`GET /api/attendance/` already existed; there was no way to **write** a day.
 
-- **Services**, **Staff** (in `741b895`)
-- **Customers** + a new **Customer detail** screen (`/customers/:id`, which had
-  no local equivalent — the old screen popped a modal)
-- **Expenses**
+The screen was the worst offender left in the app. It hardcoded six staff who
+were not the seeded roster — "Mohan Das" and "Anita Sharma" were invention —
+and **Save Register showed a green "Attendance saved successfully" snackbar
+without making any network call at all.**
 
-The Customers screen had been *fabricating* data: one hardcoded fake customer
-called "Me", plus an invented area (`'Hbr layout'`) and last-order time
-(`'7h ago'`) for anyone found in the orders list — while `AppProvider` was
-already loading the real list and being ignored.
+### The endpoint has to upsert
 
----
+`Attendance` is `unique_together = ('staff', 'date')`. A create-only endpoint
+would 400 the second time Save Register was pressed, which is a thing users do.
+`POST /api/attendance/bulk/` uses `update_or_create`.
 
-## Live capture — order detail
+Validation runs over the whole batch **before the first write**. A half-saved
+register is worse than a rejected one, because nothing on screen tells you
+which half made it.
 
-Captured `app.laundrybill.com/orders/EPHoc8XH3OcXtoGTmoEO` (`#WA3P-00002`, a
-store-pickup order). **This corrects LIVE_AUDIT.md** and is the most valuable
-reference gained this session.
+### LEAVE was missing from the UI
 
-### The step bar is four stages and adapts to fulfilment type
+The backend has always had four statuses and `dashboard_stats` counts LEAVE.
+The chip row only ever offered three. Now four.
 
-The real app collapses `Out for Delivery` into the Timeline, so the bar is:
+### "not marked" is not ABSENT
 
-| Step | Store pickup | Delivery |
-|---|---|---|
-| 1 | Order Placed | Order Placed |
-| 2 | Processing | Processing |
-| 3 | **Ready for Pickup** | Ready |
-| 4 | **Picked Up** | Delivered |
-
-Ours was a fixed five-step path that still said "Washing" — a word in none of
-the three status vocabularies — and showed Out for Delivery / Delivered steps on
-collection orders that can never reach them. Now driven by
-`OrderModel.stepLabels` / `stepStatuses` / `stepIndex`.
-
-### The right rail switches too
-
-Store pickup gets **FULFILMENT / Expected Ready**. Delivery gets
-**DELIVERY & ROUTE / Assigned Agent**. The audit had only recorded the latter.
-
-### Actions row
-
-Live has `WhatsApp` · `Edit` · `Print Receipt` · `Update Status` · `⋮`.
-The audit had recorded only WhatsApp and Print Receipt.
-
-### Update Status modal
-
-Radio list of the four stages with a `CURRENT` badge, `Cancelled` separated out
-and marked *"This action cannot be undone"*, a **Notes (optional)** field, and
-`Share via WhatsApp` + `Update Status`. All reproduced.
-
-### Provenance
-
-Live timeline writes **"Created by abhishek kumar"** for a counter order but
-"Created by Mobile App" for an app one — it holds *either a person or a
-channel*, which `OrderSource` cannot represent. Added `Order.created_by` as free
-text falling back to the source label (migration `0006`).
+A staff member with no row for the day renders as "not marked". Defaulting them
+to ABSENT would have invented an unpaid day.
 
 ---
 
-## What was fake in our order detail (all now real)
+## Payroll
 
-Found by reading the file, not from the screenshot:
+### It needed a new model, not just wiring
 
-1. **Status buttons only called `setState`** — never touched the API, so a
-   status change looked applied and vanished on reload. `provider.updateOrderStatus`
-   already existed and was simply never called.
-2. **Collect Payment** — same story; `provider.collectPayment` existed unused.
-3. **Hardcoded delivery address** — every order claimed
-   `"Hbr layout, Bengaluru - 560064"`.
-4. **Invented invoice rows** — "Express Delivery Fee (1.5x)" and "Tax (GST
-   Included)", both permanently ₹0, and `totalAmount` mislabelled as "Subtotal"
-   with no delivery line.
+Wages *earned* were always derivable — `Staff.daily_wage` times what the
+register says. What was **paid** had nowhere to live, so the screen's Paid /
+Pending Balance cards and PAID/PARTIAL/UNPAID badges had no possible source.
+That is why this screen was left until late.
+
+`SalaryPayment` (staff, month, amount, paid_on, method, note), migration
+`0007`. **Deliberately not unique on (staff, month)** — a month can be paid in
+instalments, which is what makes PARTIAL a real state rather than a decoration.
+
+### Half-days are worth half
+
+`Attendance.DAY_VALUE` maps PRESENT → 1.0, HALF_DAY → 0.5, ABSENT and LEAVE →
+0. HALF_DAY has always been storable and the register offers it, so paying it
+as a whole day would have quietly overpaid. Overpayment floors pending at zero
+rather than going negative.
+
+Nothing is cached on the `Staff` row, so payroll cannot drift out of step with
+the register.
+
+### The seed was actively misleading here
+
+Attendance was seeded for **7 days**. Payroll totals a calendar month, so every
+employee read as roughly five days worked and almost no wages. Now 70 days,
+minus Sundays, and the roll produces HALF_DAY (it never did before). Seeds
+`SalaryPayment` rows so all three states appear on first run: last month
+settled, this month part-paid for some and untouched for others.
+
+### Latent seed crash, fixed in passing
+
+`CREATED_BY` covered three of `OrderSource`'s five values while the seed picks
+one at random — so `python seed_db.py` died with `KeyError: 'STAFF_APP'` on
+roughly two runs in five. Unrelated to payroll, but it blocks the only source
+of demo data in the repo.
 
 ---
 
-## Backend bug fixed: expense dates
+## Reports
 
-`Expense.date` was `auto_now_add=True`, so an expense could only ever be filed
-under the moment it was typed in. The seed proved the damage — it creates
-"Monthly Shop Rent (July)" and Django stamped all eight rows with the current
-timestamp, so the dashboard's month-to-date expense total counted last
-quarter's rent as today's spending. Now `default=timezone.now` (migration
-`0005`), settable so the Add Expense dialog can backdate.
+Everything was hardcoded, down to an eight-month bar chart whose heights were
+typed in as ratios (`0.25`, `0.35`, …) and a status breakdown listing
+**"Washing"** — a status deleted from the model in an earlier pass.
+
+`GET /api/reports/?from=&to=` now returns the whole screen. Notes:
+
+- **Breakdowns are driven by the canonical choices**, so `Washing` cannot come
+  back and `Ironing` cannot be forgotten. Statuses with no orders are omitted.
+- **`by_type` covers all four `DeliveryType` values**; the screen only ever
+  showed two.
+- **Percentage change is against the immediately preceding window of equal
+  length**, which is what "▲ 12% vs last month" always claimed to be.
+- **`monthly_series` carries rupee amounts**; the widget normalises against the
+  series peak itself.
+- **`payment_mix` percentages are computed server-side.** The screen used to
+  recover the number by parsing its own label —
+  `double.parse(pct.replaceAll('%', ''))`.
+- **Null, not zero, when there is nothing to measure** — the rule
+  `dashboard_stats` already set for Store Health. An idle period is not a 0%
+  margin, and the screen renders `—` for it.
+
+`Print` and `Export PDF` are still no-ops, now explicitly **disabled** rather
+than live buttons that do nothing. Both are paid-plan gated on the live app and
+have never been captured, so there is nothing to clone them against.
 
 ---
 
-## Running it locally (no Docker)
+## Two things worth carrying forward
 
-Docker Desktop was not running, and `docker compose up` pulls a multi-GB Flutter
-SDK image, so the session used the non-Docker path:
+### Range-scoped loads do not go in `loadDataFromBackend`
 
-```bash
-cd backend && python manage.py runserver 8000 --noreload
-cd washnlaundrycrm && flutter build web --release --no-tree-shake-icons \
-  --dart-define=API_BASE_URL=http://localhost:8000/api
-cd build/web && python -m http.server 8080 --bind 127.0.0.1
-```
+A day of Attendance, a month of Payroll and a date range of Reports each load
+on demand and carry their own `attendanceLoading` / `payrollLoading` /
+`reportsLoading` and `*Error` flags.
 
-`API_BASE_URL` must be absolute here: the bundle defaults to a relative `/api`,
-which only resolves behind the nginx proxy in the Docker setup. Cross-origin
-works because `CORS_ALLOW_ALL_ORIGINS = True`.
+Keeping these out of the shared `error` matters: `error` means "this shop
+failed to load" and blanks a screen. A failed single-day attendance fetch
+should surface inline and leave a roster that loaded perfectly well on screen.
+The first cut conflated the two and made "no staff" indistinguishable from
+"still loading".
 
-**Both servers were background processes of that session and are now stopped.**
+### `flutter analyze` is slow cold, not hung
 
-### The checkout 500 — cause and lesson
-
-Checkout failed with:
-
-```
-django.db.utils.IntegrityError: NOT NULL constraint failed: api_order.created_by
-POST /api/orders/ 500
-```
-
-Not a code bug. The server was started with `--noreload` *before* `created_by`
-was added, then the migration ran. The database had the new `NOT NULL` column
-while the process still held the old model in memory, so the INSERT omitted the
-column — and Django keeps field defaults in Python, not at the DB level, so
-there was nothing to fall back on.
-
-**Lesson: `--noreload` means any model change needs a manual restart.** After
-restarting, checkout was verified end-to-end through the UI (`#WASH-00016`,
-Walk-in customer, Store Pickup, ₹15). Both test orders created during
-verification were deleted afterwards.
+A combined `flutter test; flutter analyze` blew a 600 s timeout and looked like
+a `pumpAndSettle` deadlock against the new infinite `LoadingState` spinner. It
+was not — the suite runs in 10 s and analyze in 3.5 s once warm. The first
+analyze after a large edit re-analyses from scratch and can take 90 s+.
 
 ---
 
 ## Open items
 
-### Still hardcoded literals
+### Not addressed, carried over
 
-| Screen | Literal |
-|---|---|
-| Attendance | `_staff` |
-| Payroll | `_staffPayroll` |
-| Reports | derives from the Attendance / Payroll literals |
+- **Order number prefix.** Local DB generates `WASH-000NN`; the live app uses
+  `WA3P-00002`, derived differently from the shop name `washing`.
+- **Sidebar shape.** Live has 8 items; ours has 14. All the extras are
+  paid-plan features that silently redirect to `/dashboard` on the live Free
+  account. `CLAUDE.md` calls this the biggest structural divergence and it is
+  still unresolved — the clone targets neither the Free surface nor the
+  Business one.
+- **No router.** `main.dart` still switches on `AppProvider.currentNavIndex`.
+  `CLAUDE.md` calls the `go_router` migration the single highest-value refactor
+  available, and it is the thing blocking Android (the system back button has
+  nothing to pop).
+- **Settings, Apps and Subscription stay disabled.** Confirmed deliberate.
+  Re-enabling Settings is a two-line revert: flip `disabled` in
+  `sidebar_navigation.dart`, restore `case 13` plus its import in `main.dart`.
 
-Reports should come last, since it feeds off the other two.
+### Not verified in a browser this session
 
-### Deliberately left alone
+The three screens are covered by widget tests and the endpoints by Django
+tests, and the payroll endpoint was checked against freshly seeded data
+(July settles to PAID, August comes back mixed, half-days show as `.5`). But
+**nothing was driven through `flutter run -d chrome`** — the previous session's
+end-to-end pass has not been repeated. Worth doing before trusting the Reports
+screen's layout at real widths, since it packs six metric cards into one row.
 
-**Settings, Apps and Subscription stay disabled** (`disabled: true`, "Soon"
-chip). Settings was taken out on purpose in `3bce9e4` and the user confirmed it
-stays that way. Re-enabling Settings is a two-line revert: flip the flag in
-`sidebar_navigation.dart` and restore `case 13` plus its import in `main.dart`.
+### Caveats that still apply
 
-### Known divergences not yet addressed
-
-- **Order number prefix.** Local DB generates `WASH-00016`; the live app uses
-  `WA3P-00002`, derived differently from the shop name `washing`. Our
-  `Shop.order_prefix` holds `WASH`.
-- **Sidebar shape.** Live has 8 items; ours has 14, promoting Staff /
-  Attendance / Payroll / Expenses / Reports / Scan to top level. All of those
-  are paid-plan features that silently redirect to `/dashboard` on the live Free
-  account. CLAUDE.md calls this the biggest structural divergence and it is
-  still unresolved — the clone targets neither the Free surface nor the Business
-  one.
-
-### Caveats on what can be cloned at all
-
-- The live account is **Free plan**. `/manage-staff`, `/attendance`, `/payroll`,
-  `/expenses`, `/reports`, `/scan`, `/settings/public-page` and
-  `/settings/offers` all **silently redirect to `/dashboard`**. Our versions of
-  those screens are invention, not clones. Matching them needs a paid account.
-- **Only a human can sign in** (CLAUDE.md), and the app allows one active
-  session per account.
-- The **`Edit` order dialog is our own design** — the live one was never opened,
-  because clicking Edit would have put a real order into an edit state. It edits
-  header fields our model carries and is deliberately *not* a line-item editor.
-- **Only a store-pickup order has been seen.** The delivery-side step labels
-  come from the audit's earlier capture, not from direct observation. Opening a
-  `delivery home` order would confirm them.
+- The live account is **Free plan**. `/attendance`, `/payroll` and `/reports`
+  all redirect to `/dashboard` there, so **our versions of all three screens
+  are invention, not clones.** Matching them needs a paid account.
+- Only a human can sign in, and the app allows one active session per account.

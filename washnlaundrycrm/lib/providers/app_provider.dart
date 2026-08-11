@@ -53,6 +53,17 @@ class AppProvider extends ChangeNotifier {
   String? _payrollError;
   String? get payrollError => _payrollError;
 
+  /// Reports are range-scoped, so like payroll they are fetched on demand
+  /// rather than as part of the whole-shop load.
+  ReportsModel? _reports;
+  ReportsModel? get reports => _reports;
+
+  bool _reportsLoading = false;
+  bool get reportsLoading => _reportsLoading;
+
+  String? _reportsError;
+  String? get reportsError => _reportsError;
+
   List<ServiceAreaModel> _serviceAreas = [];
   List<ServiceAreaModel> get serviceAreas => _serviceAreas;
 
@@ -96,6 +107,7 @@ class AppProvider extends ChangeNotifier {
     List<ExpenseModel>? expenses,
     List<AttendanceModel>? attendance,
     PayrollSummaryModel? payroll,
+    ReportsModel? reports,
     List<ServiceAreaModel>? serviceAreas,
     List<TimeSlotModel>? pickupSlots,
     List<TimeSlotModel>? deliverySlots,
@@ -110,6 +122,7 @@ class AppProvider extends ChangeNotifier {
     if (expenses != null) _expenses = expenses;
     if (attendance != null) _attendance = attendance;
     if (payroll != null) _payroll = payroll;
+    if (reports != null) _reports = reports;
     if (serviceAreas != null) _serviceAreas = serviceAreas;
     if (pickupSlots != null) _pickupSlots = pickupSlots;
     if (deliverySlots != null) _deliverySlots = deliverySlots;
@@ -628,6 +641,24 @@ class AppProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  // ── Reports ────────────────────────────────────────────────────────────────
+
+  Future<void> loadReportsFor(DateTime from, DateTime to) async {
+    _reportsLoading = true;
+    _reportsError = null;
+    notifyListeners();
+    try {
+      _reports = await ApiService.fetchReports(
+        from: dateKey(from),
+        to: dateKey(to),
+      );
+    } on ApiException catch (e) {
+      _reportsError = e.message;
+    }
+    _reportsLoading = false;
+    notifyListeners();
   }
 
   Future<bool> addExpense(Map<String, dynamic> payload) async {

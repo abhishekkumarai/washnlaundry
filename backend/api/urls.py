@@ -6,6 +6,7 @@ from .views import (
     GarmentItemViewSet, OrderViewSet, ExpenseViewSet,
     StaffViewSet, AttendanceViewSet, SalaryPaymentViewSet,
     ServiceAreaViewSet, TimeSlotViewSet, dashboard_stats, payroll_summary,
+    reports,
 )
 
 router = DefaultRouter()
@@ -25,4 +26,5 @@ urlpatterns = [
     path('', include(router.urls)),
     path('dashboard/stats/', dashboard_stats, name='dashboard-stats'),
     path('payroll/', payroll_summary, name='payroll-summary'),
+    path('reports/', reports, name='reports'),
 ]

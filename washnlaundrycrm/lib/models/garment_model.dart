@@ -388,6 +388,153 @@ class PayrollSummaryModel {
   }
 }
 
+/// One labelled slice of a breakdown — a status, a delivery type or a service.
+class ReportBreakdownModel {
+  final String key;
+  final String label;
+  final int count;
+
+  const ReportBreakdownModel({this.key = '', required this.label, this.count = 0});
+
+  factory ReportBreakdownModel.fromJson(Map<String, dynamic> json) => ReportBreakdownModel(
+        key: json['key'] ?? '',
+        label: json['label'] ?? '',
+        count: (json['count'] ?? 0).toInt(),
+      );
+}
+
+/// One month of the revenue-vs-expenses chart, in rupees.
+///
+/// Absolute amounts, not the hand-typed 0..1 ratios the screen used to be
+/// handed — the widget normalises against the series maximum itself.
+class ReportMonthModel {
+  final String label;
+  final double revenue;
+  final double expenses;
+
+  const ReportMonthModel({this.label = '', this.revenue = 0, this.expenses = 0});
+
+  factory ReportMonthModel.fromJson(Map<String, dynamic> json) => ReportMonthModel(
+        label: json['label'] ?? '',
+        revenue: (json['revenue'] ?? 0).toDouble(),
+        expenses: (json['expenses'] ?? 0).toDouble(),
+      );
+}
+
+/// How much was collected by each payment method, with the share already
+/// worked out server-side rather than parsed back out of a display string.
+class PaymentMixModel {
+  final String method;
+  final double amount;
+  final double percent;
+
+  const PaymentMixModel({required this.method, this.amount = 0, this.percent = 0});
+
+  factory PaymentMixModel.fromJson(Map<String, dynamic> json) => PaymentMixModel(
+        method: json['method'] ?? '',
+        amount: (json['amount'] ?? 0).toDouble(),
+        percent: (json['percent'] ?? 0).toDouble(),
+      );
+
+  /// Payment methods that are acronyms and must not be title-cased — plain
+  /// capitalisation turns UPI into "Upi", which is how nobody writes it.
+  static const _acronyms = {'UPI', 'POS', 'QR', 'NEFT', 'IMPS', 'RTGS', 'COD'};
+
+  /// "BANK_TRANSFER" -> "Bank Transfer", but "UPI" stays "UPI".
+  String get methodLabel => method
+      .split('_')
+      .map((w) => w.isEmpty || _acronyms.contains(w.toUpperCase())
+          ? w.toUpperCase()
+          : w[0].toUpperCase() + w.substring(1).toLowerCase())
+      .join(' ');
+}
+
+/// Everything on the Reports screen for one date range, from `/api/reports/`.
+///
+/// The nullable fields are null when there is nothing to measure — an idle
+/// period is not a 0% margin, and the screen renders the two differently.
+class ReportsModel {
+  final DateTime? from;
+  final DateTime? to;
+  final double revenue;
+  final double? revenueChange;
+  final double collected;
+  final double? collectedPercent;
+  final double outstanding;
+  final double expenses;
+  final double? expensesChange;
+  final double netProfit;
+  final double? netProfitChange;
+  final double? margin;
+  final int orderCount;
+  final double averageOrderValue;
+  final List<ReportMonthModel> monthlySeries;
+  final List<ReportBreakdownModel> byStatus;
+  final List<ReportBreakdownModel> byType;
+  final List<ReportBreakdownModel> byService;
+  final List<PaymentMixModel> paymentMix;
+
+  const ReportsModel({
+    this.from,
+    this.to,
+    this.revenue = 0,
+    this.revenueChange,
+    this.collected = 0,
+    this.collectedPercent,
+    this.outstanding = 0,
+    this.expenses = 0,
+    this.expensesChange,
+    this.netProfit = 0,
+    this.netProfitChange,
+    this.margin,
+    this.orderCount = 0,
+    this.averageOrderValue = 0,
+    this.monthlySeries = const [],
+    this.byStatus = const [],
+    this.byType = const [],
+    this.byService = const [],
+    this.paymentMix = const [],
+  });
+
+  static double? _optionalDouble(dynamic value) =>
+      value == null ? null : (value as num).toDouble();
+
+  static List<T> _list<T>(dynamic raw, T Function(Map<String, dynamic>) parse) =>
+      ((raw as List?) ?? const [])
+          .map((e) => parse((e as Map).cast<String, dynamic>()))
+          .toList();
+
+  factory ReportsModel.fromJson(Map<String, dynamic> json) => ReportsModel(
+        from: DateTime.tryParse(json['from'] ?? ''),
+        to: DateTime.tryParse(json['to'] ?? ''),
+        revenue: (json['revenue'] ?? 0).toDouble(),
+        revenueChange: _optionalDouble(json['revenue_change']),
+        collected: (json['collected'] ?? 0).toDouble(),
+        collectedPercent: _optionalDouble(json['collected_percent']),
+        outstanding: (json['outstanding'] ?? 0).toDouble(),
+        expenses: (json['expenses'] ?? 0).toDouble(),
+        expensesChange: _optionalDouble(json['expenses_change']),
+        netProfit: (json['net_profit'] ?? 0).toDouble(),
+        netProfitChange: _optionalDouble(json['net_profit_change']),
+        margin: _optionalDouble(json['margin']),
+        orderCount: (json['order_count'] ?? 0).toInt(),
+        averageOrderValue: (json['average_order_value'] ?? 0).toDouble(),
+        monthlySeries: _list(json['monthly_series'], ReportMonthModel.fromJson),
+        byStatus: _list(json['by_status'], ReportBreakdownModel.fromJson),
+        byType: _list(json['by_type'], ReportBreakdownModel.fromJson),
+        byService: _list(json['by_service'], ReportBreakdownModel.fromJson),
+        paymentMix: _list(json['payment_mix'], PaymentMixModel.fromJson),
+      );
+
+  /// "▲ 12% vs last period" / "▼ 8% vs last period", or null when there was no
+  /// preceding period to compare against.
+  static String? changeLabel(double? change) {
+    if (change == null) return null;
+    final arrow = change >= 0 ? '▲' : '▼';
+    return '$arrow ${change.abs().toStringAsFixed(change.abs() % 1 == 0 ? 0 : 1)}% vs last period';
+  }
+}
+
 /// A bookable pickup or delivery window.
 ///
 /// [capacity] is the max orders per day for the slot; null means unlimited.

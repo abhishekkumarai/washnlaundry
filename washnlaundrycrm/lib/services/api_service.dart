@@ -257,6 +257,18 @@ class ApiService {
   static Future<void> recordSalaryPayment(Map<String, dynamic> payload) =>
       _send('POST', '/salary-payments/', body: payload);
 
+  // ── Reports ────────────────────────────────────────────────────────────────
+
+  /// [from] and [to] are `YYYY-MM-DD`. Omitted, the server reports on the
+  /// current month.
+  static Future<ReportsModel> fetchReports({String? from, String? to}) async {
+    final data = await _send('GET', '/reports/', query: {
+      if (from != null && from.isNotEmpty) 'from': from,
+      if (to != null && to.isNotEmpty) 'to': to,
+    });
+    return ReportsModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
   // ── Scheduling ─────────────────────────────────────────────────────────────
 
   static Future<List<ServiceAreaModel>> fetchServiceAreas() async {

@@ -104,7 +104,9 @@ So only **orders** and **garment items** are real. Everything else is a hardcode
 | Expenses | wired to API |
 | Attendance | wired to API |
 | Payroll | wired to API |
-| Reports | derived from the Attendance / Payroll literals |
+| Reports | wired to API |
+
+Every screen now reads from the backend. `loadDataFromBackend` fetches the whole shop in one `Future.wait`; the three range-scoped screens (a day of Attendance, a month of Payroll, a date range of Reports) load on demand instead, and keep their own `*Loading` / `*Error` flags so a failed single-day fetch reports inline rather than blanking a roster that loaded fine.
 
 Wiring these to their existing endpoints is mostly mechanical and is the main outstanding backend-integration work.
 

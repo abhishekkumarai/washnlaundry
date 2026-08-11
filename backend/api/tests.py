@@ -835,6 +835,177 @@ class PayrollTests(APITestCase):
         self.assertEqual(response.status_code, 400)
 
 
+class ReportsApiTests(APITestCase):
+    """GET /api/reports/?from=&to=.
+
+    The Reports screen used to hardcode every figure it showed, including a
+    status breakdown listing "Washing" — a status deleted from the model.
+    Driving the breakdowns off the canonical choices makes that impossible.
+    """
+
+    def setUp(self):
+        Shop.objects.create(name='washing')
+        self.today = timezone.localdate()
+        self.month_start = self.today.replace(day=1)
+
+    def make_order(self, *, total, paid, when=None, status=OrderStatus.PLACED,
+                   delivery_type=DeliveryType.STORE_PICKUP, method='CASH'):
+        order = Order.objects.create(
+            customer_name='A',
+            status=status,
+            delivery_type=delivery_type,
+            payment_method=method,
+            total_amount=total,
+            paid_amount=paid,
+            due_amount=total - paid,
+        )
+        if when:
+            Order.objects.filter(pk=order.pk).update(created_at=when)
+        return order
+
+    def report(self, **params):
+        return self.client.get('/api/reports/', params).data
+
+    def test_defaults_to_the_current_month(self):
+        data = self.report()
+        self.assertEqual(data['from'], self.month_start.isoformat())
+        self.assertEqual(data['to'], self.today.isoformat())
+
+    def test_totals_come_from_the_orders_in_range(self):
+        self.make_order(total=1000, paid=800)
+        self.make_order(total=500, paid=0)
+        data = self.report()
+        self.assertEqual(data['revenue'], 1500)
+        self.assertEqual(data['collected'], 800)
+        self.assertEqual(data['outstanding'], 700)
+        self.assertEqual(data['order_count'], 2)
+        self.assertEqual(data['average_order_value'], 750)
+
+    def test_orders_outside_the_range_are_excluded(self):
+        self.make_order(total=1000, paid=1000)
+        self.make_order(
+            total=9999, paid=9999, when=timezone.now() - timedelta(days=400)
+        )
+        self.assertEqual(self.report()['revenue'], 1000)
+
+    def test_an_explicit_range_is_honoured(self):
+        self.make_order(total=100, paid=100, when=timezone.now() - timedelta(days=10))
+        self.make_order(total=200, paid=200, when=timezone.now() - timedelta(days=2))
+        data = self.report(
+            **{
+                'from': (self.today - timedelta(days=4)).isoformat(),
+                'to': self.today.isoformat(),
+            }
+        )
+        self.assertEqual(data['revenue'], 200)
+
+    def test_a_reversed_range_is_swapped_rather_than_returning_nothing(self):
+        self.make_order(total=100, paid=100)
+        data = self.report(
+            **{'from': self.today.isoformat(), 'to': self.month_start.isoformat()}
+        )
+        self.assertEqual(data['from'], self.month_start.isoformat())
+        self.assertEqual(data['revenue'], 100)
+
+    def test_net_profit_is_collected_minus_expenses(self):
+        self.make_order(total=1000, paid=900)
+        Expense.objects.create(title='Rent', amount=400.0)
+        data = self.report()
+        self.assertEqual(data['expenses'], 400)
+        self.assertEqual(data['net_profit'], 500)
+        self.assertEqual(data['margin'], round((500 / 900) * 100, 1))
+
+    def test_margin_is_null_not_zero_when_nothing_was_collected(self):
+        # An idle period is not a 0% margin; the UI renders the two differently.
+        data = self.report()
+        self.assertIsNone(data['margin'])
+        self.assertIsNone(data['collected_percent'])
+
+    def test_monthly_series_has_eight_points(self):
+        series = self.report()['monthly_series']
+        self.assertEqual(len(series), 8)
+        self.assertEqual(series[-1]['month'], self.month_start.isoformat())
+
+    def test_monthly_series_is_chronological_and_labelled(self):
+        series = self.report()['monthly_series']
+        months = [point['month'] for point in series]
+        self.assertEqual(months, sorted(months))
+        self.assertTrue(all(point['label'] for point in series))
+
+    def test_monthly_series_carries_amounts_not_ratios(self):
+        # The screen used to be handed hand-typed ratios like 0.25 and had to
+        # be told the scale; it now normalises real rupee amounts itself.
+        self.make_order(total=1234, paid=1234)
+        series = self.report()['monthly_series']
+        self.assertEqual(series[-1]['revenue'], 1234)
+
+    def test_by_status_uses_the_canonical_vocabulary(self):
+        self.make_order(total=10, paid=0, status=OrderStatus.IRONING)
+        labels = [row['label'] for row in self.report()['by_status']]
+        self.assertIn('Ironing', labels)
+
+    def test_washing_can_never_appear_in_a_breakdown(self):
+        self.make_order(total=10, paid=0, status=OrderStatus.PROCESSING)
+        labels = [row['label'] for row in self.report()['by_status']]
+        self.assertNotIn('Washing', labels)
+
+    def test_breakdowns_omit_statuses_with_no_orders(self):
+        self.make_order(total=10, paid=0, status=OrderStatus.READY)
+        keys = [row['key'] for row in self.report()['by_status']]
+        self.assertEqual(keys, [OrderStatus.READY])
+
+    def test_by_type_covers_all_four_channels(self):
+        self.make_order(total=10, paid=0, delivery_type=DeliveryType.HOME_DELIVERY)
+        self.make_order(total=10, paid=0, delivery_type=DeliveryType.ONLINE)
+        keys = {row['key'] for row in self.report()['by_type']}
+        self.assertEqual(keys, {DeliveryType.HOME_DELIVERY, DeliveryType.ONLINE})
+
+    def test_by_service_groups_order_items(self):
+        order = self.make_order(total=10, paid=0)
+        OrderItem.objects.create(order=order, item_title='Shirt', service_type='Ironing')
+        OrderItem.objects.create(order=order, item_title='Trousers', service_type='Ironing')
+        OrderItem.objects.create(order=order, item_title='Coat', service_type='Dry Cleaning')
+        by_service = {row['label']: row['count'] for row in self.report()['by_service']}
+        self.assertEqual(by_service, {'Ironing': 2, 'Dry Cleaning': 1})
+
+    def test_payment_mix_percentages_sum_to_a_hundred(self):
+        self.make_order(total=600, paid=600, method='UPI')
+        self.make_order(total=400, paid=400, method='CASH')
+        mix = self.report()['payment_mix']
+        self.assertEqual(round(sum(row['percent'] for row in mix)), 100)
+        # Sorted by amount, so the dominant method reads first.
+        self.assertEqual(mix[0]['method'], 'UPI')
+        self.assertEqual(mix[0]['percent'], 60.0)
+
+    def test_payment_mix_is_empty_rather_than_dividing_by_zero(self):
+        self.make_order(total=500, paid=0, method='CASH')
+        self.assertEqual(self.report()['payment_mix'], [])
+
+    def test_an_empty_range_returns_zeroes_not_an_error(self):
+        data = self.report(**{'from': '2020-01-01', 'to': '2020-01-31'})
+        self.assertEqual(data['revenue'], 0)
+        self.assertEqual(data['order_count'], 0)
+        self.assertEqual(data['average_order_value'], 0)
+        self.assertEqual(data['by_status'], [])
+
+    def test_change_is_measured_against_the_preceding_window(self):
+        span_start = self.today - timedelta(days=6)
+        self.make_order(total=200, paid=200, when=timezone.now() - timedelta(days=1))
+        self.make_order(total=100, paid=100, when=timezone.now() - timedelta(days=8))
+        data = self.report(
+            **{'from': span_start.isoformat(), 'to': self.today.isoformat()}
+        )
+        self.assertEqual(data['revenue'], 200)
+        self.assertEqual(data['revenue_change'], 100.0)
+
+    def test_change_is_null_when_there_is_nothing_to_compare(self):
+        self.assertIsNone(self.report()['revenue_change'])
+
+    def test_an_unparseable_date_falls_back_rather_than_500ing(self):
+        data = self.report(**{'from': 'last tuesday'})
+        self.assertEqual(data['from'], self.month_start.isoformat())
+
+
 class PosCheckoutContractTests(APITestCase):
     """The exact request the Flutter New Order screen sends on Checkout.
 

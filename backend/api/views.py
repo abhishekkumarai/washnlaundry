@@ -308,6 +308,140 @@ def payroll_summary(request):
     })
 
 
+@api_view(['GET'])
+def reports(request):
+    """GET /api/reports/?from=YYYY-MM-DD&to=YYYY-MM-DD — the Reports screen.
+
+    Defaults to the current month. Every figure the screen shows comes from
+    here; it used to hardcode all of them, down to an eight-month bar chart
+    whose heights were typed in by hand.
+
+    Follows the same rule as `dashboard_stats`: a metric with nothing to
+    measure is None, not 0, because the two mean very different things and the
+    UI renders them differently.
+    """
+    today = timezone.localdate()
+    start = parse_date(request.query_params.get('from') or '') or today.replace(day=1)
+    end = parse_date(request.query_params.get('to') or '') or today
+    if end < start:
+        start, end = end, start
+
+    orders = Order.objects.filter(created_at__date__gte=start, created_at__date__lte=end)
+    expenses_qs = Expense.objects.filter(date__date__gte=start, date__date__lte=end)
+
+    revenue = orders.aggregate(s=Sum('total_amount'))['s'] or 0.0
+    collected = orders.aggregate(s=Sum('paid_amount'))['s'] or 0.0
+    expenses = expenses_qs.aggregate(s=Sum('amount'))['s'] or 0.0
+    order_count = orders.count()
+
+    # The immediately preceding window of equal length — which is what
+    # "▲ 12% vs last month" on the cards has always claimed to be.
+    span = (end - start).days + 1
+    prev_end = start - timedelta(days=1)
+    prev_start = prev_end - timedelta(days=span - 1)
+    prev_orders = Order.objects.filter(
+        created_at__date__gte=prev_start, created_at__date__lte=prev_end
+    )
+    prev_revenue = prev_orders.aggregate(s=Sum('total_amount'))['s'] or 0.0
+    prev_collected = prev_orders.aggregate(s=Sum('paid_amount'))['s'] or 0.0
+    prev_expenses = Expense.objects.filter(
+        date__date__gte=prev_start, date__date__lte=prev_end
+    ).aggregate(s=Sum('amount'))['s'] or 0.0
+
+    def pct_change(now, before):
+        if not before:
+            return None if not now else 100.0
+        return round(((now - before) / before) * 100, 1)
+
+    net_profit = collected - expenses
+    prev_net = prev_collected - prev_expenses
+
+    # ── Revenue vs expenses, last 8 months ────────────────────────────────────
+    # Anchored on the range's end month so a custom range shows the months it
+    # actually covers rather than always the last eight from today.
+    monthly_series = []
+    anchor = end.replace(day=1)
+    for offset in range(7, -1, -1):
+        month_start = anchor
+        for _ in range(offset):
+            month_start = (month_start - timedelta(days=1)).replace(day=1)
+        month_end = (month_start + timedelta(days=32)).replace(day=1)
+        monthly_series.append({
+            'month': month_start.isoformat(),
+            'label': month_start.strftime('%b'),
+            'revenue': Order.objects.filter(
+                created_at__date__gte=month_start, created_at__date__lt=month_end
+            ).aggregate(s=Sum('total_amount'))['s'] or 0.0,
+            'expenses': Expense.objects.filter(
+                date__date__gte=month_start, date__date__lt=month_end
+            ).aggregate(s=Sum('amount'))['s'] or 0.0,
+        })
+
+    def breakdown(field, choices):
+        counts = {
+            row[field]: row['n']
+            for row in orders.values(field).annotate(n=Count('id'))
+        }
+        # Driven by the canonical choices, so a status the model no longer has
+        # (the screen used to list "Washing") cannot appear, and one it does
+        # have (Ironing) cannot be forgotten.
+        return [
+            {'key': value, 'label': label, 'count': counts.get(value, 0)}
+            for value, label in choices
+            if counts.get(value, 0)
+        ]
+
+    by_service = [
+        {'label': row['service_type'], 'count': row['n']}
+        for row in OrderItem.objects.filter(order__in=orders)
+        .values('service_type')
+        .annotate(n=Count('id'))
+        .order_by('-n')
+    ]
+
+    mix_rows = [
+        row for row in orders.values('payment_method').annotate(s=Sum('paid_amount'))
+        if (row['s'] or 0) > 0
+    ]
+    mix_total = sum(row['s'] for row in mix_rows)
+    payment_mix = sorted(
+        (
+            {
+                'method': row['payment_method'],
+                'amount': round(row['s'], 2),
+                'percent': round((row['s'] / mix_total) * 100, 1) if mix_total else 0.0,
+            }
+            for row in mix_rows
+        ),
+        key=lambda row: row['amount'],
+        reverse=True,
+    )
+
+    return Response({
+        'from': start.isoformat(),
+        'to': end.isoformat(),
+        'revenue': revenue,
+        'revenue_change': pct_change(revenue, prev_revenue),
+        'collected': collected,
+        # Share of what was billed that actually came in. None when nothing was
+        # billed — "0% collected" would be a lie about an idle period.
+        'collected_percent': round((collected / revenue) * 100, 1) if revenue else None,
+        'outstanding': round(revenue - collected, 2),
+        'expenses': expenses,
+        'expenses_change': pct_change(expenses, prev_expenses),
+        'net_profit': round(net_profit, 2),
+        'net_profit_change': pct_change(net_profit, prev_net),
+        'margin': round((net_profit / collected) * 100, 1) if collected else None,
+        'order_count': order_count,
+        'average_order_value': round(revenue / order_count, 2) if order_count else 0.0,
+        'monthly_series': monthly_series,
+        'by_status': breakdown('status', OrderStatus.choices),
+        'by_type': breakdown('delivery_type', DeliveryType.choices),
+        'by_service': by_service,
+        'payment_mix': payment_mix,
+    })
+
+
 class ServiceAreaViewSet(viewsets.ModelViewSet):
     queryset = ServiceArea.objects.all()
     serializer_class = ServiceAreaSerializer
