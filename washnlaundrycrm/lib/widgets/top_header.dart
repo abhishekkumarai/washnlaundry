@@ -1,12 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/app_provider.dart';
+import 'panel_card.dart';
 
 class TopHeader extends StatelessWidget {
   final VoidCallback onNewOrderPressed;
 
-  const TopHeader({super.key, required this.onNewOrderPressed});
+  /// The screen this header sits on. It used to always read "Dashboard", on
+  /// Expenses and Payroll too.
+  final String title;
+
+  const TopHeader({
+    super.key,
+    required this.onNewOrderPressed,
+    required this.title,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final shop = context.watch<AppProvider>().shop;
+    final ownerName = (shop?['owner_name'] as String?)?.trim() ?? '';
+    final shopName = (shop?['name'] as String?)?.trim() ?? '';
+
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -17,9 +33,9 @@ class TopHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            'Dashboard',
-            style: TextStyle(
+          Text(
+            title,
+            style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Color(0xFF0F172A),
@@ -27,20 +43,9 @@ class TopHeader extends StatelessWidget {
           ),
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: const [
-                    Text('Pro ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    Text('Active', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
+              // A "Pro · Active" plan badge used to sit here. There are no
+              // plan tiers — `Shop.plan` was dropped in migration 0008 — so it
+              // measured nothing. Removed rather than wired.
               ElevatedButton.icon(
                 onPressed: onNewOrderPressed,
                 icon: const Icon(Icons.add, size: 16, color: Colors.white),
@@ -62,12 +67,15 @@ class TopHeader extends StatelessWidget {
                 tooltip: 'Help',
               ),
               const SizedBox(width: 8),
-              const CircleAvatar(
-                radius: 16,
-                backgroundColor: Color(0xFFDBEAFE),
-                child: Text(
-                  'AK',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
+              Tooltip(
+                message: ownerName.isEmpty ? 'Your shop' : ownerName,
+                child: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: const Color(0xFFDBEAFE),
+                  child: Text(
+                    initialsFor(ownerName.isEmpty ? shopName : ownerName),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
+                  ),
                 ),
               ),
             ],

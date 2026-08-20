@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
+import '../utils/navigation.dart';
 import '../widgets/load_state.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/top_header.dart';
+import '../utils/money.dart';
 
 /// `/payroll` in the live app. Not captured yet, so this follows our own
 /// conventions rather than cloning a screenshot — see LIVE_AUDIT.md
@@ -30,7 +32,6 @@ class _PayrollScreenState extends State<PayrollScreen> {
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
-  static const _paymentMethods = ['CASH', 'UPI', 'BANK_TRANSFER', 'CARD'];
 
   String get _monthLabel =>
       '${_monthNames[_selectedMonth.month - 1]} ${_selectedMonth.year}';
@@ -62,7 +63,10 @@ class _PayrollScreenState extends State<PayrollScreen> {
           Expanded(
             child: Column(
               children: [
-                TopHeader(onNewOrderPressed: () => provider.setNavIndex(1)),
+                TopHeader(
+                  title: 'Payroll',
+                  onNewOrderPressed: () => context.goSection(1),
+                ),
                 Expanded(child: _body(provider)),
               ],
             ),
@@ -97,12 +101,12 @@ class _PayrollScreenState extends State<PayrollScreen> {
 
           Row(
             children: [
-              _buildSummaryCard('Total Payroll', '₹${_money(payroll?.totalPayroll)}',
+              _buildSummaryCard('Total Payroll', '${Money.symbol}${_money(payroll?.totalPayroll)}',
                   const Color(0xFF1A4FD6)),
               const SizedBox(width: 12),
-              _buildSummaryCard('Paid', '₹${_money(payroll?.paid)}', const Color(0xFF10B981)),
+              _buildSummaryCard('Paid', '${Money.symbol}${_money(payroll?.paid)}', const Color(0xFF10B981)),
               const SizedBox(width: 12),
-              _buildSummaryCard('Pending Balance', '₹${_money(payroll?.pending)}',
+              _buildSummaryCard('Pending Balance', '${Money.symbol}${_money(payroll?.pending)}',
                   const Color(0xFFEF4444)),
               const SizedBox(width: 12),
               _buildSummaryCard('Staff Count', '${payroll?.staffCount ?? 0}',
@@ -275,7 +279,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
                 children: [
                   Text(entry.staffName,
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                  Text('${entry.role} • ₹${entry.dailyWage.round()}/day',
+                  Text('${entry.role} • ${Money.symbol}${entry.dailyWage.round()}/day',
                       style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                 ],
               ),
@@ -287,7 +291,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('₹${_money(entry.totalSalary)}',
+                  Text('${Money.symbol}${_money(entry.totalSalary)}',
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                   Text('Days worked: ${entry.daysWorkedLabel}',
                       style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
@@ -298,9 +302,9 @@ class _PayrollScreenState extends State<PayrollScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('Paid ₹${_money(entry.paidAmount)}',
+                  Text('Paid ${Money.symbol}${_money(entry.paidAmount)}',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF10B981))),
-                  Text('Due ₹${_money(entry.pendingAmount)}',
+                  Text('Due ${Money.symbol}${_money(entry.pendingAmount)}',
                       style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                 ],
               ),
@@ -336,7 +340,9 @@ class _PayrollScreenState extends State<PayrollScreen> {
     final amountController =
         TextEditingController(text: entry.pendingAmount.round().toString());
     final noteController = TextEditingController();
-    var method = _paymentMethods.first;
+    // One served vocabulary, replacing this screen's own copy.
+    final methodChoices = context.read<AppProvider>().paymentMethods;
+    var method = methodChoices.first.value;
     String? error;
 
     final saved = await showDialog<bool>(
@@ -350,16 +356,16 @@ class _PayrollScreenState extends State<PayrollScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('$_monthLabel • ₹${_money(entry.pendingAmount)} outstanding',
+                Text('$_monthLabel • ${Money.symbol}${_money(entry.pendingAmount)} outstanding',
                     style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                 const SizedBox(height: 16),
                 TextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Amount',
-                    prefixText: '₹ ',
-                    border: OutlineInputBorder(),
+                    prefixText: '${Money.symbol} ',
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -370,8 +376,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
                     border: OutlineInputBorder(),
                   ),
                   items: [
-                    for (final m in _paymentMethods)
-                      DropdownMenuItem(value: m, child: Text(m.replaceAll('_', ' '))),
+                    for (final m in methodChoices)
+                      DropdownMenuItem(value: m.value, child: Text(m.label)),
                   ],
                   onChanged: (value) => setDialogState(() => method = value ?? method),
                 ),

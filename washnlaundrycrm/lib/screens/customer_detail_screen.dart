@@ -6,6 +6,7 @@ import '../models/order_model.dart';
 import '../providers/app_provider.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
+import '../utils/money.dart';
 
 /// `/customers/:customerId` in the live app — see LIVE_AUDIT.md "Customer detail".
 ///
@@ -203,7 +204,7 @@ class CustomerDetailScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                '₹${customer.dueAmount.toStringAsFixed(0)} due',
+                '${Money.symbol}${customer.dueAmount.toStringAsFixed(0)} due',
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
               ),
             ),
@@ -214,11 +215,11 @@ class CustomerDetailScreen extends StatelessWidget {
 
   Widget _kpiRow(DateTime? lastOrder) {
     final cards = [
-      _kpi('Lifetime value', '₹${customer.totalSpent.toStringAsFixed(0)}',
+      _kpi('Lifetime value', '${Money.symbol}${customer.totalSpent.toStringAsFixed(0)}',
           Icons.account_balance_wallet_outlined, const Color(0xFF10B981)),
       _kpi('Total Orders', '${customer.totalOrders}',
           Icons.shopping_bag_outlined, const Color(0xFF1A4FD6)),
-      _kpi('Avg order value', '₹${customer.avgOrderValue.toStringAsFixed(0)}',
+      _kpi('Avg order value', '${Money.symbol}${customer.avgOrderValue.toStringAsFixed(0)}',
           Icons.trending_up_rounded, const Color(0xFFA855F7)),
       _kpi('Last order', lastOrder == null ? '—' : relativeTime(lastOrder),
           Icons.access_time_rounded, const Color(0xFFF59E0B)),
@@ -360,7 +361,7 @@ class CustomerDetailScreen extends StatelessWidget {
                     ),
                     Expanded(
                       flex: 2,
-                      child: Text('₹${o.totalAmount.toStringAsFixed(0)}',
+                      child: Text('${Money.symbol}${o.totalAmount.toStringAsFixed(0)}',
                           textAlign: TextAlign.right,
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                     ),

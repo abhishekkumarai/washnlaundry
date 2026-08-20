@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
 import '../widgets/sidebar_navigation.dart';
+import '../utils/money.dart';
 
 class ServicesScreen extends StatefulWidget {
   const ServicesScreen({super.key});
@@ -55,38 +56,10 @@ class _ServicesScreenState extends State<ServicesScreen> {
     'Star':     {'icon': Icons.workspace_premium_rounded,      'color': Color(0xFFEC4899), 'bg': Color(0xFFFCE7F3)},
   };
 
-  /// Human labels for the icon picker in the New Service dialog.
-  static const Map<String, String> _iconLabels = {
-    'Iron': 'Ironing',
-    'Laundry': 'Laundry',
-    'WashIron': 'Wash & Iron',
-    'Sparkles': 'Dry Cleaning',
-    'Home': 'Household',
-    'Shoe': 'Shoe Care',
-    'Star': 'Premium',
-  };
-
   static const Map<String, dynamic> _fallbackStyle = {
     'icon': Icons.label_outline_rounded,
     'color': Color(0xFF64748B),
     'bg': Color(0xFFF1F5F9),
-  };
-
-  // Product photography, matched on item name. Missing entries fall back to a
-  // placeholder tile — the price and metadata still come from the API.
-  static const Map<String, String> _itemImages = {
-    'Shirt': 'https://images.unsplash.com/photo-1602810316493-c1e5e6a89dce?w=300&h=300&fit=crop',
-    'T-Shirt': 'https://images.unsplash.com/photo-1527719327859-c6ce80353573?w=300&h=300&fit=crop',
-    'Kurta': 'https://images.unsplash.com/photo-1594938291221-94f18cbb5660?w=300&h=300&fit=crop',
-    'Suit (2 piece)': 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=300&h=300&fit=crop',
-    'Pant': 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=300&h=300&fit=crop',
-    'Jeans': 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=300&h=300&fit=crop',
-    'Shorts': 'https://images.unsplash.com/photo-1591195853828-11db59a44f43?w=300&h=300&fit=crop',
-    'Top / Kurti': 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=300&h=300&fit=crop',
-    'Saree (Silk)': 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=300&h=300&fit=crop',
-    'Sherwani': 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=300&h=300&fit=crop',
-    'Lehenga (Bridal)': 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=300&h=300&fit=crop',
-    'Blazer/Jacket': 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=300&h=300&fit=crop',
   };
 
   /// Categories in display order, as view-models. Rebuilt from the provider on
@@ -107,6 +80,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
         'icon': style['icon'],
         'color': style['color'],
         'bg': style['bg'],
+        'turnaroundDays': c.turnaroundDays,
       };
     }).toList();
 
@@ -130,7 +104,9 @@ class _ServicesScreenState extends State<ServicesScreen> {
               'unitShort': g.unitShortLabel,
               'turnaround': g.turnaroundLabel,
               'active': g.isActive,
-              'img': _itemImages[g.name] ?? '',
+              // Comes off the catalogue record now. Matching Unsplash URLs to
+              // item *names* in the client meant a rename lost the photo.
+              'img': g.imageUrl,
             })
         .toList();
   }
@@ -529,11 +505,42 @@ class _ServicesScreenState extends State<ServicesScreen> {
           const SizedBox(width: 16),
           IconButton(
             icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
-            onPressed: () {},
+            tooltip: 'Edit Category',
+            onPressed: () => _showEditCategoryModal(context, cat),
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, size: 18, color: Color(0xFF64748B)),
-            onPressed: () {},
+            tooltip: 'More actions',
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            onSelected: (action) {
+              if (action == 'edit') {
+                _showEditCategoryModal(context, cat);
+              } else if (action == 'delete') {
+                _showDeleteCategoryConfirm(context, cat);
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)),
+                    SizedBox(width: 8),
+                    Text('Edit category', style: TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFDC2626)),
+                    SizedBox(width: 8),
+                    Text('Delete category', style: TextStyle(fontSize: 13, color: Color(0xFFDC2626))),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -603,7 +610,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 Positioned(
                   bottom: 8, right: 8,
                   child: GestureDetector(
-                    onTap: () {},
+                    onTap: () => _showEditItemModal(context, item),
                     child: Container(
                       width: 28, height: 28,
                       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)]),
@@ -638,7 +645,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Text('₹${(item['price'] as double).toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    Text('${Money.symbol}${(item['price'] as double).toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                     Text(' / ${item['unitShort']}', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                   ],
                 ),
@@ -1316,7 +1323,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _modalLabel('Price (₹) *'),
+                            _modalLabel('Price (${Money.symbol}) *'),
                             TextField(
                               controller: priceCtrl,
                               keyboardType: TextInputType.number,
@@ -1400,7 +1407,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
   /// what GarmentCategory stores: name, icon and the active flag.
   void _showAddCategoryModal(BuildContext context) {
     final nameCtrl = TextEditingController();
-    String selectedIcon = _categoryStyles.keys.first;
+    final turnaroundCtrl = TextEditingController(text: '1');
     bool isActive = true;
     String? nameError;
     String? submitError;
@@ -1419,9 +1426,9 @@ class _ServicesScreenState extends State<ServicesScreen> {
             final provider = context.read<AppProvider>();
             final id = await provider.addCategory({
               'name': name,
-              'icon': selectedIcon,
               'display_order': _categories.length + 1,
               'is_active': isActive,
+              'turnaround_days': int.tryParse(turnaroundCtrl.text.trim()) ?? 1,
             });
             if (!ctx.mounted) return;
 
@@ -1444,7 +1451,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
             title: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('New Service', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const Text('Add Service', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                 IconButton(
                   icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
                   onPressed: () => Navigator.pop(ctx),
@@ -1471,32 +1478,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       if (nameError != null) setModalState(() => nameError = null);
                     },
                   ),
-                  const SizedBox(height: 14),
-
-                  _modalLabel('Service Icon'),
-                  _modalDropdown<String>(
-                    value: selectedIcon,
-                    items: _categoryStyles.entries.map((e) {
-                      final style = e.value;
-                      return DropdownMenuItem(
-                        value: e.key,
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 26, height: 26,
-                              decoration: BoxDecoration(color: style['bg'] as Color, borderRadius: BorderRadius.circular(6)),
-                              child: Icon(style['icon'] as IconData, size: 14, color: style['color'] as Color),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(_iconLabels[e.key] ?? e.key, style: const TextStyle(fontSize: 13)),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (v) {
-                      if (v != null) setModalState(() => selectedIcon = v);
-                    },
-                  ),
                   const SizedBox(height: 8),
 
                   SwitchListTile(
@@ -1507,6 +1488,17 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     subtitle: const Text('Show in items list', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                     value: isActive,
                     onChanged: (v) => setModalState(() => isActive = v),
+                  ),
+                  const SizedBox(height: 6),
+
+                  _modalLabel('Turnaround Days'),
+                  TextField(
+                    controller: turnaroundCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                   ),
 
                   if (submitError != null) ...[
@@ -1530,6 +1522,416 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 child: saving
                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Text('Add Service', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+
+
+  void _showEditCategoryModal(BuildContext context, Map<String, dynamic> cat) {
+    final nameCtrl = TextEditingController(text: cat['title'] as String);
+    final turnaroundCtrl =
+        TextEditingController(text: '${cat['turnaroundDays'] ?? 1}');
+    bool isActive = true;
+    String? nameError;
+    String? submitError;
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          Future<void> save() async {
+            final name = nameCtrl.text.trim();
+            setModalState(() => nameError = name.isEmpty ? 'Please enter a service name.' : null);
+            if (nameError != null) return;
+
+            setModalState(() => saving = true);
+            final provider = context.read<AppProvider>();
+            final ok = await provider.updateCategory('${cat['id']}', {
+              'name': name,
+              'is_active': isActive,
+              'turnaround_days': int.tryParse(turnaroundCtrl.text.trim()) ?? 1,
+            });
+            if (!ctx.mounted) return;
+
+            if (!ok) {
+              setModalState(() {
+                saving = false;
+                submitError = provider.error ?? 'Failed to update service category.';
+              });
+              return;
+            }
+            Navigator.pop(ctx);
+            _showSuccess('Updated "$name"');
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Edit Service', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _modalLabel('Service Name *'),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'e.g., Dry Clean',
+                      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                      errorText: nameError,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onChanged: (_) {
+                      if (nameError != null) setModalState(() => nameError = null);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    activeColor: const Color(0xFF1A4FD6),
+                    title: const Text('Active', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                    subtitle: const Text('Show in items list', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                    value: isActive,
+                    onChanged: (v) => setModalState(() => isActive = v),
+                  ),
+                  const SizedBox(height: 6),
+
+                  _modalLabel('Turnaround Days'),
+                  TextField(
+                    controller: turnaroundCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+
+                  if (submitError != null) ...[
+                    const SizedBox(height: 10),
+                    _modalErrorBanner(submitError!),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: saving ? null : () => Navigator.pop(ctx),
+                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+              ElevatedButton(
+                onPressed: saving ? null : save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A4FD6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: saving
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showDeleteCategoryConfirm(BuildContext context, Map<String, dynamic> cat) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Category', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        content: Text('Are you sure you want to delete "${cat['title']}"? All associated items will also be deleted.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final provider = context.read<AppProvider>();
+              final ok = await provider.deleteCategory('${cat['id']}');
+              if (ok) {
+                setState(() => _selectedCategoryIndex = 0);
+                _showSuccess('Deleted category "${cat['title']}"');
+              } else {
+                _showError(provider.error ?? 'Could not delete category');
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditItemModal(BuildContext context, Map<String, dynamic> item) {
+    final nameCtrl = TextEditingController(text: item['name'] as String? ?? '');
+    final priceCtrl = TextEditingController(text: ((item['price'] as num?) ?? 0).toStringAsFixed(0));
+    final imgCtrl = TextEditingController(text: item['img'] as String? ?? '');
+    String selectedCat = _categories[_selectedCategoryIndex]['title'] as String;
+    String selectedUnit = PricingUnit.all.firstWhere(
+      (u) => PricingUnit.label(u) == item['unit'],
+      orElse: () => PricingUnit.piece,
+    );
+    int turnaroundDays = int.tryParse((item['turnaround'] as String? ?? '').replaceAll('d', '').trim()) ?? 1;
+    bool isActive = (item['active'] as bool?) ?? true;
+
+    String? nameError;
+    String? priceError;
+    String? submitError;
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          Future<void> save() async {
+            final name = nameCtrl.text.trim();
+            final price = double.tryParse(priceCtrl.text.trim());
+            final match = _categories.firstWhere(
+              (c) => c['title'] == selectedCat,
+              orElse: () => const <String, dynamic>{},
+            );
+            final categoryId = int.tryParse('${match['id']}');
+
+            setModalState(() {
+              nameError = name.isEmpty ? 'Item name is required' : null;
+              priceError = (price == null || price <= 0) ? 'Enter a valid price' : null;
+              submitError = categoryId == null ? 'Please select a service category' : null;
+            });
+            if (nameError != null || priceError != null || submitError != null) return;
+
+            setModalState(() => saving = true);
+            final provider = context.read<AppProvider>();
+            final ok = await provider.updateGarmentItem('${item['id']}', {
+              'category': categoryId,
+              'name': name,
+              'price': price,
+              'unit': selectedUnit,
+              'turnaround_days': turnaroundDays,
+              'is_active': isActive,
+              'image_url': imgCtrl.text.trim(),
+            });
+            if (!ctx.mounted) return;
+
+            if (!ok) {
+              setModalState(() {
+                saving = false;
+                submitError = provider.error ?? 'Could not update the item';
+              });
+              return;
+            }
+            Navigator.pop(ctx);
+            _showSuccess('Updated "$name"');
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Edit Service / Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 440,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _modalLabel('Service Category *'),
+                    _modalDropdown<String>(
+                      value: selectedCat,
+                      items: _categories
+                          .map((c) => DropdownMenuItem(value: c['title'] as String, child: Text(c['title'] as String)))
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) setModalState(() => selectedCat = v);
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    _modalLabel('Item Name *'),
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Jacket / Blazer',
+                        hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        errorText: nameError,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onChanged: (_) {
+                        if (nameError != null) setModalState(() => nameError = null);
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _modalLabel('Price (${Money.symbol}) *'),
+                              TextField(
+                                controller: priceCtrl,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  hintText: 'e.g. 150',
+                                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                                  errorText: priceError,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onChanged: (_) {
+                                  if (priceError != null) setModalState(() => priceError = null);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _modalLabel('Unit'),
+                              _modalDropdown<String>(
+                                value: selectedUnit,
+                                items: PricingUnit.all
+                                    .map((u) => DropdownMenuItem(value: u, child: Text(PricingUnit.label(u))))
+                                    .toList(),
+                                onChanged: (v) {
+                                  if (v != null) setModalState(() => selectedUnit = v);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _modalLabel('Turnaround Time'),
+                              _modalDropdown<int>(
+                                value: turnaroundDays,
+                                items: List.generate(7, (i) => i + 1)
+                                    .map((d) => DropdownMenuItem(value: d, child: Text('${d}d')))
+                                    .toList(),
+                                onChanged: (v) {
+                                  if (v != null) setModalState(() => turnaroundDays = v);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _modalLabel('Status'),
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                activeColor: const Color(0xFF1A4FD6),
+                                title: Text(isActive ? 'Active' : 'Inactive',
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                value: isActive,
+                                onChanged: (v) => setModalState(() => isActive = v),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    _modalLabel('Image URL (optional)'),
+                    TextField(
+                      controller: imgCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'https://images.unsplash.com/...',
+                        hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+
+                    if (submitError != null) ...[
+                      const SizedBox(height: 14),
+                      _modalErrorBanner(submitError!),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final provider = context.read<AppProvider>();
+                        final ok = await provider.deleteGarmentItem('${item['id']}');
+                        if (!ctx.mounted) return;
+                        Navigator.pop(ctx);
+                        if (ok) {
+                          _showSuccess('Deleted "${item['name']}"');
+                        } else {
+                          _showError(provider.error ?? 'Could not delete item');
+                        }
+                      },
+                child: const Text('Delete', style: TextStyle(color: Color(0xFFDC2626))),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: saving ? null : () => Navigator.pop(ctx),
+                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+              ElevatedButton(
+                onPressed: saving ? null : save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A4FD6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: saving
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ],
           );

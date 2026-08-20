@@ -17,6 +17,11 @@ services:
     build:
       context: ./washnlaundrycrm
       dockerfile: Dockerfile
+      args:
+        # Empty by default — see the Dockerfile and CLAUDE.md "Authentication".
+        # Set a real value in a .env file (docker compose reads it
+        # automatically) to turn on Google Sign-In.
+        GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     container_name: laundry_flutter_frontend
     ports:
       - "8080:80"

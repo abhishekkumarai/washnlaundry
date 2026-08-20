@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
+import '../utils/navigation.dart';
 import 'panel_card.dart';
 
 /// "Revenue Analytics — This month overview": collection progress bar plus the
@@ -99,7 +100,7 @@ class RevenueAnalyticsCard extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: GestureDetector(
-              onTap: () => provider.setNavIndex(9),
+              onTap: () => context.goSection(9),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

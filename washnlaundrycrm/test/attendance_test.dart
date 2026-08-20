@@ -130,6 +130,44 @@ void main() {
       expect(find.byType(SnackBar), findsOneWidget);
     });
 
+    testWidgets('saving an untouched register marks nobody present',
+        (tester) async {
+      // Save used to send `_pending[id] ?? saved[id] ?? 'PRESENT'` for the
+      // whole roster, so pressing it without marking anyone invented a *paid*
+      // day for every staff member — contradicting the "not marked is not
+      // ABSENT" care this screen takes everywhere else.
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: [roster.first], attendance: []);
+      await tester.pumpWidget(host(provider, const AttendanceScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('Save Register'));
+      await tester.pump();
+
+      expect(find.text('Nothing to save — mark at least one staff member.'),
+          findsOneWidget);
+      // Still "not marked" afterwards — saving did not quietly fill it in.
+      expect(find.text('Head Washer • not marked'), findsOneWidget);
+    });
+
+    testWidgets('saving sends the staff who were marked', (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: [roster.first], attendance: []);
+      await tester.pumpWidget(host(provider, const AttendanceScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'ABSENT'));
+      await tester.pump();
+      await tester.tap(find.text('Save Register'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      // It got as far as the network (which fails in tests) rather than
+      // stopping at "nothing to save".
+      expect(find.text('Nothing to save — mark at least one staff member.'),
+          findsNothing);
+    });
+
     testWidgets('an empty roster says so and disables saving', (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: []);
       await tester.pumpWidget(host(provider, const AttendanceScreen()));

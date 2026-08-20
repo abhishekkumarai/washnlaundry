@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
+import '../utils/navigation.dart';
 import '../widgets/dashboard_side_panels.dart';
 import '../widgets/kpi_cards_row.dart';
 import '../widgets/load_state.dart';
@@ -35,7 +36,8 @@ class DashboardScreen extends StatelessWidget {
             child: Column(
               children: [
                 TopHeader(
-                  onNewOrderPressed: () => provider.setNavIndex(1),
+                  title: 'Dashboard',
+                  onNewOrderPressed: () => context.goSection(1),
                 ),
                 Expanded(child: _body(provider)),
               ],

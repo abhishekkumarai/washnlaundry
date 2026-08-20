@@ -1,3 +1,10 @@
+# ── Secrets ───────────────────────────────────────────────────────────────────
+# Google Cloud Console downloads an OAuth client's secret as this filename —
+# it must never be committed. This app's Google Sign-In flow only needs the
+# Client ID (public), never the secret, so this file shouldn't need to exist
+# in the repo at all; delete it once it's no longer needed for reference.
+client_secret_*.json
+
 # ── Python / Django ───────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]

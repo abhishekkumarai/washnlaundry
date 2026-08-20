@@ -2,15 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/order_model.dart';
+import '../utils/money.dart';
 
 class ReceiptDialog extends StatelessWidget {
   final OrderModel order;
 
   /// The shop profile from `/api/shops/`. The header used to be hardcoded to a
   /// Noida branch that has nothing to do with the seeded shop.
+  ///
+  /// Required — still nullable, because the shop may not have loaded yet, but
+  /// callers must pass it deliberately. Three of the four call sites used to
+  /// omit it and silently print the 'LaundryBill' fallback with no address or
+  /// phone on the receipt.
   final Map<String, dynamic>? shop;
 
-  const ReceiptDialog({Key? key, required this.order, this.shop})
+  const ReceiptDialog({Key? key, required this.order, required this.shop})
       : super(key: key);
 
   String get _shopName => (shop?['name'] as String?)?.trim().isNotEmpty == true
@@ -103,7 +109,7 @@ class ReceiptDialog extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('${it.itemTitle} x${it.quantity}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                        Text('₹${it.totalPrice.toInt()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        Text('${Money.symbol}${it.totalPrice.toInt()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   );
@@ -117,7 +123,7 @@ class ReceiptDialog extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Total Bill:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                Text('₹${order.totalAmount.toInt()}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
+                Text('${Money.symbol}${order.totalAmount.toInt()}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
               ],
             ),
             const SizedBox(height: 16),
@@ -167,7 +173,7 @@ class ReceiptDialog extends StatelessWidget {
 
   void _shareWhatsapp(OrderModel order) async {
     final cleanPhone = order.customerPhone.replaceAll(RegExp(r'\D'), '');
-    final msg = Uri.encodeComponent('Hello ${order.customerName},\nThank you for choosing LaundryBill!\nYour Order #${order.orderNumber} is processed.\nTotal: ₹${order.totalAmount.toInt()}\nThank you!');
+    final msg = Uri.encodeComponent('Hello ${order.customerName},\nThank you for choosing LaundryBill!\nYour Order #${order.orderNumber} is processed.\nTotal: ${Money.symbol}${order.totalAmount.toInt()}\nThank you!');
     final url = Uri.parse('https://wa.me/91$cleanPhone?text=$msg');
     if (await canLaunchUrl(url)) {
       await launchUrl(url);

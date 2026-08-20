@@ -177,6 +177,36 @@ void main() {
       expect(find.text('Checkout • ₹22'), findsOneWidget);
     });
 
+    testWidgets('picking a delivery type other than pickup adds the flat fee',
+        (tester) async {
+      // Checkout used to hardcode STORE_PICKUP, so there was no way to bill
+      // an order that needed carrying — and no way to charge for it either.
+      await pumpWithCatalogue(tester);
+
+      await tester.tap(find.text('+ Add to List').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Checkout • ₹15'), findsOneWidget);
+      // Just the "Delivery" section label — no charge line yet.
+      expect(find.text('Delivery'), findsOneWidget);
+      expect(find.text('₹50'), findsNothing);
+
+      await tester.tap(find.text('Home Delivery'));
+      await tester.pumpAndSettle();
+
+      // The section label plus the new totals-block charge line.
+      expect(find.text('Delivery'), findsNWidgets(2));
+      expect(find.text('₹50'), findsOneWidget);
+      expect(find.text('Checkout • ₹65'), findsOneWidget);
+
+      // Switching back to a pickup type drops the fee again.
+      await tester.tap(find.text('Store Pickup'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delivery'), findsOneWidget);
+      expect(find.text('₹50'), findsNothing);
+      expect(find.text('Checkout • ₹15'), findsOneWidget);
+    });
+
     testWidgets('decrementing to zero drops the line', (tester) async {
       await pumpWithCatalogue(tester);
 
@@ -279,7 +309,7 @@ void main() {
 
     testWidgets('shows the saved order number and total', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(home: ReceiptDialog(order: order)),
+        MaterialApp(home: ReceiptDialog(order: order, shop: null)),
       );
       await tester.pump();
 
@@ -337,6 +367,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: ReceiptDialog(
+            shop: null,
             order: OrderModel(
               id: 'o2',
               orderNumber: 'WASH-00017',

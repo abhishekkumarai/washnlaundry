@@ -432,6 +432,19 @@ class DashboardStatsTests(APITestCase):
     def test_revenue_series_has_fourteen_points(self):
         self.assertEqual(len(self.stats['revenue_series']), 14)
 
+    def test_revenue_series_measures_collected_not_billed(self):
+        # Today's orders bill 1000 but have collected 700. The series used to
+        # sum total_amount while `revenue_today` summed paid_amount, so the
+        # chart's last bar could never match the KPI card beside it.
+        self.assertEqual(self.stats['revenue_series'][-1]['amount'], 700.0)
+        self.assertEqual(self.stats['revenue_today'], 700.0)
+
+    def test_revenue_series_ends_today(self):
+        self.assertEqual(
+            self.stats['revenue_series'][-1]['date'],
+            timezone.localdate().isoformat(),
+        )
+
     def test_revenue_analytics(self):
         analytics = self.stats['revenue_analytics']
         self.assertEqual(analytics['sales'], 1000.0)
@@ -1232,3 +1245,82 @@ class OrderStatusNoteTests(APITestCase):
         )
         self.order.refresh_from_db()
         self.assertFalse(self.order.notes)
+
+
+class MetaEndpointTests(APITestCase):
+    """`/api/meta/` is the single source for vocabularies the client used to
+    hardcode. The payment methods are the reason it exists: the Flutter app
+    carried three separate lists in three different orders."""
+
+    def setUp(self):
+        self.data = self.client.get('/api/meta/').data
+
+    def test_payment_methods_are_served(self):
+        values = [c['value'] for c in self.data['payment_methods']]
+        self.assertEqual(values, ['CASH', 'UPI', 'CARD', 'BANK_TRANSFER'])
+
+    def test_every_vocabulary_is_present(self):
+        for key in (
+            'order_statuses', 'payment_statuses', 'delivery_types',
+            'order_sources', 'pricing_units', 'payment_methods',
+            'expense_categories', 'attendance_statuses',
+        ):
+            self.assertTrue(self.data[key], f'{key} came back empty')
+
+    def test_choices_carry_a_label(self):
+        # The client renders the label, so a value-only payload would force it
+        # to invent display strings again.
+        for choice in self.data['order_statuses']:
+            self.assertIn('value', choice)
+            self.assertIn('label', choice)
+
+    def test_ironing_is_offered(self):
+        values = [c['value'] for c in self.data['order_statuses']]
+        self.assertIn('IRONING', values)
+
+    def test_attendance_offers_all_four_states(self):
+        values = [c['value'] for c in self.data['attendance_statuses']]
+        self.assertEqual(sorted(values), ['ABSENT', 'HALF_DAY', 'LEAVE', 'PRESENT'])
+
+
+class ShopOperatingRulesTests(APITestCase):
+    """Rules that used to live as Dart constants in the client."""
+
+    def setUp(self):
+        self.shop = Shop.objects.create(name='washing')
+
+    def test_defaults_match_the_constants_they_replace(self):
+        data = self.client.get('/api/shops/').data[0]
+        self.assertEqual(data['express_multiplier'], 1.5)
+        self.assertEqual(data['default_daily_wage'], 600.0)
+        self.assertEqual(data['default_staff_role'], 'Washer')
+        self.assertEqual(data['currency_symbol'], '\u20b9')
+        self.assertEqual(data['locale'], 'en_IN')
+
+    def test_rules_are_patchable(self):
+        response = self.client.patch(
+            f'/api/shops/{self.shop.id}/',
+            {'express_multiplier': 2.0, 'default_daily_wage': 750.0},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.shop.refresh_from_db()
+        self.assertEqual(self.shop.express_multiplier, 2.0)
+        self.assertEqual(self.shop.default_daily_wage, 750.0)
+
+
+class GarmentItemImageTests(APITestCase):
+    def setUp(self):
+        self.category = GarmentCategory.objects.create(name='Ironing')
+
+    def test_image_url_defaults_to_blank_not_null(self):
+        item = GarmentItem.objects.create(category=self.category, name='Shirt', price=10)
+        self.assertEqual(item.image_url, '')
+
+    def test_image_url_round_trips(self):
+        url = 'https://example.com/shirt.png'
+        GarmentItem.objects.create(
+            category=self.category, name='Shirt', price=10, image_url=url,
+        )
+        data = self.client.get('/api/items/').data[0]
+        self.assertEqual(data['image_url'], url)

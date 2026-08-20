@@ -1,3 +1,5 @@
+import '../utils/money.dart';
+
 /// Pricing units used by the catalogue. Mirrors `PricingUnit` in the backend.
 class PricingUnit {
   static const piece = 'PC';
@@ -55,6 +57,11 @@ class GarmentItemModel {
   final int turnaroundDays;
   final bool isActive;
 
+  /// Product photo, or '' to fall back to the icon treatment. The client used
+  /// to hold a map of item *names* to Unsplash URLs, so a rename lost the
+  /// picture and a shop could never supply its own.
+  final String imageUrl;
+
   const GarmentItemModel({
     required this.id,
     required this.categoryId,
@@ -64,6 +71,7 @@ class GarmentItemModel {
     this.unit = PricingUnit.piece,
     this.turnaroundDays = 1,
     this.isActive = true,
+    this.imageUrl = '',
   });
 
   String get unitLabel => PricingUnit.label(unit);
@@ -80,6 +88,7 @@ class GarmentItemModel {
       unit: json['unit'] ?? PricingUnit.piece,
       turnaroundDays: json['turnaround_days'] ?? 1,
       isActive: json['is_active'] ?? true,
+      imageUrl: json['image_url'] ?? '',
     );
   }
 }
@@ -90,6 +99,7 @@ class GarmentCategoryModel {
   final String icon;
   final int displayOrder;
   final bool isActive;
+  final int turnaroundDays;
   final int itemCount;
   final double minPrice;
   final double maxPrice;
@@ -101,15 +111,17 @@ class GarmentCategoryModel {
     this.icon = 'Shirt',
     this.displayOrder = 0,
     this.isActive = true,
+    this.turnaroundDays = 1,
     this.itemCount = 0,
     this.minPrice = 0,
     this.maxPrice = 0,
     this.items = const [],
   });
 
-  /// "10–100 ₹", as the live Services screen renders it.
+  /// "10–100 ₹", as the live Services screen renders it — symbol trailing,
+  /// which is why this one does not go through [Money.format].
   String get priceRangeLabel =>
-      '${minPrice.toStringAsFixed(0)}–${maxPrice.toStringAsFixed(0)} ₹';
+      '${minPrice.toStringAsFixed(0)}–${maxPrice.toStringAsFixed(0)} ${Money.symbol}';
 
   factory GarmentCategoryModel.fromJson(Map<String, dynamic> json) {
     final range = json['price_range'] as Map<String, dynamic>? ?? const {};
@@ -120,6 +132,7 @@ class GarmentCategoryModel {
       icon: json['icon'] ?? 'Shirt',
       displayOrder: json['display_order'] ?? 0,
       isActive: json['is_active'] ?? true,
+      turnaroundDays: json['turnaround_days'] ?? 1,
       itemCount: json['item_count'] ?? rawItems.length,
       minPrice: (range['min'] ?? 0).toDouble(),
       maxPrice: (range['max'] ?? 0).toDouble(),
@@ -418,6 +431,91 @@ class ReportMonthModel {
         label: json['label'] ?? '',
         revenue: (json['revenue'] ?? 0).toDouble(),
         expenses: (json['expenses'] ?? 0).toDouble(),
+      );
+}
+
+/// One `{value, label}` pair from `/api/meta/`.
+class ChoiceModel {
+  final String value;
+  final String label;
+
+  const ChoiceModel({required this.value, required this.label});
+
+  factory ChoiceModel.fromJson(Map<String, dynamic> json) => ChoiceModel(
+        value: json['value']?.toString() ?? '',
+        label: json['label']?.toString() ?? '',
+      );
+}
+
+/// The canonical vocabularies, served rather than hand-mirrored.
+///
+/// Payment methods are why this exists: the app used to carry three separate
+/// hardcoded lists — New Order offered three methods, Expenses and Payroll
+/// four in different orders — against a backend field with no choices at all.
+class MetaModel {
+  final List<ChoiceModel> orderStatuses;
+  final List<ChoiceModel> paymentStatuses;
+  final List<ChoiceModel> deliveryTypes;
+  final List<ChoiceModel> orderSources;
+  final List<ChoiceModel> pricingUnits;
+  final List<ChoiceModel> paymentMethods;
+  final List<ChoiceModel> expenseCategories;
+  final List<ChoiceModel> attendanceStatuses;
+
+  const MetaModel({
+    this.orderStatuses = const [],
+    this.paymentStatuses = const [],
+    this.deliveryTypes = const [],
+    this.orderSources = const [],
+    this.pricingUnits = const [],
+    this.paymentMethods = const [],
+    this.expenseCategories = const [],
+    this.attendanceStatuses = const [],
+  });
+
+  bool get isEmpty => paymentMethods.isEmpty;
+
+  static List<ChoiceModel> _list(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map<String, dynamic>>()
+        .map(ChoiceModel.fromJson)
+        .toList();
+  }
+
+  factory MetaModel.fromJson(Map<String, dynamic> json) => MetaModel(
+        orderStatuses: _list(json['order_statuses']),
+        paymentStatuses: _list(json['payment_statuses']),
+        deliveryTypes: _list(json['delivery_types']),
+        orderSources: _list(json['order_sources']),
+        pricingUnits: _list(json['pricing_units']),
+        paymentMethods: _list(json['payment_methods']),
+        expenseCategories: _list(json['expense_categories']),
+        attendanceStatuses: _list(json['attendance_statuses']),
+      );
+}
+
+/// One day of the dashboard's 14-day revenue series.
+///
+/// [day] is the day-of-month the server labelled the point with, so the axis
+/// follows the real calendar. The chart used to hardcode days 16..29 and
+/// invent the amounts.
+class RevenueSeriesPointModel {
+  final String date;
+  final int day;
+  final double amount;
+
+  const RevenueSeriesPointModel({
+    this.date = '',
+    this.day = 0,
+    this.amount = 0,
+  });
+
+  factory RevenueSeriesPointModel.fromJson(Map<String, dynamic> json) =>
+      RevenueSeriesPointModel(
+        date: json['date'] ?? '',
+        day: (json['day'] ?? 0).toInt(),
+        amount: (json['amount'] ?? 0).toDouble(),
       );
 }
 

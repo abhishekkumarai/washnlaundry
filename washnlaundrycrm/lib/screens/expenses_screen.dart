@@ -3,8 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
+import '../utils/navigation.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/top_header.dart';
+import '../utils/money.dart';
 
 /// `/expenses` in the live app. Not captured yet, so this follows our own
 /// conventions rather than cloning a screenshot. See LIVE_AUDIT.md
@@ -20,21 +22,6 @@ class ExpensesScreen extends StatefulWidget {
 class _ExpensesScreenState extends State<ExpensesScreen> {
   String _category = 'All';
 
-  /// Offered in the Add dialog. The field is free text on the backend, so this
-  /// is a convenience list, not a constraint — an expense loaded with some
-  /// other category still renders and still gets its own filter chip.
-  static const _categoryPresets = [
-    'Supplies',
-    'Rent',
-    'Utilities',
-    'Maintenance',
-    'Salary',
-    'Transport',
-    'Other',
-  ];
-
-  static const _paymentMethods = ['CASH', 'UPI', 'CARD', 'BANK_TRANSFER'];
-
   static const _categoryColors = {
     'Supplies': Color(0xFF1A4FD6),
     'Rent': Color(0xFFDC2626),
@@ -47,8 +34,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   static Color _colorFor(String category) =>
       _categoryColors[category] ?? const Color(0xFF64748B);
 
-  static String _methodLabel(String raw) =>
-      raw.split('_').map((w) => w.isEmpty ? w : w[0] + w.substring(1).toLowerCase()).join(' ');
+  static String _methodLabel(AppProvider provider, String raw) => provider.paymentMethods
+      .firstWhere((c) => c.value == raw, orElse: () => ChoiceModel(value: raw, label: raw))
+      .label;
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +61,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           Expanded(
             child: Column(
               children: [
-                TopHeader(onNewOrderPressed: () => provider.setNavIndex(1)),
+                TopHeader(
+                  title: 'Expenses',
+                  onNewOrderPressed: () => context.goSection(1),
+                ),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
@@ -132,9 +123,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Widget _summaryRow(double total, double thisMonth, int count) {
     final cards = [
-      _summaryCard('This month', '₹${thisMonth.toStringAsFixed(0)}',
+      _summaryCard('This month', '${Money.symbol}${thisMonth.toStringAsFixed(0)}',
           Icons.calendar_month_rounded, const Color(0xFFDC2626)),
-      _summaryCard('Total logged', '₹${total.toStringAsFixed(0)}',
+      _summaryCard('Total logged', '${Money.symbol}${total.toStringAsFixed(0)}',
           Icons.account_balance_wallet_outlined, const Color(0xFF1A4FD6)),
       _summaryCard('Entries', '$count', Icons.receipt_long_outlined, const Color(0xFF8B5CF6)),
     ];
@@ -282,7 +273,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             const SizedBox(width: 8),
                             Flexible(
                               child: Text(
-                                '${_methodLabel(expenses[i].paymentMethod)} · '
+                                '${_methodLabel(provider, expenses[i].paymentMethod)} · '
                                 '${expenses[i].date == null ? 'No date' : DateFormat('MMM d, yyyy').format(expenses[i].date!)}',
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
@@ -294,7 +285,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text('₹${expenses[i].amount.toStringAsFixed(0)}',
+                  Text('${Money.symbol}${expenses[i].amount.toStringAsFixed(0)}',
                       style: const TextStyle(
                           fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFEF4444))),
                 ],
@@ -313,11 +304,17 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final amountController = TextEditingController();
     final provider = context.read<AppProvider>();
 
+    // Vocabularies come from `/api/meta/` now. This screen used to hold its
+    // own seven categories and four payment methods, while New Order offered
+    // three methods and Payroll four in a different order.
+    final categoryChoices = provider.expenseCategories;
+    final methodChoices = provider.paymentMethods;
+
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) {
-        var category = _categoryPresets.first;
-        var method = _paymentMethods.first;
+        var category = categoryChoices.isEmpty ? 'Supplies' : categoryChoices.first.value;
+        var method = methodChoices.first.value;
         var date = DateTime.now();
         String? error;
         var saving = false;
@@ -341,7 +338,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       decoration: _fieldDecoration('e.g. Commercial detergent (50L)'),
                     ),
                     const SizedBox(height: 14),
-                    _label('Amount (₹)'),
+                    _label('Amount (${Money.symbol})'),
                     TextField(
                       controller: amountController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -356,8 +353,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
                       decoration: _fieldDecoration(''),
                       items: [
-                        for (final c in _categoryPresets)
-                          DropdownMenuItem(value: c, child: Text(c)),
+                        for (final c in categoryChoices)
+                          DropdownMenuItem(value: c.value, child: Text(c.label)),
                       ],
                       onChanged: (v) => setDialogState(() => category = v ?? category),
                     ),
@@ -369,8 +366,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
                       decoration: _fieldDecoration(''),
                       items: [
-                        for (final m in _paymentMethods)
-                          DropdownMenuItem(value: m, child: Text(_methodLabel(m))),
+                        for (final m in methodChoices)
+                          DropdownMenuItem(value: m.value, child: Text(m.label)),
                       ],
                       onChanged: (v) => setDialogState(() => method = v ?? method),
                     ),

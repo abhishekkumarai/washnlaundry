@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
+import '../utils/navigation.dart';
 import 'panel_card.dart';
 
 /// "Store Health — Operational performance · last 30 days": a 0–100 score with
@@ -109,7 +110,7 @@ class StoreHealthCard extends StatelessWidget {
                 style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
               ),
               GestureDetector(
-                onTap: () => context.read<AppProvider>().setNavIndex(9),
+                onTap: () => context.goSection(9),
                 child: const Row(
                   children: [
                     Text(

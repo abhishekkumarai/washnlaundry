@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/order_model.dart';
 import '../providers/app_provider.dart';
+import '../utils/navigation.dart';
 import 'panel_card.dart';
 import 'status_pill.dart';
 import 'receipt_dialog.dart';
@@ -41,7 +43,7 @@ class RecentActivityCard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           GestureDetector(
-            onTap: () => provider.setNavIndex(2),
+            onTap: () => context.goSection(2),
             child: const Text(
               'View all',
               style: TextStyle(
@@ -81,22 +83,22 @@ class RecentActivityCard extends StatelessWidget {
 
   Widget _headerRow() {
     const style = TextStyle(
-      fontSize: 9.5,
+      fontSize: 10,
       fontWeight: FontWeight.w700,
       color: Color(0xFF94A3B8),
       letterSpacing: 0.6,
     );
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
         children: const [
           SizedBox(width: 58, child: Text('TIME', style: style)),
           SizedBox(width: 118, child: Text('ORDER', style: style)),
           Expanded(child: Text('CUSTOMER', style: style)),
           SizedBox(width: 12),
-          SizedBox(width: 108, child: Text('TYPE', style: style)),
-          SizedBox(width: 78, child: Text('PAYMENT', style: style)),
-          SizedBox(width: 104, child: Text('STATUS', style: style)),
+          SizedBox(width: 110, child: Text('TYPE', style: style)),
+          SizedBox(width: 80, child: Text('PAYMENT', style: style)),
+          SizedBox(width: 110, child: Text('STATUS', style: style)),
           SizedBox(width: 36),
         ],
       ),
@@ -104,117 +106,128 @@ class RecentActivityCard extends StatelessWidget {
   }
 
   Widget _dataRow(BuildContext context, OrderModel order) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 58,
-            child: Text(
-              DateFormat('HH:mm').format(order.createdAt),
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0F172A),
-              ),
-            ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        hoverColor: const Color(0xFFF8FAFC),
+        onTap: () => context.go('/orders/${order.id}'),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
           ),
-          SizedBox(
-            width: 118,
-            child: Text(
-              '#${order.orderNumber}',
-              style: const TextStyle(
-                fontSize: 12,
-                fontFamily: 'monospace',
-                color: Color(0xFF334155),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              order.customerName,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 108,
-            child: Row(
-              children: [
-                const Icon(Icons.circle, size: 6, color: Color(0xFF10B981)),
-                const SizedBox(width: 5),
-                Flexible(
-                  child: Text(
-                    order.deliveryTypeLabel,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF10B981)),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 58,
+                child: Text(
+                  DateFormat('HH:mm').format(order.createdAt),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: 78,
-            child: Text(
-              order.paymentStatusLabel,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: paymentColor(order.paymentStatus),
               ),
-            ),
-          ),
-          SizedBox(
-            width: 104,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: statusColor(order.status).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
+              SizedBox(
+                width: 118,
+                child: Text(
+                  '#${order.orderNumber}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A4FD6),
+                  ),
                 ),
+              ),
+              Expanded(
+                child: Text(
+                  order.customerName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 110,
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.circle, size: 5, color: statusColor(order.status)),
-                    const SizedBox(width: 4),
-                    Text(
-                      order.statusLabel,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: statusColor(order.status),
+                    const Icon(Icons.circle, size: 6, color: Color(0xFF10B981)),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        order.deliveryTypeLabel,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF10B981)),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ),
-          SizedBox(
-            width: 36,
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              tooltip: 'Receipt',
-              onPressed: () => showDialog(
-                context: context,
-                builder: (_) => ReceiptDialog(order: order),
+              SizedBox(
+                width: 80,
+                child: Text(
+                  order.paymentStatusLabel,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: paymentColor(order.paymentStatus),
+                  ),
+                ),
               ),
-              icon: const Icon(Icons.receipt_outlined, size: 17, color: Color(0xFF1A4FD6)),
-            ),
+              SizedBox(
+                width: 110,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: statusColor(order.status).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.circle, size: 5, color: statusColor(order.status)),
+                        const SizedBox(width: 4),
+                        Text(
+                          order.statusLabel,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: statusColor(order.status),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 36,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Receipt',
+                  onPressed: () => showDialog(
+                    context: context,
+                    builder: (_) => ReceiptDialog(
+                      order: order,
+                      shop: context.read<AppProvider>().shop,
+                    ),
+                  ),
+                  icon: const Icon(Icons.receipt_outlined, size: 17, color: Color(0xFF1A4FD6)),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

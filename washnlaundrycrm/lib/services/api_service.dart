@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
 
+import 'package:flutter/foundation.dart';
+
 /// Thrown for any failed API call. Callers are expected to catch this and show
 /// an error state — the previous version swallowed failures and returned empty
 /// lists, which made a backend outage look like an empty shop.
@@ -25,10 +27,20 @@ class ApiService {
   ///
   /// Defaults to same-origin `/api`, which is what the nginx container serves.
   /// Hardcoding localhost broke every deploy and the Docker build.
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: '/api',
-  );
+  ///
+  /// The one exception is `kDebugMode`: `flutter run -d chrome` has no nginx
+  /// proxy in front of it, so a `manage.py runserver` backend on
+  /// `127.0.0.1:8000` is otherwise unreachable without typing the dart-define
+  /// every time. Gating this on `kDebugMode` rather than sniffing the host
+  /// keeps it out of every `flutter build web` output (debug mode is always
+  /// false there) — release and Docker builds can never see this fallback,
+  /// regardless of what host the browser happens to be on.
+  static String get baseUrl {
+    const raw = String.fromEnvironment('API_BASE_URL', defaultValue: '');
+    if (raw.isNotEmpty) return raw;
+    if (kDebugMode && kIsWeb) return 'http://127.0.0.1:8000/api';
+    return '/api';
+  }
 
   static Uri _uri(String path, [Map<String, String>? query]) {
     final normalised = path.startsWith('/') ? path : '/$path';
@@ -180,6 +192,20 @@ class ApiService {
     return GarmentCategoryModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
+  static Future<GarmentCategoryModel> updateCategory(
+    String id,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send('PATCH', '/categories/$id/', body: payload);
+    return GarmentCategoryModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  static Future<void> deleteCategory(String id) =>
+      _send('DELETE', '/categories/$id/');
+
+  static Future<void> deleteGarmentItem(String id) =>
+      _send('DELETE', '/items/$id/');
+
   // ── Customers ──────────────────────────────────────────────────────────────
 
   static Future<List<CustomerModel>> fetchCustomers({String? search}) async {
@@ -326,5 +352,14 @@ class ApiService {
   ) async {
     final data = await _send('PATCH', '/shops/$id/', body: payload);
     return (data as Map).cast<String, dynamic>();
+  }
+
+  // ── Meta ───────────────────────────────────────────────────────────────────
+
+  /// The canonical vocabularies (payment methods, expense categories, statuses)
+  /// that the screens used to hardcode one copy of each.
+  static Future<MetaModel> fetchMeta() async {
+    final data = await _send('GET', '/meta/');
+    return MetaModel.fromJson((data as Map).cast<String, dynamic>());
   }
 }

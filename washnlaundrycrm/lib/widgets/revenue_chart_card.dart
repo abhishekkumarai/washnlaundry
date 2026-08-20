@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
+import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
+import 'panel_card.dart';
 
+/// "Revenue — last 14 days".
+///
+/// Every bar used to be invented: the series was
+/// `index == 13 ? revenueToday : (index % 3 == 0 ? 40.0 : 0.0)` and the axis
+/// was hardcoded to days 16..29 whatever the date. It now plots
+/// `revenue_series` from `/api/dashboard/stats/`, which has always been in the
+/// payload.
 class RevenueChartCard extends StatelessWidget {
   const RevenueChartCard({super.key});
 
@@ -10,12 +19,16 @@ class RevenueChartCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = Provider.of<AppProvider>(context);
 
-    // Days 16 through 29
-    final days = List.generate(14, (index) => (16 + index).toString());
+    final series = provider.revenueSeries;
+    final days = series.map((p) => '${p.day}').toList();
 
-    // Calculate dynamic maxY so bars never overflow the container height
-    final double maxRevenue = provider.revenueToday;
-    final double maxY = maxRevenue > 300 ? (maxRevenue * 1.25) : 350.0;
+    final double peak =
+        series.isEmpty ? 0 : series.map((p) => p.amount).reduce((a, b) => a > b ? a : b);
+    final double total = series.fold(0.0, (sum, p) => sum + p.amount);
+
+    // Headroom above the tallest bar so it never touches the container top.
+    // The 350 floor keeps the axis readable on a quiet fortnight.
+    final double maxY = peak > 300 ? (peak * 1.25) : 350.0;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -48,14 +61,18 @@ class RevenueChartCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  // The total across the window — the subtitle says "last 14
+                  // days", so a single day's figure never belonged here.
                   Text(
-                    '₹${maxRevenue.toInt()}',
+                    formatRupees(total),
                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
-                    '— vs prior',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                  Text(
+                    provider.revenueTodayChange == null
+                        ? '— vs prior'
+                        : '${formatPercent(provider.revenueTodayChange!.abs())} vs prior',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                   ),
                 ],
               ),
@@ -63,6 +80,17 @@ class RevenueChartCard extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
+          if (series.isEmpty)
+            const SizedBox(
+              height: 180,
+              child: Center(
+                child: Text(
+                  'No revenue recorded in the last 14 days',
+                  style: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                ),
+              ),
+            )
+          else
           ClipRect(
             child: SizedBox(
               height: 180,
@@ -70,7 +98,7 @@ class RevenueChartCard extends StatelessWidget {
                 BarChartData(
                   alignment: BarChartAlignment.spaceAround,
                   maxY: maxY,
-                  barTouchData: barTouchDataEnabled(),
+                  barTouchData: barTouchDataEnabled(series),
                   titlesData: FlTitlesData(
                     show: true,
                     bottomTitles: AxisTitles(
@@ -117,12 +145,14 @@ class RevenueChartCard extends StatelessWidget {
                     getDrawingHorizontalLine: getHorizontalLine,
                   ),
                   borderData: FlBorderData(show: false),
-                  barGroups: List.generate(14, (index) {
-                    final val = index == 13 ? maxRevenue : (index % 3 == 0 ? 40.0 : 0.0);
+                  barGroups: List.generate(series.length, (index) {
+                    final val = series[index].amount;
                     return BarChartGroupData(
                       x: index,
                       barRods: [
                         BarChartRodData(
+                          // A day with no revenue still draws a stub, so the
+                          // axis reads as 14 days rather than a gap.
                           toY: val == 0 ? 4 : val,
                           color: const Color(0xFF1A4FD6),
                           width: 12,
@@ -150,13 +180,18 @@ class RevenueChartCard extends StatelessWidget {
     );
   }
 
-  BarTouchData barTouchDataEnabled() {
+  BarTouchData barTouchDataEnabled(List<RevenueSeriesPointModel> series) {
     return BarTouchData(
       enabled: true,
       touchTooltipData: BarTouchTooltipData(
         getTooltipItem: (group, groupIndex, rod, rodIndex) {
+          final point = group.x >= 0 && group.x < series.length ? series[group.x] : null;
+          // The rod's height is floored at 4 for empty days, so report the
+          // point's real amount rather than reading it back off the bar.
+          final label = point == null ? '' : '${point.date}\n';
+          final amount = point?.amount ?? rod.toY;
           return BarTooltipItem(
-            'Day ${group.x + 16}\n₹${rod.toY.toInt()}',
+            '$label${formatRupees(amount)}',
             const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
           );
         },

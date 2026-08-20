@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../utils/money.dart';
+
 /// Shared chrome for the dashboard panels: white surface, hairline border,
 /// optional title/subtitle row with a trailing action.
 class PanelCard extends StatelessWidget {
@@ -72,9 +74,27 @@ class PanelCard extends StatelessWidget {
 String formatPercent(dynamic value) =>
     value == null ? '—' : '${(value as num).toStringAsFixed(value % 1 == 0 ? 0 : 1)}%';
 
-String formatRupees(dynamic value) {
-  final amount = (value as num?)?.round() ?? 0;
-  return '₹$amount';
+/// Formats an amount in the shop's currency, grouped ("₹4,850") to match
+/// Reports — the symbol used to be a bare '₹' here and in a dozen other
+/// widgets; it now comes from the shop record via [Money].
+String formatRupees(dynamic value) => Money.grouped(value as num?);
+
+/// Avatar initials for a person or shop name — "AK" for "AK", "RK" for
+/// "Ramesh Kumar", "?" when the shop hasn't loaded yet. Shared so the sidebar,
+/// the header and Settings can't drift apart.
+String initialsFor(String? name) {
+  final parts = (name ?? '')
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((p) => p.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return '?';
+  if (parts.length == 1) {
+    final word = parts.first;
+    // A single word gives up to two letters: "AK" stays "AK".
+    return word.substring(0, word.length >= 2 ? 2 : 1).toUpperCase();
+  }
+  return (parts.first[0] + parts[1][0]).toUpperCase();
 }
 
 /// A small labelled statistic used across the side panels.

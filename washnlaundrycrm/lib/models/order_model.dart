@@ -77,10 +77,12 @@ class OrderSource {
 class TimelineEntry {
   final String status;
   final DateTime at;
+  final String? title;
+  final String? subtitle;
 
-  const TimelineEntry(this.status, this.at);
+  const TimelineEntry(this.status, this.at, {this.title, this.subtitle});
 
-  String get label => OrderStatus.label(status);
+  String get label => title ?? OrderStatus.label(status);
 }
 
 class OrderItemModel {

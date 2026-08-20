@@ -47,6 +47,30 @@ class PricingUnit(models.TextChoices):
     SET = 'SET', 'per set'
 
 
+class PaymentMethod(models.TextChoices):
+    """How money changed hands.
+
+    Previously `payment_method` was a free-text CharField with no choices, and
+    the Flutter client carried three divergent hardcoded lists: New Order
+    offered CASH/UPI/CARD, while Expenses and Payroll each offered four in a
+    different order. Serving this from `/api/meta/` gives all three one source.
+    """
+    CASH = 'CASH', 'Cash'
+    UPI = 'UPI', 'UPI'
+    CARD = 'CARD', 'Card'
+    BANK_TRANSFER = 'BANK_TRANSFER', 'Bank Transfer'
+
+
+class ExpenseCategory(models.TextChoices):
+    SUPPLIES = 'Supplies', 'Supplies'
+    RENT = 'Rent', 'Rent'
+    UTILITIES = 'Utilities', 'Utilities'
+    MAINTENANCE = 'Maintenance', 'Maintenance'
+    SALARY = 'Salary', 'Salary'
+    TRANSPORT = 'Transport', 'Transport'
+    OTHER = 'Other', 'Other'
+
+
 # ── Shop ──────────────────────────────────────────────────────────────────────
 
 class Shop(models.Model):
@@ -79,6 +103,20 @@ class Shop(models.Model):
     # Minutes before a slot starts after which customers can no longer book it.
     pickup_buffer_minutes = models.IntegerField(default=30)
     delivery_buffer_minutes = models.IntegerField(default=30)
+
+    # ── Operating rules ───────────────────────────────────────────────────────
+    # These were client-side Dart constants: a 1.5x express surcharge baked into
+    # new_order_screen.dart, and a 600 wage / 'Washer' role hardcoded as the
+    # defaults on the Add Staff form. They are shop policy, not app policy.
+    express_multiplier = models.FloatField(default=1.5)
+    default_daily_wage = models.FloatField(default=600.0)
+    default_staff_role = models.CharField(max_length=100, default='Washer')
+
+    # ── Presentation ──────────────────────────────────────────────────────────
+    # '₹' was a bare literal in ~15 widgets and the en_IN grouping was hardcoded
+    # in the Reports screen.
+    currency_symbol = models.CharField(max_length=8, default='₹')
+    locale = models.CharField(max_length=16, default='en_IN')
 
     def save(self, *args, **kwargs):
         if not self.order_prefix:
@@ -125,6 +163,10 @@ class GarmentCategory(models.Model):
     icon = models.CharField(max_length=50, default='Shirt')
     display_order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    # The live app's Add/Edit Service modal offers Turnaround Days, not an
+    # icon picker — icon is chosen from a fixed set the client already maps
+    # by category name, so it was never a field the real form exposes.
+    turnaround_days = models.IntegerField(default=1)
 
     class Meta:
         verbose_name_plural = 'Garment categories'
@@ -152,6 +194,10 @@ class GarmentItem(models.Model):
     category = models.ForeignKey(GarmentCategory, on_delete=models.CASCADE, related_name='items')
     name = models.CharField(max_length=255)
     icon = models.CharField(max_length=50, default='Shirt')
+    # Product photography. The client used to hold a 12-entry map of garment
+    # *names* to Unsplash URLs, so renaming an item lost its picture and a shop
+    # could never supply its own. Blank falls back to the icon treatment.
+    image_url = models.URLField(max_length=500, blank=True, default='')
     price = models.FloatField(default=0.0)
     unit = models.CharField(max_length=8, choices=PricingUnit.choices, default=PricingUnit.PIECE)
     turnaround_days = models.IntegerField(default=1)
@@ -180,7 +226,7 @@ class Order(models.Model):
 
     status = models.CharField(max_length=20, choices=OrderStatus.choices, default=OrderStatus.PLACED)
     payment_status = models.CharField(max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID)
-    payment_method = models.CharField(max_length=50, default='CASH')
+    payment_method = models.CharField(max_length=50, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
     delivery_type = models.CharField(max_length=20, choices=DeliveryType.choices, default=DeliveryType.STORE_PICKUP)
     source = models.CharField(max_length=20, choices=OrderSource.choices, default=OrderSource.WEB)
     # Free text, not a choice: the live timeline renders "Created by abhishek
@@ -319,9 +365,9 @@ class TimeSlot(models.Model):
 
 class Expense(models.Model):
     title = models.CharField(max_length=255)
-    category = models.CharField(max_length=100, default='Supplies')
+    category = models.CharField(max_length=100, choices=ExpenseCategory.choices, default=ExpenseCategory.SUPPLIES)
     amount = models.FloatField()
-    payment_method = models.CharField(max_length=50, default='CASH')
+    payment_method = models.CharField(max_length=50, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
     # Settable, not auto_now_add: an expense is logged when someone gets round
     # to it, but it belongs to the day it was actually incurred. Stamping it
     # with the moment of entry filed July's rent under whatever day you typed
@@ -372,7 +418,7 @@ class SalaryPayment(models.Model):
     # Settable, like Expense.date and for the same reason: a payout is recorded
     # when someone gets round to it but belongs to the day it was made.
     paid_on = models.DateTimeField(default=timezone.now)
-    method = models.CharField(max_length=50, default='CASH')
+    method = models.CharField(max_length=50, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
     note = models.TextField(blank=True, default='')
 
     class Meta:

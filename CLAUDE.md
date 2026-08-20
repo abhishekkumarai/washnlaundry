@@ -80,14 +80,23 @@ Settings are dev-only and must not ship as-is: `DEBUG = True`, hardcoded `SECRET
 
 Flutter Web, Material 3, `provider` for state, `fl_chart` for charts, `google_fonts` (IBM Plex Sans). Brand colour `#1A4FD6`, surface `#F8FAFC`.
 
-**There is no router.** `main.dart` switches on `AppProvider.currentNavIndex` in a `switch` statement, and `SidebarNavigation` sets that index. Consequences you will hit:
+**There is now a real router** (`go_router`, `lib/router.dart`). `AppProvider.currentNavIndex`/`setNavIndex` still exist and are still what every screen and the sidebar read for "which section is active" — routing is layered on top as a hybrid, not a replacement: each `GoRoute`'s builder defers a `setNavIndex` call (via a post-frame callback — calling it synchronously from `builder:` throws, since that runs during the build phase) and returns the screen. This kept the change from touching `SidebarNavigation`'s read path or any of the ~20 widget tests that pump a screen directly with no router ancestor.
 
-- No URLs, no deep links, no browser back button, no `/orders/:id` route.
-- `OrderDetailScreen` is reached by `OrdersScreen` swapping its own body (`orders_screen.dart:39`), not by navigation.
-- `SettingsScreen` (408 lines) exists but **is not wired into `main.dart` at all** — it is dead code today.
-- Sidebar indices are load-bearing magic numbers. Index 10 (`Apps`), 12 (`Subscription`), 13 (`Settings`) are flagged `disabled: true` and render a "Soon" chip. Apps and Subscription have no screen at all; Settings has one, deliberately left unrouted — re-enabling it means flipping `disabled` back to `false` in `sidebar_navigation.dart` and restoring `case 13` plus its import in `main.dart`.
+- URLs, deep links, and browser back/forward all work — confirmed by signing into the real app.laundrybill.com and comparing behaviour directly (see `wip.md`'s "go_router migration" section for what was checked).
+- `/orders/:id` is a real per-record route (`router.dart`), matching the real app's Firestore-doc-ID URLs. It `watch`es `AppProvider` rather than `read`ing it, so a deep link hit before `loadDataFromBackend()` resolves shows a spinner that turns into the real order once the data arrives, rather than a false "not found". `OrdersScreen` no longer swaps its own body for `OrderDetailScreen` — `orders_screen.dart:39`'s old pattern is gone.
+- Section navigation goes through `context.goSection(n)` (`lib/utils/navigation.dart`), a thin wrapper that looks `n` up in `AppProvider.routePaths` and calls `context.go(path)` — every former `setNavIndex(n)` call site was a same-shape one-line swap to this.
+- `SettingsScreen` (408 lines) still exists but **is not wired into the router at all** — still dead code today, unchanged by this migration.
+- Sidebar indices are still load-bearing magic numbers, now doubling as the vocabulary `AppProvider.routePaths` maps to URL paths. Index 10 (`Apps`), 12 (`Subscription`), 13 (`Settings`) are still flagged `disabled: true` and render a "Soon" chip; re-enabling one still means flipping `disabled` back to `false` in `sidebar_navigation.dart`, but now also means adding a route for it in `router.dart` rather than a `case` in `main.dart`.
 
-Adding a screen means: write it, add a `navItems` entry with a new index, add a `case` in `main.dart`. Moving to `go_router` would fix all of the above and is the single highest-value refactor available.
+Adding a screen now means: write it, add a `navItems` entry with a new index, add its path to `AppProvider.routePaths`, add a `GoRoute` in `router.dart`.
+
+### Authentication
+
+`/login` is Google Sign-In (`google_sign_in` ^7, via `AuthProvider`), matching the real app's route — and, like the rest of this section describes, **UI-only**: it gates which screen `main.dart` shows, exactly as the backend's own doc comment says the API stays ("no auth, no permissions"). Wiring a real, server-verified session is a separate, larger change than this covers.
+
+Needs `--dart-define=GOOGLE_CLIENT_ID=your-id.apps.googleusercontent.com` — a **Web application** OAuth Client ID from Google Cloud Console, with `http://localhost:<port>` (whatever `--web-port` you run with) and, for the Docker path, `http://localhost:8080` as Authorized JavaScript origins. Leave Authorized redirect URIs empty — Google Identity Services signs in via its own rendered button and a JS callback, not a server redirect. **A build with no `GOOGLE_CLIENT_ID` skips the login gate entirely** and behaves exactly as before this existed, so the zero-config `docker compose up` / `flutter run` workflow above is unaffected by default.
+
+The GIS SDK only allows signing in through UI it renders itself — a programmatic `authenticate()` call throws on web. `lib/utils/google_signin_button.dart` conditionally exports a web implementation (`google_sign_in_web`'s `renderButton`) or a plain button wired to `AuthProvider.authenticate()` everywhere else, picked via `if (dart.library.js_interop)` — the same conditional-import shape this file already calls for around `dart:io`, mirrored for a web-only dependency instead of a non-web-only one. `google_sign_in_web` fails to *compile* (not just run) off web, including on the plain-VM target `flutter test` uses, which is why this is a real conditional export and not a `kIsWeb` runtime check.
 
 ### Data flow — read this before touching a screen
 
@@ -210,19 +219,22 @@ to reflow to one column. Pick the breakpoints once, put them next to
 `expandedMinWidth` / `railMinWidth`, and reuse them everywhere rather than scattering
 magic numbers.
 
-**Android.** Three things block it, in order:
+**Android.** Two things block it, in order:
 
 1. **`ApiService.baseUrl` defaults to a relative `/api`.** That is correct on web, where
    nginx proxies same-origin, and meaningless in an APK — there is no origin. Android
    builds need an absolute base URL via `--dart-define=API_BASE_URL=...`, and the
-   emulator reaches a host machine at `10.0.2.2`, not `localhost`.
-2. **There is no router.** `main.dart` switches on `AppProvider.currentNavIndex`, so the
-   Android system back button has nothing to pop and will exit the app from any screen.
-   This is the point at which the `go_router` migration stops being optional — see the
-   Frontend section.
-3. **Phone widths are below every breakpoint the app was designed for.** A 60px icon rail
+   emulator reaches a host machine at `10.0.2.2`, not `localhost`. (There is now a
+   `kDebugMode`-gated dev convenience for `flutter run` reaching a local `manage.py
+   runserver` — see `ApiService.baseUrl`'s doc comment — but that's debug-only and
+   doesn't extend to a release APK.)
+2. **Phone widths are below every breakpoint the app was designed for.** A 60px icon rail
    is wrong on a phone; that wants a bottom navigation bar or a drawer, which is a
    different navigation shell, not a narrower one.
+
+The router is no longer a blocker here — `go_router` (see the Frontend section) gives the
+Android system back button a real Navigator to pop, which the old `switch`-on-`currentNavIndex`
+shell didn't.
 
 Also unhandled on mobile: `Scan` currently assumes a desktop webcam, and the receipt flow
 assumes browser printing.

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../providers/auth_provider.dart';
+import '../utils/navigation.dart';
+import 'panel_card.dart';
 
 /// Left navigation rail.
 ///
@@ -293,7 +296,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
-          onTap: disabled ? null : () => context.read<AppProvider>().setNavIndex(navIndex),
+          onTap: disabled ? null : () => context.goSection(navIndex),
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: expanded ? 12 : 4,
@@ -315,7 +318,14 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
   }
 
   Widget _profileFooter(BuildContext context, {required bool expanded}) {
+    // Real when Google Sign-In is configured (main.dart drops back to
+    // LoginScreen once AuthProvider.isSignedIn flips) — a snackbar otherwise,
+    // since there is no session to end.
     void signOut() {
+      if (AuthProvider.isConfigured) {
+        context.read<AuthProvider>().signOut();
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Logged out of LaundryBill'),
@@ -325,12 +335,20 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
       );
     }
 
-    const avatar = CircleAvatar(
+    // The shop from `/api/shops/`. These used to be the literals 'AK' and
+    // 'washing' — which happen to match the seed, which is exactly why nobody
+    // noticed they were literals.
+    final shop = context.watch<AppProvider>().shop;
+    final shopName = (shop?['name'] as String?)?.trim() ?? '';
+    final ownerName = (shop?['owner_name'] as String?)?.trim() ?? '';
+    final title = shopName.isEmpty ? 'Your shop' : shopName;
+
+    final avatar = CircleAvatar(
       radius: 18,
-      backgroundColor: Color(0xFFEEF2FF),
+      backgroundColor: const Color(0xFFEEF2FF),
       child: Text(
-        'AK',
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _brandBlue),
+        initialsFor(ownerName.isEmpty ? shopName : ownerName),
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _brandBlue),
       ),
     );
 
@@ -344,12 +362,20 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
               children: [
                 avatar,
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('washing', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _ink)),
-                      Text('Admin', style: TextStyle(fontSize: 11, color: _muted)),
+                      Text(
+                        title,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _ink),
+                      ),
+                      Text(
+                        ownerName.isEmpty ? 'Admin' : ownerName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: _muted),
+                      ),
                     ],
                   ),
                 ),
@@ -364,7 +390,10 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
             )
           : Column(
               children: [
-                const Tooltip(message: 'washing · Admin', child: avatar),
+                Tooltip(
+                  message: ownerName.isEmpty ? title : '$title · $ownerName',
+                  child: avatar,
+                ),
                 IconButton(
                   tooltip: 'Sign out',
                   icon: const Icon(Icons.logout_rounded, size: 16, color: Color(0xFF94A3B8)),

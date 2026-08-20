@@ -1,19 +1,12 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'providers/app_provider.dart';
-import 'screens/dashboard_screen.dart';
-import 'screens/new_order_screen.dart';
-import 'screens/orders_screen.dart';
-import 'screens/customers_screen.dart';
-import 'screens/services_screen.dart';
-import 'screens/staff_screen.dart';
-import 'screens/attendance_screen.dart';
-import 'screens/payroll_screen.dart';
-import 'screens/expenses_screen.dart';
-import 'screens/reports_screen.dart';
-import 'screens/scan_screen.dart';
+import 'providers/auth_provider.dart';
+import 'router.dart';
 
 /// Flutter web excludes the mouse from [dragDevices], so any list that needs
 /// dragging — the nav rail on a short window, the horizontal activity table —
@@ -30,22 +23,28 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
+  final authProvider = AuthProvider();
+  final router = buildRouter(authProvider);
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppProvider()),
+        ChangeNotifierProvider.value(value: authProvider),
       ],
-      child: const WashNLaundryCrmApp(),
+      child: WashNLaundryCrmApp(router: router),
     ),
   );
 }
 
 class WashNLaundryCrmApp extends StatelessWidget {
-  const WashNLaundryCrmApp({super.key});
+  const WashNLaundryCrmApp({super.key, required this.router});
+
+  final GoRouter router;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'WashNLaundry CRM - Professional Laundry & Dry Cleaning',
       debugShowCheckedModeBanner: false,
       scrollBehavior: AppScrollBehavior(),
@@ -61,27 +60,22 @@ class WashNLaundryCrmApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
       ),
-      home: Consumer<AppProvider>(
-        builder: (context, provider, _) {
-          switch (provider.currentNavIndex) {
-            case 0:  return const DashboardScreen();
-            case 1:  return const NewOrderScreen();
-            case 2:  return const OrdersScreen();
-            case 3:  return const CustomersScreen();
-            case 4:  return const ServicesScreen();
-            case 5:  return const StaffScreen();
-            case 6:  return const AttendanceScreen();
-            case 7:  return const PayrollScreen();
-            case 8:  return const ExpensesScreen();
-            case 9:  return const ReportsScreen();
-            // 10 = Apps   (disabled — no screen)
-            case 11: return const ScanScreen();
-            // 12 = Subscription (disabled — no screen)
-            // 13 = Settings (disabled — SettingsScreen exists but is unrouted)
-            default: return const DashboardScreen();
-          }
-        },
-      ),
+      routerConfig: router,
+      // Overlays a spinner in place of whatever route matched underneath
+      // while Google auth is still restoring a session — reproduces the old
+      // pre-router "spinner Scaffold instead of home:" behaviour, since
+      // go_router's own `redirect` can only choose *not* to redirect during
+      // this state, not suppress rendering the matched route itself.
+      builder: (context, child) {
+        final auth = context.watch<AuthProvider>();
+        if (AuthProvider.isConfigured && auth.initializing) {
+          return const Scaffold(
+            backgroundColor: Color(0xFFF8FAFC),
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return child ?? const SizedBox.shrink();
+      },
     );
   }
 }

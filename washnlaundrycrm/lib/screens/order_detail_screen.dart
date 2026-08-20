@@ -5,6 +5,7 @@ import '../models/order_model.dart';
 import '../providers/app_provider.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
+import '../utils/money.dart';
 
 /// `/orders/:orderId` in the live app.
 ///
@@ -393,7 +394,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     const Text('Total',
                         style: TextStyle(
                             fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    Text('₹${order.totalAmount.toStringAsFixed(0)}',
+                    Text('${Money.symbol}${order.totalAmount.toStringAsFixed(0)}',
                         style: const TextStyle(
                             fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                   ],
@@ -437,6 +438,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF0F172A))),
                     ),
+                    const SizedBox(width: 6),
+                    StatusPill(status: item.status, fontSize: 9),
                     if (orderIsExpress) ...[
                       const SizedBox(width: 6),
                       Container(
@@ -460,12 +463,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ],
             ),
           ),
-          Text('${item.quantity} × ₹${item.unitPrice.toStringAsFixed(0)}',
+          Text('${item.quantity} × ${Money.symbol}${item.unitPrice.toStringAsFixed(0)}',
               style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
           const SizedBox(width: 16),
           SizedBox(
             width: 70,
-            child: Text('₹${item.totalPrice.toStringAsFixed(0)}',
+            child: Text('${Money.symbol}${item.totalPrice.toStringAsFixed(0)}',
                 textAlign: TextAlign.right,
                 style: const TextStyle(
                     fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
@@ -480,7 +483,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-        Text('₹${amount.toStringAsFixed(0)}',
+        Text('${Money.symbol}${amount.toStringAsFixed(0)}',
             style: const TextStyle(
                 fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
       ],
@@ -497,9 +500,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Timeline',
-              style:
-                  TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Timeline & Audit Log',
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text('Auto Recorded',
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B))),
+              ),
+            ],
+          ),
           const SizedBox(height: 14),
           if (entries.isEmpty)
             const Text('No timeline recorded for this order.',
@@ -543,6 +563,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             Text('Created by ${order.createdByLabel}',
                                 style:
                                     const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                          if (entries[i].subtitle != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                entries[i].subtitle!,
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -551,7 +579,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
           if (order.notes != null && order.notes!.trim().isNotEmpty) ...[
             const Divider(height: 20, color: Color(0xFFE2E8F0)),
-            const Text('NOTES',
+            const Text('NOTES & AUDIT LOG',
                 style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
@@ -699,11 +727,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _railRow('Total', '₹${order.totalAmount.toStringAsFixed(0)}'),
+          _railRow('Total', '${Money.symbol}${order.totalAmount.toStringAsFixed(0)}'),
           const SizedBox(height: 8),
-          _railRow('Amount Paid', '₹${order.paidAmount.toStringAsFixed(0)}'),
+          _railRow('Amount Paid', '${Money.symbol}${order.paidAmount.toStringAsFixed(0)}'),
           const SizedBox(height: 8),
-          _railRow('Balance Due', '₹${order.dueAmount.toStringAsFixed(0)}'),
+          _railRow('Balance Due', '${Money.symbol}${order.dueAmount.toStringAsFixed(0)}'),
           if (order.dueAmount > 0) ...[
             const SizedBox(height: 14),
             SizedBox(
@@ -736,7 +764,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final ok = await provider.collectPayment(order.id, order.dueAmount);
     if (!mounted) return;
     _toast(ok
-        ? 'Payment of ₹${order.dueAmount.toStringAsFixed(0)} collected.'
+        ? 'Payment of ${Money.symbol}${order.dueAmount.toStringAsFixed(0)} collected.'
         : provider.error ?? 'Could not record the payment.');
   }
 

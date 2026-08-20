@@ -3,8 +3,65 @@ import 'package:flutter/foundation.dart';
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
 import '../services/api_service.dart';
+import '../utils/money.dart';
 
 class AppProvider extends ChangeNotifier {
+  static const Map<int, String> routePaths = {
+    0: '/dashboard',
+    1: '/new-order',
+    2: '/orders',
+    3: '/customers',
+    4: '/services',
+    5: '/staff',
+    6: '/attendance',
+    7: '/payroll',
+    8: '/expenses',
+    9: '/reports',
+    11: '/scan',
+  };
+
+  static int navIndexForPath(String path) {
+    final clean = path.trim().toLowerCase().replaceAll(RegExp(r'^/+'), '').split('?').first;
+    switch (clean) {
+      case 'new-order':
+      case 'new_order':
+      case 'neworder':
+      case 'create-order':
+        return 1;
+      case 'orders':
+      case 'order':
+        return 2;
+      case 'customers':
+      case 'customer':
+        return 3;
+      case 'services':
+      case 'service':
+      case 'items':
+        return 4;
+      case 'staff':
+      case 'team':
+      case 'employees':
+        return 5;
+      case 'attendance':
+        return 6;
+      case 'payroll':
+        return 7;
+      case 'expenses':
+      case 'expense':
+        return 8;
+      case 'reports':
+      case 'report':
+        return 9;
+      case 'scan':
+      case 'qr':
+        return 11;
+      case 'dashboard':
+      case '':
+      default:
+        return 0;
+    }
+  }
+
   int _currentNavIndex = 0;
   int get currentNavIndex => _currentNavIndex;
 
@@ -79,6 +136,57 @@ class AppProvider extends ChangeNotifier {
   Map<String, dynamic>? _shop;
   Map<String, dynamic>? get shop => _shop;
 
+  /// Single writer for [Money]'s statics — call this wherever `_shop` is set.
+  void _applyShopFormatting() {
+    Money.configure(
+      symbol: _shop?['currency_symbol'] as String?,
+      locale: _shop?['locale'] as String?,
+    );
+  }
+
+  MetaModel _meta = const MetaModel();
+  MetaModel get meta => _meta;
+
+  // ── Shop-driven settings ───────────────────────────────────────────────────
+  //
+  // Each of these replaces a hardcoded Dart constant. The fallback is the
+  // constant it replaced, so the app still behaves before the shop loads —
+  // but the shop is now the authority.
+
+  double get expressMultiplier =>
+      (_shop?['express_multiplier'] as num?)?.toDouble() ?? 1.5;
+
+  double get defaultDailyWage =>
+      (_shop?['default_daily_wage'] as num?)?.toDouble() ?? 600.0;
+
+  String get defaultStaffRole =>
+      (_shop?['default_staff_role'] as String?)?.trim().isNotEmpty == true
+          ? _shop!['default_staff_role'] as String
+          : 'Washer';
+
+  String get currencySymbol =>
+      (_shop?['currency_symbol'] as String?)?.trim().isNotEmpty == true
+          ? _shop!['currency_symbol'] as String
+          : '₹';
+
+  String get locale =>
+      (_shop?['locale'] as String?)?.trim().isNotEmpty == true
+          ? _shop!['locale'] as String
+          : 'en_IN';
+
+  /// Payment methods as the backend defines them. Falls back to the four the
+  /// model declares so a failed `/meta/` fetch cannot empty every dropdown.
+  List<ChoiceModel> get paymentMethods => _meta.paymentMethods.isNotEmpty
+      ? _meta.paymentMethods
+      : const [
+          ChoiceModel(value: 'CASH', label: 'Cash'),
+          ChoiceModel(value: 'UPI', label: 'UPI'),
+          ChoiceModel(value: 'CARD', label: 'Card'),
+          ChoiceModel(value: 'BANK_TRANSFER', label: 'Bank Transfer'),
+        ];
+
+  List<ChoiceModel> get expenseCategories => _meta.expenseCategories;
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
@@ -93,6 +201,10 @@ class AppProvider extends ChangeNotifier {
 
   /// Set [autoLoad] to false to build a provider without hitting the network —
   /// used by tests, which seed state directly via [seedForTest].
+  // `initialPath` used to seed `_currentNavIndex` from `Uri.base.path` here —
+  // go_router now owns parsing the URL (see lib/router.dart), and each
+  // GoRoute's builder calls setNavIndex on the way in, so a second reader of
+  // the same URL here would just get overwritten on first frame.
   AppProvider({bool autoLoad = true}) {
     if (autoLoad) loadDataFromBackend();
   }
@@ -113,6 +225,7 @@ class AppProvider extends ChangeNotifier {
     List<TimeSlotModel>? deliverySlots,
     Map<String, dynamic>? stats,
     Map<String, dynamic>? shop,
+    MetaModel? meta,
   }) {
     if (orders != null) _orders = orders;
     if (garments != null) _garments = garments;
@@ -127,7 +240,11 @@ class AppProvider extends ChangeNotifier {
     if (pickupSlots != null) _pickupSlots = pickupSlots;
     if (deliverySlots != null) _deliverySlots = deliverySlots;
     if (stats != null) _stats = stats;
-    if (shop != null) _shop = shop;
+    if (shop != null) {
+      _shop = shop;
+      _applyShopFormatting();
+    }
+    if (meta != null) _meta = meta;
     notifyListeners();
   }
 
@@ -205,17 +322,70 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  // ── Dashboard counters ─────────────────────────────────────────────────────
+  //
+  // These come from `/api/dashboard/stats/`, which scopes them properly — the
+  // server knows what "today" means and sums *collected* rather than *billed*
+  // revenue. They used to be derived from `_orders` here, which answered a
+  // different question than the card titles claimed: "Orders today" was the
+  // length of the whole order list and "Revenue today" was every order ever
+  // billed, which also disagreed with the Revenue Analytics panel directly
+  // below it on the same screen.
+  //
+  // The local derivation survives only as a fallback for the window before the
+  // first fetch lands, and for tests that seed orders without stats.
+
+  int _stat(String key, int fallback) => (_stats[key] as num?)?.toInt() ?? fallback;
+
+  int get ordersToday => _stat('orders_today', _orders.length);
+
+  double get revenueToday =>
+      (_stats['revenue_today'] as num?)?.toDouble() ??
+      _orders.fold(0.0, (sum, o) => sum + o.totalAmount);
+
+  int get readyForPickup =>
+      _stat('ready_for_pickup', _countByStatus(OrderStatus.ready));
+
+  int get overdueCount =>
+      _stat('overdue', _orders.where((o) => o.isOverdue).length);
+
+  int get customersTotal => _stat(
+      'customers_total', _orders.map((o) => o.customerPhone).toSet().length);
+
+  /// Percentage change against yesterday. Null means "nothing to compare
+  /// against" — rendered as an em dash, never as 0%.
+  double? get ordersTodayChange => (_stats['orders_today_change'] as num?)?.toDouble();
+
+  double? get revenueTodayChange =>
+      (_stats['revenue_today_change'] as num?)?.toDouble();
+
+  int? get customersNewToday => (_stats['customers_new_today'] as num?)?.toInt();
+
+  /// The last 14 days of revenue, oldest first. Empty until the stats land.
+  List<RevenueSeriesPointModel> get revenueSeries {
+    final raw = _stats['revenue_series'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map<String, dynamic>>()
+        .map(RevenueSeriesPointModel.fromJson)
+        .toList();
+  }
+
+  /// Pipeline counts as the server groups them, falling back to the local
+  /// status tallies before the first fetch.
+  int get pipelineReceived => _pipeline('received', receivedCount);
+  int get pipelineProcessing => _pipeline('processing', processingCount);
+  int get pipelineReady => _pipeline('ready', readyCount);
+  int get pipelineOutForDelivery =>
+      _pipeline('out_for_delivery', outForDeliveryCount);
+
+  int _pipeline(String key, int fallback) {
+    final data = _stats['pipeline'];
+    if (data is! Map) return fallback;
+    return (data[key] as num?)?.toInt() ?? fallback;
+  }
+
   // ── Derived counters, all using the canonical status constants ─────────────
-
-  int get ordersToday => _orders.length;
-
-  double get revenueToday => _orders.fold(0.0, (sum, o) => sum + o.totalAmount);
-
-  int get readyForPickup => _countByStatus(OrderStatus.ready);
-
-  int get overdueCount => _orders.where((o) => o.isOverdue).length;
-
-  int get customersToday => _orders.map((o) => o.customerPhone).toSet().length;
 
   int get receivedCount => _countByStatus(OrderStatus.placed);
 
@@ -252,6 +422,7 @@ class AppProvider extends ChangeNotifier {
         ApiService.fetchTimeSlots(kind: TimeSlotModel.delivery),
         ApiService.fetchDashboardStats(),
         ApiService.fetchShop(),
+        ApiService.fetchMeta(),
       ]);
 
       _orders = results[0] as List<OrderModel>;
@@ -266,6 +437,8 @@ class AppProvider extends ChangeNotifier {
       _deliverySlots = results[9] as List<TimeSlotModel>;
       _stats = results[10] as Map<String, dynamic>;
       _shop = results[11] as Map<String, dynamic>?;
+      _applyShopFormatting();
+      _meta = results[12] as MetaModel;
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {
@@ -381,6 +554,34 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateGarmentItem(String id, Map<String, dynamic> payload) async {
+    try {
+      await ApiService.saveGarmentItem(payload, id: id);
+      await loadDataFromBackend();
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteGarmentItem(String id) async {
+    try {
+      await ApiService.deleteGarmentItem(id);
+      await loadDataFromBackend();
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Creates a service category. Like [addGarmentItem] this reloads rather than
   /// inserting locally, because `item_count` and `price_range` are server-side
   /// properties the POST response can't be trusted to keep current.
@@ -397,6 +598,34 @@ class AppProvider extends ChangeNotifier {
       _error = e.message;
       notifyListeners();
       return null;
+    }
+  }
+
+  Future<bool> updateCategory(String id, Map<String, dynamic> payload) async {
+    try {
+      await ApiService.updateCategory(id, payload);
+      await loadDataFromBackend();
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteCategory(String id) async {
+    try {
+      await ApiService.deleteCategory(id);
+      await loadDataFromBackend();
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
     }
   }
 
@@ -520,6 +749,7 @@ class AppProvider extends ChangeNotifier {
     }
     try {
       _shop = await ApiService.updateShop(id, payload);
+      _applyShopFormatting();
       _error = null;
       notifyListeners();
       return true;

@@ -89,6 +89,19 @@ void main() {
       expect(find.text('3'), findsOneWidget); // entry count
     });
 
+    testWidgets('payment method labels come from the served vocabulary, not a naive title-case',
+        (tester) async {
+      // A raw title-case (upper first letter, lower the rest) turns 'UPI'
+      // into 'Upi'. The served/fallback label is 'UPI' verbatim.
+      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pump();
+
+      expect(find.textContaining('UPI ·'), findsOneWidget);
+      expect(find.textContaining('Upi ·'), findsNothing);
+      expect(find.textContaining('Bank Transfer ·'), findsOneWidget);
+    });
+
     testWidgets('the month total ignores older entries', (tester) async {
       final provider = AppProvider(autoLoad: false)
         ..seedForTest(expenses: [ledger.last]); // last month only

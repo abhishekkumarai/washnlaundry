@@ -10,7 +10,8 @@ from rest_framework.response import Response
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
     Expense, Staff, Attendance, SalaryPayment, ServiceArea, TimeSlot,
-    OrderStatus, PaymentStatus, DeliveryType,
+    OrderStatus, PaymentStatus, DeliveryType, OrderSource, PricingUnit,
+    PaymentMethod, ExpenseCategory,
 )
 from .serializers import (
     ShopSerializer, CustomerSerializer, GarmentCategorySerializer,
@@ -458,6 +459,35 @@ class TimeSlotViewSet(viewsets.ModelViewSet):
         return qs
 
 
+def _choices(enum):
+    return [{'value': value, 'label': label} for value, label in enum.choices]
+
+
+@api_view(['GET'])
+def meta(request):
+    """The canonical vocabularies, so the client stops hardcoding them.
+
+    Every one of these existed only as a hand-maintained Dart literal that
+    could drift from the model — most visibly the payment methods, which the
+    Flutter app carried in three different lists with three different
+    orderings. Serving them means a value added here shows up everywhere, and
+    a value removed cannot linger in a dropdown.
+    """
+    return Response({
+        'order_statuses': _choices(OrderStatus),
+        'payment_statuses': _choices(PaymentStatus),
+        'delivery_types': _choices(DeliveryType),
+        'order_sources': _choices(OrderSource),
+        'pricing_units': _choices(PricingUnit),
+        'payment_methods': _choices(PaymentMethod),
+        'expense_categories': _choices(ExpenseCategory),
+        'attendance_statuses': [
+            {'value': value, 'label': label}
+            for value, label in Attendance.STATUS_CHOICES
+        ],
+    })
+
+
 @api_view(['GET'])
 def dashboard_stats(request):
     today = timezone.localdate()
@@ -483,10 +513,16 @@ def dashboard_stats(request):
         return round(((now - before) / before) * 100, 1)
 
     # 14-day revenue series for the dashboard bar chart.
+    #
+    # Sums paid_amount, not total_amount: `revenue_today` above is collected
+    # money, and the chart sits directly beside it. Billing the series and
+    # collecting the card meant the last bar could never equal the "Revenue
+    # today" figure, with nothing on screen explaining why. The whole
+    # dashboard now speaks one language — collected.
     revenue_series = []
     for offset in range(13, -1, -1):
         day = today - timedelta(days=offset)
-        amount = orders.filter(created_at__date=day).aggregate(s=Sum('total_amount'))['s'] or 0.0
+        amount = orders.filter(created_at__date=day).aggregate(s=Sum('paid_amount'))['s'] or 0.0
         revenue_series.append({'date': day.isoformat(), 'day': day.day, 'amount': amount})
 
     attendance_today = Attendance.objects.filter(date=today)

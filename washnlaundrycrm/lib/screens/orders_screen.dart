@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../models/order_model.dart';
+import '../utils/navigation.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
-import '../screens/order_detail_screen.dart';
+import '../utils/money.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -18,7 +20,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
   String _selectedTab = 'All';
   OrderDateRange _timeFilter = OrderDateRange.allTime;
   String _searchQuery = '';
-  OrderModel? _selectedOrderForDetails;
 
   /// The live app's 11 chips. 'key' is what the provider filters on — every
   /// chip must map to one, or it silently falls through and shows every order.
@@ -70,13 +71,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_selectedOrderForDetails != null) {
-      return OrderDetailScreen(
-        order: _selectedOrderForDetails!,
-        onBack: () => setState(() => _selectedOrderForDetails = null),
-      );
-    }
-
     final provider = Provider.of<AppProvider>(context);
 
     final filteredOrders = provider.ordersFor(
@@ -183,7 +177,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       const SizedBox(width: 8),
 
                       ElevatedButton.icon(
-                        onPressed: () => context.read<AppProvider>().setNavIndex(1),
+                        onPressed: () => context.goSection(1),
                         icon: const Icon(Icons.add, size: 16, color: Colors.white),
                         label: const Text('New Order', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
                         style: ElevatedButton.styleFrom(
@@ -296,7 +290,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                           : order.customerName[0].toUpperCase();
 
                                       return InkWell(
-                                        onTap: () => setState(() => _selectedOrderForDetails = order),
+                                        onTap: () => context.go('/orders/${order.id}'),
                                         child: Padding(
                                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                                           child: Row(
@@ -412,7 +406,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                               // TOTAL
                                               Expanded(
                                                 flex: 1,
-                                                child: Text('₹${order.totalAmount.toInt()}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                                child: Text('${Money.symbol}${order.totalAmount.toInt()}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                                               ),
 
                                               // UPDATED

@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 import 'package:washnlaundrycrm/providers/app_provider.dart';
 import 'package:washnlaundrycrm/widgets/sidebar_navigation.dart';
 
-Widget wrap(AppProvider provider, Widget child) {
-  return ChangeNotifierProvider<AppProvider>.value(
-    value: provider,
-    child: MaterialApp(home: Scaffold(body: child)),
-  );
-}
+import 'support/router_test_utils.dart';
+
+// `SidebarNavigation` now calls `context.goSection`, which needs a real
+// `GoRouter` ancestor — `hostWithRouter` (test/support) provides one that
+// keeps rendering the same widget on every route, mirroring only the
+// `setNavIndex` side effect these tests actually assert on.
+Widget wrap(AppProvider provider, Widget child) => hostWithRouter(provider, child);
 
 void main() {
   // The rail has 14 items; the default 800x600 test surface cuts off the last

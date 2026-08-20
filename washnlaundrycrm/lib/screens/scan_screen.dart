@@ -15,16 +15,40 @@ class _ScanScreenState extends State<ScanScreen> {
   int _selectedMode = 0; // 0: Camera, 1: Manual
   final TextEditingController _orderIdController = TextEditingController();
 
+  /// Set when a lookup found nothing, so the screen can say so.
+  String? _notFoundQuery;
+
   void _handleSearchOrder(AppProvider provider) {
     final query = _orderIdController.text.trim();
     if (query.isEmpty) return;
 
-    final match = provider.orders.firstWhere(
-      (o) => o.orderNumber.toLowerCase() == query.toLowerCase() || o.id.toLowerCase() == query.toLowerCase(),
-      orElse: () => provider.orders.isNotEmpty ? provider.orders.first : provider.orders.first,
-    );
+    // No `orElse` fallback: this used to return `orders.first` when nothing
+    // matched, so a mistyped order number silently opened another customer's
+    // receipt. A miss must read as a miss.
+    final matches = provider.orders.where((o) =>
+        o.orderNumber.toLowerCase() == query.toLowerCase() ||
+        o.id.toLowerCase() == query.toLowerCase());
 
-    showDialog(context: context, builder: (_) => ReceiptDialog(order: match));
+    if (matches.isEmpty) {
+      setState(() => _notFoundQuery = query);
+      return;
+    }
+
+    setState(() => _notFoundQuery = null);
+    showDialog(
+      context: context,
+      builder: (_) => ReceiptDialog(order: matches.first, shop: provider.shop),
+    );
+  }
+
+  /// A sample order number in this shop's own format, for the input hint.
+  String _orderNumberExample(AppProvider provider) {
+    final prefix = (provider.shop?['order_prefix'] as String?)?.trim();
+    if (prefix != null && prefix.isNotEmpty) return '$prefix-00001';
+    // Before the shop loads, show a real order number if we have one.
+    return provider.orders.isNotEmpty
+        ? provider.orders.first.orderNumber
+        : 'WASH-00001';
   }
 
   @override
@@ -175,18 +199,18 @@ class _ScanScreenState extends State<ScanScreen> {
                                       ),
                                       const SizedBox(height: 20),
                                       const Text(
-                                        'Tap to open the camera and scan a QR code',
+                                        "Camera scanning isn't available yet. Use Manual to look up an order number.",
+                                        textAlign: TextAlign.center,
                                         style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                                       ),
                                       const SizedBox(height: 24),
+                                      // Disabled rather than live: this button
+                                      // used to open the *first* order's
+                                      // receipt with no camera involved.
                                       ElevatedButton.icon(
-                                        onPressed: () {
-                                          if (provider.orders.isNotEmpty) {
-                                            showDialog(context: context, builder: (_) => ReceiptDialog(order: provider.orders.first));
-                                          }
-                                        },
-                                        icon: const Icon(Icons.camera_alt_rounded, size: 18, color: Colors.white),
-                                        label: const Text('Open scanner', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                                        onPressed: null,
+                                        icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                                        label: const Text('Open scanner', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: const Color(0xFF1A4FD6),
                                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -198,10 +222,19 @@ class _ScanScreenState extends State<ScanScreen> {
                                 : Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text('Order ID (e.g. LB-1001)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                                      // The example follows the shop's own
+                                      // prefix — the backend derives it from
+                                      // the shop name (`WASH-00001`), so the
+                                      // old hardcoded "LB-1001" matched
+                                      // nothing a user would ever type.
+                                      Text(
+                                        'Order ID (e.g. ${_orderNumberExample(provider)})',
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                                      ),
                                       const SizedBox(height: 8),
                                       TextField(
                                         controller: _orderIdController,
+                                        onSubmitted: (_) => _handleSearchOrder(provider),
                                         decoration: InputDecoration(
                                           hintText: 'Enter order number...',
                                           hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
@@ -222,6 +255,22 @@ class _ScanScreenState extends State<ScanScreen> {
                                           child: const Text('Search', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
                                         ),
                                       ),
+                                      if (_notFoundQuery != null) ...[
+                                        const SizedBox(height: 16),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEF2F2),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(color: const Color(0xFFFECACA)),
+                                          ),
+                                          child: Text(
+                                            'No order found for "$_notFoundQuery".',
+                                            style: const TextStyle(fontSize: 12.5, color: Color(0xFFB91C1C)),
+                                          ),
+                                        ),
+                                      ],
                                     ],
                                   ),
                           ),

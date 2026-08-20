@@ -85,11 +85,28 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Future<void> _save(AppProvider provider, List<StaffModel> roster) async {
     final saved = provider.attendanceFor(_selectedDate);
-    // Send the whole roster, not just the edits: an unmarked day should end up
-    // fully recorded, and the backend upserts so re-sending is free.
-    final marks = <String, String>{
-      for (final s in roster) s.id: _pending[s.id] ?? saved[s.id] ?? 'PRESENT',
-    };
+
+    // Only staff with an explicit mark are sent. This used to fall back to
+    // 'PRESENT' for anyone unmarked, which invented a *paid* day for someone
+    // nobody had looked at — and flatly contradicted the rest of this screen,
+    // where a staff member with no row renders as "not marked" precisely
+    // because defaulting them would invent a day. Re-sending already-saved
+    // marks is still free: the endpoint upserts.
+    final marks = <String, String>{};
+    for (final s in roster) {
+      final mark = _pending[s.id] ?? saved[s.id];
+      if (mark != null) marks[s.id] = mark;
+    }
+
+    if (marks.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nothing to save — mark at least one staff member.'),
+          backgroundColor: Color(0xFF64748B),
+        ),
+      );
+      return;
+    }
 
     setState(() => _saving = true);
     final ok = await provider.saveAttendance(_selectedDate, marks);

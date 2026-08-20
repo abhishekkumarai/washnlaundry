@@ -171,6 +171,19 @@ void main() {
     });
   });
 
+  group('Items', () {
+    testWidgets('each line carries its own status badge', (tester) async {
+      // The model has always parsed OrderItem.status; nothing rendered it.
+      await pump(tester, order());
+
+      expect(find.text('Suit (2 Piece)'), findsOneWidget);
+      // "Placed" renders three times with this fixture: the order-level pill,
+      // the Timeline entry, and now the item's own badge — all PLACED, since
+      // the fixture's item status matches the order.
+      expect(find.text('Placed'), findsNWidgets(3));
+    });
+  });
+
   group('fulfilment rail', () {
     testWidgets('store pickup gets FULFILMENT and no agent row', (tester) async {
       await pump(tester, order(

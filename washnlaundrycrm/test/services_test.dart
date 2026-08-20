@@ -188,11 +188,25 @@ void main() {
 
       await tester.tap(find.text('New service category'));
       await tester.pumpAndSettle();
-      expect(find.text('New Service'), findsOneWidget);
+      expect(find.text('Add Service'), findsWidgets);
 
       await tester.tap(find.widgetWithText(ElevatedButton, 'Add Service'));
       await tester.pumpAndSettle();
       expect(find.text('Please enter a service name.'), findsOneWidget);
+    });
+
+    testWidgets('offers Turnaround Days, not the icon picker the live app lacks',
+        (tester) async {
+      // The live app's Add Service modal is Name / Active / Turnaround Days —
+      // no icon picker. Ours used to offer one instead of Turnaround Days.
+      await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('New service category'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Turnaround Days'), findsOneWidget);
+      expect(find.text('Service Icon'), findsNothing);
     });
   });
 

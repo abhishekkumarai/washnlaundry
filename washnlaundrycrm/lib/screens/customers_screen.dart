@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
+import '../utils/navigation.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
 import 'customer_detail_screen.dart';
+import '../utils/money.dart';
 
 /// `/customers` in the live app — see LIVE_AUDIT.md "Customers".
 class CustomersScreen extends StatefulWidget {
@@ -46,7 +48,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         onBack: () => setState(() => _selected = null),
         onNewOrder: () {
           setState(() => _selected = null);
-          context.read<AppProvider>().setNavIndex(1);
+          context.goSection(1);
         },
       );
     }
@@ -322,7 +324,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             ),
             Expanded(
               flex: 2,
-              child: Text('₹${c.totalSpent.toStringAsFixed(0)}',
+              child: Text('${Money.symbol}${c.totalSpent.toStringAsFixed(0)}',
                   style: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
             ),

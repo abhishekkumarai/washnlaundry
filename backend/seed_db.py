@@ -96,6 +96,25 @@ DEFAULT_SLOTS = [
     (time(16, 0), time(18, 0)),
 ]
 
+# Demo product photography. Only the items we happen to have a picture for —
+# the rest seed with an empty image_url and render the icon treatment, which
+# is the same thing a real shop sees before it uploads its own.
+_UNSPLASH = 'https://images.unsplash.com/photo-{}?w=300&h=300&fit=crop'
+ITEM_IMAGES = {
+    'Shirt': _UNSPLASH.format('1602810316493-c1e5e6a89dce'),
+    'T-Shirt': _UNSPLASH.format('1527719327859-c6ce80353573'),
+    'Kurta': _UNSPLASH.format('1594938291221-94f18cbb5660'),
+    'Suit (2 piece)': _UNSPLASH.format('1507679799987-c73779587ccf'),
+    'Pant': _UNSPLASH.format('1624378439575-d8705ad7ae80'),
+    'Jeans': _UNSPLASH.format('1542272604-787c3835535d'),
+    'Shorts': _UNSPLASH.format('1591195853828-11db59a44f43'),
+    'Top / Kurti': _UNSPLASH.format('1610030469983-98e550d6193c'),
+    'Saree (Silk)': _UNSPLASH.format('1610030469983-98e550d6193c'),
+    'Sherwani': _UNSPLASH.format('1599643478518-a784e5dc4c8f'),
+    'Lehenga (Bridal)': _UNSPLASH.format('1515372039744-b8f02a3ae446'),
+    'Blazer/Jacket': _UNSPLASH.format('1507679799987-c73779587ccf'),
+}
+
 
 def seed():
     print('Clearing old data...')
@@ -130,6 +149,12 @@ def seed():
         bank_name='HDFC Bank',
         ifsc_code='HDFC0001234',
         upi_id='washing@upi',
+        # Operating rules that used to be Dart constants in the client.
+        express_multiplier=1.5,
+        default_daily_wage=600.0,
+        default_staff_role='Washer',
+        currency_symbol='₹',
+        locale='en_IN',
     )
 
     print('Seeding Categories & Items...')
@@ -137,13 +162,17 @@ def seed():
     total_items = 0
     for order_index, (cat_name, icon, items) in enumerate(CATALOGUE, start=1):
         category = GarmentCategory.objects.create(
-            name=cat_name, icon=icon, display_order=order_index
+            name=cat_name, icon=icon, display_order=order_index, turnaround_days=1
         )
         categories[cat_name] = category
         for item_index, (name, price, unit) in enumerate(items, start=1):
             GarmentItem.objects.create(
                 category=category, name=name, price=float(price), unit=unit,
                 turnaround_days=1, display_order=item_index,
+                # Matched by name *here*, once, at seed time. The client used
+                # to do this lookup on every build, which meant renaming an
+                # item silently lost its photo.
+                image_url=ITEM_IMAGES.get(name, ''),
             )
             total_items += 1
 
@@ -174,6 +203,15 @@ def seed():
         )
         for name, phone, email, addr, area, orders, spent, due in customers_data
     ]
+    # Same auto_now_add problem as orders: without this every customer counts
+    # as new today, and the dashboard reports "+10 new today" on a shop that
+    # has been trading for months. The newest two stay on today so the figure
+    # is not simply zero.
+    signup_base = timezone.now()
+    for offset, customer in enumerate(customers):
+        Customer.objects.filter(pk=customer.pk).update(
+            created_at=signup_base - timedelta(days=max(offset - 1, 0) * 9)
+        )
 
     print('Seeding Staff...')
     # (name, role, phone, daily wage, delivery agent, has app login)
@@ -226,7 +264,12 @@ def seed():
 
     for idx, (cust_i, status, pay_status, method, delivery_type, express, sched_offset) in enumerate(orders_plan):
         customer = customers[cust_i]
-        placed_at = now - timedelta(days=abs(sched_offset) + 1, hours=idx % 8)
+        # Spread the orders evenly across the dashboard's 14-day window, with
+        # the newest landing today. This used to derive the age from
+        # `sched_offset`, which bunched every order into the last six days and
+        # left today empty — so the dashboard opened on "0 orders today".
+        day_offset = (idx * 13) // max(len(orders_plan) - 1, 1)
+        placed_at = now - timedelta(days=day_offset, hours=(idx % 6))
 
         source = random.choice(OrderSource.values)
         order = Order(
@@ -286,6 +329,13 @@ def seed():
             order.paid_amount = 0.0
         order.due_amount = round(order.total_amount - order.paid_amount, 2)
         order.save()
+
+        # `created_at` is auto_now_add, so every seeded order landed on today
+        # however far back its timeline said it was placed. Every dashboard and
+        # report query filters on created_at, which meant "Orders today" was
+        # always the entire seed and the 14-day revenue chart was a single
+        # bar. A queryset update is the only way past auto_now_add.
+        Order.objects.filter(pk=order.pk).update(created_at=placed_at)
 
     print('Seeding Attendance...')
     # 70 days, not 7: Payroll totals a calendar month, and a week of register

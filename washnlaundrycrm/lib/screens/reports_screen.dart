@@ -5,6 +5,7 @@ import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
 import '../widgets/load_state.dart';
 import '../widgets/sidebar_navigation.dart';
+import '../utils/money.dart';
 
 /// `/reports` in the live app. Not captured yet, so this follows our own
 /// conventions rather than cloning a screenshot — see LIVE_AUDIT.md
@@ -272,10 +273,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  /// Rupees with thousands separators — "₹4,850", the format the screen has
-  /// always shown.
-  static String _money(double value) =>
-      '₹${NumberFormat.decimalPattern('en_IN').format(value.round())}';
+  /// Money with thousands separators — "₹4,850", the format the screen has
+  /// always shown. The symbol and the grouping both come from the shop now;
+  /// this used to hardcode '₹' and an `en_IN` pattern.
+  static String _money(double value) => Money.grouped(value);
 
   Widget _metricRow(ReportsModel r) {
     // An em dash for "no data" rather than a 0% that would read as a real

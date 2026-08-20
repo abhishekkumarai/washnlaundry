@@ -1,9 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import 'panel_card.dart';
 
 class KpiCardsRow extends StatelessWidget {
   const KpiCardsRow({Key? key}) : super(key: key);
+
+  static const _muted = Color(0xFF94A3B8);
+  static const _up = Color(0xFF10B981);
+  static const _down = Color(0xFFDC2626);
+
+  /// "▲ 12% vs yesterday", or "— vs yesterday" when there is nothing to
+  /// compare against. A missing comparison is not a 0% change, which is the
+  /// same rule [formatPercent] enforces across the rest of the dashboard.
+  static String _changeLabel(double? change) {
+    if (change == null) return '— vs yesterday';
+    final arrow = change >= 0 ? '▲' : '▼';
+    return '$arrow ${formatPercent(change.abs())} vs yesterday';
+  }
+
+  static Color _changeColor(double? change) {
+    if (change == null) return _muted;
+    return change >= 0 ? _up : _down;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,17 +32,17 @@ class KpiCardsRow extends StatelessWidget {
       {
         'title': 'Orders today',
         'value': '${provider.ordersToday}',
-        'subtext': '— vs yesterday',
-        'subtextColor': const Color(0xFF94A3B8),
+        'subtext': _changeLabel(provider.ordersTodayChange),
+        'subtextColor': _changeColor(provider.ordersTodayChange),
         'icon': Icons.inventory_2_outlined,
         'iconBg': const Color(0xFFEFF6FF),
         'iconColor': const Color(0xFF1A4FD6),
       },
       {
         'title': 'Revenue today',
-        'value': '₹${provider.revenueToday.toInt()}',
-        'subtext': '— vs yesterday',
-        'subtextColor': const Color(0xFF94A3B8),
+        'value': formatRupees(provider.revenueToday),
+        'subtext': _changeLabel(provider.revenueTodayChange),
+        'subtextColor': _changeColor(provider.revenueTodayChange),
         'icon': Icons.attach_money_rounded,
         'iconBg': const Color(0xFFECFDF5),
         'iconColor': const Color(0xFF10B981),
@@ -48,9 +67,10 @@ class KpiCardsRow extends StatelessWidget {
       },
       {
         'title': 'Customers',
-        'value': '${provider.customersToday}',
-        'subtext': '+1 new today',
-        'subtextColor': const Color(0xFF10B981),
+        'value': '${provider.customersTotal}',
+        'subtext': '+${provider.customersNewToday ?? 0} new today',
+        'subtextColor':
+            (provider.customersNewToday ?? 0) > 0 ? _up : _muted,
         'icon': Icons.credit_card_outlined,
         'iconBg': const Color(0xFFF3E8FF),
         'iconColor': const Color(0xFFA855F7),

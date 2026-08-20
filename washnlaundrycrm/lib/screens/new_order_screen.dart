@@ -3,12 +3,11 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
+import '../utils/navigation.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/receipt_dialog.dart';
-
-/// Express orders are charged at 1.5x the catalogue price, per item — the
-/// EXPRESS switch on a product card only affects that card's lines.
-const double _expressMultiplier = 1.5;
+import '../widgets/panel_card.dart';
+import '../utils/money.dart';
 
 class NewOrderScreen extends StatefulWidget {
   const NewOrderScreen({super.key});
@@ -33,11 +32,33 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   bool _markPaid = true;
   bool _submitting = false;
 
+  /// Store Pickup by default — checkout used to hardcode this, so there was
+  /// no way to bill a Home Pickup / Home Delivery / Online order without
+  /// editing it afterward.
+  String _deliveryType = DeliveryType.storePickup;
+
+  /// Flat delivery fee for anything the shop has to carry, matching the rule
+  /// the seed data already encodes (`seed_db.py`: ₹50 for HOME_DELIVERY and
+  /// ONLINE, nothing for a pickup the customer makes themselves).
+  static const _deliveryFee = 50.0;
+
+  double get _deliveryCharge =>
+      _deliveryType == DeliveryType.homeDelivery || _deliveryType == DeliveryType.online
+          ? _deliveryFee
+          : 0.0;
+
   static const _walkInName = 'Walk-in customer';
   static const _walkInPhone = '';
 
   String get _customerName => _customer?.name ?? _walkInName;
   String get _customerPhone => _customer?.phone ?? _walkInPhone;
+
+  /// The express surcharge is shop policy, not app policy — it used to be a
+  /// `const double _expressMultiplier = 1.5` at the top of this file, so no
+  /// shop could charge anything else. The EXPRESS switch on a product card
+  /// still only affects that card's lines.
+  double get _expressMultiplier =>
+      context.read<AppProvider>().expressMultiplier;
 
   double _priceFor(GarmentItemModel g) =>
       _expressToggles[g.id] == true ? g.price * _expressMultiplier : g.price;
@@ -118,9 +139,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF475569)),
-                        onPressed: () {
-                          Provider.of<AppProvider>(context, listen: false).setNavIndex(0);
-                        },
+                        onPressed: () => context.goSection(0),
                       ),
                       const SizedBox(width: 8),
                       const Text(
@@ -136,7 +155,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                       CircleAvatar(
                         radius: 16,
                         backgroundColor: const Color(0xFF1A4FD6),
-                        child: const Text('AK', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                        child: Text(
+                          initialsFor((provider.shop?['owner_name'] as String?) ??
+                              (provider.shop?['name'] as String?)),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
                       ),
                     ],
                   ),
@@ -301,8 +324,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                           children: _cartItems(garments).map((item) {
                             return ListTile(
                               title: Text(item.itemTitle, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                              subtitle: Text('${item.quantity}x @ ₹${item.unitPrice.toInt()}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                              trailing: Text('₹${item.totalPrice.toInt()}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                              subtitle: Text('${item.quantity}x @ ${Money.symbol}${item.unitPrice.toInt()}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                              trailing: Text('${Money.symbol}${item.totalPrice.toInt()}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                             );
                           }).toList(),
                         ),
@@ -317,6 +340,46 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   ),
                   child: Column(
                     children: [
+                      // Delivery — how the order leaves the shop. Checkout
+                      // used to hardcode Store Pickup on every order, which
+                      // also meant the ₹50 delivery fee could never be billed.
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text('Delivery', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: DeliveryType.labels.keys.map((type) {
+                          final isSel = _deliveryType == type;
+                          return Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: GestureDetector(
+                                onTap: () => setState(() => _deliveryType = type),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 6),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: isSel ? const Color(0xFFEEF2FF) : Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      DeliveryType.label(type),
+                                      maxLines: 1,
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 14),
+
                       // Payment method — what the shop is collecting in, and
                       // whether they've been paid yet. Previously hardcoded to
                       // "paid by UPI" on every single order.
@@ -327,8 +390,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                       const SizedBox(height: 6),
                       // Equal thirds: the rail is only 280px inside its padding,
                       // so intrinsically-sized chips overflow it.
+                      // The methods the backend accepts, not this screen's own
+                      // three — Bank Transfer was offered on Expenses and
+                      // Payroll but silently missing here.
                       Row(
-                        children: ['CASH', 'UPI', 'CARD'].map((method) {
+                        children: provider.paymentMethods.map((choice) {
+                          final method = choice.value;
                           final isSel = _paymentMethod == method;
                           return Expanded(
                             child: Padding(
@@ -343,9 +410,17 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
                                   ),
-                                  child: Text(
-                                    method,
-                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
+                                  // The rail is only 280px inside its padding
+                                  // and there are now four methods, so a long
+                                  // label like "Bank Transfer" must shrink
+                                  // rather than overflow.
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      choice.label,
+                                      maxLines: 1,
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -372,15 +447,25 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Subtotal', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-                          Text('₹${subtotal.toInt()}', style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A))),
+                          Text('${Money.symbol}${subtotal.toInt()}', style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A))),
                         ],
                       ),
+                      if (_deliveryCharge > 0) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Delivery', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                            Text('${Money.symbol}${_deliveryCharge.toInt()}', style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A))),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Total', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                          Text('₹${subtotal.toInt()}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                          Text('${Money.symbol}${(subtotal + _deliveryCharge).toInt()}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -404,7 +489,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                 )
                               : Text(
-                                  'Checkout • ₹${subtotal.toInt()}',
+                                  'Checkout • ${Money.symbol}${(subtotal + _deliveryCharge).toInt()}',
                                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
                                 ),
                         ),
@@ -516,7 +601,25 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               ),
               child: Stack(
                 children: [
-                  Center(child: Icon(art.icon, size: 48, color: art.color)),
+                  // Real product photography when the catalogue has it; the
+                  // icon treatment is the fallback, not the only option.
+                  // `_artFor` remains a stand-in keyed on the item name — it
+                  // picks an icon, never a picture, so it cannot go stale the
+                  // way the old Unsplash-by-name map did.
+                  if (item.imageUrl.isNotEmpty)
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          item.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              Center(child: Icon(art.icon, size: 48, color: art.color)),
+                        ),
+                      ),
+                    )
+                  else
+                    Center(child: Icon(art.icon, size: 48, color: art.color)),
                   Positioned(
                     top: 6,
                     right: 8,
@@ -535,7 +638,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
           Row(
             children: [
-              Text('₹${_priceFor(item).toInt()}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
+              Text('${Money.symbol}${_priceFor(item).toInt()}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
               const SizedBox(width: 4),
               Text(item.unitLabel, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
             ],
@@ -639,7 +742,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     if (items.isEmpty) return;
 
     final anyExpress = _cartQuantities.keys.any((id) => _expressToggles[id] == true);
-    final paid = _markPaid ? subtotal : 0.0;
+    final total = subtotal + _deliveryCharge;
+    final paid = _markPaid ? total : 0.0;
 
     final payload = <String, dynamic>{
       // `order_number` is deliberately absent: the serializer marks it
@@ -650,12 +754,13 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       'status': OrderStatus.placed,
       'payment_status': _markPaid ? PaymentStatus.paid : PaymentStatus.unpaid,
       'payment_method': _paymentMethod,
-      'delivery_type': DeliveryType.storePickup,
+      'delivery_type': _deliveryType,
+      'delivery_charge': _deliveryCharge,
       'source': 'WEB',
       'subtotal': subtotal,
-      'total_amount': subtotal,
+      'total_amount': total,
       'paid_amount': paid,
-      'due_amount': subtotal - paid,
+      'due_amount': total - paid,
       'express': anyExpress,
       'items': items.map((i) => i.toJson()).toList(),
     };
