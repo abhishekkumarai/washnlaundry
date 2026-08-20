@@ -294,14 +294,17 @@ class Order(models.Model):
                 seq = Order.objects.count() + 1
         return f'{prefix}-{seq:05d}'
 
-    def mark_status(self, new_status, when=None):
-        """Set status and stamp the matching timeline field."""
-        from django.utils import timezone
+    def mark_status(self, new_status, when=None, note=''):
+        """Set status, stamp the matching timeline field, and log the change."""
         self.status = new_status
         field = self.STATUS_TIMESTAMP_FIELD.get(new_status)
+        at = when or timezone.now()
         if field and not getattr(self, field):
-            setattr(self, field, when or timezone.now())
+            setattr(self, field, at)
         self.save()
+        self.audit_log.create(
+            status=new_status, title=OrderStatus(new_status).label, detail=note, created_at=at,
+        )
 
     @property
     def is_overdue(self):
@@ -314,6 +317,30 @@ class Order(models.Model):
 
     def __str__(self):
         return f"Order #{self.order_number} - {self.customer_name}"
+
+
+class OrderAuditLog(models.Model):
+    """One row per recorded change to an order: creation, a status
+    transition, a payment collection, or an edit to its details. Backs the
+    order-detail "Timeline & Audit Log" panel with real per-change history,
+    unlike `STATUS_TIMESTAMP_FIELD`, which only holds one timestamp per
+    stage and can't carry a note or a payment amount.
+
+    Settable `created_at`, not auto_now_add, so seed data can backdate a
+    plausible history the same way `Expense.date` and `SalaryPayment.paid_on`
+    already do.
+    """
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='audit_log')
+    status = models.CharField(max_length=20, choices=OrderStatus.choices, blank=True, default='')
+    title = models.CharField(max_length=255)
+    detail = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.order.order_number}: {self.title}"
 
 
 class OrderItem(models.Model):

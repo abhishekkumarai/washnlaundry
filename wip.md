@@ -530,11 +530,51 @@ this pass (no errors, no new warnings).
   host sniff — so it can only ever affect a `flutter run` dev session, never
   a `flutter build web` (debug mode is always false there), release, or
   Docker output.
-- Point 3 (Timeline should be a full audit log) is **still not fixed** —
-  still just the cosmetic "Timeline & Audit Log" / "Auto Recorded" relabel
-  from the Antigravity diff, with a `TimelineEntry.subtitle` field that
-  nothing populates. Building the real thing (a backend audit-log model) or
-  walking the label back to plain "Timeline" is a separate decision, not
-  bundled into this pass.
 - `SettingsScreen` stays unrouted — adding `/settings` to the new router was
   explicitly out of scope for this migration, per the plan.
+
+## Point 3 fixed — Timeline is now a real backend audit log
+
+The "Timeline & Audit Log" / "Auto Recorded" labeling (from the Antigravity
+diff) used to be cosmetic: `TimelineEntry.subtitle` existed but nothing
+populated it, and the panel only ever showed the 7 fixed per-stage
+timestamps `Order` already carried. Asked to pick a scope, chose the real
+backend audit log over rolling the label back.
+
+**New model** `OrderAuditLog` (`backend/api/models.py`, migration `0011`):
+one row per recorded change — `order` FK, `status` (blank for non-stage
+events), `title`, `detail`, and a settable `created_at` (not
+`auto_now_add`, so seed data can backdate a plausible history the same way
+`Expense.date` already does).
+
+**Write points**, each producing one entry:
+- `OrderSerializer.create` — the opening "Placed" entry.
+- `Order.mark_status` (now takes an optional `note`) — every status
+  transition, carrying the same note the Update Status dialog already
+  collects.
+- `OrderViewSet.payment` — "Payment Collected", with the amount and the
+  resulting payment status in `detail`.
+- `OrderViewSet.perform_update` (new) — diffs `customer_name`,
+  `customer_phone`, `delivery_type`, `scheduled_date` and `notes` before vs.
+  after a PATCH and logs a single "Order Updated" entry listing what
+  changed, so the Edit Order dialog is covered too.
+
+`seed_db.py` backfills a matching stage-by-stage trail per seeded order
+(`bulk_create`, backdated to line up with the existing `STATUS_TIMESTAMP_FIELD`
+stamps) so the panel has real content on a fresh seed instead of an empty
+state.
+
+**Frontend**: `TimelineEntry` gained a `fromJson` factory; `OrderModel`
+gained an `auditLog` field parsed from the new `audit_log` array the
+serializer now sends. `OrderModel.timeline` now returns real `auditLog`
+entries (sorted oldest-first) instead of being derived from
+`stageTimestamps` — `stageTimestamps` itself is untouched and still drives
+the step bar. Live-verified against a real backend on port 8010: fetched a
+seeded order's `audit_log`, then exercised `status` (with a note),
+`payment`, and `PATCH` in sequence and confirmed each produced the expected
+entry with correct `detail` text.
+
+### Suites after this pass
+Django 160/160 (unchanged pass rate, model/view changes covered by existing
+`OrderTimelineTests`), Flutter 237/237, `flutter analyze` still the same 41
+info-level lints, no new errors.

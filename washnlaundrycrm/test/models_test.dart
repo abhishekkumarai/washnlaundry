@@ -150,6 +150,26 @@ void main() {
           'placed_at': '2026-07-29T10:20:00Z',
           'processing_at': '2026-07-29T10:21:00Z',
           'ready_at': '2026-07-29T10:21:30Z',
+          'audit_log': [
+            {
+              'status': 'READY',
+              'title': 'Ready',
+              'detail': '',
+              'created_at': '2026-07-29T10:21:30Z',
+            },
+            {
+              'status': 'PLACED',
+              'title': 'Placed',
+              'detail': '',
+              'created_at': '2026-07-29T10:20:00Z',
+            },
+            {
+              'status': 'PROCESSING',
+              'title': 'Processing',
+              'detail': '',
+              'created_at': '2026-07-29T10:21:00Z',
+            },
+          ],
           'items': [
             {
               'item_title': 'Sports Shoes',
@@ -179,7 +199,7 @@ void main() {
       expect(order.paymentStatusLabel, 'Unpaid');
     });
 
-    test('builds the timeline from stage stamps, oldest first', () {
+    test('builds the timeline from the audit log, oldest first', () {
       final order = OrderModel.fromJson(payload());
       expect(order.timeline.map((e) => e.status).toList(),
           ['PLACED', 'PROCESSING', 'READY']);

@@ -91,13 +91,37 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
         return qs
 
+    # Fields the "Edit Order" dialog can PATCH, and the label their audit
+    # entry uses. Financial fields go through `status`/`payment` instead,
+    # which log their own, more specific entries.
+    _TRACKED_UPDATE_FIELDS = {
+        'customer_name': 'Customer name',
+        'customer_phone': 'Phone',
+        'delivery_type': 'Delivery type',
+        'scheduled_date': 'Scheduled date',
+        'notes': 'Notes',
+    }
+
+    def perform_update(self, serializer):
+        before = self.get_object()
+        old_values = {f: getattr(before, f) for f in self._TRACKED_UPDATE_FIELDS}
+        instance = serializer.save()
+        changes = [
+            f'{label}: {old_values[field] or "—"} → {getattr(instance, field) or "—"}'
+            for field, label in self._TRACKED_UPDATE_FIELDS.items()
+            if old_values[field] != getattr(instance, field)
+        ]
+        if changes:
+            instance.audit_log.create(title='Order Updated', detail='; '.join(changes))
+
     @action(detail=True, methods=['post'])
     def status(self, request, pk=None):
         """POST /api/orders/<id>/status/ {"status": "READY", "note": "..."}
 
         Stamps the timeline. `note` is the optional free-text the live Update
         Status dialog collects; it is appended to the order's notes with the
-        stage it belongs to, so the reason for a change survives.
+        stage it belongs to, so the reason for a change survives, and it also
+        rides along on the audit entry `mark_status` logs.
         """
         order = self.get_object()
         new_status = (request.data.get('status') or '').upper()
@@ -112,7 +136,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             entry = f'[{label}] {note}'
             order.notes = f'{order.notes}\n{entry}' if order.notes else entry
 
-        order.mark_status(new_status)
+        order.mark_status(new_status, note=note)
         return Response(self.get_serializer(order).data)
 
     @action(detail=True, methods=['post'])
@@ -135,6 +159,10 @@ class OrderViewSet(viewsets.ModelViewSet):
         else:
             order.payment_status = PaymentStatus.UNPAID
         order.save()
+        order.audit_log.create(
+            title='Payment Collected',
+            detail=f'₹{amount:.0f} collected — now {order.get_payment_status_display()}',
+        )
 
         if order.customer:
             order.customer.due_amount = max(order.customer.due_amount - amount, 0.0)

@@ -73,7 +73,9 @@ class OrderSource {
   static String label(String source) => labels[source] ?? source;
 }
 
-/// A single stage stamp, for the order-detail timeline.
+/// A single entry in the order-detail Timeline & Audit Log, backed by the
+/// backend's `OrderAuditLog` — real per-change history, not just the fixed
+/// per-stage timestamps `stageTimestamps` carries for the step bar.
 class TimelineEntry {
   final String status;
   final DateTime at;
@@ -81,6 +83,16 @@ class TimelineEntry {
   final String? subtitle;
 
   const TimelineEntry(this.status, this.at, {this.title, this.subtitle});
+
+  factory TimelineEntry.fromJson(Map<String, dynamic> json) {
+    final detail = (json['detail'] as String?)?.trim();
+    return TimelineEntry(
+      json['status'] ?? '',
+      DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      title: json['title'],
+      subtitle: (detail == null || detail.isEmpty) ? null : detail,
+    );
+  }
 
   String get label => title ?? OrderStatus.label(status);
 }
@@ -161,6 +173,7 @@ class OrderModel {
 
   final DateTime createdAt;
   final Map<String, DateTime> stageTimestamps;
+  final List<TimelineEntry> auditLog;
   final List<OrderItemModel> items;
 
   const OrderModel({
@@ -188,6 +201,7 @@ class OrderModel {
     this.createdBy = '',
     required this.createdAt,
     this.stageTimestamps = const {},
+    this.auditLog = const [],
     required this.items,
   });
 
@@ -248,11 +262,10 @@ class OrderModel {
   int get progressIndex =>
       isCancelled ? -1 : OrderStatus.progression.indexOf(status);
 
-  /// Every stage this order has actually reached, oldest first.
+  /// The real audit trail — order placed, status changes, payments, edits —
+  /// oldest first.
   List<TimelineEntry> get timeline {
-    final entries = stageTimestamps.entries
-        .map((e) => TimelineEntry(e.key, e.value))
-        .toList()
+    final entries = List<TimelineEntry>.from(auditLog)
       ..sort((a, b) => a.at.compareTo(b.at));
     return entries;
   }
@@ -269,6 +282,7 @@ class OrderModel {
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'] as List? ?? const [];
+    final rawAuditLog = json['audit_log'] as List? ?? const [];
 
     final stamps = <String, DateTime>{};
     _stageJsonKeys.forEach((status, key) {
@@ -301,6 +315,9 @@ class OrderModel {
       createdBy: json['created_by'] ?? '',
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
       stageTimestamps: stamps,
+      auditLog: rawAuditLog
+          .map((e) => TimelineEntry.fromJson(e as Map<String, dynamic>))
+          .toList(),
       items: rawItems
           .map((i) => OrderItemModel.fromJson(i as Map<String, dynamic>))
           .toList(),

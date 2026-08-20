@@ -1,8 +1,8 @@
 from rest_framework import serializers
 
 from .models import (
-    Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
-    Expense, Staff, Attendance, SalaryPayment, ServiceArea, TimeSlot,
+    Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem, OrderAuditLog,
+    OrderStatus, Expense, Staff, Attendance, SalaryPayment, ServiceArea, TimeSlot,
 )
 
 
@@ -46,8 +46,15 @@ class OrderItemSerializer(serializers.ModelSerializer):
         extra_kwargs = {'order': {'required': False}}
 
 
+class OrderAuditLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderAuditLog
+        fields = ['id', 'status', 'title', 'detail', 'created_at']
+
+
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True)
+    audit_log = OrderAuditLogSerializer(many=True, read_only=True)
     is_overdue = serializers.BooleanField(read_only=True)
     assigned_agent_name = serializers.CharField(source='assigned_agent.name', read_only=True, default=None)
 
@@ -57,7 +64,7 @@ class OrderSerializer(serializers.ModelSerializer):
         read_only_fields = ['order_number']
 
     def create(self, validated_data):
-        """Accept nested items on POST, and stamp the opening timeline entry."""
+        """Accept nested items on POST, and log the opening audit entry."""
         from django.utils import timezone
 
         items_data = validated_data.pop('items', [])
@@ -65,6 +72,9 @@ class OrderSerializer(serializers.ModelSerializer):
         if not order.placed_at:
             order.placed_at = timezone.now()
         order.save()
+        order.audit_log.create(
+            status=OrderStatus.PLACED, title=OrderStatus.PLACED.label, created_at=order.placed_at,
+        )
 
         subtotal = 0.0
         for item_data in items_data:

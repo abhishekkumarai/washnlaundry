@@ -51,6 +51,7 @@ OrderModel order({
     createdBy: createdBy,
     createdAt: placedAt,
     stageTimestamps: stages ?? {OrderStatus.placed: placedAt},
+    auditLog: [TimelineEntry(OrderStatus.placed, placedAt)],
     items: const [
       OrderItemModel(
         itemTitle: 'Suit (2 Piece)',

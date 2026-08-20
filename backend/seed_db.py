@@ -18,7 +18,7 @@ django.setup()
 from django.utils import timezone  # noqa: E402
 
 from api.models import (  # noqa: E402
-    Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
+    Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem, OrderAuditLog,
     Expense, Staff, Attendance, SalaryPayment, ServiceArea, TimeSlot,
     OrderStatus, PaymentStatus, DeliveryType, OrderSource, PricingUnit,
 )
@@ -291,15 +291,26 @@ def seed():
             if drivers and status in (OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED):
                 order.assigned_agent = drivers[0]
 
-        # Stamp every stage up to the current one.
+        # Stamp every stage up to the current one, and log the same trail as
+        # audit entries so the order-detail Timeline & Audit Log panel has
+        # real history to show rather than an empty state on every seed.
+        stage_events = [(OrderStatus.PLACED, placed_at)]
         if status == OrderStatus.CANCELLED:
             order.cancelled_at = placed_at + timedelta(hours=2)
+            stage_events.append((OrderStatus.CANCELLED, order.cancelled_at))
         else:
             reached = progression[: progression.index(status) + 1]
-            for step, stage in enumerate(reached):
+            for step, stage in enumerate(reached[1:], start=1):
                 field = Order.STATUS_TIMESTAMP_FIELD[stage]
-                setattr(order, field, placed_at + timedelta(minutes=step * 45))
+                at = placed_at + timedelta(minutes=step * 45)
+                setattr(order, field, at)
+                stage_events.append((stage, at))
         order.save()
+
+        OrderAuditLog.objects.bulk_create([
+            OrderAuditLog(order=order, status=stage, title=OrderStatus(stage).label, created_at=at)
+            for stage, at in stage_events
+        ])
 
         chosen = random.sample(all_items, random.randint(2, 4))
         subtotal = 0.0
