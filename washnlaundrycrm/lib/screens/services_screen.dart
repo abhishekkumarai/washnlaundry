@@ -81,6 +81,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
         'color': style['color'],
         'bg': style['bg'],
         'turnaroundDays': c.turnaroundDays,
+        'isActive': c.isActive,
       };
     }).toList();
 
@@ -95,6 +96,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
     _currentItems = provider.garments
         .where((g) => g.categoryName == categoryName)
+        .where((g) => _showInactive || g.isActive)
         .where((g) => query.isEmpty || g.name.toLowerCase().contains(query))
         .map((g) => <String, dynamic>{
               'id': g.id,
@@ -104,6 +106,12 @@ class _ServicesScreenState extends State<ServicesScreen> {
               'unitShort': g.unitShortLabel,
               'turnaround': g.turnaroundLabel,
               'active': g.isActive,
+              // The item's own category — Edit reads this instead of
+              // assuming the sidebar's currently-selected tab, which only
+              // coincidentally matches today (this list is itself always
+              // pre-filtered to the selected tab) but shouldn't be load-
+              // bearing for what category Edit preselects.
+              'categoryName': g.categoryName,
               // Comes off the catalogue record now. Matching Unsplash URLs to
               // item *names* in the client meant a rename lost the photo.
               'img': g.imageUrl,
@@ -336,7 +344,12 @@ class _ServicesScreenState extends State<ServicesScreen> {
                             ),
                             Container(
                               width: 8, height: 8,
-                              decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
+                              decoration: BoxDecoration(
+                                color: (c['isActive'] as bool? ?? true)
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFF94A3B8),
+                                shape: BoxShape.circle,
+                              ),
                             ),
                           ],
                         ),
@@ -478,17 +491,24 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   children: [
                     Text(cat['title'] as String, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                     const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(20)),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.circle, size: 6, color: Color(0xFF10B981)),
-                          SizedBox(width: 4),
-                          Text('Active', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF10B981))),
-                        ],
-                      ),
-                    ),
+                    Builder(builder: (_) {
+                      final active = cat['isActive'] as bool? ?? true;
+                      final color = active ? const Color(0xFF10B981) : const Color(0xFF94A3B8);
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: active ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.circle, size: 6, color: color),
+                            const SizedBox(width: 4),
+                            Text(active ? 'Active' : 'Inactive', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                 ),
                 Text('${cat['count']} items in ${cat['title']}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
@@ -1593,7 +1613,10 @@ class _ServicesScreenState extends State<ServicesScreen> {
     final nameCtrl = TextEditingController(text: cat['title'] as String);
     final turnaroundCtrl =
         TextEditingController(text: '${cat['turnaroundDays'] ?? 1}');
-    bool isActive = true;
+    // Was hardcoded `true` regardless of the category's real state — saving
+    // any edit to an already-inactive category (even just its name) would
+    // silently reactivate it, since the switch always started on.
+    bool isActive = cat['isActive'] as bool? ?? true;
     String? nameError;
     String? submitError;
     bool saving = false;
@@ -1778,7 +1801,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
     final nameCtrl = TextEditingController(text: item['name'] as String? ?? '');
     final priceCtrl = TextEditingController(text: ((item['price'] as num?) ?? 0).toStringAsFixed(0));
     final imgCtrl = TextEditingController(text: item['img'] as String? ?? '');
-    String selectedCat = _categories[_selectedCategoryIndex]['title'] as String;
+    // The item's own category, not whatever tab the sidebar happens to be
+    // on — the two only ever coincided by construction (see the comment
+    // where 'categoryName' is set), which made this fragile rather than
+    // actually correct.
+    String selectedCat = item['categoryName'] as String? ?? _categories[_selectedCategoryIndex]['title'] as String;
     String selectedUnit = PricingUnit.all.firstWhere(
       (u) => PricingUnit.label(u) == item['unit'],
       orElse: () => PricingUnit.piece,
@@ -1990,36 +2017,50 @@ class _ServicesScreenState extends State<ServicesScreen> {
               ),
             ),
             actions: [
-              TextButton(
-                onPressed: saving
-                    ? null
-                    : () async {
-                        final provider = context.read<AppProvider>();
-                        final ok = await provider.deleteGarmentItem('${item['id']}');
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx);
-                        if (ok) {
-                          _showSuccess('Deleted "${item['name']}"');
-                        } else {
-                          _showError(provider.error ?? 'Could not delete item');
-                        }
-                      },
-                child: const Text('Delete', style: TextStyle(color: Color(0xFFDC2626))),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: saving ? null : () => Navigator.pop(ctx),
-                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
-              ),
-              ElevatedButton(
-                onPressed: saving ? null : save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A4FD6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              // A single Row so `Spacer` has the bounded Flex ancestor it
+              // needs — `AlertDialog.actions` lays its children out in an
+              // `OverflowBar`, which doesn't support flex children directly.
+              // A bare `Spacer` here threw at layout time and took the whole
+              // dialog content down with it (release builds show a blank
+              // grey box instead of the usual red error screen).
+              SizedBox(
+                width: double.infinity,
+                child: Row(
+                  children: [
+                    TextButton(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              final provider = context.read<AppProvider>();
+                              final ok = await provider.deleteGarmentItem('${item['id']}');
+                              if (!ctx.mounted) return;
+                              Navigator.pop(ctx);
+                              if (ok) {
+                                _showSuccess('Deleted "${item['name']}"');
+                              } else {
+                                _showError(provider.error ?? 'Could not delete item');
+                              }
+                            },
+                      child: const Text('Delete', style: TextStyle(color: Color(0xFFDC2626))),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: saving ? null : () => Navigator.pop(ctx),
+                      child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: saving ? null : save,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A4FD6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: saving
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
                 ),
-                child: saving
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ],
           );

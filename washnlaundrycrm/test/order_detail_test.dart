@@ -341,5 +341,31 @@ void main() {
       expect(find.text('Collect Payment'), findsNothing);
       expect(find.text('Balance Due'), findsOneWidget);
     });
+
+    testWidgets('Collect Payment stays disabled until the order is delivered',
+        (tester) async {
+      // Money owed alone used to be enough to press it — staff could collect
+      // payment on an order that hadn't even left the shop yet.
+      await pump(tester, order(due: 150, status: OrderStatus.processing));
+
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Collect Payment'),
+      );
+      expect(button.onPressed, isNull);
+      expect(find.text('Available once the order is marked Delivered.'),
+          findsOneWidget);
+    });
+
+    testWidgets('Collect Payment is pressable once the order is delivered',
+        (tester) async {
+      await pump(tester, order(due: 150, status: OrderStatus.delivered));
+
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Collect Payment'),
+      );
+      expect(button.onPressed, isNotNull);
+      expect(find.text('Available once the order is marked Delivered.'),
+          findsNothing);
+    });
   });
 }

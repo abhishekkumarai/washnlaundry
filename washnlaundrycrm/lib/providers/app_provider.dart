@@ -411,7 +411,11 @@ class AppProvider extends ChangeNotifier {
     try {
       final results = await Future.wait([
         ApiService.fetchOrders(),
-        ApiService.fetchGarmentItems(),
+        // Inactive items must still be fetched — Services' "Show Inactive"
+        // toggle and New Order's active-only filter both need to see them
+        // to do anything; filtering out inactive items at the fetch meant
+        // neither had inactive data to work with in the first place.
+        ApiService.fetchGarmentItems(includeInactive: true),
         ApiService.fetchCategories(),
         ApiService.fetchCustomers(),
         ApiService.fetchStaff(),

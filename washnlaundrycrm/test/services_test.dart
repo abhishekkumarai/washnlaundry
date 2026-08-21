@@ -94,6 +94,9 @@ void main() {
     testWidgets('price tags and chips use each item own unit', (tester) async {
       await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
       await tester.pump();
+      // Retired Item (the 'set'-unit row) is inactive and hidden by default.
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
 
       // The card used to hardcode "/ pc" and "Per piece" for every row.
       expect(find.text(' / pc'), findsWidgets);
@@ -102,13 +105,81 @@ void main() {
       expect(find.text('Per kg'), findsOneWidget);
     });
 
-    testWidgets('an inactive item is not badged Active', (tester) async {
+    testWidgets('inactive items are hidden until Show Inactive is ticked',
+        (tester) async {
+      // Both the item-level filter and the "Show Inactive" checkbox used to
+      // do nothing — every item showed regardless, so there was no way to
+      // actually confirm disabling one had any visible effect.
       await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
       await tester.pump();
 
+      expect(find.text('Retired Item'), findsNothing);
+      expect(find.text('Inactive'), findsNothing);
+
+      await tester.tap(find.byType(Checkbox));
+      await tester.pump();
+
+      expect(find.text('Retired Item'), findsOneWidget);
       expect(find.text('Inactive'), findsOneWidget);
       // Two active item badges, plus the category header's own Active pill.
       expect(find.text('Active'), findsNWidgets(3));
+    });
+
+    testWidgets('an inactive category reads Inactive, not a hardcoded Active',
+        (tester) async {
+      // The sidebar dot and the category header's pill were both hardcoded
+      // green/"Active" regardless of the category's real `is_active` flag.
+      final retired = GarmentCategoryModel.fromJson({
+        'id': 2,
+        'name': 'Retired Category',
+        'icon': 'Home',
+        'display_order': 2,
+        'item_count': 0,
+        'price_range': {'min': 0, 'max': 0},
+        'is_active': false,
+      });
+      await tester.pumpWidget(host(
+        _seeded(categories: [_ironing, retired]),
+        const ServicesScreen(),
+      ));
+      await tester.pump();
+
+      // Ironing (active, selected by default) shows Active; nothing reads
+      // Inactive yet.
+      expect(find.text('Inactive'), findsNothing);
+
+      await tester.tap(find.text('Retired Category'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Inactive'), findsOneWidget);
+    });
+
+    testWidgets('editing an already-inactive category keeps Status Inactive',
+        (tester) async {
+      // The Edit dialog's Status switch was hardcoded to start Active no
+      // matter what — saving any edit to an inactive category (even just
+      // its name) silently reactivated it.
+      final retired = GarmentCategoryModel.fromJson({
+        'id': 2,
+        'name': 'Retired Category',
+        'icon': 'Home',
+        'display_order': 1,
+        'item_count': 0,
+        'price_range': {'min': 0, 'max': 0},
+        'is_active': false,
+      });
+      await tester.pumpWidget(host(
+        _seeded(categories: [retired], garments: const []),
+        const ServicesScreen(),
+      ));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.edit_outlined).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Service'), findsOneWidget);
+      final toggle = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+      expect(toggle.value, isFalse);
     });
 
     testWidgets('an empty catalogue offers a category instead of crashing',
@@ -121,6 +192,27 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('No services'), findsOneWidget);
       expect(find.text('New service category'), findsOneWidget);
+    });
+
+    testWidgets('Edit Service / Item opens without crashing', (tester) async {
+      // A bare `Spacer()` in this dialog's `actions` used to throw at layout
+      // time — `AlertDialog.actions` lays out through an `OverflowBar`,
+      // which doesn't support flex children. Release builds showed a blank
+      // grey box where the whole form should be, with no visible error.
+      await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
+      await tester.pump();
+
+      // Index 0 is the category header's own edit pencil ("Edit Service");
+      // index 1 is Shirt's, the first item card.
+      await tester.tap(find.byIcon(Icons.edit_outlined).at(1));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Edit Service / Item'), findsOneWidget);
+      expect(find.text('Shirt'), findsWidgets); // prefilled name field
+      expect(find.widgetWithText(TextButton, 'Delete'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Cancel'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Save Changes'), findsOneWidget);
     });
   });
 

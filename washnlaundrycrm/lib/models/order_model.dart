@@ -52,8 +52,8 @@ class DeliveryType {
   static const online = 'ONLINE';
 
   static const labels = {
-    storePickup: 'Store Pickup',
-    homePickup: 'Home Pickup',
+    storePickup: 'Shop Pickup',
+    homePickup: 'Pickup from Home',
     homeDelivery: 'Home Delivery',
     online: 'Online',
   };

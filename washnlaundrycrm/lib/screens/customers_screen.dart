@@ -20,6 +20,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
   String _searchQuery = '';
   CustomerModel? _selected;
 
+  /// Which KPI card is acting as the active filter tab. 'all' means no
+  /// extra filter beyond the search box.
+  String _kpiFilter = 'all';
+
   /// Most recent order date per customer, keyed by both id and phone so a
   /// counter order written without a customer FK still matches on phone.
   Map<String, DateTime> _lastOrderIndex(AppProvider provider) {
@@ -40,6 +44,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
   DateTime? _lastOrderFor(CustomerModel c, Map<String, DateTime> index) =>
       index[c.id] ?? index[c.phone];
 
+  bool _isActiveCustomer(CustomerModel c) => c.totalOrders > 0;
+
+  bool _isNewCustomer(CustomerModel c) {
+    final at = c.createdAt;
+    if (at == null) return false;
+    final now = DateTime.now();
+    return at.year == now.year && at.month == now.month;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_selected != null) {
@@ -59,10 +72,17 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     final q = _searchQuery.trim().toLowerCase();
     final filtered = customers.where((c) {
-      if (q.isEmpty) return true;
-      return c.name.toLowerCase().contains(q) ||
+      final matchesSearch = q.isEmpty ||
+          c.name.toLowerCase().contains(q) ||
           c.phone.toLowerCase().contains(q) ||
-          c.email.toLowerCase().contains(q);
+          c.email.toLowerCase().contains(q) ||
+          c.area.toLowerCase().contains(q);
+      final matchesTab = switch (_kpiFilter) {
+        'active' => _isActiveCustomer(c),
+        'new' => _isNewCustomer(c),
+        _ => true,
+      };
+      return matchesSearch && matchesTab;
     }).toList();
 
     return Scaffold(
@@ -161,17 +181,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Widget _kpiRow(List<CustomerModel> customers) {
-    final now = DateTime.now();
-    final active = customers.where((c) => c.totalOrders > 0).length;
-    final isNew = customers.where((c) {
-      final at = c.createdAt;
-      return at != null && at.year == now.year && at.month == now.month;
-    }).length;
+    // Counts always reflect every customer, not the tab-filtered subset —
+    // otherwise selecting "Active" would immediately shrink its own count.
+    final active = customers.where(_isActiveCustomer).length;
+    final isNew = customers.where(_isNewCustomer).length;
 
     final cards = [
-      _kpi('Total', '${customers.length}', Icons.people_outline_rounded, const Color(0xFF1A4FD6)),
-      _kpi('Active', '$active', Icons.verified_user_outlined, const Color(0xFF10B981)),
-      _kpi('New', '$isNew', Icons.person_add_alt_1_outlined, const Color(0xFFA855F7)),
+      _kpi('all', 'Total', '${customers.length}', Icons.people_outline_rounded, const Color(0xFF1A4FD6)),
+      _kpi('active', 'Active', '$active', Icons.verified_user_outlined, const Color(0xFF10B981)),
+      _kpi('new', 'New', '$isNew', Icons.person_add_alt_1_outlined, const Color(0xFFA855F7)),
     ];
 
     return LayoutBuilder(
@@ -188,31 +206,43 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
-  Widget _kpi(String label, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _panel,
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(9),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
+  /// [tabKey] is one of 'all' / 'active' / 'new' — tapping a card makes it
+  /// the active filter tab for the table below, same idea as the Orders
+  /// screen's status chips.
+  Widget _kpi(String tabKey, String label, String value, IconData icon, Color color) {
+    final isSel = _kpiFilter == tabKey;
+    return InkWell(
+      onTap: () => setState(() => _kpiFilter = tabKey),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isSel ? color : const Color(0xFFE2E8F0), width: isSel ? 1.5 : 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 18, color: color),
             ),
-            child: Icon(icon, size: 18, color: color),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-              const SizedBox(height: 2),
-              Text(value,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            ],
-          ),
-        ],
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const SizedBox(height: 2),
+                Text(value,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -227,10 +257,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('All customers',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              switch (_kpiFilter) {
+                'active' => 'Active customers',
+                'new' => 'New customers',
+                _ => 'All customers',
+              },
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
           ),
           const Divider(height: 1, color: Color(0xFFE2E8F0)),
           if (customers.isEmpty)
@@ -240,9 +276,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 child: Text(
                   provider.isLoading
                       ? 'Loading customers…'
-                      : _searchQuery.trim().isEmpty
-                          ? 'No customers yet. Add one to get started.'
-                          : 'No customer matches "${_searchQuery.trim()}".',
+                      : _searchQuery.trim().isNotEmpty
+                          ? 'No customer matches "${_searchQuery.trim()}".'
+                          : switch (_kpiFilter) {
+                              'active' => 'No active customers yet.',
+                              'new' => 'No new customers this month.',
+                              _ => 'No customers yet. Add one to get started.',
+                            },
                   style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                 ),
               ),

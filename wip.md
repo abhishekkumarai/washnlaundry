@@ -713,3 +713,610 @@ check — screenshots intermittently timed out and network-request status
 lagged behind reality by several seconds. Waiting longer and retrying
 resolved it every time; nothing here pointed to an actual app bug, unlike
 the `RecentActivityCard` investigation earlier in this file.)
+
+---
+
+## Session of 2026-08-21 — two gaps found, neither fixed yet
+
+### New Order checkout is a different, lighter design, not a broken one
+
+Reported as "the checkout button is present, once clicked it should behave
+like the original but it is missing." Static reading of `_checkout` in
+`new_order_screen.dart` showed it fully wired (builds a payload, POSTs to
+`/api/orders/`, shows a `ReceiptDialog` on success) — not dead code. The real
+gap only showed up by actually driving `app.laundrybill.com` (signed in as
+the seeded owner) and clicking Checkout live, with explicit go-ahead to do so
+on the account's own test data. Screenshots from that walkthrough are at
+`screenshots/steps_order/step1-3.png`.
+
+The real Checkout button does **not** submit the order — it swaps `/new-order`
+(no route change) into a second **review step** our clone skips entirely:
+
+1. **Cart** (matches ours): items, customer, Subtotal/Total, Checkout button.
+2. **Checkout review** (missing here): customer card with "Change"; a
+   **Fulfilment** selector — 3 cards, Shop Pickup / Home Delivery / Pickup
+   from Home; a **Ready by** date row with −/+ day steppers; a **Payment**
+   card with just a "Collect payment now" toggle (no method picker); an
+   **Order Notes** box; a right-rail **Order Summary** — items, Subtotal, an
+   editable **Discount** field, Total, and the actual **Place order** button.
+3. **"Order Placed!" success view** (missing here): green check, Order ID,
+   summary rows (Customer / Items / Order Type / Payment — "Balance Due: ₹X"
+   or paid / Ready by / Total), then **New Order** / **Print Receipt** /
+   **View Order Details** / **Share** / **Track** actions. Confirmed live by
+   placing a real test order, `#WA3P-00005`.
+
+Our clone instead keeps Delivery-type and payment-method chips inline in the
+cart's right rail, has no date/notes/discount fields anywhere, and jumps
+straight from "Checkout" to POST + an itemized `ReceiptDialog` popup (QR
+code, WhatsApp button) — a different design, not a lighter version of the
+real one.
+
+**This is frontend-only.** `Order` already has `notes`, `scheduled_date`,
+`discount_amount` (`backend/api/models.py:148,246,248`), `OrderSerializer`
+only marks `order_number` read-only (`serializers.py:64`) and already folds
+`discount_amount` into `total_amount` itself (`serializers.py:93`), and
+`OrderModel`/`OrderItemModel` already parse `notes`/`scheduledDate`/
+`discountAmount` (`order_model.dart:159,166,167,306,312,313`).
+`order_detail_screen.dart` already renders both discount (`:384-386`) and
+notes (`:580-589`) when present, and already has a working `showDatePicker`
+pattern for `scheduled_date` in its Edit dialog (`:1010-1118`) to copy.
+Nothing on the backend or in any other screen needs to change.
+
+**Planned approach** (not started — full plan is at
+`C:\Users\abhi3\.claude\plans\under-the-http-localhost-8080-new-order-melodic-wall.md`,
+saved instead of implemented this session):
+
+- Add `_showCheckoutReview` (+`_notes`, `_discountAmount`) to
+  `_NewOrderScreenState`. Checkout no longer calls `_checkout` directly — it
+  flips the flag, swapping the center column (search/category/item grid,
+  `new_order_screen.dart:168-223`) for a new `_buildCheckoutReview`, and the
+  right rail's cart list + Delivery/Payment/Paid-in-full block
+  (`:301-444`) for a compact Order Summary + Place order button.
+- Delete the inline Delivery/Payment-method chips from the cart screen
+  (`:342-444`) — the real cart rail only shows Subtotal/Total/Checkout at
+  that stage. Keep `_paymentMethod` defaulted to `'CASH'` with no chooser
+  anywhere in New Order, matching the real flow and the model's own default
+  (`backend/api/models.py:229`).
+- Reuse `DeliveryType` (`order_model.dart:48-61`) but offer only 3 of its 4
+  values here (drop `online`), relabelled to match the live app's copy:
+  `storePickup: 'Shop Pickup'`, `homePickup: 'Pickup from Home'`.
+- Payload gains `notes`, `discount_amount`, `scheduled_date`; total becomes
+  `(subtotal + deliveryCharge - discountAmount).clamp(0, ∞)` to match the
+  backend's own formula.
+- Replace the auto-popped `ReceiptDialog` with a real "Order Placed!" view
+  (check icon, Order ID, summary rows) and three real actions — **New
+  Order** (reset), **View Receipt** (opens the existing `ReceiptDialog` as a
+  secondary view instead of auto-showing it), **View Order Details**
+  (`context.go('/orders/${created.id}')`). Deliberately *not* adding fake
+  "Print Receipt"/"Track" buttons — no printable view or public tracking
+  page exists in this clone (`LIVE_AUDIT.md` lists `/track/:trackingId` as
+  never built), and this file already flags fake success actions elsewhere
+  as tech debt to remove, not a pattern to add to.
+- `new_order_test.dart`'s `'picking a delivery type other than pickup adds
+  the flat fee'` (lines 180-208) targets the chips being deleted — move it
+  into the new review step rather than dropping the coverage. Add tests for
+  the review step's visibility, Ready-by stepping, Discount reducing the
+  total, New Order fully resetting state, and the payload actually carrying
+  `notes`/`discount_amount`/`scheduled_date`.
+
+### Services "Show Inactive" toggle doesn't hide inactive items from New Order
+
+Second gap, reported mid-investigation of the above, not yet root-caused in
+depth. `GarmentItemModel.isActive` exists (`garment_model.dart:58`, parsed
+from `is_active`, defaults `true`), and `services_screen.dart` already has a
+real "Show Inactive" filter (`:171`) and an Active/Inactive toggle in its
+edit dialog (`:1787,1822,1961-1964`) — disabling an item there is a real,
+persisted write. But `new_order_screen.dart`'s `filteredItems` (`:110-116`)
+only filters on `_selectedCategory` and `_searchQuery` — it never checks
+`isActive`, so a garment disabled in Services still shows up and is
+orderable on the New Order grid. Fix is presumably a one-line addition to
+that filter's predicate (`&& item.isActive`), but not yet verified live
+end-to-end or checked for whether Services' "Show Inactive" list should
+still let you *view* inactive items without being able to add them to a
+cart — worth confirming against the real app before just hiding them
+outright.
+
+### Customers page search doesn't match the AREA column it displays
+
+Third gap, reported mid-session. There is no separate "Filters" control on
+`/customers` in either app — `LIVE_AUDIT.md:112` and a live screenshot of
+`app.laundrybill.com/customers` both confirm the header is just
+`Customers N Total`, the search box, `Export`, `Add`, matching
+`customers_screen.dart:98-161` exactly. So "the filter at the top" is that
+search box, wired at `customers_screen.dart:60-66`:
+```dart
+final q = _searchQuery.trim().toLowerCase();
+final filtered = customers.where((c) {
+  if (q.isEmpty) return true;
+  return c.name.toLowerCase().contains(q) ||
+      c.phone.toLowerCase().contains(q) ||
+      c.email.toLowerCase().contains(q);
+}).toList();
+```
+Live-tested against the running clone (`localhost:8080/customers`, 10 seeded
+customers): typing "Priya" correctly narrows to one row — the box isn't
+dead. But typing **"Koramangala"** — the exact, visible value in Rohan
+Verma's own AREA column, the table's third field — returns "No customer
+matches "Koramangala"." The predicate above only checks `name`/`phone`/
+`email`; `area` (`CustomerModel.area`, rendered right there in the table at
+`customers_screen.dart:316`) is never included. A user filtering by
+something they can see in the table gets a silent, confident-looking "no
+results" instead of a match — that's almost certainly the "doesn't work"
+being reported, not the box being unresponsive.
+
+Not yet confirmed against the live app whether its own search also excludes
+area (the signed-in test account only has one customer, area unset, so
+there's nothing to search for there) — worth checking with a live account
+that has area data before assuming the fix is simply adding
+`|| c.area.toLowerCase().contains(q)` to the predicate. If real search does
+cover area, that one-line addition is the whole fix; if it doesn't either,
+this is at most a placeholder/copy mismatch, not a functional bug.
+
+---
+
+## All three fixed
+
+### New Order checkout — the two-step flow, built as planned
+
+Implemented per the plan above, in `new_order_screen.dart` and a 2-line
+relabel in `order_model.dart`. `_showCheckoutReview` now gates a second
+screen: cart's Checkout button no longer calls `_checkout` directly — it
+sets a default `_readyBy` (tomorrow) and flips the flag, swapping the item
+grid for `_buildCheckoutReview` (customer card, FULFILMENT — Shop Pickup /
+Home Delivery / Pickup from Home, in that order, matching the live app
+rather than the enum's own declaration order — Ready by with day steppers,
+a Payment "Collect payment now" toggle defaulting off, Order Notes) and the
+cart-items rail for `_buildOrderSummary` (items, Subtotal, an editable
+Discount field, Total, **Place order**). The inline Delivery/Payment-method
+chips and "Paid in full" switch that used to sit in the cart footer are
+gone — the cart stage now only shows Subtotal/Total/Checkout, like the real
+app. `_checkout`'s payload gained `notes`, `discount_amount`,
+`scheduled_date`, and its total formula now matches the backend's own
+(`subtotal + delivery_charge - discount_amount`, clamped to 0). On success
+it resets all cart/review state first, then shows a new `_OrderPlacedDialog`
+(green check, Order ID, Customer/Items/Order Type/Payment/Ready by/Total,
+then **New Order** / **View Receipt** — opens the existing `ReceiptDialog`
+as a secondary view / **Order Details** — `context.go('/orders/${id}')`)
+instead of auto-popping the old receipt.
+
+`new_order_test.dart`'s delivery-fee test was moved into the new review flow
+(tap Checkout first) instead of being dropped, and two new tests cover the
+review step's visibility and a discount reducing the total. Full suite
+after: Flutter 241/241, `flutter analyze` clean (55 info-level lints, same
+kind as the pre-existing baseline — no new errors or warnings).
+
+Live-verified end-to-end against the rebuilt Docker frontend: added a
+Shirt, Checkout → Home Delivery → Ready by defaulted to the next day →
+discount ₹5 → paid toggle on → **Place order** created `#WASH-00018`
+(`Subtotal ₹15, Delivery ₹50, Discount ₹5, Total ₹60`), the success dialog
+matched the live app's almost exactly, and **Order Details** navigated to
+`/orders/8e7533c2-...` showing the same delivery type, discount, total and
+"Expected Delivery Aug 22, 2026" pulled straight from what was submitted.
+
+**Not done**: `View Receipt`'s `ReceiptDialog` and the whole in-place
+"Print Receipt" / "Track" pair from the real app's success screen were
+deliberately left as scoped-out in the plan (no printable view or public
+tracking route exists here) — still true, unchanged.
+
+### Services inactive items — fixed
+
+One-line fix, exactly as scoped: `new_order_screen.dart`'s `filteredItems`
+predicate now requires `item.isActive`, so a garment turned off in Services
+no longer appears in the New Order grid. The base `garments` list (used for
+cart pricing/lookup) is untouched, so an item already in someone's cart when
+it gets disabled doesn't silently vanish mid-order. Verified live via the
+API (`PATCH /api/items/1134/ {"is_active": false}` → Shirt disappeared from
+`/new-order`'s grid; re-enabling brought it back).
+
+Whether Services' "Show Inactive" list should let you *view* an inactive
+item without being able to add it to a cart is still an open question this
+session didn't need to answer — New Order simply never shows inactive items
+at all now, active-viewing-only wasn't part of what was reported broken.
+
+### Customers AREA search — fixed
+
+One-line fix: the search predicate in `customers_screen.dart` now also
+checks `c.area.toLowerCase().contains(q)`. Live-verified: searching
+"Koramangala" now finds Rohan Verma (previously "No customer matches"). The
+open question from the original write-up — whether the real app's own
+search covers area — is still unresolved; the fix was made on the merits
+(AREA is a displayed column, so it should be searchable) rather than on
+confirmed parity.
+
+### One incident during this session: an accidental delete, caught and fixed
+
+While live-testing the Services-inactive fix through the UI (before
+switching to the API for reliability), a click meant for the "Edit Service /
+Item" dialog's × close button appears to have landed on the adjacent red
+**Delete** control instead — the dialog's content area was failing to
+render for unrelated reasons (a rendering glitch, not caused by this
+session's changes; matches the "browser automation was flaky against this
+Flutter build" note elsewhere in this file), which made the click target
+harder to judge from screenshots alone. The seeded "Shirt" item (Ironing,
+id 1134) was gone from `GET /api/items/1134/` moments later. Caught via a
+follow-up API check, fixed by `docker compose exec backend python
+seed_db.py` — confirmed back to 79 items across 7 categories. No other data
+was touched. Worth remembering for next time: prefer the API over clicking
+through a dialog whose content isn't rendering, rather than trusting
+coordinates against a screenshot that might be stale.
+
+### Delivery charge — made editable, not just a fixed ₹50
+
+Follow-up request after the checkout flow landed: the ₹50 Home Delivery fee
+was still a hardcoded constant (`_deliveryFee`), applied automatically with
+no way to change it per order. `new_order_screen.dart` now carries a real
+`_deliveryCharge` field (was a getter derived from `_deliveryType`) plus a
+`_deliveryChargeController`. Picking Home Delivery in FULFILMENT seeds the
+field at the ₹50 default; picking a pickup type zeroes it and hides the
+field again. In the Order Summary panel, the Delivery line is now an
+editable `TextField` — same treatment as Discount already had — so a shop
+can charge more or less than the default per order. Resets to the ₹50
+default on the next order after a successful Place order, same as every
+other review field.
+
+`new_order_test.dart`'s delivery-fee test was rewritten to assert the field
+is editable (checks the controller's default `'50'` text, then types `'30'`
+and confirms the total follows) rather than just asserting a static ₹50/₹65
+readout. Full suite after: Flutter 241/241, `flutter analyze` clean (same
+12-issue file-level baseline, no new errors). User-validated live against
+the rebuilt Docker frontend.
+
+### Collect Payment — gated on Delivered
+
+Another follow-up: `order_detail_screen.dart`'s Payment card offered
+**Collect Payment** the moment any balance was owed, regardless of order
+status — staff could record payment before an order had even left the
+shop. `_paymentCard` now computes `isDelivered = order.status ==
+OrderStatus.delivered` and only wires `onPressed` when true; the button
+stays visible (so the balance is never hidden) but greys out otherwise,
+with a caption — "Available once the order is marked Delivered." — so it's
+clear why, not just that it's unresponsive.
+
+`order_detail_test.dart` gained two tests: disabled + caption shown at
+`OrderStatus.processing`, enabled + caption gone at
+`OrderStatus.delivered`. Full suite after: Flutter 243/243, `flutter
+analyze` clean on the file (0 issues).
+
+**Not live-screenshotted this time** — browser automation's scroll/resize
+was too unreliable this session to get the Payment card into frame (matches
+the pre-existing "flaky against this Flutter build" note elsewhere in this
+file; `resize_window` didn't change the captured viewport, mouse-wheel and
+Page_Down scroll both no-opped on this page). Confidence here rests on the
+two new widget tests directly asserting `FilledButton.onPressed` is
+null/non-null by status, not on an eyeballed screenshot — worth a manual
+look next session on `/orders/f37d7419-064e-4542-84a5-cffa635b46fd`
+(`#WASH-00002`, due ₹126, status Placed) to confirm the disabled state
+actually renders as expected.
+
+### Customers KPI cards — now real filter tabs
+
+Reported as "the tabs should filter, they aren't" — the only tab-like UI on
+`/customers` is the Total/Active/New KPI row, which was purely read-only
+(`_kpiRow`/`_kpi` in `customers_screen.dart`). Added `_kpiFilter` state
+('all'/'active'/'new'); each `_kpi` card is now an `InkWell` that sets it,
+with a colored border marking the selected one. The table's filter
+predicate (already combining search) now also applies
+`_isActiveCustomer`/`_isNewCustomer` — the same predicates the KPI counts
+already used, extracted so the count and the filter can't drift apart. The
+table heading and empty-state message ("No active customers yet." / "No
+new customers this month.") follow the active tab too, matching the
+Orders screen's existing pattern of a state-aware empty message.
+
+`customers_test.dart` gained one test tapping through all three tabs and
+checking the roster narrows correctly plus the heading/empty-state text.
+Full suite after: Flutter 245/245, `flutter analyze` clean (0 issues on the
+file). Live-verified against the rebuilt Docker frontend: Active correctly
+dropped a freshly-added 0-order customer ("mukesh") from the list, heading
+changed to "Active customers", selected card got a green border.
+
+### New Order's "Add" customer — Existing/New tabs, matching the real app
+
+Follow-up request: New Order's customer picker (`_CustomerPickerDialog`)
+only ever searched existing customers, with "Bill to walk-in customer" as
+the only other option — there was no way to add a brand-new customer
+without leaving New Order for the Customers screen. The real app's own
+"Bill to" dialog has **Existing customer** / **New customer** tabs (seen in
+`screenshots/steps_order/step2.png`), so this was a real gap, not
+invention.
+
+The dialog now has that same tab pair. "Existing customer" is the search +
+list + walk-in button, unchanged. "New customer" reuses the same four
+fields as the Customers screen's own Add Customer dialog (Full Name, Phone
+Number, Email, Area/Locality — deliberately identical, since it's the same
+`provider.addCustomer` payload shape) with the same required-field
+validation. On success it pops the dialog with the newly-created customer
+(read back via `provider.customers.first`, since `addCustomer` inserts at
+the front of the list rather than returning the record directly) so New
+Order attaches it to the order immediately, same as picking an existing
+one.
+
+`new_order_test.dart` gained a test covering: both tabs are offered, New
+customer hides the existing-customer UI and shows the form, submitting
+blank fields surfaces the validation error without a network call, and
+switching back to Existing customer restores the search list. (Actually
+creating a customer end-to-end isn't covered — `addCustomer` hits a real
+`ApiService` call with no mock seam in this test suite, same gap already
+noted for order creation.) Full suite after: Flutter 245/245, `flutter
+analyze` clean (same 12-issue baseline). Live-verified against the rebuilt
+Docker frontend — the user's own test customer "mukesh" (0 orders, "Just
+now") showed up in the Customers roster, created through this exact flow.
+
+### Orders' "Filters" button — implemented
+
+Last of the reported dead buttons: `orders_screen.dart`'s `Filters` was
+`onPressed: () {}`. The 11 status chips, date-range dropdown and search box
+already cover a lot, so the new dialog only adds the dimensions nothing else
+does: **Delivery Type** (`DeliveryType.labels`), **Payment Method**
+(`provider.paymentMethods`, same source Expenses/Payroll already use), and
+an **Express only** toggle — all real `OrderModel` fields with no UI
+anywhere else on this screen. Applied as a plain client-side `.where()` on
+top of `provider.ordersFor(...)`'s result, no provider changes needed.
+
+The dialog edits a scratch copy of the three values so **Cancel** truly
+discards changes and **Clear all** only resets the in-dialog scratch state
+(does nothing until **Apply**). The button itself shows an active count —
+`Filters (2)` — and turns blue, mirroring the KPI-tab selection style
+established on Customers this session. One implementation gotcha:
+`AlertDialog.actions` lays children out in an `OverflowBar`, which doesn't
+support flex children — an initial `Spacer()` directly in `actions` needed
+wrapping in a single bounded `Row` inside one `actions` entry instead.
+
+No existing test file pumped `OrdersScreen` at all (only
+`orders_filter_test.dart`, which tests `AppProvider.ordersFor` directly) —
+added `orders_screen_test.dart` covering: the dialog opens with all three
+controls, selecting Home Delivery + Apply narrows the table and updates the
+button label, Cancel discards an in-dialog toggle, Clear all resets before
+Apply. Full suite after: Flutter 249/249, `flutter analyze` clean (4
+pre-existing info-level lints, no new ones). Live-verified against the
+rebuilt Docker frontend: Home Delivery filter took 20 orders to "Showing 7
+of 20", every visible row correctly showing Home Delivery.
+
+### Filter Orders — rebuilt from scratch after comparing against the live dialog
+
+The version above was a reasonable-looking invention, not a copy — asked to
+compare it against the real thing, opened `app.laundrybill.com/orders` and
+its own Filters button side by side. The real "Filter Orders" dialog is a
+completely different, considerably bigger surface: **ATTENTION NEEDED**
+(Overdue Orders / Unpaid Dues — independent toggle cards, not radio),
+**ORDER SOURCE** (All / Online "From public page" / In-shop "POS /
+counter"), **ORDER TYPE** (All Types / Shop Pickup / Home Delivery /
+"Pickup & Delivery"), **SERVICE TYPE** (a dropdown of the shop's actual
+categories), **STATUS** (a radio list: All, Order Placed, Processing,
+Ready, Partially Delivered, Delivered, Cancelled), closed by **Reset** /
+**Apply Filters** — no Cancel button, just an × in the header. None of
+Payment Method or Express-only exist in the real dialog at all; both got
+dropped.
+
+Rebuilt `orders_screen.dart`'s filter state and dialog to match section for
+section:
+- **Attention Needed** → `_overdueOnly`/`_unpaidDuesOnly`, independent
+  booleans (`order.isOverdue`, `order.paymentStatus == UNPAID`) — same two
+  conditions the main chip row's OVERDUE/UNPAID chips already compute, just
+  reachable as an orthogonal layer here instead of a single-select swap.
+- **Order Source** → `_orderSource` ('all'/'online'/'inshop'), mapped to
+  `order.source`: Online = `PUBLIC_PAGE`, In-shop = `WEB`. `MOBILE_APP`/
+  `STAFF_APP`/`AGENT_APP` orders (present in seed data — `seed_db.py`
+  randomizes across all five) fall under neither non-"all" option, matching
+  that the real dialog only exposes two.
+- **Order Type** → `_orderType`, one of `DeliveryType`'s values (`online`
+  deliberately excluded — it's under Order Source here, not Order Type,
+  matching the real split). "Pickup & Delivery" maps to `homePickup`.
+- **Service type** → `_serviceType`, a category name matched against
+  `order.items.any((i) => i.serviceType == _serviceType)`, options read
+  live from `provider.categories` rather than hardcoded, since the
+  catalogue can differ shop to shop.
+- **Status** → deliberately did *not* fork a second status variable. The
+  dialog's Status radios write straight into the existing `_selectedTab`
+  (same state the main chip row already owns), so there's one source of
+  truth instead of two filters racing each other. One real adaptation:
+  "Partially Delivered" isn't a status this data model tracks at all (no
+  per-item partial-delivery concept — a real data-model gap, not something
+  fixable in a dialog), so the radio list keeps `OrderStatus.outForDelivery`
+  instead, which is real here and absent from the live list.
+
+`orders_screen_test.dart` was rewritten alongside it — the old chip-based
+assertions ('DELIVERY TYPE', 'PAYMENT METHOD', 'Cancel') no longer describe
+anything that exists. New tests cover: all five section headers render:
+Order Type narrows the table and the button shows the count; Overdue Orders
+isolates the overdue seed order; Order Source's Online isolates the
+public-page order; the Status radio for Delivered narrows the table *and*
+leaves the main chip row's Delivered chip reading as selected (proving the
+single-source-of-truth wiring); the × discards an in-dialog change with no
+Cancel button to rely on; Reset clears the scratch state without closing
+the dialog, requiring Apply Filters to actually commit. Full suite after:
+Flutter 252/252, `flutter analyze` clean (1 pre-existing info-level lint).
+
+Live-verified against the rebuilt Docker frontend: opened Filters, visually
+near-identical to the real dialog — same title, same × placement, same
+Attention Needed/Order Source/Order Type section layout and icons, same
+Reset/Apply Filters footer. (Scrolling the dialog to check Service Type and
+Status live hit the same browser-automation flakiness noted elsewhere in
+this file — a stray scroll zoomed the whole page instead of scrolling the
+dialog's content. Those two sections are confirmed working via the widget
+tests above, just not re-confirmed with a live screenshot this session.)
+
+---
+
+## TODO — two gaps reported, not yet fixed
+
+### 1. Disabling a whole Service *category* doesn't hide its items in New Order
+
+The `is_active` fix earlier in this session (see "Services inactive items —
+fixed" above) only covers the **item**-level toggle. `GarmentCategory` has
+its own, completely independent `is_active` field
+(`backend/api/models.py:165`; `GarmentCategoryModel.isActive`,
+`garment_model.dart:101`) — Services already has a category-level
+Active/Inactive concept, since `item_count`/`price_range` both filter to
+`is_active=True` items server-side (`models.py:174-180`). But
+`GarmentItemModel` carries no reference to whether its *own* category is
+active — just `categoryId`/`categoryName` (`garment_model.dart:50-58`) —
+and `new_order_screen.dart`'s `filteredItems` predicate
+(`item.isActive && matchesCategory && matchesSearch`, `:113-119`) only
+checks the item's own flag. So: turn off an entire category in Services,
+and every item under it — each still individually `is_active: true` — stays
+fully visible and orderable in New Order. Not yet confirmed live (no
+category-level disable toggle has been exercised this session), but the
+code path is unambiguous: nothing anywhere cross-references
+`provider.categories` when building New Order's grid.
+
+Likely fix shape: either have `filteredItems` also check
+`provider.categories.firstWhere((c) => c.name == item.categoryName,
+orElse: ...).isActive`, or thread the category's active flag onto
+`GarmentItemModel` itself (the backend's item serializer would need to
+start including it, or the client derives it client-side from
+`provider.categories`).
+
+### 2. Editing a Service's item ("Edit Service / Item") is broken
+
+Directly observed earlier this session: opening this dialog live
+(`services_screen.dart:1777`, `_showEditItemModal`) rendered the title bar
+and the red **Delete** link, but the entire form body came up as a blank
+grey box — nothing else painted. At the time this got misread as an
+unrelated rendering glitch and worked around via the API instead (see the
+"accidental delete" incident above — same dialog, same session).
+
+Reading the code now turns up a real bug that fits: `selectedCat` is
+seeded from `_categories[_selectedCategoryIndex]['title']`
+(`:1781`) — the **sidebar's currently-selected category tab** — not from
+the item's own actual category. That line is correct in
+`_showAddItemModal` (`:1277`), where "default to whatever tab you're on"
+is the right behavior for a *new* item, but it was copy-pasted into
+`_showEditItemModal` where it's wrong: the form should seed from the item
+being edited, not from whatever the sidebar happens to be showing. Under
+plain single-category browsing the two usually coincide (you can only see
+an item to click Edit on it if you're already on its category's tab), so
+this may not be the direct cause of the blank-render — but it's a live
+correctness bug regardless: if a future "search all items" or "Show
+Inactive across categories" view ever lists an item next to a
+different tab selection, Edit would silently preselect the *wrong*
+category, and saving would move the item.
+
+`selectedUnit`'s init is also suspect, separately:
+```dart
+String selectedUnit = PricingUnit.all.firstWhere(
+  (u) => PricingUnit.label(u) == item['unit'],
+  orElse: () => PricingUnit.piece,
+);
+```
+compares `item['unit']` (almost certainly the raw backend code, e.g.
+`'PC'`) against `PricingUnit.label(u)` (the human label, e.g. `'Per
+piece'`) — those can never match, so this silently always falls back to
+`PricingUnit.piece` regardless of the item's real unit. Doesn't crash
+(has `orElse`), but means Edit always shows the wrong unit pre-selected too.
+
+Not yet root-caused to certainty, not yet fixed. Next step: reopen this
+exact dialog live, check the browser console for the actual thrown
+exception (release-mode Flutter web swallows the red-screen overlay, which
+is why this presented as a silent blank box rather than a visible error),
+and confirm which of the two `selectedCat`/`selectedUnit` init lines — or
+something else entirely — is the real cause before touching the fix.
+
+---
+
+## Both TODO items fixed, plus two more found along the way
+
+### 1. Edit Service / Item — root cause confirmed and fixed
+
+It was the `Spacer()`. Reproduced live with the console open:
+`TypeError: Instance of 'minified:mC': type 'minified:mC' is not a
+subtype of type 'minified:f4'` at render time — exactly the
+`AlertDialog.actions` + bare `Spacer()` incompatibility already diagnosed
+and fixed once this session in the Orders Filters dialog
+(`OverflowBar`, which lays out `actions`, doesn't support flex children).
+`_showEditItemModal`'s actions (`Delete … Spacer() … Cancel, Save`) had the
+identical shape. Fixed the same way: wrapped the whole row in one bounded
+`SizedBox(width: double.infinity, child: Row(...))` as the dialog's single
+`actions` entry. Grepped the rest of `lib/` for the same pattern
+(`Spacer()` within 20 lines of an `actions: [`) — no other instances.
+
+`selectedCat`'s fragile derivation (seeded from the sidebar's selected tab,
+not the item's own category — see the original TODO writeup above) was
+real but turned out not to be reachable today, since `_currentItems` is
+itself always pre-filtered to the selected tab. Fixed anyway for
+robustness: added `'categoryName': g.categoryName` to the item view-model
+map and seed `selectedCat` from that.
+
+`selectedUnit`'s comparison, on closer reading, was actually correct —
+`item['unit']` is set from `g.unitLabel`, which is itself
+`PricingUnit.label(g.unit)`, so comparing `PricingUnit.label(u) ==
+item['unit']` does match correctly. Not a bug; withdrawn from the fix list.
+
+`services_test.dart` gained `'Edit Service / Item opens without crashing'`,
+tapping the *second* `Icons.edit_outlined` (index 0 is the category
+header's own edit pencil, easy to grab by mistake) and asserting
+`tester.takeException()` is null plus all three action buttons render.
+
+### 2. Category-level disable — the real root cause was one level deeper
+
+Started fixing "New Order still shows items from a disabled category" and
+found the actual bug was upstream of everything already built: `AppProvider
+.loadDataFromBackend` calls `ApiService.fetchGarmentItems()` with no
+arguments, and that method defaults to `includeInactive: false` — so
+`provider.garments` **never contained an inactive item in the first
+place**, for any screen, ever. Two consequences neither of us had noticed:
+
+- New Order's `item.isActive` check (fixed earlier this session) was
+  checking a field that was always true in practice — real code, vacuous
+  effect, because the inactive rows it was meant to catch were never in the
+  list to begin with.
+- Services' own "Show Inactive" checkbox (`_showInactive`) was **never read
+  anywhere** — `_currentItems`'s filter chain had no `is_active` clause at
+  all. Toggling the checkbox changed a boolean nobody consulted.
+
+Fixed at the source: `loadDataFromBackend` now calls
+`fetchGarmentItems(includeInactive: true)`, so `provider.garments` always
+has everything, and every screen filters client-side (consistent with how
+search/category filtering already works everywhere else in this app).
+`new_order_screen.dart`'s existing `item.isActive` check is now load-
+bearing for real. `services_screen.dart`'s `_currentItems` gained
+`.where((g) => _showInactive || g.isActive)`.
+
+**Two more bugs in the same family, found while fixing this:**
+
+- The sidebar category dot and the category header's "Active" pill
+  (`services_screen.dart`) were both **hardcoded** to the green/Active
+  styling — `Color(0xFF10B981)` and the literal string `'Active'`, with no
+  reference to the category's real `is_active` at all. This is the "green
+  signal should be grey when disabled" report. Added `'isActive':
+  c.isActive` to the category view-model map and made both the dot color
+  and the header pill (color + Active/Inactive text) conditional on it.
+- `_showEditCategoryModal` (the category-level "Edit Service" dialog)
+  hardcoded `bool isActive = true;` regardless of the category's actual
+  state — editing an already-inactive category's name (or anything else)
+  while never touching the Status switch would silently **reactivate** it
+  on save, since the switch always opened on. Now seeds from
+  `cat['isActive']`.
+
+`new_order_test.dart` gained tests for an inactive item being hidden, an
+item under an inactive category being hidden, and — a real regression
+guard — that items are *not* hidden when a test seeds garments without
+seeding categories at all (the first version of the category-cascade fix
+broke exactly this: treating "category not found" as "category inactive"
+hid the entire catalogue in every test that didn't bother seeding
+categories). `services_test.dart` gained tests for: inactive items staying
+hidden until Show Inactive is ticked (rewriting two pre-existing tests that
+had been silently relying on the missing filter to show an inactive seed
+item unconditionally), an inactive category reading "Inactive" instead of
+a hardcoded "Active", and editing an inactive category preserving Inactive
+on its Status switch.
+
+Full suite after everything above: Flutter 258/258, `flutter analyze`
+clean (same pre-existing baseline, no new issues).
+
+Live-verified against the rebuilt Docker containers (both frontend and
+backend rebuilt, database reseeded to a clean 79-item/7-category state
+before and after):
+- Edit Service / Item: pencil → full form renders (Service Category,
+  Item Name, Price, Unit, Turnaround, Status, Image URL, Delete/Cancel/Save)
+  — no more blank box.
+- Toggling an item's Status to Inactive and saving: toast "Updated
+  'Shirt'", item count 23→22, item vanished from the (default,
+  Show-Inactive-off) grid immediately — the original "disabling doesn't
+  disable it" report, confirmed fixed.
+- Category dot/pill: browser-click flakiness made toggling the switch
+  in-app unreliable this session (same class of issue noted earlier with
+  this Flutter build), so verified via a direct API PATCH
+  (`is_active: false` on the Ironing category) instead — reloaded and
+  confirmed the sidebar dot turned grey and the header pill read
+  "Inactive" in grey, both correctly reactive to the real flag. Reverted
+  the PATCH and reseeded afterward; no lasting data changes.

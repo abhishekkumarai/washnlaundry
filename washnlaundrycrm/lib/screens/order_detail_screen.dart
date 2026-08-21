@@ -697,6 +697,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Widget _paymentCard(OrderModel order) {
     final isPaid = order.paymentStatus == PaymentStatus.paid;
+    // Staff collect payment when the customer actually receives the order,
+    // not while it's still in the wash — the button stays visible so the
+    // balance is never hidden, but it can't be pressed early.
+    final isDelivered = order.status == OrderStatus.delivered;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _panel,
@@ -737,9 +741,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () => _collectPayment(order),
+                onPressed: isDelivered ? () => _collectPayment(order) : null,
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF10B981),
+                  disabledBackgroundColor: const Color(0xFFCBD5E1),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -747,6 +752,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
+            if (!isDelivered) ...[
+              const SizedBox(height: 6),
+              const Text(
+                'Available once the order is marked Delivered.',
+                style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+              ),
+            ],
           ],
         ],
       ),

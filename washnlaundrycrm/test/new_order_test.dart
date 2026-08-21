@@ -69,6 +69,80 @@ void main() {
       expect(find.text('Pant'), findsOneWidget);
     });
 
+    testWidgets('an inactive item is hidden from the grid', (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(garments: const [
+          GarmentItemModel(
+            id: '1',
+            categoryId: 'c1',
+            categoryName: 'Ironing',
+            name: 'Shirt',
+            price: 15,
+          ),
+          GarmentItemModel(
+            id: '2',
+            categoryId: 'c1',
+            categoryName: 'Ironing',
+            name: 'Retired Item',
+            price: 20,
+            isActive: false,
+          ),
+        ]);
+      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pump();
+
+      expect(find.text('Shirt'), findsOneWidget);
+      expect(find.text('Retired Item'), findsNothing);
+    });
+
+    testWidgets('an item whose whole category is inactive is also hidden',
+        (tester) async {
+      // The item itself can still be individually `is_active: true` — the
+      // category's own flag is what New Order used to never check at all.
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(
+          garments: const [
+            GarmentItemModel(
+              id: '1',
+              categoryId: 'c1',
+              categoryName: 'Ironing',
+              name: 'Shirt',
+              price: 15,
+            ),
+            GarmentItemModel(
+              id: '2',
+              categoryId: 'c2',
+              categoryName: 'Retired Category',
+              name: 'Old Service Item',
+              price: 40,
+            ),
+          ],
+          categories: const [
+            GarmentCategoryModel(id: 'c1', name: 'Ironing'),
+            GarmentCategoryModel(id: 'c2', name: 'Retired Category', isActive: false),
+          ],
+        );
+      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pump();
+
+      expect(find.text('Shirt'), findsOneWidget);
+      expect(find.text('Old Service Item'), findsNothing);
+    });
+
+    testWidgets('items are not hidden when categories were never seeded',
+        (tester) async {
+      // A category name absent from provider.categories entirely (not
+      // loaded yet, or a test that only seeds garments) must not read as
+      // "inactive" — that regressed the whole grid to empty once already.
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(garments: _catalogue);
+      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pump();
+
+      expect(find.text('Shirt'), findsOneWidget);
+      expect(find.text('Curtain'), findsOneWidget);
+    });
+
     testWidgets('shows nothing at all when the catalogue is empty',
         (tester) async {
       final provider = AppProvider(autoLoad: false);
@@ -177,36 +251,6 @@ void main() {
       expect(find.text('Checkout • ₹22'), findsOneWidget);
     });
 
-    testWidgets('picking a delivery type other than pickup adds the flat fee',
-        (tester) async {
-      // Checkout used to hardcode STORE_PICKUP, so there was no way to bill
-      // an order that needed carrying — and no way to charge for it either.
-      await pumpWithCatalogue(tester);
-
-      await tester.tap(find.text('+ Add to List').first);
-      await tester.pumpAndSettle();
-      expect(find.text('Checkout • ₹15'), findsOneWidget);
-      // Just the "Delivery" section label — no charge line yet.
-      expect(find.text('Delivery'), findsOneWidget);
-      expect(find.text('₹50'), findsNothing);
-
-      await tester.tap(find.text('Home Delivery'));
-      await tester.pumpAndSettle();
-
-      // The section label plus the new totals-block charge line.
-      expect(find.text('Delivery'), findsNWidgets(2));
-      expect(find.text('₹50'), findsOneWidget);
-      expect(find.text('Checkout • ₹65'), findsOneWidget);
-
-      // Switching back to a pickup type drops the fee again.
-      await tester.tap(find.text('Store Pickup'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Delivery'), findsOneWidget);
-      expect(find.text('₹50'), findsNothing);
-      expect(find.text('Checkout • ₹15'), findsOneWidget);
-    });
-
     testWidgets('decrementing to zero drops the line', (tester) async {
       await pumpWithCatalogue(tester);
 
@@ -217,6 +261,97 @@ void main() {
       await tester.tap(find.byIcon(Icons.remove).first);
       await tester.pumpAndSettle();
       expect(find.text('No items yet'), findsOneWidget);
+    });
+  });
+
+  group('NewOrderScreen checkout review', () {
+    Future<AppProvider> pumpWithItemInCart(WidgetTester tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(garments: _catalogue);
+      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pump();
+      await tester.tap(find.text('+ Add to List').first);
+      await tester.pumpAndSettle();
+      return provider;
+    }
+
+    testWidgets('Checkout opens the review step, Back to items returns',
+        (tester) async {
+      // The real app doesn't submit straight from the cart — Checkout opens
+      // a second review step (Fulfilment / Ready by / Payment / Notes)
+      // before there's an actual Place order button.
+      await pumpWithItemInCart(tester);
+
+      expect(find.text('FULFILMENT'), findsNothing);
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Checkout'), findsOneWidget);
+      expect(find.text('FULFILMENT'), findsOneWidget);
+      expect(find.text('ORDER NOTES'), findsOneWidget);
+      expect(find.text('Place order'), findsOneWidget);
+      // The cart-stage Checkout button is gone now — only the grid's search
+      // bar is, and that's hidden behind the review too.
+      expect(find.text('Search items or scan a tag...'), findsNothing);
+
+      await tester.tap(find.text('Back to items'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('FULFILMENT'), findsNothing);
+      expect(find.text('Checkout • ₹15'), findsOneWidget);
+    });
+
+    testWidgets(
+        'picking a delivery type other than pickup adds an editable flat fee',
+        (tester) async {
+      // Checkout used to hardcode STORE_PICKUP, so there was no way to bill
+      // an order that needed carrying — and no way to charge for it either.
+      // The fee itself used to be a fixed ₹50 with no way to change it.
+      await pumpWithItemInCart(tester);
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+
+      // Just Order Notes and Discount exist before a carried type is picked.
+      expect(find.byType(TextField), findsNWidgets(2));
+      expect(find.text('₹65'), findsNothing);
+
+      await tester.tap(find.text('Home Delivery'));
+      await tester.pumpAndSettle();
+
+      // A third field appears: the editable delivery charge, defaulting to
+      // the seed data's ₹50 rule but not locked to it.
+      expect(find.byType(TextField), findsNWidgets(3));
+      final deliveryField = tester.widget<TextField>(find.byType(TextField).at(1));
+      expect(deliveryField.controller!.text, '50');
+      expect(find.text('₹65'), findsOneWidget); // 15 subtotal + 50 fee
+
+      // Editing it updates the total, not just displaying a fixed fee.
+      await tester.enterText(find.byType(TextField).at(1), '30');
+      await tester.pumpAndSettle();
+      expect(find.text('₹45'), findsOneWidget); // 15 subtotal + 30 fee
+      expect(find.text('₹65'), findsNothing);
+
+      // Switching back to a pickup type drops the fee and hides the field.
+      await tester.tap(find.text('Shop Pickup'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TextField), findsNWidgets(2));
+      expect(find.text('₹45'), findsNothing);
+    });
+
+    testWidgets('a discount reduces the total', (tester) async {
+      await pumpWithItemInCart(tester);
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+
+      // ₹10 (15 subtotal - 5 discount) is unique to the discounted total —
+      // the item line and Subtotal both stay at ₹15 regardless.
+      expect(find.text('₹10'), findsNothing);
+
+      await tester.enterText(find.byType(TextField).last, '5');
+      await tester.pumpAndSettle();
+
+      expect(find.text('₹10'), findsOneWidget);
     });
   });
 
@@ -272,6 +407,51 @@ void main() {
       expect(find.text('Priya Sundaram'), findsOneWidget);
       expect(find.text('9000000002'), findsOneWidget);
       expect(find.text('Tap to add a customer'), findsNothing);
+    });
+
+    testWidgets('the picker offers a New customer tab, not just search',
+        (tester) async {
+      // The real app's own "Bill to" dialog has Existing customer / New
+      // customer tabs — ours used to only search existing records, with no
+      // way to add someone new without leaving New Order.
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(
+          garments: _catalogue,
+          customers: const [
+            CustomerModel(id: 'c1', name: 'Priya Sundaram', phone: '9000000002'),
+          ],
+        );
+      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(TextButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Existing customer'), findsOneWidget);
+      expect(find.text('New customer'), findsOneWidget);
+      expect(find.text('Priya Sundaram'), findsOneWidget);
+
+      await tester.tap(find.text('New customer'));
+      await tester.pumpAndSettle();
+
+      // The existing-customer list and its walk-in escape hatch are gone;
+      // the add-customer form is up instead.
+      expect(find.text('Priya Sundaram'), findsNothing);
+      expect(find.text('Bill to walk-in customer'), findsNothing);
+      expect(find.text('Full Name'), findsOneWidget);
+      expect(find.text('Phone Number'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Add Customer'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Add Customer'));
+      await tester.pump();
+
+      expect(find.text('Name and phone are both required.'), findsOneWidget);
+
+      await tester.tap(find.text('Existing customer'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Priya Sundaram'), findsOneWidget);
+      expect(find.text('Full Name'), findsNothing);
     });
   });
 

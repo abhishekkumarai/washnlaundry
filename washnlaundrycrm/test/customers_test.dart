@@ -141,6 +141,37 @@ void main() {
       expect(find.text('Geeta Devi'), findsNothing);
     });
 
+    testWidgets('the KPI cards act as filter tabs', (tester) async {
+      // They used to be read-only counters — tapping one did nothing.
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Geeta Devi'), findsOneWidget);
+
+      await tester.tap(find.text('Active'));
+      await tester.pump();
+
+      // Only Ramesh has ever placed an order.
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Geeta Devi'), findsNothing);
+      expect(find.text('Active customers'), findsOneWidget);
+
+      await tester.tap(find.text('New'));
+      await tester.pump();
+
+      // Ramesh joined in July; nobody in this roster joined this month.
+      expect(find.text('No new customers this month.'), findsOneWidget);
+
+      await tester.tap(find.text('Total'));
+      await tester.pump();
+
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Geeta Devi'), findsOneWidget);
+      expect(find.text('All customers'), findsOneWidget);
+    });
+
     testWidgets('a search matching nobody says so', (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
       await tester.pumpWidget(host(provider, const CustomersScreen()));
