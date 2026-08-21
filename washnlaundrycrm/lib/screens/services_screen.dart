@@ -606,16 +606,73 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     );
                   }),
                 ),
-                // Edit button bottom-right
+                // Edit & 3-dots button bottom-right
                 Positioned(
                   bottom: 8, right: 8,
-                  child: GestureDetector(
-                    onTap: () => _showEditItemModal(context, item),
-                    child: Container(
-                      width: 28, height: 28,
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)]),
-                      child: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF64748B)),
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      GestureDetector(
+                        onTap: () => _showEditItemModal(context, item),
+                        child: Container(
+                          width: 28, height: 28,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4),
+                            ],
+                          ),
+                          child: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF64748B)),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Container(
+                        width: 28, height: 28,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4),
+                          ],
+                        ),
+                        child: PopupMenuButton<String>(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.more_vert_rounded, size: 15, color: Color(0xFF64748B)),
+                          tooltip: 'Item options',
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          onSelected: (action) {
+                            if (action == 'edit') {
+                              _showEditItemModal(context, item);
+                            } else if (action == 'delete') {
+                              _showDeleteItemConfirm(context, item);
+                            }
+                          },
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit_outlined, size: 15, color: Color(0xFF64748B)),
+                                  SizedBox(width: 8),
+                                  Text('Edit item', style: TextStyle(fontSize: 13)),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFDC2626)),
+                                  SizedBox(width: 8),
+                                  Text('Delete item', style: TextStyle(fontSize: 13, color: Color(0xFFDC2626))),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -1451,7 +1508,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
             title: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Add Service', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const Text('New Service', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                 IconButton(
                   icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
                   onPressed: () => Navigator.pop(ctx),
@@ -1676,6 +1733,37 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 _showSuccess('Deleted category "${cat['title']}"');
               } else {
                 _showError(provider.error ?? 'Could not delete category');
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteItemConfirm(BuildContext context, Map<String, dynamic> item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        content: Text('Are you sure you want to delete "${item['name']}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final provider = context.read<AppProvider>();
+              final ok = await provider.deleteGarmentItem('${item['id']}');
+              if (ok) {
+                _showSuccess('Deleted item "${item['name']}"');
+              } else {
+                _showError(provider.error ?? 'Could not delete item');
               }
             },
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),

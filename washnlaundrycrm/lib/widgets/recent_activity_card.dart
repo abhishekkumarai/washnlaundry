@@ -67,15 +67,12 @@ class RecentActivityCard extends StatelessWidget {
             )
           : SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 620),
-                child: Column(
-                  children: [
-                    _headerRow(),
-                    const SizedBox(height: 4),
-                    for (final order in orders) _dataRow(context, order),
-                  ],
-                ),
+              child: Column(
+                children: [
+                  _headerRow(),
+                  const SizedBox(height: 4),
+                  for (final order in orders) _dataRow(context, order),
+                ],
               ),
             ),
     );
@@ -94,7 +91,7 @@ class RecentActivityCard extends StatelessWidget {
         children: const [
           SizedBox(width: 58, child: Text('TIME', style: style)),
           SizedBox(width: 118, child: Text('ORDER', style: style)),
-          Expanded(child: Text('CUSTOMER', style: style)),
+          SizedBox(width: 170, child: Text('CUSTOMER', style: style)),
           SizedBox(width: 12),
           SizedBox(width: 110, child: Text('TYPE', style: style)),
           SizedBox(width: 80, child: Text('PAYMENT', style: style)),
@@ -142,7 +139,8 @@ class RecentActivityCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Expanded(
+              SizedBox(
+                width: 170,
                 child: Text(
                   order.customerName,
                   overflow: TextOverflow.ellipsis,
@@ -196,12 +194,15 @@ class RecentActivityCard extends StatelessWidget {
                       children: [
                         Icon(Icons.circle, size: 5, color: statusColor(order.status)),
                         const SizedBox(width: 4),
-                        Text(
-                          order.statusLabel,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: statusColor(order.status),
+                        Flexible(
+                          child: Text(
+                            order.statusLabel,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: statusColor(order.status),
+                            ),
                           ),
                         ),
                       ],

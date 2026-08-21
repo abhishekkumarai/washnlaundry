@@ -295,11 +295,21 @@ class Order(models.Model):
         return f'{prefix}-{seq:05d}'
 
     def mark_status(self, new_status, when=None, note=''):
-        """Set status, stamp the matching timeline field, and log the change."""
+        """Set status, stamp the matching timeline field, and log the change.
+
+        The stamp is always refreshed, including on a revisit (e.g. Ready
+        walked back to Processing and forward to Ready again) — the step bar
+        reads these fields, and a stale first-arrival timestamp next to a
+        Timeline that shows the revisit happened moments ago is exactly the
+        "update and the audit log don't match" report this fixes. Every
+        transition, revisit included, is still preserved in full in
+        `audit_log` below; only the single-timestamp-per-stage summary now
+        always reflects the most recent arrival.
+        """
         self.status = new_status
         field = self.STATUS_TIMESTAMP_FIELD.get(new_status)
         at = when or timezone.now()
-        if field and not getattr(self, field):
+        if field:
             setattr(self, field, at)
         self.save()
         self.audit_log.create(

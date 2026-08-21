@@ -578,3 +578,138 @@ entry with correct `detail` text.
 Django 160/160 (unchanged pass rate, model/view changes covered by existing
 `OrderTimelineTests`), Flutter 237/237, `flutter analyze` still the same 41
 info-level lints, no new errors.
+
+## Also added: `docker compose` seeding gotcha, documented in CLAUDE.md
+
+`backend/Dockerfile`'s `CMD` only runs `migrate --noinput`, never `seed_db.py`.
+"`docker compose up --build` is genuinely the whole command" was only true in
+practice because `db.sqlite3` is bind-mounted, so a machine that had already
+run local dev once had a seeded file sitting there for Docker to reuse. A
+genuinely fresh clone gets a migrated-but-empty shop. Documented in
+`CLAUDE.md`'s "Running it" section with the fix (`docker compose exec backend
+python seed_db.py`, or `python seed_db.py` before ever starting Docker).
+Confirmed live: `docker compose up --build` against the already-seeded host
+db came up with 15 orders and a working `/api/orders/` proxy through nginx.
+
+## Point 1 fixed — Recent activity's "broken alignment" was a real RenderFlex crash
+
+The user re-flagged `washnlaundrycrm/wip.md` point 1 ("alignment... needs
+attention") as still not done after an earlier pass had marked it fixed on
+the strength of a live click-through test alone — alignment itself was never
+actually exercised with real order data. This time: browser automation could
+scroll the real app.laundrybill.com tab fine but was a no-op against our
+Flutter build's canvas across ~10 attempts (wheel at multiple
+coordinates/amounts, Page Down, End, drag, window resize) — a tooling
+limitation, not a rebuttal of the bug report. Switched to a Flutter widget
+test rendering `RecentActivityCard` directly with real `OrderModel` data,
+which had **zero** prior test coverage anywhere in the suite.
+
+That surfaced the real bug immediately: `_headerRow()`/`_dataRow()` in
+`recent_activity_card.dart` wrapped the CUSTOMER column in
+`Expanded(child: Text(...))` inside a *horizontally-scrolling*
+`SingleChildScrollView` — which hands its child unbounded width, and
+`Expanded` cannot compute a flex share of unbounded space. Flutter threw
+`RenderFlex children have non-zero flex but incoming width constraints are
+unbounded` on every row, every frame (23 exceptions in the first captured
+run) — exactly what "left alignment is broken" looks like when the renderer
+swallows a RenderFlex error per-frame instead of crashing the app outright.
+A second, smaller bug in the same widget: the STATUS pill's label had no
+overflow handling and clipped for longer labels ("Out for Delivery").
+
+**Fix**: swapped the CUSTOMER `Expanded` for a fixed-width
+`SizedBox(width: 170)`, matching every other column in the table (all were
+already fixed-width — CUSTOMER was the only flex one), and removed the
+`ConstrainedBox(minWidth: 620)` that had papered over the underlying
+constraint problem without fixing it. Wrapped the STATUS label in
+`Flexible(... overflow: ellipsis)`. Added
+`test/recent_activity_card_test.dart` — asserts zero layout exceptions, that
+the CUSTOMER column's left edge matches between the header and every data
+row (the actual "left alignment" contract), and that the longest real status
+label renders without overflow. Rebuilt the PNG-capture approach twice
+(direct `toImage()`, then `tester.runAsync()`-wrapped) to actually *see* the
+before/after — both hung indefinitely in this environment (a `flutter test`
+image-encoding hang, unrelated to the widget code) and were abandoned in
+favor of the geometry-assertion test above, which is more rigorous than a
+screenshot anyway since it survives future refactors.
+
+Full Flutter suite: 238/238 (237 + the new test). `flutter analyze`: 46
+issues, same baseline plus 5 new `prefer_const_constructors` infos in the new
+test file — no errors, no new warnings elsewhere.
+
+Docker rebuilt afterward (`docker compose up --build`) so the running
+containers serve this fix plus the earlier `OrderAuditLog` work — both had
+been sitting stale in the containers since before either fix landed.
+
+While reviewing `washnlaundrycrm/wip.md` for this, found the user had
+directly edited it with new annotations. Both are now fixed:
+
+## Point 5.1 fixed — Staff KPI cards were a second, redundant set of filters
+
+`5.1` now adds *"Keep the above filter by click but remove the below ones"*.
+`staff_screen.dart` had two separate controls doing the same job: the
+sub-tabs bar (All Staff / Active / Inactive / App Logins / Delivery Agents,
+the "above" one) and, below it, 4 of the 5 KPI stat cards *also* wired with
+`onTap: () => setState(() => _selectedTab = N)` — a second, undocumented way
+to change the filter, with no visual indication either control was linked to
+the other. Removed the four `onTap` lines from the KPI card row (`onTap` on
+`_buildKpiCard` was already optional, so this is a pure deletion — no
+signature change). The cards are now purely informational stats; only the
+sub-tab bar filters. Added
+`test/screens_test.dart`'s *"the KPI cards are informational, not a second
+set of filters"* — taps the Inactive KPI card (found by icon, since its
+label text is shared with the sub-tab above it) and asserts nothing
+filters, then taps the sub-tab with the same label and confirms it does.
+
+## Point 3.1 fixed — the step bar could show a stale timestamp next to a fresher Timeline
+
+`3.1` now adds *"The update and the audit logs dont match"*. Reproduced live
+against the rebuilt Docker backend: the "Update Status" dialog
+(`order_detail_screen.dart`) lists all 4 step-bar stages as selectable
+regardless of the order's current stage, so walking an order backward (e.g.
+Ready → Processing) and forward again (→ Ready) is a real, reachable path,
+not a synthetic edge case. `Order.mark_status`'s old guard
+(`if field and not getattr(self, field)`) only stamped a stage's timestamp
+on its *first* arrival — so after a revisit, `ready_at` still read the
+original arrival time from the first pass, while `audit_log` correctly
+logged the revisit's `PROCESSING`→`READY` entries with today's timestamp.
+The step bar (driven by `stageTimestamps`) and the Timeline & Audit Log
+panel (driven by `audit_log`) told two different stories for the same order.
+
+**Fix**: `mark_status` now always refreshes the stage timestamp, revisit or
+not — nothing is lost, since every transition (including revisits) was
+already being preserved in full in `audit_log`; only the single
+summary-timestamp-per-stage now always reflects the *most recent* arrival
+rather than the first. `backend/api/tests.py`'s
+`test_stamps_are_not_overwritten_on_revisit` (asserting the old, now-wrong
+behavior) became `test_stamps_refresh_on_revisit` (asserts the timestamp
+advances), plus a new `test_every_transition_is_logged_even_a_revisit`
+locking in that `audit_log` still records both the detour and the return.
+Live-verified: revisited a seeded order (Ready → Processing → Ready) against
+the rebuilt backend and confirmed `ready_at` now exactly matches
+`audit_log[-1].created_at`.
+
+### Suites after this pass
+Django 161/161 (+1 for the new revisit-logging test). Flutter 239/239
+(+1 for the Staff KPI test). `flutter analyze`: same 46-issue baseline, no
+new errors. Docker rebuilt (`docker compose up --build`) so both containers
+serve every fix from this session.
+
+## Point 6.1 re-verified against the rebuilt Docker containers
+
+The go_router migration that fixed `/new-order` not existing was implemented
+and committed earlier this session, but never actually verified against the
+rebuilt Docker containers afterward. Did that now: deep-linked to
+`/new-order` (rendered correctly, item grid + cart panel) and hard-reloaded
+it — stayed put rather than resetting to `/`, the exact original bug.
+Went further and checked the two other routes the same migration touched:
+`/orders` deep-links with real data (`15 Total`, all filter chips, full
+table), and clicking into an order navigates to a real per-record URL
+(`/orders/<uuid>`, e.g. `/orders/4dad5dcf-485f-4cc7-b947-9c3a1c4882d9`) that
+also survives a hard reload and re-resolves the same order. All three
+confirmed live via the browser, not just by reading the router code.
+
+(Browser automation was flaky against this Flutter build again during this
+check — screenshots intermittently timed out and network-request status
+lagged behind reality by several seconds. Waiting longer and retrying
+resolved it every time; nothing here pointed to an actual app bug, unlike
+the `RecentActivityCard` investigation earlier in this file.)

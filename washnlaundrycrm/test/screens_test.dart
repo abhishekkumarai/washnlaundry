@@ -204,6 +204,39 @@ void main() {
       );
     });
 
+    testWidgets('the KPI cards are informational, not a second set of filters',
+        (tester) async {
+      // The KPI row used to duplicate the sub-tab bar's filtering via its own
+      // onTap, so there were two different controls doing the same job.
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: [
+          ...roster,
+          const StaffModel(
+            id: '3',
+            name: 'Suresh Yadav',
+            role: 'Washer',
+            phone: '9900112233',
+            status: 'INACTIVE',
+          ),
+        ]);
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      // Default view (All Staff, Show Inactive unticked) hides Suresh.
+      expect(find.text('Suresh Yadav'), findsNothing);
+
+      // Tapping the "Inactive" KPI card — found by its icon, since its label
+      // shares text with the sub-tab above it — must not filter anything.
+      await tester.tap(find.byIcon(Icons.person_off_outlined));
+      await tester.pump();
+      expect(find.text('Suresh Yadav'), findsNothing);
+
+      // The sub-tab bar is still the one control that does filter.
+      await tester.tap(find.text('Inactive').first);
+      await tester.pump();
+      expect(find.text('Suresh Yadav'), findsOneWidget);
+    });
+
     testWidgets('the add dialog has no active toggle', (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
       await tester.pumpWidget(host(provider, const StaffScreen()));

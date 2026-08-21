@@ -70,12 +70,26 @@ class OrderTimelineTests(TestCase):
         self.assertEqual(self.order.status, OrderStatus.PROCESSING)
         self.assertIsNotNone(self.order.processing_at)
 
-    def test_stamps_are_not_overwritten_on_revisit(self):
+    def test_stamps_refresh_on_revisit(self):
+        # A stale first-arrival timestamp next to a Timeline & Audit Log that
+        # shows the revisit happening moments ago is exactly what "the update
+        # and the audit logs don't match" reported — the stamp must track the
+        # most recent arrival, not just the first one.
         self.order.mark_status(OrderStatus.READY)
         first = Order.objects.get(pk=self.order.pk).ready_at
         self.order.mark_status(OrderStatus.PROCESSING)
         self.order.mark_status(OrderStatus.READY)
-        self.assertEqual(Order.objects.get(pk=self.order.pk).ready_at, first)
+        self.assertGreater(Order.objects.get(pk=self.order.pk).ready_at, first)
+
+    def test_every_transition_is_logged_even_a_revisit(self):
+        self.order.mark_status(OrderStatus.READY)
+        self.order.mark_status(OrderStatus.PROCESSING)
+        self.order.mark_status(OrderStatus.READY)
+        statuses = list(self.order.audit_log.values_list('status', flat=True))
+        self.assertEqual(
+            statuses,
+            [OrderStatus.READY, OrderStatus.PROCESSING, OrderStatus.READY],
+        )
 
     def test_every_status_has_a_timestamp_field(self):
         for status in OrderStatus.values:

@@ -41,6 +41,25 @@ The trade-off is speed: the first build pulls a multi-GB SDK image and compiles 
 scratch. **For frontend work, use `flutter run -d chrome` below instead** — hot reload,
 seconds not minutes. Reach for Docker to verify the real artefact, not to iterate.
 
+**On a genuinely fresh clone, that command alone gives you an empty shop.**
+`backend/Dockerfile`'s `CMD` only runs `python manage.py migrate --noinput` before
+starting the server — it never seeds. What makes "the whole command" true in practice is
+that `docker-compose.yml` bind-mounts `./backend:/app`, so the container's SQLite file
+*is* `backend/db.sqlite3` on the host; once you've run `python seed_db.py` locally once
+(see below), every subsequent `docker compose up` — with or without `--build` — reuses
+that already-seeded file. `backend/db.sqlite3` is gitignored, so a fresh clone has none
+of that history. Seed it once, either way:
+
+```bash
+docker compose exec backend python seed_db.py   # container already running
+# or, before ever starting Docker:
+cd backend && python seed_db.py
+```
+
+Re-running `seed_db.py` is always safe to reach for again later — it wipes and reseeds
+every table, so a container you've been poking at in a broken state can be reset the same
+way.
+
 Local dev without Docker:
 
 ```bash
