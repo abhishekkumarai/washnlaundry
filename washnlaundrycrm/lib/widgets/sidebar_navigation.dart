@@ -318,21 +318,11 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
   }
 
   Widget _profileFooter(BuildContext context, {required bool expanded}) {
-    // Real when Google Sign-In is configured (main.dart drops back to
-    // LoginScreen once AuthProvider.isSignedIn flips) — a snackbar otherwise,
-    // since there is no session to end.
+    // router.dart's redirect reacts to AuthProvider.isSignedIn flipping and
+    // sends the app back to /login — true for a real Google session or a
+    // Demo Mode one, since AuthProvider.signOut() clears either.
     void signOut() {
-      if (AuthProvider.isConfigured) {
-        context.read<AuthProvider>().signOut();
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Logged out of LaundryBill'),
-          backgroundColor: _muted,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      context.read<AuthProvider>().signOut();
     }
 
     // The shop from `/api/shops/`. These used to be the literals 'AK' and

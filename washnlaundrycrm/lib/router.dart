@@ -163,16 +163,16 @@ List<RouteBase> appRoutes() => [
 
 /// The real router, wrapping [appRoutes] with the auth gate.
 ///
-/// `redirect`/`refreshListenable` reproduce exactly what `main.dart` used to
-/// do inline: an unconfigured build (no `GOOGLE_CLIENT_ID`) skips the gate
-/// entirely, so the zero-config `docker compose up` / `flutter run` workflow
-/// CLAUDE.md documents is unaffected; a configured-but-signed-out visit is
-/// sent to `/login`; `/login` itself redirects away once signed in.
+/// `redirect`/`refreshListenable` gate purely on [AuthProvider.isSignedIn]: a
+/// signed-out visit is sent to `/login`; `/login` itself redirects away once
+/// signed in. Google Sign-In and `AuthProvider.signInAsDemo()` are both valid
+/// ways to satisfy that — the gate applies the same whether or not
+/// `GOOGLE_CLIENT_ID` is configured, so Demo Mode works, and Sign Out, in
+/// every local run.
 GoRouter buildRouter(AuthProvider auth) => GoRouter(
       initialLocation: '/dashboard',
       refreshListenable: auth,
       redirect: (context, state) {
-        if (!AuthProvider.isConfigured) return null;
         if (auth.initializing) return null;
         final loggingIn = state.matchedLocation == '/login';
         if (!auth.isSignedIn) return loggingIn ? null : '/login';

@@ -62,13 +62,16 @@ class WashNLaundryCrmApp extends StatelessWidget {
       ),
       routerConfig: router,
       // Overlays a spinner in place of whatever route matched underneath
-      // while Google auth is still restoring a session — reproduces the old
+      // while AuthProvider is still restoring a session — reproduces the old
       // pre-router "spinner Scaffold instead of home:" behaviour, since
       // go_router's own `redirect` can only choose *not* to redirect during
-      // this state, not suppress rendering the matched route itself.
+      // this state, not suppress rendering the matched route itself. This
+      // restore is real even when Google isn't configured: a Demo Mode
+      // sign-in is persisted and needs the same SharedPreferences read on
+      // every reload.
       builder: (context, child) {
         final auth = context.watch<AuthProvider>();
-        if (AuthProvider.isConfigured && auth.initializing) {
+        if (auth.initializing) {
           return const Scaffold(
             backgroundColor: Color(0xFFF8FAFC),
             body: Center(child: CircularProgressIndicator()),

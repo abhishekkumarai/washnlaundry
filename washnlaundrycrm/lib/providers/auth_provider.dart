@@ -36,29 +36,30 @@ class AuthProvider extends ChangeNotifier {
   String? get error => _error;
 
   AuthProvider() {
-    if (isConfigured) {
-      _init();
-    } else {
-      _initializing = false;
-    }
+    _init();
   }
 
   Future<void> _init() async {
     try {
+      // Restoring a persisted session (Demo Mode or Google) needs this read
+      // regardless of `isConfigured` — a Demo Mode sign-in must survive a
+      // page reload even when there's no Google client ID to restore via.
       final prefs = await SharedPreferences.getInstance();
       _isPersistedSignedIn = prefs.getBool('is_signed_in') ?? false;
       _persistedEmail = prefs.getString('user_email');
       _persistedName = prefs.getString('user_name');
 
-      await _googleSignIn.initialize(clientId: _clientId);
-      _googleSignIn.authenticationEvents.listen(_handleEvent, onError: (e) {
-        _error = _messageFor(e);
-        notifyListeners();
-      });
-      // Silently restores a still-live Google session — the equivalent of
-      // the real app's `onAuthStateChanged` firing on a page reload, rather
-      // than forcing every reload back through the sign-in button.
-      await _googleSignIn.attemptLightweightAuthentication();
+      if (isConfigured) {
+        await _googleSignIn.initialize(clientId: _clientId);
+        _googleSignIn.authenticationEvents.listen(_handleEvent, onError: (e) {
+          _error = _messageFor(e);
+          notifyListeners();
+        });
+        // Silently restores a still-live Google session — the equivalent of
+        // the real app's `onAuthStateChanged` firing on a page reload, rather
+        // than forcing every reload back through the sign-in button.
+        await _googleSignIn.attemptLightweightAuthentication();
+      }
     } on GoogleSignInException catch (e) {
       _error = _messageFor(e);
     } catch (_) {
@@ -140,7 +141,9 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    await _googleSignIn.signOut();
+    if (isConfigured) {
+      await _googleSignIn.signOut();
+    }
     _account = null;
     _isPersistedSignedIn = false;
     _persistedEmail = null;

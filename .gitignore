@@ -5,6 +5,12 @@
 # in the repo at all; delete it once it's no longer needed for reference.
 client_secret_*.json
 
+# docker-compose.yml reads GOOGLE_CLIENT_ID from this automatically — copy
+# .env.example to .env and fill it in once you have a real Client ID.
+# Not a secret (OAuth Client IDs for web apps are public), but kept out of
+# the repo anyway since it's local machine/deploy config, not shared code.
+.env
+
 # ── Python / Django ───────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
