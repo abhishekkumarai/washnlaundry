@@ -1320,3 +1320,190 @@ before and after):
   confirmed the sidebar dot turned grey and the header pill read
   "Inactive" in grey, both correctly reactive to the real flag. Reverted
   the PATCH and reseeded afterward; no lasting data changes.
+
+---
+
+## Session of 2026-08-25
+
+Five separate asks, landed as four commits, then a production deploy.
+
+### Login screen: "Sign in with mobile number instead" disabled, not hidden
+
+Asked to keep the link visible (it matches the real login page's layout)
+but make it do nothing, marking it as future work rather than a working
+placeholder. `login_screen.dart`'s `InkWell` (which called
+`_notAvailable('Mobile number sign-in')`, popping a toast) is now a plain
+`Text` in `sidebar_navigation.dart`'s existing disabled-item grey
+(`Color(0xFFCBD5E1)`) — no `onTap`, no ripple, no new color introduced.
+Live-verified in the rebuilt Docker frontend: click does nothing, no
+toast; `Forgot password?` beside it still shows its own toast, unchanged.
+While in there, also live-tested Sign In (Demo Mode → `/dashboard` with
+real backend data) and Sign Out (→ `/login`, survives a reload) end to
+end. One tooling note: after a Docker rebuild, Chrome kept serving a
+stale `main.dart.js` from its disk cache despite normal navigation and
+even a `Ctrl+Shift+R`-style reload — had to force it with
+`fetch(url, {cache:'reload'})` from the page console before a plain
+`location.reload()` picked up the new build. Worth remembering next time
+a rebuild doesn't seem to show up in the browser.
+
+### Two commits landed from the previous session's uncommitted work
+
+Prior session had left staff-wages-to-monthly and the login/auth rework
+sitting uncommitted (see the tail end of the previous entries above this
+one — the "Both TODO items fixed" pass and everything after it up through
+the Google Sign-In section were still unstaged when this session opened).
+Committed as:
+
+- `80253bf` — `Shop.default_daily_wage`/`Staff.daily_wage` →
+  `default_monthly_wage`/`monthly_wage` (migration 0012), payroll deriving
+  a per-day rate from the paid month's actual day count instead of a flat
+  daily number, `Staff.is_delivery_agent` dropped, Staff screen's sub-tabs
+  cut from 5 to 3, and the sub-tab row's alignment gap fixed (`ListView`
+  instead of `SingleChildScrollView(child: Row(...))`, which was handing
+  its child unbounded width and letting the parent Column center the
+  shrink-wrapped result).
+- `27768b1` — login screen rebuilt to match the real
+  `app.laundrybill.com/login` (Email/Password fields, Sign In/Create
+  Account tabs, Forgot password?), the auth gate made unconditional (no
+  more `isConfigured` bypass — Demo Mode is the way in when Google isn't
+  configured, so `docker compose up` / `flutter run` now always show
+  `/login` first), plus the mobile-number-link fix above.
+
+### `CLAUDE.md`'s stale auth claim fixed — `14ee157`
+
+The Authentication section still said "a build with no `GOOGLE_CLIENT_ID`
+skips the login gate entirely," which stopped being true the moment
+`27768b1` landed. Rewrote the section to describe both real sign-in paths
+(Google when configured, Demo Mode always), how the Email/Password UI
+relates to `signInAsDemo` (no backend to check those fields against), and
+where `GOOGLE_CLIENT_ID` actually comes from per workflow (`.env` for
+Docker via `docker-compose.yml`'s build arg, `--dart-define` for
+`flutter run`).
+
+### Customers/expenses edit+delete, salary payment history shown — `90ccd6f`
+
+Three items from the CLAUDE.md backlog, asked together. None needed a
+backend change — `/customers/`, `/expenses/` and `/salary-payments/` were
+already full `ModelViewSet` CRUD; the frontend had just never called
+anything past POST.
+
+- Customers and Expenses both gained a row-level ⋮ menu (Edit/Delete),
+  the same `PopupMenuButton` pattern Services already uses for catalogue
+  items. Both screens' Add dialogs became a single add/edit dialog
+  (`existing` null vs non-null), pre-filling the record's own values for
+  Edit. Deleting a customer is safe — `Order.customer` is `SET_NULL`, so
+  past orders keep their own snapshotted name/phone and just lose the
+  link.
+- Payroll gained a "History" link next to "Record Payment" opening a
+  dialog that lists a staff member's full `SalaryPayment` ledger across
+  *every* month, not just the one currently selected — new
+  `SalaryPaymentModel`, `ApiService.fetchSalaryPayments`,
+  `AppProvider.fetchSalaryHistory`, all reading `/salary-payments/?staff=`.
+
+Live-verified against the rebuilt Docker frontend: edited a customer's
+area and watched the PATCH round-trip into the table; deleted an expense
+and watched entries/totals/chips update; opened History on a staff member
+and saw a payment from a *previous* month that had never been visible
+anywhere in the UI before.
+
+### Test coverage raised to ~83%, one flaky backend test fixed — `da7c84d`
+
+Asked for 80% coverage. Baseline was 76.6% line coverage
+(`flutter test --coverage` / `lcov.info`), with real files — not edge
+cases, whole files — never touched by any test: `router.dart` (the actual
+`buildRouter`/`appRoutes`, as opposed to the synthetic stand-in
+`test/support/router_test_utils.dart` provides for isolated widget pumps),
+`dashboard_screen.dart` and every side panel it composes
+(`QuickScanCard`, `NeedsAttentionCard`, `OrderChannelsCard`,
+`StaffAttendanceCard`, `StoreHealthCard`, `RevenueAnalyticsCard`), and
+most of `AppProvider`/`ApiService`'s own methods — every prior test only
+ever exercised the network-free getters (`ordersForFilter`,
+`filteredOrders`, counters).
+
+There's still no mock HTTP client in this suite. The insight that unlocked
+most of the gain: with no server reachable in a `flutter test` VM run,
+`ApiService._send`'s catch-all turns the platform error ("no host
+specified in URI") into a real `ApiException` almost instantly — and
+every `AppProvider` method already has a `try { ... } on ApiException`
+that handles it by setting an error and returning false/empty rather than
+throwing. Driving every method to that failure path, deliberately, is
+what it actually means for "fails gracefully" to hold — and it's fast and
+deterministic, unlike waiting on a real network call.
+
+New files: `router_test.dart` (the real auth gate — signed-out → `/login`,
+Demo Mode in, sign-out back out — plus every section route and all three
+states `/orders/:id` can resolve to), `dashboard_screen_test.dart`,
+`app_provider_coverage_test.dart`, `api_service_test.dart`,
+`panel_card_test.dart`, `load_state_test.dart`,
+`google_signin_button_test.dart`. `login_screen_test.dart` gained
+`signInAsDemo`/`signOut` persistence tests, not just the
+already-covered unconfigured-build guard.
+
+Two things learned the hard way:
+
+- `pumpAndSettle()` hangs on any route that renders `SidebarNavigation`
+  through the *real* `MaterialApp.router` (works fine through a plain
+  `MaterialApp` in every other test file) — something about
+  `AnimatedContainer` combined with go_router's own page transition never
+  reaches Flutter's idea of "settled" in this harness. Every router test
+  uses a bounded `pump()` + `pump(Duration)` pair instead, same fix this
+  session already knew from the Payroll History dialog and the
+  `RecentActivityCard` investigation two sessions ago.
+- A `WashNLaundryCrmApp` (`main.dart`) widget test was attempted and
+  dropped: `GoogleFonts.ibmPlexSansTextTheme` hung the suite for minutes,
+  even with `GoogleFonts.config.allowRuntimeFetching = false` set before
+  first use. Not worth chasing further for one small file — `main()`
+  itself was always going to be untested anyway (conventional for a
+  Flutter entrypoint), and this drops just the thin `MaterialApp.router`
+  wrapper around it.
+
+Also fixed, found while adding backend coverage as a sanity check
+(already at 97% — no backend tests needed for the goal, but a run
+surfaced a real flake): `test_stamps_refresh_on_revisit` called
+`mark_status` three times back to back with no explicit `when`, so all
+three could land on the same `timezone.now()` microsecond and "refreshed
+to something later" failed comparing a value to itself. Fixed by passing
+explicit, one-second-apart `when`s — `mark_status` already accepts one
+for exactly this kind of backdating (`seed_db.py` uses it the same way).
+Reran the suite three times afterward to confirm it's actually fixed, not
+just not-flaked-this-time.
+
+Final numbers: Flutter lcov 82.9% (was 76.6%), 387/387 tests, `flutter
+analyze` clean at the same 56-issue baseline. Django 161/161, stable
+across repeated runs (was flaking roughly 1 in 3 before the fix).
+
+### Deployed to production — Vercel (frontend) confirmed manual, Render (backend) confirmed already automatic
+
+Asked to push the frontend to Vercel after the coverage work. Built
+`flutter build web --release --dart-define=API_BASE_URL=...` — the value
+wasn't recorded anywhere in the repo (split-host deploys have always been
+override-at-build-time per CLAUDE.md, and nothing here writes down what
+that override *is*), so found it by fetching the *currently live* site's
+`main.dart.js` and grepping for a baked-in absolute URL:
+`https://laundrybill-backend.onrender.com/api`. Built and deployed that
+exact bundle with `vercel deploy build/web --prod` from
+`washnlaundrycrm/` (where `.vercel/project.json` already links this
+directory to the `washnlaundry-crm` project). Confirmed live: `200`,
+correct API URL baked into the served JS, deployment `READY` and tagged
+to commit `da7c84d`.
+
+Asked directly afterward whether the backend was also deployed to Render.
+It was not touched manually, and didn't need to be: `render services`
+shows `laundrybill-backend` has `autoDeploy: "yes"` / `autoDeployTrigger:
+"commit"` on `branch: "main"`, so both of this session's pushes already
+triggered their own Render deploys automatically. `render deploys list`
+confirmed the latest is `live`, on commit `da7c84d` — matching what was
+just pushed — and a direct `curl` to `/api/shops/` returned `200` in
+about a second once past the free-tier cold start (the first attempt
+timed out at 15s, which reads exactly like a hung backend; it wasn't —
+Render's free web services sleep after inactivity and take significantly
+longer than that to wake on the next request).
+
+One red herring chased down while checking this: `render services` also
+listed a Postgres instance (`laundrypro-db`) in `suspended` status with
+`suspenders: ["billing"]`. Traced it to a *different* service entirely —
+`laundrypro-api`, an unrelated project in the same Render account (name
+collision with this project's "laundrybill" only by way of a shared
+prefix). This project's backend uses SQLite per CLAUDE.md and has no
+Postgres dependency at all, so the suspension is a non-issue here —
+worth remembering only so it isn't mistaken for a real problem again.
