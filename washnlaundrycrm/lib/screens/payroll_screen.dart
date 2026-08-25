@@ -14,7 +14,8 @@ import '../utils/money.dart';
 /// it can be captured and this screen checked against it.
 ///
 /// Every figure comes from `/api/payroll/`: wages earned are the attendance
-/// register times the daily wage, and what was paid comes from SalaryPayment.
+/// register times the monthly wage divided into a per-day rate, and what was
+/// paid comes from SalaryPayment.
 class PayrollScreen extends StatefulWidget {
   const PayrollScreen({super.key});
 
@@ -279,7 +280,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
                 children: [
                   Text(entry.staffName,
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                  Text('${entry.role} • ${Money.symbol}${entry.dailyWage.round()}/day',
+                  Text('${entry.role} • ${Money.symbol}${entry.monthlyWage.round()}/month',
                       style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                 ],
               ),

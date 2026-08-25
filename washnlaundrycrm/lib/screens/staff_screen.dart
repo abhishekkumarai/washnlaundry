@@ -12,9 +12,11 @@ class StaffScreen extends StatefulWidget {
 }
 
 class _StaffScreenState extends State<StaffScreen> {
-  int _selectedTab = 0; // 0: Roster, 1: App Logins
+  int _selectedTab = 0; // 0: All Staff, 1: Active, 2: Inactive
   String _searchQuery = '';
   bool _showInactive = false;
+
+  static const _subTabTitles = ['All Staff', 'Active', 'Inactive'];
 
   /// Roster view-models rebuilt from the provider on each build, so adds and
   /// edits reflect what the backend actually stored.
@@ -27,9 +29,8 @@ class _StaffScreenState extends State<StaffScreen> {
               'name': s.name,
               'role': s.role,
               'phone': s.phone,
-              'wage': s.dailyWage,
+              'wage': s.monthlyWage,
               'status': s.status,
-              'isDriver': s.isDeliveryAgent,
               'hasAppLogin': s.hasAppLogin,
             })
         .toList();
@@ -52,24 +53,6 @@ class _StaffScreenState extends State<StaffScreen> {
             : 'Could not update ${member['name']}: ${provider.error ?? 'unknown error'}'),
         backgroundColor: ok ? const Color(0xFF10B981) : const Color(0xFFDC2626),
       ),
-    );
-  }
-
-  /// Grant or revoke access to the Staff / Delivery Agent app.
-  ///
-  /// There is no seat cap. This used to refuse a grant past
-  /// `Shop.team_login_limit`, but the live app has no plan tiers, so there was
-  /// nothing behind the limit it was enforcing.
-  Future<void> _toggleAppLogin(BuildContext context, Map<String, dynamic> member) async {
-    final granting = !(member['hasAppLogin'] as bool);
-
-    await _patchStaff(
-      context,
-      member,
-      {'has_app_login': granting},
-      granting
-          ? 'App access granted to ${member['name']}'
-          : 'App access revoked for ${member['name']}',
     );
   }
 
@@ -103,12 +86,6 @@ class _StaffScreenState extends State<StaffScreen> {
         case 2: // Inactive
           matchesTab = s['status'] != 'ACTIVE';
           break;
-        case 3: // App Logins
-          matchesTab = s['hasAppLogin'] == true;
-          break;
-        case 4: // Delivery Agents
-          matchesTab = s['isDriver'] == true;
-          break;
       }
       return matchesSearch && matchesTab;
     }).toList();
@@ -122,7 +99,7 @@ class _StaffScreenState extends State<StaffScreen> {
     // 'Washer' and 600 here, so every shop opened this form on ours.
     final shopDefaults = context.read<AppProvider>();
     final defaultRole = shopDefaults.defaultStaffRole;
-    final defaultWage = shopDefaults.defaultDailyWage;
+    final defaultWage = shopDefaults.defaultMonthlyWage;
 
     final nameCtrl = TextEditingController(text: existing?['name'] as String? ?? '');
     final phoneCtrl = TextEditingController(text: existing?['phone'] as String? ?? '');
@@ -130,7 +107,6 @@ class _StaffScreenState extends State<StaffScreen> {
     final wageCtrl = TextEditingController(
       text: ((existing?['wage'] as num?) ?? defaultWage).toStringAsFixed(0),
     );
-    bool isDeliveryAgent = (existing?['isDriver'] as bool?) ?? false;
     bool isActive = (existing?['status'] as String?) != 'INACTIVE';
 
     showDialog(
@@ -207,7 +183,7 @@ class _StaffScreenState extends State<StaffScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Daily Wage (${Money.symbol})', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                            Text('Monthly Wage (${Money.symbol})', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
                             const SizedBox(height: 6),
                             TextField(
                               controller: wageCtrl,
@@ -226,21 +202,6 @@ class _StaffScreenState extends State<StaffScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: isDeliveryAgent,
-                        activeColor: const Color(0xFF1A4FD6),
-                        onChanged: (v) => setModalState(() => isDeliveryAgent = v ?? false),
-                      ),
-                      const Expanded(
-                        child: Text(
-                          'Mark as Delivery Agent / Driver',
-                          style: TextStyle(fontSize: 13, color: Color(0xFF334155)),
-                        ),
-                      ),
-                    ],
-                  ),
                   if (isEdit)
                     Row(
                       children: [
@@ -278,8 +239,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 'name': name,
                 'role': roleCtrl.text.trim().isEmpty ? defaultRole : roleCtrl.text.trim(),
                 'phone': phoneCtrl.text.trim(),
-                'daily_wage': double.tryParse(wageCtrl.text) ?? defaultWage,
-                'is_delivery_agent': isDeliveryAgent,
+                'monthly_wage': double.tryParse(wageCtrl.text) ?? defaultWage,
                 if (isEdit) 'status': isActive ? 'ACTIVE' : 'INACTIVE',
               };
               final ok = isEdit
@@ -315,11 +275,6 @@ class _StaffScreenState extends State<StaffScreen> {
   @override
   Widget build(BuildContext context) {
     _syncFromProvider(context.watch<AppProvider>());
-
-    final activeCount = _staffMembers.where((s) => s['status'] == 'ACTIVE').length;
-    final inactiveCount = _staffMembers.length - activeCount;
-    final appLoginsCount = _staffMembers.where((s) => s['hasAppLogin'] == true).length;
-    final driverCount = _staffMembers.where((s) => s['isDriver'] == true).length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -408,7 +363,7 @@ class _StaffScreenState extends State<StaffScreen> {
                       ElevatedButton.icon(
                         onPressed: () => _showStaffModal(context),
                         icon: const Icon(Icons.add, size: 16, color: Colors.white),
-                        label: const Text('+ Add Staff', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                        label: const Text('Add Staff', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1A4FD6),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -420,24 +375,26 @@ class _StaffScreenState extends State<StaffScreen> {
                   ),
                 ),
 
-                // Sub-Tabs Bar (Roster / Active / Inactive / App Logins / Delivery Agents)
+                // Sub-Tabs Bar (All Staff / Active / Inactive)
+                //
+                // ListView, not SingleChildScrollView(child: Row(...)): inside a
+                // horizontal scroll view a Row gets an unbounded max-width
+                // constraint and shrink-wraps to its content, and the parent
+                // Column's default CrossAxisAlignment.center then centers that
+                // narrow box — producing a large blank gap before "All Staff".
+                // ListView's RenderViewport always fills the available width
+                // instead, which is why orders_screen.dart's filter-chip row
+                // uses the same pattern.
                 Container(
                   color: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildSubTab(0, 'All Staff'),
-                        const SizedBox(width: 8),
-                        _buildSubTab(1, 'Active'),
-                        const SizedBox(width: 8),
-                        _buildSubTab(2, 'Inactive'),
-                        const SizedBox(width: 8),
-                        _buildSubTab(3, 'App Logins'),
-                        const SizedBox(width: 8),
-                        _buildSubTab(4, 'Delivery Agents'),
-                      ],
+                  child: SizedBox(
+                    height: 38,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _subTabTitles.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, i) => _buildSubTab(i, _subTabTitles[i]),
                     ),
                   ),
                 ),
@@ -448,55 +405,6 @@ class _StaffScreenState extends State<StaffScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Top 4 KPI Cards
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildKpiCard(
-                                icon: Icons.people_outline_rounded,
-                                iconBg: const Color(0xFFEEF2FF),
-                                iconColor: const Color(0xFF1A4FD6),
-                                val: '$activeCount',
-                                label: 'Active staff',
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildKpiCard(
-                                icon: Icons.person_off_outlined,
-                                iconBg: const Color(0xFFF1F5F9),
-                                iconColor: const Color(0xFF64748B),
-                                val: '$inactiveCount',
-                                label: 'Inactive',
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildKpiCard(
-                                icon: Icons.smartphone_rounded,
-                                iconBg: const Color(0xFFF3E8FF),
-                                iconColor: const Color(0xFFA855F7),
-                                val: '$appLoginsCount',
-                                label: 'App logins',
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: _buildKpiCard(
-                                icon: Icons.location_on_outlined,
-                                iconBg: const Color(0xFFE0F2FE),
-                                iconColor: const Color(0xFF0284C7),
-                                val: '$driverCount',
-                                label: 'Delivery agents',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        if (_selectedTab == 3)
-                          _buildAppLoginsTab(context)
-                        else
                         // Staff Grid / List
                         _filteredStaff.isEmpty
                             ? Container(
@@ -515,7 +423,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                         color: Color(0xFFF1F5F9),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: const Icon(Icons.people_outline_rounded, size: 36, color: Color(0xFF94A3B8)),
+                                      child: const Icon(Icons.person_rounded, size: 36, color: Color(0xFF94A3B8)),
                                     ),
                                     const SizedBox(height: 16),
                                     const Text('No staff members found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
@@ -554,7 +462,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                           Expanded(flex: 3, child: Text('STAFF MEMBER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
                                           Expanded(flex: 2, child: Text('ROLE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
                                           Expanded(flex: 2, child: Text('PHONE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-                                          Expanded(flex: 2, child: Text('DAILY WAGE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+                                          Expanded(flex: 2, child: Text('MONTHLY WAGE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
                                           Expanded(flex: 2, child: Text('STATUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
                                           SizedBox(width: 48),
                                         ],
@@ -619,8 +527,6 @@ class _StaffScreenState extends State<StaffScreen> {
                                                                 overflow: TextOverflow.ellipsis,
                                                                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                                                               ),
-                                                              if (s['isDriver'] == true)
-                                                                const Text('Delivery Agent', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: Color(0xFF0284C7), fontWeight: FontWeight.bold)),
                                                             ],
                                                           ),
                                                         ),
@@ -661,7 +567,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                                   Expanded(
                                                     flex: 2,
                                                     child: Text(
-                                                      '${Money.symbol}${(s['wage'] as num).toInt()} / day',
+                                                      '${Money.symbol}${(s['wage'] as num).toInt()} / month',
                                                       overflow: TextOverflow.ellipsis,
                                                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                                                     ),
@@ -771,193 +677,6 @@ class _StaffScreenState extends State<StaffScreen> {
     );
   }
 
-  /// "App Logins" tab: who can sign into the Staff / Delivery Agent apps.
-  /// Previously this tab rendered the roster verbatim, so it did nothing at all.
-  ///
-  /// The seat-usage meter that used to head this tab is gone with
-  /// `Shop.team_login_limit` — there are no plan tiers on the live app, so
-  /// "3 seats remaining on your plan" was measuring against nothing. A plain
-  /// count of who has access is all the data actually supports.
-  Widget _buildAppLoginsTab(BuildContext context) {
-    final withAccess = _staffMembers.where((m) => m['hasAppLogin'] == true).toList();
-    final used = withAccess.length;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Row(
-            children: [
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Team logins',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    Text('Who can sign in to the Staff and Delivery Agent apps',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8))),
-                  ],
-                ),
-              ),
-              Text('$used with access',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
-                  )),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Per-member access
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                  border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-                ),
-                child: const Row(
-                  children: [
-                    Expanded(flex: 3, child: Text('STAFF MEMBER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-                    Expanded(flex: 3, child: Text('APP', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-                    Expanded(flex: 2, child: Text('ACCESS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-                  ],
-                ),
-              ),
-              if (_filteredStaff.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 40),
-                  child: Text('No staff members found',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
-                )
-              else
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _filteredStaff.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, idx) {
-                    final member = _filteredStaff[idx];
-                    final hasAccess = member['hasAppLogin'] == true;
-                    final isAgent = member['isDriver'] == true;
-                    final name = member['name'] as String;
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 14,
-                                  backgroundColor: const Color(0xFFEEF2FF),
-                                  child: Text(
-                                    name.isEmpty ? '?' : name[0].toUpperCase(),
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(name,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                      Text(member['role'] as String,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8))),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            flex: 3,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  isAgent ? Icons.local_shipping_outlined : Icons.point_of_sale_outlined,
-                                  size: 15,
-                                  color: const Color(0xFF64748B),
-                                ),
-                                const SizedBox(width: 7),
-                                Flexible(
-                                  child: Text(
-                                    isAgent ? 'Delivery Agent app' : 'Staff app',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            flex: 2,
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              // The status label is part of the switch's hit
-                              // target, not decoration next to it.
-                              child: InkWell(
-                                onTap: () => _toggleAppLogin(context, member),
-                                borderRadius: BorderRadius.circular(20),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Switch(
-                                      value: hasAccess,
-                                      activeThumbColor: const Color(0xFF1A4FD6),
-                                      onChanged: (_) => _toggleAppLogin(context, member),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        hasAccess ? 'Enabled' : 'No access',
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: hasAccess ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildSubTab(int idx, String title) {
     final isSel = _selectedTab == idx;
     // InkWell, not GestureDetector — the latter gives no pointer cursor or
@@ -982,55 +701,6 @@ class _StaffScreenState extends State<StaffScreen> {
               fontWeight: isSel ? FontWeight.w600 : FontWeight.w500,
               color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF334155),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildKpiCard({
-    required IconData icon,
-    required Color iconBg,
-    required Color iconColor,
-    required String val,
-    required String label,
-    VoidCallback? onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        hoverColor: const Color(0xFFF8FAFC),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
-                child: Icon(icon, size: 22, color: iconColor),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(val, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    Text(
-                      label,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
         ),
       ),

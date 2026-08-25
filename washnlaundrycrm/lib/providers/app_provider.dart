@@ -156,8 +156,8 @@ class AppProvider extends ChangeNotifier {
   double get expressMultiplier =>
       (_shop?['express_multiplier'] as num?)?.toDouble() ?? 1.5;
 
-  double get defaultDailyWage =>
-      (_shop?['default_daily_wage'] as num?)?.toDouble() ?? 600.0;
+  double get defaultMonthlyWage =>
+      (_shop?['default_monthly_wage'] as num?)?.toDouble() ?? 18000.0;
 
   String get defaultStaffRole =>
       (_shop?['default_staff_role'] as String?)?.trim().isNotEmpty == true

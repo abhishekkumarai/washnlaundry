@@ -86,7 +86,7 @@ void main() {
         name: 'Ramesh Kumar',
         role: 'Head Washer',
         phone: '9711223344',
-        dailyWage: 650,
+        monthlyWage: 17000,
         hasAppLogin: true,
       ),
       const StaffModel(
@@ -94,8 +94,7 @@ void main() {
         name: 'Mohan Das',
         role: 'Delivery Driver',
         phone: '9933441122',
-        dailyWage: 580,
-        isDeliveryAgent: true,
+        monthlyWage: 15000,
         hasAppLogin: true,
       ),
     ];
@@ -126,67 +125,6 @@ void main() {
       expect(find.text('Save Changes'), findsOneWidget);
     });
 
-    testWidgets('App Logins tab shows access, not a copy of the roster',
-        (tester) async {
-      // This tab used to render the roster verbatim — it did nothing.
-      final provider = AppProvider(autoLoad: false)
-        ..seedForTest(staff: roster, shop: {'id': 1});
-      await tester.pumpWidget(host(provider, const StaffScreen()));
-      await tester.pump();
-
-      await tester.tap(find.text('App Logins'));
-      await tester.pump();
-
-      expect(find.text('Team logins'), findsOneWidget);
-      expect(find.text('2 with access'), findsOneWidget);
-      expect(find.text('Staff app'), findsOneWidget);
-      expect(find.text('Delivery Agent app'), findsOneWidget);
-      expect(find.byType(Switch), findsNWidgets(2));
-    });
-
-    testWidgets('there is no seat cap to measure against', (tester) async {
-      // The tab used to head itself with "N of M used" and "K seats remaining
-      // on your plan", against Shop.team_login_limit. There are no plan tiers
-      // on the live app, so the meter was measuring against nothing.
-      final provider = AppProvider(autoLoad: false)
-        ..seedForTest(staff: roster, shop: {'id': 1});
-      await tester.pumpWidget(host(provider, const StaffScreen()));
-      await tester.pump();
-
-      await tester.tap(find.text('App Logins'));
-      await tester.pump();
-
-      expect(find.textContaining('used'), findsNothing);
-      expect(find.textContaining('remaining on your plan'), findsNothing);
-      expect(find.byType(LinearProgressIndicator), findsNothing);
-    });
-
-    testWidgets('granting app access is never refused for want of a seat',
-        (tester) async {
-      // Two members already have access and a third does not. Under the old
-      // cap this combination was blocked outright; now it reaches the API.
-      final provider = AppProvider(autoLoad: false)
-        ..seedForTest(
-          staff: [
-            ...roster,
-            const StaffModel(id: '3', name: 'Geeta Devi', role: 'Dry Cleaning', phone: '9922334455'),
-          ],
-          shop: {'id': 1},
-        );
-      await tester.pumpWidget(host(provider, const StaffScreen()));
-      await tester.pump();
-
-      await tester.tap(find.text('App Logins'));
-      await tester.pump();
-
-      await tester.tap(find.byType(Switch).last);
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
-
-      expect(find.textContaining('Your plan includes'), findsNothing);
-      expect(find.textContaining('Revoke one or upgrade'), findsNothing);
-    });
-
     testWidgets('the edit dialog offers an active toggle', (tester) async {
       // Without this, "Show Inactive" could never match anything.
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
@@ -204,45 +142,12 @@ void main() {
       );
     });
 
-    testWidgets('the KPI cards are informational, not a second set of filters',
-        (tester) async {
-      // The KPI row used to duplicate the sub-tab bar's filtering via its own
-      // onTap, so there were two different controls doing the same job.
-      final provider = AppProvider(autoLoad: false)
-        ..seedForTest(staff: [
-          ...roster,
-          const StaffModel(
-            id: '3',
-            name: 'Suresh Yadav',
-            role: 'Washer',
-            phone: '9900112233',
-            status: 'INACTIVE',
-          ),
-        ]);
-      await tester.pumpWidget(host(provider, const StaffScreen()));
-      await tester.pump();
-
-      // Default view (All Staff, Show Inactive unticked) hides Suresh.
-      expect(find.text('Suresh Yadav'), findsNothing);
-
-      // Tapping the "Inactive" KPI card — found by its icon, since its label
-      // shares text with the sub-tab above it — must not filter anything.
-      await tester.tap(find.byIcon(Icons.person_off_outlined));
-      await tester.pump();
-      expect(find.text('Suresh Yadav'), findsNothing);
-
-      // The sub-tab bar is still the one control that does filter.
-      await tester.tap(find.text('Inactive').first);
-      await tester.pump();
-      expect(find.text('Suresh Yadav'), findsOneWidget);
-    });
-
     testWidgets('the add dialog has no active toggle', (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
 
-      await tester.tap(find.text('+ Add Staff'));
+      await tester.tap(find.text('Add Staff').first);
       await tester.pumpAndSettle();
 
       expect(
@@ -280,7 +185,7 @@ void main() {
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
 
-      await tester.tap(find.text('+ Add Staff'));
+      await tester.tap(find.text('Add Staff').first);
       await tester.pumpAndSettle();
 
       expect(find.text('Add Staff Member'), findsOneWidget);

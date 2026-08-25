@@ -48,7 +48,7 @@ void main() {
     test('fall back to the constants they replaced', () {
       final provider = AppProvider(autoLoad: false);
       expect(provider.expressMultiplier, 1.5);
-      expect(provider.defaultDailyWage, 600.0);
+      expect(provider.defaultMonthlyWage, 18000.0);
       expect(provider.defaultStaffRole, 'Washer');
     });
 
@@ -57,20 +57,20 @@ void main() {
         ..seedForTest(shop: {
           'id': 1,
           'express_multiplier': 2.0,
-          'default_daily_wage': 850.0,
+          'default_monthly_wage': 21000.0,
           'default_staff_role': 'Presser',
         });
       expect(provider.expressMultiplier, 2.0);
-      expect(provider.defaultDailyWage, 850.0);
+      expect(provider.defaultMonthlyWage, 21000.0);
       expect(provider.defaultStaffRole, 'Presser');
     });
 
-    testWidgets('Add Staff opens on the shop defaults, not 600/Washer',
+    testWidgets('Add Staff opens on the shop defaults, not 18000/Washer',
         (tester) async {
       final provider = AppProvider(autoLoad: false)
         ..seedForTest(shop: {
           'id': 1,
-          'default_daily_wage': 850.0,
+          'default_monthly_wage': 21000.0,
           'default_staff_role': 'Presser',
         });
       await tester.pumpWidget(host(provider, const StaffScreen()));
@@ -80,10 +80,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.widgetWithText(TextField, 'Presser'), findsOneWidget);
-      // The wage field carries 850 as both its value and its hint.
-      expect(find.widgetWithText(TextField, '850'), findsWidgets);
+      // The wage field carries 21000 as both its value and its hint.
+      expect(find.widgetWithText(TextField, '21000'), findsWidgets);
       expect(find.widgetWithText(TextField, 'Washer'), findsNothing);
-      expect(find.widgetWithText(TextField, '600'), findsNothing);
+      expect(find.widgetWithText(TextField, '18000'), findsNothing);
     });
   });
 

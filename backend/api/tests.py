@@ -541,24 +541,22 @@ class StaffApiTests(APITestCase):
     def setUp(self):
         Staff.objects.create(
             name='Mohan Das', role='Delivery Driver', phone='9933441122',
-            daily_wage=580, is_delivery_agent=True, has_app_login=True,
+            monthly_wage=15000, has_app_login=True,
         )
         Staff.objects.create(name='Sunil Paswan', role='Steam Press', phone='9811445566')
 
     def test_list_exposes_the_roster_flags(self):
         response = self.client.get('/api/staff/')
         by_name = {s['name']: s for s in response.data}
-        self.assertTrue(by_name['Mohan Das']['is_delivery_agent'])
         self.assertTrue(by_name['Mohan Das']['has_app_login'])
-        self.assertFalse(by_name['Sunil Paswan']['is_delivery_agent'])
+        self.assertFalse(by_name['Sunil Paswan']['has_app_login'])
 
     def test_create_staff_persists(self):
         response = self.client.post('/api/staff/', {
             'name': 'New Presser',
             'role': 'Ironing',
             'phone': '9000000009',
-            'daily_wage': 640,
-            'is_delivery_agent': False,
+            'monthly_wage': 16000,
         }, format='json')
         self.assertEqual(response.status_code, 201, response.data)
         self.assertTrue(Staff.objects.filter(name='New Presser').exists())
@@ -694,8 +692,11 @@ class PayrollTests(APITestCase):
     """
 
     def setUp(self):
+        # July has 31 days, so 600.0/day == 18600.0/month — chosen so the
+        # existing daily-rate assertions below (1200.0, 600.0, ...) hold
+        # exactly under the new monthly_wage / days_in_month formula.
         self.staff = Staff.objects.create(
-            name='Ramesh Kumar', role='Head Washer', phone='1', daily_wage=600.0
+            name='Ramesh Kumar', role='Head Washer', phone='1', monthly_wage=600.0 * 31
         )
         self.month = date(2026, 7, 1)
 
@@ -750,7 +751,8 @@ class PayrollTests(APITestCase):
     def test_december_does_not_bleed_into_january(self):
         # The next-month boundary is computed by adding 32 days and snapping to
         # the 1st, so a year rollover is worth pinning.
-        member = Staff.objects.create(name='Solo', role='Washer', phone='9', daily_wage=100.0)
+        # December also has 31 days — 100.0 * 31 keeps the same daily rate.
+        member = Staff.objects.create(name='Solo', role='Washer', phone='9', monthly_wage=100.0 * 31)
         Staff.objects.filter(id=self.staff.id).delete()
         Attendance.objects.create(staff=member, date=date(2026, 12, 31), status=Attendance.PRESENT)
         Attendance.objects.create(staff=member, date=date(2027, 1, 1), status=Attendance.PRESENT)
@@ -808,7 +810,7 @@ class PayrollTests(APITestCase):
 
     def test_totals_sum_the_entries(self):
         other = Staff.objects.create(
-            name='Geeta Devi', role='Dry Cleaning', phone='3', daily_wage=500.0
+            name='Geeta Devi', role='Dry Cleaning', phone='3', monthly_wage=500.0 * 31
         )
         self.mark(1, Attendance.PRESENT)
         self.mark(1, Attendance.PRESENT, staff=other)
@@ -1306,7 +1308,7 @@ class ShopOperatingRulesTests(APITestCase):
     def test_defaults_match_the_constants_they_replace(self):
         data = self.client.get('/api/shops/').data[0]
         self.assertEqual(data['express_multiplier'], 1.5)
-        self.assertEqual(data['default_daily_wage'], 600.0)
+        self.assertEqual(data['default_monthly_wage'], 18000.0)
         self.assertEqual(data['default_staff_role'], 'Washer')
         self.assertEqual(data['currency_symbol'], '\u20b9')
         self.assertEqual(data['locale'], 'en_IN')
@@ -1314,13 +1316,13 @@ class ShopOperatingRulesTests(APITestCase):
     def test_rules_are_patchable(self):
         response = self.client.patch(
             f'/api/shops/{self.shop.id}/',
-            {'express_multiplier': 2.0, 'default_daily_wage': 750.0},
+            {'express_multiplier': 2.0, 'default_monthly_wage': 20000.0},
             format='json',
         )
         self.assertEqual(response.status_code, 200)
         self.shop.refresh_from_db()
         self.assertEqual(self.shop.express_multiplier, 2.0)
-        self.assertEqual(self.shop.default_daily_wage, 750.0)
+        self.assertEqual(self.shop.default_monthly_wage, 20000.0)
 
 
 class GarmentItemImageTests(APITestCase):

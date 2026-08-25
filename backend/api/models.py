@@ -109,7 +109,7 @@ class Shop(models.Model):
     # new_order_screen.dart, and a 600 wage / 'Washer' role hardcoded as the
     # defaults on the Add Staff form. They are shop policy, not app policy.
     express_multiplier = models.FloatField(default=1.5)
-    default_daily_wage = models.FloatField(default=600.0)
+    default_monthly_wage = models.FloatField(default=18000.0)
     default_staff_role = models.CharField(max_length=100, default='Washer')
 
     # ── Presentation ──────────────────────────────────────────────────────────
@@ -420,11 +420,8 @@ class Staff(models.Model):
     name = models.CharField(max_length=255)
     role = models.CharField(max_length=100, default='Washer')
     phone = models.CharField(max_length=20)
-    daily_wage = models.FloatField(default=500.0)
+    monthly_wage = models.FloatField(default=15000.0)
     status = models.CharField(max_length=20, default='ACTIVE')
-    # Drives the "Delivery agents" KPI and decides who can be assigned to an
-    # order; the Agent app is a separate portal from the Staff app.
-    is_delivery_agent = models.BooleanField(default=False)
     # Whether this person has credentials for the Staff/Agent mobile app.
     # Plans cap how many of these a shop gets.
     has_app_login = models.BooleanField(default=False)
@@ -439,10 +436,11 @@ class Staff(models.Model):
 class SalaryPayment(models.Model):
     """A payout against one staff member's wages for one month.
 
-    Wages *earned* are derived — `Staff.daily_wage` times days worked, which
-    Attendance already records. Nothing recorded what was actually handed over,
-    so the Payroll screen's Paid / Pending columns had no possible source and
-    were hardcoded.
+    Wages *earned* are derived — `Staff.monthly_wage` divided into a per-day
+    rate (by the number of days in the month being paid) times days worked,
+    which Attendance already records. Nothing recorded what was actually
+    handed over, so the Payroll screen's Paid / Pending columns had no
+    possible source and were hardcoded.
 
     Deliberately not unique on (staff, month): a month can be paid in
     instalments, which is what makes PARTIAL a real state rather than a

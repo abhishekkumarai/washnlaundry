@@ -273,13 +273,17 @@ def payroll_summary(request):
     """GET /api/payroll/?month=YYYY-MM — the Payroll screen, in one call.
 
     Wages earned are derived from Attendance (`Attendance.DAY_VALUE` decides
-    what each state is worth) times `Staff.daily_wage`. What was actually paid
-    comes from SalaryPayment. Neither number is stored on Staff, so nothing here
-    can drift out of step with the register.
+    what each state is worth) times a per-day rate — `Staff.monthly_wage`
+    divided by however many days the month being paid actually has, so a day
+    is worth slightly more in February than in a 31-day month for the same
+    monthly wage. What was actually paid comes from SalaryPayment. Neither
+    number is stored on Staff, so nothing here can drift out of step with the
+    register.
     """
     month = parse_month(request.query_params.get('month')) or timezone.localdate().replace(day=1)
     # First day of the following month, without needing calendar arithmetic.
     next_month = (month + timedelta(days=32)).replace(day=1)
+    days_in_month = (next_month - month).days
 
     roster = Staff.objects.filter(status='ACTIVE').order_by('name')
 
@@ -298,7 +302,8 @@ def payroll_summary(request):
     entries = []
     for member in roster:
         days_worked = round(days.get(member.id, 0.0), 1)
-        total_salary = round(days_worked * member.daily_wage, 2)
+        daily_rate = member.monthly_wage / days_in_month
+        total_salary = round(days_worked * daily_rate, 2)
         paid_amount = round(paid.get(member.id, 0.0), 2)
         pending = round(max(total_salary - paid_amount, 0.0), 2)
 
@@ -317,7 +322,7 @@ def payroll_summary(request):
             'staff': member.id,
             'staff_name': member.name,
             'role': member.role,
-            'daily_wage': member.daily_wage,
+            'monthly_wage': member.monthly_wage,
             'days_worked': days_worked,
             'total_salary': total_salary,
             'paid_amount': paid_amount,

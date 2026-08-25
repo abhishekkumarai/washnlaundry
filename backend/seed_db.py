@@ -6,6 +6,7 @@ per-category counts and price ranges match it exactly. See LIVE_AUDIT.md.
 WARNING: this wipes every table before seeding.
 """
 
+import calendar
 import os
 import random
 from datetime import datetime, time, timedelta
@@ -151,7 +152,7 @@ def seed():
         upi_id='washing@upi',
         # Operating rules that used to be Dart constants in the client.
         express_multiplier=1.5,
-        default_daily_wage=600.0,
+        default_monthly_wage=18000.0,
         default_staff_role='Washer',
         currency_symbol='₹',
         locale='en_IN',
@@ -214,23 +215,27 @@ def seed():
         )
 
     print('Seeding Staff...')
-    # (name, role, phone, daily wage, delivery agent, has app login)
+    # (name, role, phone, monthly wage, has app login)
     staff_data = [
-        ('Ramesh Kumar', 'Head Washer', '9711223344', 650.0, False, True),
-        ('Sunil Paswan', 'Steam Press', '9811445566', 600.0, False, False),
-        ('Geeta Devi', 'Dry Cleaning', '9922334455', 700.0, False, False),
-        ('Mohan Das', 'Delivery Driver', '9933441122', 580.0, True, True),
-        ('Lakshman Rao', 'Manager', '9944556677', 900.0, False, True),
-        ('Anita Sharma', 'Ironing Specialist', '9955667788', 620.0, False, False),
+        ('Ramesh Kumar', 'Head Washer', '9711223344', 17000.0, True),
+        ('Sunil Paswan', 'Steam Press', '9811445566', 15500.0, False),
+        ('Geeta Devi', 'Dry Cleaning', '9922334455', 18000.0, False),
+        ('Mohan Das', 'Delivery Driver', '9933441122', 15000.0, True),
+        ('Lakshman Rao', 'Manager', '9944556677', 23000.0, True),
+        ('Anita Sharma', 'Ironing Specialist', '9955667788', 16000.0, False),
     ]
     staff_objs = [
         Staff.objects.create(
-            name=name, role=role, phone=phone, daily_wage=wage,
-            is_delivery_agent=is_agent, has_app_login=app_login,
+            name=name, role=role, phone=phone, monthly_wage=wage,
+            has_app_login=app_login,
         )
-        for name, role, phone, wage, is_agent, app_login in staff_data
+        for name, role, phone, wage, app_login in staff_data
     ]
-    drivers = [s for s in staff_objs if s.is_delivery_agent]
+    # `Order.assigned_agent` is a plain FK to any Staff — picking the seed's
+    # delivery-oriented member by role, now that there's no dedicated flag.
+    agent_for_seed = next(
+        (s for s in staff_objs if s.role == 'Delivery Driver'), staff_objs[0]
+    )
 
     print('Seeding Orders...')
     today = timezone.localdate()
@@ -288,8 +293,8 @@ def seed():
         )
         if delivery_type in (DeliveryType.HOME_DELIVERY, DeliveryType.ONLINE):
             order.delivery_charge = 50.0
-            if drivers and status in (OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED):
-                order.assigned_agent = drivers[0]
+            if status in (OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED):
+                order.assigned_agent = agent_for_seed
 
         # Stamp every stage up to the current one, and log the same trail as
         # audit entries so the order-detail Timeline & Audit Log panel has
@@ -382,7 +387,9 @@ def seed():
         worked = Attendance.objects.filter(
             staff=staff, date__gte=last_month, date__lt=this_month
         )
-        earned = sum(a.day_value for a in worked) * staff.daily_wage
+        days_in_last_month = calendar.monthrange(last_month.year, last_month.month)[1]
+        daily_rate = staff.monthly_wage / days_in_last_month
+        earned = sum(a.day_value for a in worked) * daily_rate
         if earned:
             SalaryPayment.objects.create(
                 staff=staff,

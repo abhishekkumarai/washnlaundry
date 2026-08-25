@@ -200,9 +200,8 @@ class StaffModel {
   final String name;
   final String role;
   final String phone;
-  final double dailyWage;
+  final double monthlyWage;
   final String status;
-  final bool isDeliveryAgent;
   final bool hasAppLogin;
 
   const StaffModel({
@@ -210,9 +209,8 @@ class StaffModel {
     required this.name,
     required this.role,
     required this.phone,
-    this.dailyWage = 0,
+    this.monthlyWage = 0,
     this.status = 'ACTIVE',
-    this.isDeliveryAgent = false,
     this.hasAppLogin = false,
   });
 
@@ -223,9 +221,8 @@ class StaffModel {
         name: json['name'] ?? '',
         role: json['role'] ?? '',
         phone: json['phone'] ?? '',
-        dailyWage: (json['daily_wage'] ?? 0).toDouble(),
+        monthlyWage: (json['monthly_wage'] ?? 0).toDouble(),
         status: json['status'] ?? 'ACTIVE',
-        isDeliveryAgent: json['is_delivery_agent'] ?? false,
         hasAppLogin: json['has_app_login'] ?? false,
       );
 
@@ -233,9 +230,8 @@ class StaffModel {
         'name': name,
         'role': role,
         'phone': phone,
-        'daily_wage': dailyWage,
+        'monthly_wage': monthlyWage,
         'status': status,
-        'is_delivery_agent': isDeliveryAgent,
         'has_app_login': hasAppLogin,
       };
 }
@@ -322,14 +318,15 @@ class ServiceAreaModel {
 /// One staff member's payroll for one month, as `/api/payroll/` computes it.
 ///
 /// Everything here is derived server-side: wages earned come from the
-/// attendance register times the daily wage, and [paidAmount] from the month's
+/// attendance register times a per-day rate (the monthly wage divided by
+/// however many days that month has), and [paidAmount] from the month's
 /// SalaryPayment rows. Nothing is stored on the staff record, so these cannot
 /// drift out of step with the register.
 class PayrollEntryModel {
   final String staffId;
   final String staffName;
   final String role;
-  final double dailyWage;
+  final double monthlyWage;
   final double daysWorked;
   final double totalSalary;
   final double paidAmount;
@@ -342,7 +339,7 @@ class PayrollEntryModel {
     required this.staffId,
     required this.staffName,
     this.role = '',
-    this.dailyWage = 0,
+    this.monthlyWage = 0,
     this.daysWorked = 0,
     this.totalSalary = 0,
     this.paidAmount = 0,
@@ -354,7 +351,7 @@ class PayrollEntryModel {
         staffId: json['staff'].toString(),
         staffName: json['staff_name'] ?? '',
         role: json['role'] ?? '',
-        dailyWage: (json['daily_wage'] ?? 0).toDouble(),
+        monthlyWage: (json['monthly_wage'] ?? 0).toDouble(),
         daysWorked: (json['days_worked'] ?? 0).toDouble(),
         totalSalary: (json['total_salary'] ?? 0).toDouble(),
         paidAmount: (json['paid_amount'] ?? 0).toDouble(),
