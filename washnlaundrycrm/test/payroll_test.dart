@@ -165,6 +165,29 @@ void main() {
       final field = tester.widget<TextField>(find.byType(TextField).first);
       expect(field.controller!.text, '5600');
     });
+
+    testWidgets('History opens a dialog scoped to that staff member', (tester) async {
+      // Salary payments used to be write-only — recordable, never shown back.
+      // The dialog's content is a real `/salary-payments/` fetch with no mock
+      // seam in this suite (same gap noted elsewhere for order/customer
+      // creation) — it rejects almost immediately in a test environment with
+      // no server to reach, so this checks the dialog opens scoped to the
+      // right staff member and survives that failure, not what a successful
+      // fetch would render.
+      final provider = AppProvider(autoLoad: false)..seedForTest(payroll: summary);
+      await tester.pumpWidget(host(provider, const PayrollScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(TextButton, 'History').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ramesh Kumar — Payment History'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ramesh Kumar — Payment History'), findsNothing);
+    });
   });
 
   group('PayrollSummaryModel', () {
@@ -209,6 +232,28 @@ void main() {
     test('daysWorkedLabel drops a pointless .0 but keeps a real half', () {
       expect(const PayrollEntryModel(staffId: '1', staffName: 'A', daysWorked: 24).daysWorkedLabel, '24');
       expect(const PayrollEntryModel(staffId: '1', staffName: 'A', daysWorked: 23.5).daysWorkedLabel, '23.5');
+    });
+  });
+
+  group('SalaryPaymentModel', () {
+    test('parses a /salary-payments/ row', () {
+      final model = SalaryPaymentModel.fromJson({
+        'id': 7,
+        'staff': 1,
+        'staff_name': 'Ramesh Kumar',
+        'month': '2026-07-01',
+        'amount': 10000,
+        'paid_on': '2026-07-15T10:30:00Z',
+        'method': 'UPI',
+        'note': 'Advance for the month',
+      });
+
+      expect(model.id, '7');
+      expect(model.staffId, '1');
+      expect(model.month, DateTime(2026, 7, 1));
+      expect(model.amount, 10000);
+      expect(model.method, 'UPI');
+      expect(model.note, 'Advance for the month');
     });
   });
 

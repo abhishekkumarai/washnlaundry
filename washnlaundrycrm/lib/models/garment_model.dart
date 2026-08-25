@@ -365,6 +365,42 @@ class PayrollEntryModel {
       daysWorked == daysWorked.roundToDouble() ? daysWorked.toInt().toString() : '$daysWorked';
 }
 
+/// One payout against a staff member's wages — a single `SalaryPayment` row,
+/// as the "Payment History" dialog lists them. [PayrollEntryModel] only
+/// carries the current month's totals; this is the underlying ledger.
+class SalaryPaymentModel {
+  final String id;
+  final String staffId;
+  final String staffName;
+  final DateTime? month;
+  final double amount;
+  final DateTime? paidOn;
+  final String method;
+  final String note;
+
+  const SalaryPaymentModel({
+    required this.id,
+    required this.staffId,
+    this.staffName = '',
+    this.month,
+    this.amount = 0,
+    this.paidOn,
+    this.method = 'CASH',
+    this.note = '',
+  });
+
+  factory SalaryPaymentModel.fromJson(Map<String, dynamic> json) => SalaryPaymentModel(
+        id: json['id'].toString(),
+        staffId: json['staff'].toString(),
+        staffName: json['staff_name'] ?? '',
+        month: DateTime.tryParse(json['month'] ?? ''),
+        amount: (json['amount'] ?? 0).toDouble(),
+        paidOn: DateTime.tryParse(json['paid_on'] ?? ''),
+        method: json['method'] ?? 'CASH',
+        note: json['note'] ?? '',
+      );
+}
+
 /// A month of payroll: the rows plus the four KPI totals above them.
 class PayrollSummaryModel {
   final DateTime? month;

@@ -203,6 +203,77 @@ void main() {
       expect(find.byType(CustomerDetailScreen), findsOneWidget);
       expect(find.text('Back to Customers'), findsOneWidget);
     });
+
+    testWidgets('the row menu offers Edit and Delete, not just a chevron',
+        (tester) async {
+      // Customers could only ever be added — this is that gap closing.
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit'), findsOneWidget);
+      expect(find.text('Delete'), findsOneWidget);
+    });
+
+    testWidgets('Edit opens pre-filled with the customer\'s own details',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Customer'), findsOneWidget);
+      expect(find.text('Save Changes'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Ramesh Kumar'), findsOneWidget);
+      expect(find.widgetWithText(TextField, '9711223344'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'ramesh@example.com'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'HBR Layout'), findsOneWidget);
+    });
+
+    testWidgets('Edit rejects clearing the required fields', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.widgetWithText(TextField, 'Ramesh Kumar'), '');
+      await tester.tap(find.widgetWithText(FilledButton, 'Save Changes'));
+      await tester.pump();
+
+      expect(find.text('Name and phone are both required.'), findsOneWidget);
+    });
+
+    testWidgets('Delete asks for confirmation naming the customer, and Cancel leaves the roster alone',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete Customer'), findsOneWidget);
+      expect(find.textContaining('Ramesh Kumar'), findsWidgets);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete Customer'), findsNothing);
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+    });
   });
 
   group('CustomerDetailScreen', () {

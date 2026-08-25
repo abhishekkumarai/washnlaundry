@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
@@ -322,7 +323,14 @@ class _PayrollScreenState extends State<PayrollScreen> {
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: colour),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
+
+              TextButton(
+                onPressed: () => _showPaymentHistory(entry),
+                child: const Text('History',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+              ),
+              const SizedBox(width: 4),
 
               TextButton(
                 onPressed: entry.pendingAmount <= 0 ? null : () => _showRecordPayment(entry),
@@ -330,6 +338,110 @@ class _PayrollScreenState extends State<PayrollScreen> {
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The full payout ledger for [entry.staffId] — every month, not just the
+  /// one currently selected. Fetched fresh on open rather than cached
+  /// provider state, since this dialog is the only place it's read.
+  Future<void> _showPaymentHistory(PayrollEntryModel entry) async {
+    final provider = context.read<AppProvider>();
+    final methodChoices = provider.paymentMethods;
+    String methodLabel(String raw) => methodChoices
+        .firstWhere((c) => c.value == raw, orElse: () => ChoiceModel(value: raw, label: raw))
+        .label;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('${entry.staffName} — Payment History',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        content: SizedBox(
+          width: 420,
+          child: FutureBuilder<List<SalaryPaymentModel>>(
+            future: provider.fetchSalaryHistory(entry.staffId),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    'Could not load payment history: ${snapshot.error}',
+                    style: const TextStyle(fontSize: 13, color: Color(0xFFDC2626)),
+                  ),
+                );
+              }
+              final payments = snapshot.data ?? const <SalaryPaymentModel>[];
+              if (payments.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: Text('No payments recorded yet.',
+                        style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+                  ),
+                );
+              }
+              return SizedBox(
+                width: double.infinity,
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: payments.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  itemBuilder: (context, i) {
+                    final p = payments[i];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  p.month == null ? '—' : DateFormat('MMMM yyyy').format(p.month!),
+                                  style: const TextStyle(
+                                      fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${methodLabel(p.method)}'
+                                  '${p.paidOn == null ? '' : ' · ${DateFormat('MMM d, yyyy').format(p.paidOn!)}'}',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                ),
+                                if (p.note.trim().isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(p.note.trim(),
+                                      style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                                ],
+                              ],
+                            ),
+                          ),
+                          Text('${Money.symbol}${p.amount.round()}',
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close', style: TextStyle(color: Color(0xFF64748B))),
           ),
         ],
       ),

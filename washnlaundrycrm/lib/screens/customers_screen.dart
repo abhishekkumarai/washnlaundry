@@ -298,7 +298,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   Expanded(flex: 2, child: _ColHead('ORDERS')),
                   Expanded(flex: 2, child: _ColHead('LIFETIME')),
                   Expanded(flex: 3, child: _ColHead('LAST ORDER')),
-                  SizedBox(width: 32),
+                  SizedBox(width: 68),
                 ],
               ),
             ),
@@ -373,9 +373,49 @@ class _CustomersScreenState extends State<CustomersScreen> {
               child: Text(lastOrder == null ? '—' : relativeTime(lastOrder),
                   style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
             ),
-            const SizedBox(
-              width: 32,
-              child: Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFFCBD5E1)),
+            SizedBox(
+              width: 68,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  PopupMenuButton<String>(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.more_vert_rounded, size: 18, color: Color(0xFF94A3B8)),
+                    tooltip: 'Customer options',
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    onSelected: (action) {
+                      if (action == 'edit') {
+                        _showCustomerDialog(existing: c);
+                      } else if (action == 'delete') {
+                        _showDeleteCustomerConfirm(c);
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 15, color: Color(0xFF64748B)),
+                            SizedBox(width: 8),
+                            Text('Edit', style: TextStyle(fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFDC2626)),
+                            SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(fontSize: 13, color: Color(0xFFDC2626))),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFFCBD5E1)),
+                ],
+              ),
             ),
           ],
         ),
@@ -383,14 +423,21 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
+  Future<void> _showAddCustomer() => _showCustomerDialog();
+
+  /// [existing] null adds a customer; non-null edits it in place. Same dialog
+  /// either way — only the title, button label, and which provider call fires
+  /// differ, the same shape `staff_screen.dart`'s `_showStaffModal` uses.
+  ///
   /// Takes no `BuildContext`: a parameter of that name would shadow
   /// `State.context`, and then the `mounted` check below would be guarding a
   /// different context than the one the snackbar uses.
-  Future<void> _showAddCustomer() async {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-    final emailController = TextEditingController();
-    final areaController = TextEditingController();
+  Future<void> _showCustomerDialog({CustomerModel? existing}) async {
+    final isEdit = existing != null;
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    final phoneController = TextEditingController(text: existing?.phone ?? '');
+    final emailController = TextEditingController(text: existing?.email ?? '');
+    final areaController = TextEditingController(text: existing?.area ?? '');
     final provider = context.read<AppProvider>();
 
     final saved = await showDialog<bool>(
@@ -402,8 +449,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Add Customer',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            title: Text(isEdit ? 'Edit Customer' : 'Add Customer',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
             content: SizedBox(
               width: 420,
               child: Column(
@@ -442,19 +489,23 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           saving = true;
                           error = null;
                         });
-                        final ok = await provider.addCustomer({
+                        final payload = {
                           'name': name,
                           'phone': phone,
                           'email': emailController.text.trim(),
                           'area': areaController.text.trim(),
-                        });
+                        };
+                        final ok = isEdit
+                            ? await provider.updateCustomer(existing.id, payload)
+                            : await provider.addCustomer(payload);
                         if (!ctx.mounted) return;
                         if (ok) {
                           Navigator.pop(ctx, true);
                         } else {
                           setDialogState(() {
                             saving = false;
-                            error = provider.error ?? 'Could not add the customer.';
+                            error = provider.error ??
+                                'Could not ${isEdit ? 'save' : 'add'} the customer.';
                           });
                         }
                       },
@@ -462,8 +513,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   backgroundColor: const Color(0xFF1A4FD6),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: Text(saving ? 'Saving…' : 'Add Customer',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(
+                  saving ? 'Saving…' : (isEdit ? 'Save Changes' : 'Add Customer'),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
@@ -473,9 +526,46 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     if (saved == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Customer added.')),
+        SnackBar(content: Text(isEdit ? 'Customer updated.' : 'Customer added.')),
       );
     }
+  }
+
+  Future<void> _showDeleteCustomerConfirm(CustomerModel c) async {
+    final provider = context.read<AppProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Customer',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        content: Text(
+          'Are you sure you want to delete "${c.name}"? Their past orders keep '
+          'their own record of the name and phone number, but the link to this '
+          'customer will be gone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final ok = await provider.deleteCustomer(c.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Deleted "${c.name}".' : (provider.error ?? 'Could not delete the customer.')),
+      ),
+    );
   }
 
   Widget _field(

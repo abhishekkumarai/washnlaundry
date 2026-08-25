@@ -288,6 +288,41 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   Text('${Money.symbol}${expenses[i].amount.toStringAsFixed(0)}',
                       style: const TextStyle(
                           fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFEF4444))),
+                  PopupMenuButton<String>(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.more_vert_rounded, size: 18, color: Color(0xFF94A3B8)),
+                    tooltip: 'Expense options',
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    onSelected: (action) {
+                      if (action == 'edit') {
+                        _showExpenseDialog(existing: expenses[i]);
+                      } else if (action == 'delete') {
+                        _showDeleteExpenseConfirm(expenses[i]);
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 15, color: Color(0xFF64748B)),
+                            SizedBox(width: 8),
+                            Text('Edit', style: TextStyle(fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFDC2626)),
+                            SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(fontSize: 13, color: Color(0xFFDC2626))),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -296,12 +331,20 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
+  Future<void> _showAddExpense() => _showExpenseDialog();
+
+  /// [existing] null adds an expense; non-null edits it in place — same
+  /// dialog either way, same shape `customers_screen.dart`'s
+  /// `_showCustomerDialog` uses for the same reason.
+  ///
   /// Takes no `BuildContext`: a parameter of that name would shadow
   /// `State.context`, and the `mounted` check below would then be guarding a
   /// different context than the snackbar uses.
-  Future<void> _showAddExpense() async {
-    final titleController = TextEditingController();
-    final amountController = TextEditingController();
+  Future<void> _showExpenseDialog({ExpenseModel? existing}) async {
+    final isEdit = existing != null;
+    final titleController = TextEditingController(text: existing?.title ?? '');
+    final amountController =
+        TextEditingController(text: existing == null ? '' : existing.amount.toStringAsFixed(0));
     final provider = context.read<AppProvider>();
 
     // Vocabularies come from `/api/meta/` now. This screen used to hold its
@@ -313,17 +356,18 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) {
-        var category = categoryChoices.isEmpty ? 'Supplies' : categoryChoices.first.value;
-        var method = methodChoices.first.value;
-        var date = DateTime.now();
+        var category = existing?.category ??
+            (categoryChoices.isEmpty ? 'Supplies' : categoryChoices.first.value);
+        var method = existing?.paymentMethod ?? methodChoices.first.value;
+        var date = existing?.date ?? DateTime.now();
         String? error;
         var saving = false;
 
         return StatefulBuilder(
           builder: (ctx, setDialogState) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Add Expense',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            title: Text(isEdit ? 'Edit Expense' : 'Add Expense',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
             content: SizedBox(
               width: 440,
               child: SingleChildScrollView(
@@ -425,13 +469,16 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                           saving = true;
                           error = null;
                         });
-                        final ok = await provider.addExpense({
+                        final payload = {
                           'title': title,
                           'category': category,
                           'amount': amount,
                           'payment_method': method,
                           'date': date.toUtc().toIso8601String(),
-                        });
+                        };
+                        final ok = isEdit
+                            ? await provider.updateExpense(existing.id, payload)
+                            : await provider.addExpense(payload);
                         if (!ctx.mounted) return;
                         if (ok) {
                           Navigator.pop(ctx, true);
@@ -446,8 +493,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   backgroundColor: const Color(0xFF1A4FD6),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: Text(saving ? 'Saving…' : 'Add Expense',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(
+                  saving ? 'Saving…' : (isEdit ? 'Save Changes' : 'Add Expense'),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
@@ -457,9 +506,42 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
     if (saved == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Expense logged.')),
+        SnackBar(content: Text(isEdit ? 'Expense updated.' : 'Expense logged.')),
       );
     }
+  }
+
+  Future<void> _showDeleteExpenseConfirm(ExpenseModel e) async {
+    final provider = context.read<AppProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Expense',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        content: Text('Are you sure you want to delete "${e.title}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final ok = await provider.deleteExpense(e.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Deleted "${e.title}".' : (provider.error ?? 'Could not delete the expense.')),
+      ),
+    );
   }
 
   Widget _label(String text) => Padding(

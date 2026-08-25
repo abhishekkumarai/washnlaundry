@@ -529,6 +529,42 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateCustomer(String id, Map<String, dynamic> payload) async {
+    try {
+      final updated = await ApiService.updateCustomer(id, payload);
+      final index = _customers.indexWhere((c) => c.id == updated.id);
+      if (index >= 0) {
+        _customers[index] = updated;
+      } else {
+        _customers.insert(0, updated);
+      }
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// The FK from `Order.customer` is `SET_NULL`, so a customer with order
+  /// history can be deleted safely — their past orders keep their own
+  /// snapshotted `customer_name`/`customer_phone` and just lose the link.
+  Future<bool> deleteCustomer(String id) async {
+    try {
+      await ApiService.deleteCustomer(id);
+      _customers.removeWhere((c) => c.id == id);
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> addStaff(Map<String, dynamic> payload) async {
     try {
       final member = await ApiService.createStaff(payload);
@@ -877,6 +913,13 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  /// One staff member's full payout history — unlike [payroll] this is not
+  /// cached provider state, since the Payment History dialog fetches it fresh
+  /// each time it opens rather than tracking a loading/error pair for it.
+  /// Throws [ApiException] on failure; callers (a `FutureBuilder`) handle that.
+  Future<List<SalaryPaymentModel>> fetchSalaryHistory(String staffId) =>
+      ApiService.fetchSalaryPayments(staffId: staffId);
+
   // ── Reports ────────────────────────────────────────────────────────────────
 
   Future<void> loadReportsFor(DateTime from, DateTime to) async {
@@ -899,6 +942,39 @@ class AppProvider extends ChangeNotifier {
     try {
       final expense = await ApiService.createExpense(payload);
       _expenses.insert(0, expense);
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateExpense(String id, Map<String, dynamic> payload) async {
+    try {
+      final updated = await ApiService.updateExpense(id, payload);
+      final index = _expenses.indexWhere((e) => e.id == updated.id);
+      if (index >= 0) {
+        _expenses[index] = updated;
+      } else {
+        _expenses.insert(0, updated);
+      }
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteExpense(String id) async {
+    try {
+      await ApiService.deleteExpense(id);
+      _expenses.removeWhere((e) => e.id == id);
+      _error = null;
       notifyListeners();
       return true;
     } on ApiException catch (e) {

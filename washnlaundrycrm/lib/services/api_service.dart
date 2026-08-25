@@ -220,6 +220,14 @@ class ApiService {
     return CustomerModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
+  static Future<CustomerModel> updateCustomer(String id, Map<String, dynamic> payload) async {
+    final data = await _send('PATCH', '/customers/$id/', body: payload);
+    return CustomerModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  static Future<void> deleteCustomer(String id) =>
+      _send('DELETE', '/customers/$id/');
+
   // ── Back office ────────────────────────────────────────────────────────────
 
   static Future<List<StaffModel>> fetchStaff() async {
@@ -246,6 +254,14 @@ class ApiService {
     final data = await _send('POST', '/expenses/', body: payload);
     return ExpenseModel.fromJson((data as Map).cast<String, dynamic>());
   }
+
+  static Future<ExpenseModel> updateExpense(String id, Map<String, dynamic> payload) async {
+    final data = await _send('PATCH', '/expenses/$id/', body: payload);
+    return ExpenseModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  static Future<void> deleteExpense(String id) =>
+      _send('DELETE', '/expenses/$id/');
 
   static Future<List<AttendanceModel>> fetchAttendance({String? date}) async {
     final data = await _send('GET', '/attendance/', query: {
@@ -282,6 +298,16 @@ class ApiService {
 
   static Future<void> recordSalaryPayment(Map<String, dynamic> payload) =>
       _send('POST', '/salary-payments/', body: payload);
+
+  /// One staff member's payout history — every [SalaryPayment] row, not just
+  /// the current month `fetchPayroll` derives totals from. The server already
+  /// orders these newest-first (`-month, -paid_on`).
+  static Future<List<SalaryPaymentModel>> fetchSalaryPayments({
+    required String staffId,
+  }) async {
+    final data = await _send('GET', '/salary-payments/', query: {'staff': staffId});
+    return _asList(data).map(SalaryPaymentModel.fromJson).toList();
+  }
 
   // ── Reports ────────────────────────────────────────────────────────────────
 

@@ -210,5 +210,75 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets('each row offers Edit and Delete, not just an append-only log',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit'), findsOneWidget);
+      expect(find.text('Delete'), findsOneWidget);
+    });
+
+    testWidgets('Edit opens pre-filled with the expense\'s own details',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pump();
+
+      // ledger[0] is the first row: Commercial Detergent, ₹3500, UPI.
+      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Expense'), findsOneWidget);
+      expect(find.text('Save Changes'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Commercial Detergent (50L)'), findsOneWidget);
+      expect(find.widgetWithText(TextField, '3500'), findsOneWidget);
+    });
+
+    testWidgets('Edit rejects clearing the title', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Commercial Detergent (50L)'), '');
+      await tester.tap(find.widgetWithText(FilledButton, 'Save Changes'));
+      await tester.pump();
+
+      expect(find.text('Give the expense a title.'), findsOneWidget);
+    });
+
+    testWidgets('Delete asks for confirmation naming the expense, and Cancel leaves the ledger alone',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete Expense'), findsOneWidget);
+      expect(find.textContaining('Commercial Detergent (50L)'), findsWidgets);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete Expense'), findsNothing);
+      expect(find.text('Commercial Detergent (50L)'), findsOneWidget);
+    });
   });
 }
