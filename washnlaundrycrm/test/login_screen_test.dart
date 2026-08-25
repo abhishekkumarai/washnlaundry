@@ -42,6 +42,43 @@ void main() {
       expect(auth.initializing, isFalse);
       expect(auth.isSignedIn, isFalse);
     });
+
+    test('signInAsDemo signs in and persists across a fresh instance', () async {
+      final auth = AuthProvider();
+      await Future<void>.delayed(Duration.zero);
+
+      await auth.signInAsDemo();
+
+      expect(auth.isSignedIn, isTrue);
+      expect(auth.userEmail, 'demo@laundrybill.com');
+      expect(auth.userName, 'Demo Owner');
+      expect(auth.error, isNull);
+
+      // A fresh instance picks up the persisted session on its own
+      // `_init()`, the same as a page reload — this is the mechanism
+      // CLAUDE.md's Authentication section describes.
+      final restored = AuthProvider();
+      await Future<void>.delayed(Duration.zero);
+      expect(restored.isSignedIn, isTrue);
+      expect(restored.userEmail, 'demo@laundrybill.com');
+    });
+
+    test('signOut clears both the in-memory and persisted session', () async {
+      final auth = AuthProvider();
+      await Future<void>.delayed(Duration.zero);
+      await auth.signInAsDemo();
+      expect(auth.isSignedIn, isTrue);
+
+      await auth.signOut();
+
+      expect(auth.isSignedIn, isFalse);
+      expect(auth.userEmail, isNull);
+      expect(auth.userName, isNull);
+
+      final restored = AuthProvider();
+      await Future<void>.delayed(Duration.zero);
+      expect(restored.isSignedIn, isFalse);
+    });
   });
 
   group('LoginScreen', () {

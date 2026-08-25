@@ -75,10 +75,17 @@ class OrderTimelineTests(TestCase):
         # shows the revisit happening moments ago is exactly what "the update
         # and the audit logs don't match" reported — the stamp must track the
         # most recent arrival, not just the first one.
-        self.order.mark_status(OrderStatus.READY)
-        first = Order.objects.get(pk=self.order.pk).ready_at
-        self.order.mark_status(OrderStatus.PROCESSING)
-        self.order.mark_status(OrderStatus.READY)
+        #
+        # Explicit `when`s, a second apart: three `mark_status` calls with no
+        # I/O between them can land in the same microsecond on a fast enough
+        # machine, since `mark_status` defaults to `timezone.now()` — which
+        # made this assertion flaky (`not greater than` a value equal to
+        # itself) rather than actually exercising "refreshed to something
+        # later", the thing this test means to pin down.
+        first = timezone.now()
+        self.order.mark_status(OrderStatus.READY, when=first)
+        self.order.mark_status(OrderStatus.PROCESSING, when=first + timedelta(seconds=1))
+        self.order.mark_status(OrderStatus.READY, when=first + timedelta(seconds=2))
         self.assertGreater(Order.objects.get(pk=self.order.pk).ready_at, first)
 
     def test_every_transition_is_logged_even_a_revisit(self):
