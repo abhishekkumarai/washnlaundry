@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -5,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../models/order_model.dart';
 import '../utils/navigation.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
 import '../utils/money.dart';
@@ -28,11 +31,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
   /// rather than forking a second copy of the same state).
   bool _overdueOnly = false;
   bool _unpaidDuesOnly = false;
+
   /// 'all' / 'online' / 'inshop'.
   String _orderSource = 'all';
+
   /// One of [DeliveryType]'s values, or null for "All Types". Excludes
   /// `online` — the real dialog puts that under Order Source instead.
   String? _orderType;
+
   /// A category name from Services, or null for "All service types".
   String? _serviceType;
 
@@ -109,387 +115,738 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 (_orderSource == 'online' && o.source == 'PUBLIC_PAGE') ||
                 (_orderSource == 'inshop' && o.source == 'WEB')) &&
             (_orderType == null || o.deliveryType == _orderType) &&
-            (_serviceType == null || o.items.any((i) => i.serviceType == _serviceType)))
+            (_serviceType == null ||
+                o.items.any((i) => i.serviceType == _serviceType)))
         .toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Row(
-        children: [
-          const SidebarNavigation(),
+      drawer: const AppDrawer(),
+      body: AppShell(
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
+            return _body(provider, filteredOrders, narrow);
+          },
+        ),
+      ),
+    );
+  }
 
-          Expanded(
-            child: Column(
-              children: [
-                // Top Header Bar
-                Container(
-                  height: 64,
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+  Widget _body(
+      AppProvider provider, List<OrderModel> filteredOrders, bool narrow) {
+    return Column(
+      children: [
+        narrow ? _narrowHeaderBar(provider) : _wideHeaderBar(provider),
+
+        // Filter Tabs Scrollable Row
+        Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: SizedBox(
+            height: 38,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _tabs.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, idx) {
+                final tab = _tabs[idx];
+                final isSel = tab['label'] == _selectedTab;
+                return ChoiceChip(
+                  avatar: CircleAvatar(
+                    radius: 3,
+                    backgroundColor:
+                        isSel ? Colors.white : _tabColor(tab['key']!),
                   ),
-                  child: Row(
-                    children: [
-                      Row(
-                        children: [
-                          const Text('Orders', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                          const SizedBox(width: 8),
-                          Text('${provider.orders.length} Total', style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                  label: Text(
+                    tab['label']!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                      color: isSel ? Colors.white : const Color(0xFF334155),
+                    ),
+                  ),
+                  selected: isSel,
+                  selectedColor: const Color(0xFF1A4FD6),
+                  backgroundColor: Colors.white,
+                  side: BorderSide(
+                      color: isSel
+                          ? const Color(0xFF1A4FD6)
+                          : const Color(0xFFE2E8F0)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                  onSelected: (_) =>
+                      setState(() => _selectedTab = tab['label']!),
+                );
+              },
+            ),
+          ),
+        ),
+
+        // Orders Table Container
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: narrow ? 16.0 : 20.0),
+            child: Container(
+              decoration: narrow
+                  ? null
+                  : BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+              child: Column(
+                children: [
+                  // Table Header — column labels don't apply to the
+                  // narrow-mode card list below.
+                  if (!narrow)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 14),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(16),
+                            topRight: Radius.circular(16)),
+                        border: Border(
+                            bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                      ),
+                      child: Row(
+                        children: const [
+                          Expanded(
+                              flex: 2,
+                              child: Text('ORDER',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF94A3B8)))),
+                          Expanded(
+                              flex: 2,
+                              child: Text('CUSTOMER',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF94A3B8)))),
+                          Expanded(
+                              flex: 2,
+                              child: Text('TYPE',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF94A3B8)))),
+                          Expanded(
+                              flex: 2,
+                              child: Text('STATUS',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF94A3B8)))),
+                          Expanded(
+                              flex: 2,
+                              child: Text('PAYMENT',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF94A3B8)))),
+                          Expanded(
+                              flex: 1,
+                              child: Text('TOTAL',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF94A3B8)))),
+                          Expanded(
+                              flex: 1,
+                              child: Text('UPDATED',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF94A3B8)))),
                         ],
                       ),
-                      const Spacer(),
+                    ),
 
-                      // Time Filter Dropdown
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<OrderDateRange>(
-                            value: _timeFilter,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
-                            items: OrderDateRange.values
-                                .map((r) => DropdownMenuItem(value: r, child: Text(r.label)))
-                                .toList(),
-                            onChanged: (val) {
-                              if (val != null) setState(() => _timeFilter = val);
+                  // Table Rows / Empty State
+                  Expanded(
+                    child: filteredOrders.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.shopping_bag_outlined,
+                                    size: 40, color: Color(0xFF94A3B8)),
+                                const SizedBox(height: 12),
+                                const Text('No orders found',
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0F172A))),
+                                Text(
+                                  _hasActiveFilter
+                                      ? 'No orders match "$_selectedTab"'
+                                          '${_timeFilter == OrderDateRange.allTime ? '' : ' in ${_timeFilter.label}'}.'
+                                      : 'Create a new order to get started.',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Color(0xFF94A3B8)),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: narrow
+                                ? const EdgeInsets.only(top: 12, bottom: 4)
+                                : EdgeInsets.zero,
+                            itemCount: filteredOrders.length,
+                            separatorBuilder: (_, __) => narrow
+                                ? const SizedBox(height: 12)
+                                : const Divider(height: 1),
+                            itemBuilder: (context, idx) {
+                              final order = filteredOrders[idx];
+                              if (narrow) return _orderCard(order);
+                              return InkWell(
+                                onTap: () => context.go('/orders/${order.id}'),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 14),
+                                  child: _orderRow(order),
+                                ),
+                              );
                             },
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
+                  ),
 
-                      // Search Input Box
-                      Container(
-                        width: 240,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(10),
+                  // Table Footer
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    decoration: const BoxDecoration(
+                      border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          filteredOrders.length == provider.orders.length
+                              ? 'Showing ${filteredOrders.length}'
+                              : 'Showing ${filteredOrders.length} of ${provider.orders.length}',
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF94A3B8)),
                         ),
-                        child: TextField(
-                          onChanged: (val) => setState(() => _searchQuery = val),
-                          decoration: const InputDecoration(
-                            hintText: 'Search by order ID, phone, or name...',
-                            hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                            prefixIcon: Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(vertical: 10),
+                        const Text('No more orders',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xFF94A3B8))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  /// The wide-mode table row's content (7 flex-matched columns) — unchanged
+  /// from before the phone layout existed.
+  Widget _orderRow(OrderModel order) {
+    final initial =
+        order.customerName.isEmpty ? '?' : order.customerName[0].toUpperCase();
+    return Row(
+      children: [
+        // ORDER
+        Expanded(
+          flex: 2,
+          child: Text('#${order.orderNumber}',
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A4FD6))),
+        ),
+
+        // CUSTOMER
+        Expanded(
+          flex: 2,
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 14,
+                backgroundColor: const Color(0xFFEEF2FF),
+                child: Text(initial,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A4FD6))),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.customerName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A)),
+                    ),
+                    Text('${order.items.length} items',
+                        style: const TextStyle(
+                            fontSize: 10, color: Color(0xFF94A3B8))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // TYPE
+        Expanded(
+          flex: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.circle, size: 6, color: Color(0xFF10B981)),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      order.deliveryTypeLabel,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF10B981)),
+                    ),
+                  ),
+                ],
+              ),
+              if (order.scheduledDate != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.event_rounded,
+                        size: 11,
+                        color: order.isOverdue
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          DateFormat('EEE, MMM d').format(order.scheduledDate!),
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: order.isOverdue
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF64748B),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-
-                      OutlinedButton.icon(
-                        onPressed: _showFiltersDialog,
-                        icon: Icon(Icons.tune_rounded, size: 16, color: _extraFilterCount > 0 ? const Color(0xFF1A4FD6) : const Color(0xFF475569)),
-                        label: Text(
-                          _extraFilterCount > 0 ? 'Filters ($_extraFilterCount)' : 'Filters',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _extraFilterCount > 0 ? const Color(0xFF1A4FD6) : const Color(0xFF334155)),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: _extraFilterCount > 0 ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-
-                      OutlinedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.download_rounded, size: 16, color: Color(0xFF475569)),
-                        label: const Text('Export', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFE2E8F0)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-
-                      ElevatedButton.icon(
-                        onPressed: () => context.goSection(1),
-                        icon: const Icon(Icons.add, size: 16, color: Colors.white),
-                        label: const Text('New Order', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1A4FD6),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     ],
                   ),
                 ),
+            ],
+          ),
+        ),
 
-                // Filter Tabs Scrollable Row
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: SizedBox(
-                    height: 38,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _tabs.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, idx) {
-                        final tab = _tabs[idx];
-                        final isSel = tab['label'] == _selectedTab;
-                        return ChoiceChip(
-                          avatar: CircleAvatar(
-                            radius: 3,
-                            backgroundColor: isSel ? Colors.white : _tabColor(tab['key']!),
-                          ),
-                          label: Text(
-                            tab['label']!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-                              color: isSel ? Colors.white : const Color(0xFF334155),
-                            ),
-                          ),
-                          selected: isSel,
-                          selectedColor: const Color(0xFF1A4FD6),
-                          backgroundColor: Colors.white,
-                          side: BorderSide(color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          onSelected: (_) => setState(() => _selectedTab = tab['label']!),
-                        );
-                      },
-                    ),
-                  ),
+        // STATUS
+        Expanded(
+          flex: 2,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: StatusPill(status: order.status),
+          ),
+        ),
+
+        // PAYMENT
+        Expanded(
+          flex: 2,
+          child: Text(
+            order.paymentStatusLabel,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: paymentColor(order.paymentStatus),
+            ),
+          ),
+        ),
+
+        // TOTAL
+        Expanded(
+          flex: 1,
+          child: Text('${Money.symbol}${order.totalAmount.toInt()}',
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
+        ),
+
+        // UPDATED
+        Expanded(
+          flex: 1,
+          child: Text(
+            relativeTime(order.createdAt),
+            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The narrow-mode card replacing one table row — order # + status pill,
+  /// customer, delivery type/schedule, payment + total, updated time.
+  Widget _orderCard(OrderModel order) {
+    final initial =
+        order.customerName.isEmpty ? '?' : order.customerName[0].toUpperCase();
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => context.go('/orders/${order.id}'),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('#${order.orderNumber}',
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A4FD6))),
+                StatusPill(status: order.status),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 13,
+                  backgroundColor: const Color(0xFFEEF2FF),
+                  child: Text(initial,
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A4FD6))),
                 ),
-
-                // Orders Table Container
+                const SizedBox(width: 8),
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Column(
-                        children: [
-                          // Table Header
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
-                              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-                            ),
-                            child: Row(
-                              children: const [
-                                Expanded(flex: 2, child: Text('ORDER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-                                Expanded(flex: 2, child: Text('CUSTOMER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-                                Expanded(flex: 2, child: Text('TYPE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-                                Expanded(flex: 2, child: Text('STATUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-                                Expanded(flex: 2, child: Text('PAYMENT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-                                Expanded(flex: 1, child: Text('TOTAL', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-                                Expanded(flex: 1, child: Text('UPDATED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-                              ],
-                            ),
-                          ),
-
-                          // Table Rows / Empty State
-                          Expanded(
-                            child: filteredOrders.isEmpty
-                                ? Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(Icons.shopping_bag_outlined, size: 40, color: Color(0xFF94A3B8)),
-                                        const SizedBox(height: 12),
-                                        const Text('No orders found', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                        Text(
-                                          _hasActiveFilter
-                                              ? 'No orders match "$_selectedTab"'
-                                                  '${_timeFilter == OrderDateRange.allTime ? '' : ' in ${_timeFilter.label}'}.'
-                                              : 'Create a new order to get started.',
-                                          style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : ListView.separated(
-                                    itemCount: filteredOrders.length,
-                                    separatorBuilder: (_, __) => const Divider(height: 1),
-                                    itemBuilder: (context, idx) {
-                                      final order = filteredOrders[idx];
-                                      final initial = order.customerName.isEmpty
-                                          ? '?'
-                                          : order.customerName[0].toUpperCase();
-
-                                      return InkWell(
-                                        onTap: () => context.go('/orders/${order.id}'),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                                          child: Row(
-                                            children: [
-                                              // ORDER
-                                              Expanded(
-                                                flex: 2,
-                                                child: Text('#${order.orderNumber}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
-                                              ),
-
-                                              // CUSTOMER
-                                              Expanded(
-                                                flex: 2,
-                                                child: Row(
-                                                  children: [
-                                                    CircleAvatar(
-                                                      radius: 14,
-                                                      backgroundColor: const Color(0xFFEEF2FF),
-                                                      child: Text(initial, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
-                                                    ),
-                                                    const SizedBox(width: 10),
-                                                    Expanded(
-                                                      child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Text(
-                                                          order.customerName,
-                                                          overflow: TextOverflow.ellipsis,
-                                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                                                        ),
-                                                        Text('${order.items.length} items', style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                                                      ],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-
-                                              // TYPE
-                                              Expanded(
-                                                flex: 2,
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Row(
-                                                      children: [
-                                                        const Icon(Icons.circle, size: 6, color: Color(0xFF10B981)),
-                                                        const SizedBox(width: 6),
-                                                        Flexible(
-                                                          child: Text(
-                                                            order.deliveryTypeLabel,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            style: const TextStyle(fontSize: 12, color: Color(0xFF10B981)),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    if (order.scheduledDate != null)
-                                                      Padding(
-                                                        padding: const EdgeInsets.only(top: 2),
-                                                        child: Row(
-                                                          children: [
-                                                            Icon(
-                                                              Icons.event_rounded,
-                                                              size: 11,
-                                                              color: order.isOverdue
-                                                                  ? const Color(0xFFDC2626)
-                                                                  : const Color(0xFF64748B),
-                                                            ),
-                                                            const SizedBox(width: 4),
-                                                            Flexible(
-                                                              child: Text(
-                                                                DateFormat('EEE, MMM d').format(order.scheduledDate!),
-                                                                overflow: TextOverflow.ellipsis,
-                                                                style: TextStyle(
-                                                                  fontSize: 10.5,
-                                                                  fontWeight: FontWeight.w600,
-                                                                  color: order.isOverdue
-                                                                      ? const Color(0xFFDC2626)
-                                                                      : const Color(0xFF64748B),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                              ),
-
-                                              // STATUS
-                                              Expanded(
-                                                flex: 2,
-                                                child: Align(
-                                                  alignment: Alignment.centerLeft,
-                                                  child: StatusPill(status: order.status),
-                                                ),
-                                              ),
-
-                                              // PAYMENT
-                                              Expanded(
-                                                flex: 2,
-                                                child: Text(
-                                                  order.paymentStatusLabel,
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: paymentColor(order.paymentStatus),
-                                                  ),
-                                                ),
-                                              ),
-
-                                              // TOTAL
-                                              Expanded(
-                                                flex: 1,
-                                                child: Text('${Money.symbol}${order.totalAmount.toInt()}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                              ),
-
-                                              // UPDATED
-                                              Expanded(
-                                                flex: 1,
-                                                child: Text(
-                                                  relativeTime(order.createdAt),
-                                                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                          ),
-
-                          // Table Footer
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            decoration: const BoxDecoration(
-                              border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  filteredOrders.length == provider.orders.length
-                                      ? 'Showing ${filteredOrders.length}'
-                                      : 'Showing ${filteredOrders.length} of ${provider.orders.length}',
-                                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                                ),
-                                const Text('No more orders', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-                              ],
-                            ),
-                          ),
-                        ],
+                  child: Text(order.customerName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A))),
+                ),
+                Text(
+                    '${order.items.length} item${order.items.length == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF94A3B8))),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.circle, size: 6, color: Color(0xFF10B981)),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(order.deliveryTypeLabel,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF475569))),
+                ),
+                if (order.scheduledDate != null) ...[
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      '· ${DateFormat('EEE, MMM d').format(order.scheduledDate!)}',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: order.isOverdue
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF94A3B8),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
+                ],
+              ],
+            ),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(order.paymentStatusLabel,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: paymentColor(order.paymentStatus))),
+                Text('${Money.symbol}${order.totalAmount.toInt()}',
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A))),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text('Updated ${relativeTime(order.createdAt)}',
+                  style:
+                      const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The wide-mode header — title/count, date dropdown, a 240px search box,
+  /// Filters, Export, New Order — all in one unwrapped Row. Unchanged from
+  /// before the phone layout existed.
+  Widget _wideHeaderBar(AppProvider provider) {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Row(
+        children: [
+          Row(
+            children: [
+              const Text('Orders',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A))),
+              const SizedBox(width: 8),
+              Text('${provider.orders.length} Total',
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+            ],
+          ),
+          const Spacer(),
+          _dateDropdown(),
+          const SizedBox(width: 12),
+
+          // Search Input Box
+          Container(
+            width: 240,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: TextField(
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: const InputDecoration(
+                hintText: 'Search by order ID, phone, or name...',
+                hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                prefixIcon: Icon(Icons.search_rounded,
+                    size: 18, color: Color(0xFF94A3B8)),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          _filtersButton(),
+          const SizedBox(width: 8),
+          _exportButton(),
+          const SizedBox(width: 8),
+          _newOrderButton(iconOnly: false),
+        ],
+      ),
+    );
+  }
+
+  /// The narrow-mode header — the same controls, stacked instead of
+  /// unwrapped: title + icon-only New Order, a full-width search box, then
+  /// the date/Filters/Export controls in their own horizontal scroll (same
+  /// pattern the status tabs below already use).
+  Widget _narrowHeaderBar(AppProvider provider) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Text('Orders',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A))),
+                  const SizedBox(width: 8),
+                  Text('${provider.orders.length} Total',
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF94A3B8))),
+                ],
+              ),
+              _newOrderButton(iconOnly: true),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: TextField(
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: const InputDecoration(
+                hintText: 'Search by order ID, phone, or name...',
+                hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                prefixIcon: Icon(Icons.search_rounded,
+                    size: 18, color: Color(0xFF94A3B8)),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 38,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                _dateDropdown(),
+                const SizedBox(width: 8),
+                _filtersButton(),
+                const SizedBox(width: 8),
+                _exportButton(),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _dateDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 38,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<OrderDateRange>(
+          value: _timeFilter,
+          style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF334155)),
+          items: OrderDateRange.values
+              .map((r) => DropdownMenuItem(value: r, child: Text(r.label)))
+              .toList(),
+          onChanged: (val) {
+            if (val != null) setState(() => _timeFilter = val);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _filtersButton() {
+    return OutlinedButton.icon(
+      onPressed: _showFiltersDialog,
+      icon: Icon(Icons.tune_rounded,
+          size: 16,
+          color: _extraFilterCount > 0
+              ? const Color(0xFF1A4FD6)
+              : const Color(0xFF475569)),
+      label: Text(
+        _extraFilterCount > 0 ? 'Filters ($_extraFilterCount)' : 'Filters',
+        style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: _extraFilterCount > 0
+                ? const Color(0xFF1A4FD6)
+                : const Color(0xFF334155)),
+      ),
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(
+            color: _extraFilterCount > 0
+                ? const Color(0xFF1A4FD6)
+                : const Color(0xFFE2E8F0)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      ),
+    );
+  }
+
+  Widget _exportButton() {
+    return OutlinedButton.icon(
+      onPressed: () {},
+      icon: const Icon(Icons.download_rounded,
+          size: 16, color: Color(0xFF475569)),
+      label: const Text('Export',
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF334155))),
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      ),
+    );
+  }
+
+  /// `iconOnly` drops the label for the narrow header, matching the same
+  /// icon-plus treatment New Order's phone header already uses.
+  Widget _newOrderButton({required bool iconOnly}) {
+    if (iconOnly) {
+      return SizedBox(
+        width: 38,
+        height: 38,
+        child: ElevatedButton(
+          onPressed: () => context.goSection(1),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF1A4FD6),
+            padding: EdgeInsets.zero,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: const Icon(Icons.add, size: 18, color: Colors.white),
+        ),
+      );
+    }
+    return ElevatedButton.icon(
+      onPressed: () => context.goSection(1),
+      icon: const Icon(Icons.add, size: 16, color: Colors.white),
+      label: const Text('New Order',
+          style: TextStyle(
+              fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF1A4FD6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -520,37 +877,47 @@ class _OrdersScreenState extends State<OrdersScreen> {
             OrderStatus.progression.contains(t['key']) ||
             t['key'] == OrderStatus.cancelled)
         .toList();
-    var statusKey = statusOptions.any((t) => t['key'] == _selectedKey) ? _selectedKey : 'ALL';
+    var statusKey = statusOptions.any((t) => t['key'] == _selectedKey)
+        ? _selectedKey
+        : 'ALL';
 
     final applied = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setDialogState) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               children: [
                 const Expanded(
                   child: Text('Filter Orders',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A))),
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(ctx, false),
-                  icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8)),
+                  icon:
+                      const Icon(Icons.close_rounded, color: Color(0xFF94A3B8)),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
               ],
             ),
             content: SizedBox(
-              width: 400,
+              width: math.min(400.0, MediaQuery.sizeOf(ctx).width - 48),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text('ATTENTION NEEDED',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF64748B))),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -561,7 +928,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             title: 'Overdue Orders',
                             subtitle: 'Past expected delivery',
                             selected: overdueOnly,
-                            onTap: () => setDialogState(() => overdueOnly = !overdueOnly),
+                            onTap: () => setDialogState(
+                                () => overdueOnly = !overdueOnly),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -572,14 +940,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             title: 'Unpaid Dues',
                             subtitle: 'Balance not collected',
                             selected: unpaidDuesOnly,
-                            onTap: () => setDialogState(() => unpaidDuesOnly = !unpaidDuesOnly),
+                            onTap: () => setDialogState(
+                                () => unpaidDuesOnly = !unpaidDuesOnly),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 20),
                     const Text('ORDER SOURCE',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF64748B))),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -589,7 +961,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             title: 'All',
                             subtitle: 'All sources',
                             selected: orderSource == 'all',
-                            onTap: () => setDialogState(() => orderSource = 'all'),
+                            onTap: () =>
+                                setDialogState(() => orderSource = 'all'),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -599,7 +972,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             title: 'Online',
                             subtitle: 'From public page',
                             selected: orderSource == 'online',
-                            onTap: () => setDialogState(() => orderSource = 'online'),
+                            onTap: () =>
+                                setDialogState(() => orderSource = 'online'),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -609,14 +983,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             title: 'In-shop',
                             subtitle: 'POS / counter',
                             selected: orderSource == 'inshop',
-                            onTap: () => setDialogState(() => orderSource = 'inshop'),
+                            onTap: () =>
+                                setDialogState(() => orderSource = 'inshop'),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 20),
                     const Text('ORDER TYPE',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF64748B))),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -636,7 +1014,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             title: 'Shop Pickup',
                             subtitle: 'Customer picks up',
                             selected: orderType == DeliveryType.storePickup,
-                            onTap: () => setDialogState(() => orderType = DeliveryType.storePickup),
+                            onTap: () => setDialogState(
+                                () => orderType = DeliveryType.storePickup),
                           ),
                         ),
                       ],
@@ -650,7 +1029,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             title: 'Home Delivery',
                             subtitle: 'Deliver to customer',
                             selected: orderType == DeliveryType.homeDelivery,
-                            onTap: () => setDialogState(() => orderType = DeliveryType.homeDelivery),
+                            onTap: () => setDialogState(
+                                () => orderType = DeliveryType.homeDelivery),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -660,14 +1040,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             title: 'Pickup & Delivery',
                             subtitle: 'We pick up and deliver',
                             selected: orderType == DeliveryType.homePickup,
-                            onTap: () => setDialogState(() => orderType = DeliveryType.homePickup),
+                            onTap: () => setDialogState(
+                                () => orderType = DeliveryType.homePickup),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 20),
                     const Text('SERVICE TYPE',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF64748B))),
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -679,19 +1063,26 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         child: DropdownButton<String?>(
                           isExpanded: true,
                           value: serviceType,
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                          style: const TextStyle(
+                              fontSize: 13, color: Color(0xFF0F172A)),
                           items: [
-                            const DropdownMenuItem<String?>(value: null, child: Text('All service types')),
+                            const DropdownMenuItem<String?>(
+                                value: null, child: Text('All service types')),
                             for (final c in provider.categories)
-                              DropdownMenuItem<String?>(value: c.name, child: Text(c.name)),
+                              DropdownMenuItem<String?>(
+                                  value: c.name, child: Text(c.name)),
                           ],
-                          onChanged: (v) => setDialogState(() => serviceType = v),
+                          onChanged: (v) =>
+                              setDialogState(() => serviceType = v),
                         ),
                       ),
                     ),
                     const SizedBox(height: 20),
                     const Text('STATUS',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF64748B))),
                     const SizedBox(height: 8),
                     for (final tab in statusOptions)
                       Padding(
@@ -725,18 +1116,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       }),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Color(0xFFE2E8F0)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: const Text('Reset', style: TextStyle(color: Color(0xFF64748B))),
+                      child: const Text('Reset',
+                          style: TextStyle(color: Color(0xFF64748B))),
                     ),
                     const Spacer(),
                     FilledButton(
                       onPressed: () => Navigator.pop(ctx, true),
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF1A4FD6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: const Text('Apply Filters', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text('Apply Filters',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -754,7 +1149,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
         _orderSource = orderSource;
         _orderType = orderType;
         _serviceType = serviceType;
-        _selectedTab = statusOptions.firstWhere((t) => t['key'] == statusKey)['label']!;
+        _selectedTab =
+            statusOptions.firstWhere((t) => t['key'] == statusKey)['label']!;
       });
     }
   }
@@ -774,16 +1170,30 @@ class _OrdersScreenState extends State<OrdersScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0), width: selected ? 1.5 : 1),
+          border: Border.all(
+              color:
+                  selected ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0),
+              width: selected ? 1.5 : 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 18, color: selected ? const Color(0xFF1A4FD6) : (iconColor ?? const Color(0xFF64748B))),
+            Icon(icon,
+                size: 18,
+                color: selected
+                    ? const Color(0xFF1A4FD6)
+                    : (iconColor ?? const Color(0xFF64748B))),
             const SizedBox(height: 6),
-            Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: selected ? const Color(0xFF1A4FD6) : const Color(0xFF0F172A))),
+            Text(title,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: selected
+                        ? const Color(0xFF1A4FD6)
+                        : const Color(0xFF0F172A))),
             const SizedBox(height: 2),
-            Text(subtitle, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+            Text(subtitle,
+                style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
           ],
         ),
       ),
@@ -798,17 +1208,28 @@ class _OrdersScreenState extends State<OrdersScreen> {
         decoration: BoxDecoration(
           color: selected ? const Color(0xFFEEF2FF) : Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
+          border: Border.all(
+              color:
+                  selected ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
         ),
         child: Row(
           children: [
             Icon(
-              selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_off_rounded,
               size: 18,
-              color: selected ? const Color(0xFF1A4FD6) : const Color(0xFFCBD5E1),
+              color:
+                  selected ? const Color(0xFF1A4FD6) : const Color(0xFFCBD5E1),
             ),
             const SizedBox(width: 10),
-            Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? const Color(0xFF1A4FD6) : const Color(0xFF334155))),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: selected
+                        ? const Color(0xFF1A4FD6)
+                        : const Color(0xFF334155))),
           ],
         ),
       ),

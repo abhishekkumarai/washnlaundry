@@ -21,7 +21,12 @@ class AppProvider extends ChangeNotifier {
   };
 
   static int navIndexForPath(String path) {
-    final clean = path.trim().toLowerCase().replaceAll(RegExp(r'^/+'), '').split('?').first;
+    final clean = path
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'^/+'), '')
+        .split('?')
+        .first;
     switch (clean) {
       case 'new-order':
       case 'new_order':
@@ -169,10 +174,9 @@ class AppProvider extends ChangeNotifier {
           ? _shop!['currency_symbol'] as String
           : '₹';
 
-  String get locale =>
-      (_shop?['locale'] as String?)?.trim().isNotEmpty == true
-          ? _shop!['locale'] as String
-          : 'en_IN';
+  String get locale => (_shop?['locale'] as String?)?.trim().isNotEmpty == true
+      ? _shop!['locale'] as String
+      : 'en_IN';
 
   /// Payment methods as the backend defines them. Falls back to the four the
   /// model declares so a failed `/meta/` fetch cannot empty every dropdown.
@@ -314,9 +318,13 @@ class AppProvider extends ChangeNotifier {
                 o.status != OrderStatus.cancelled)
             .toList();
       case 'UNPAID':
-        return _orders.where((o) => o.paymentStatus == PaymentStatus.unpaid).toList();
+        return _orders
+            .where((o) => o.paymentStatus == PaymentStatus.unpaid)
+            .toList();
       case 'PARTIAL':
-        return _orders.where((o) => o.paymentStatus == PaymentStatus.partial).toList();
+        return _orders
+            .where((o) => o.paymentStatus == PaymentStatus.partial)
+            .toList();
       default:
         return _orders.where((o) => o.status == filter.toUpperCase()).toList();
     }
@@ -335,7 +343,8 @@ class AppProvider extends ChangeNotifier {
   // The local derivation survives only as a fallback for the window before the
   // first fetch lands, and for tests that seed orders without stats.
 
-  int _stat(String key, int fallback) => (_stats[key] as num?)?.toInt() ?? fallback;
+  int _stat(String key, int fallback) =>
+      (_stats[key] as num?)?.toInt() ?? fallback;
 
   int get ordersToday => _stat('orders_today', _orders.length);
 
@@ -354,12 +363,14 @@ class AppProvider extends ChangeNotifier {
 
   /// Percentage change against yesterday. Null means "nothing to compare
   /// against" — rendered as an em dash, never as 0%.
-  double? get ordersTodayChange => (_stats['orders_today_change'] as num?)?.toDouble();
+  double? get ordersTodayChange =>
+      (_stats['orders_today_change'] as num?)?.toDouble();
 
   double? get revenueTodayChange =>
       (_stats['revenue_today_change'] as num?)?.toDouble();
 
-  int? get customersNewToday => (_stats['customers_new_today'] as num?)?.toInt();
+  int? get customersNewToday =>
+      (_stats['customers_new_today'] as num?)?.toInt();
 
   /// The last 14 days of revenue, oldest first. Empty until the stats land.
   List<RevenueSeriesPointModel> get revenueSeries {
@@ -390,7 +401,8 @@ class AppProvider extends ChangeNotifier {
   int get receivedCount => _countByStatus(OrderStatus.placed);
 
   int get processingCount =>
-      _countByStatus(OrderStatus.processing) + _countByStatus(OrderStatus.ironing);
+      _countByStatus(OrderStatus.processing) +
+      _countByStatus(OrderStatus.ironing);
 
   int get readyCount => _countByStatus(OrderStatus.ready);
 
@@ -478,9 +490,11 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateOrderStatus(String orderId, String status, {String? note}) async {
+  Future<bool> updateOrderStatus(String orderId, String status,
+      {String? note}) async {
     try {
-      final updated = await ApiService.updateOrderStatus(orderId, status, note: note);
+      final updated =
+          await ApiService.updateOrderStatus(orderId, status, note: note);
       _replaceOrder(updated);
       return true;
     } on ApiException catch (e) {
@@ -492,7 +506,8 @@ class AppProvider extends ChangeNotifier {
 
   /// Edits the order header. Returns the saved order so the detail screen can
   /// re-render from the server's copy rather than its own optimistic guess.
-  Future<OrderModel?> updateOrder(String orderId, Map<String, dynamic> payload) async {
+  Future<OrderModel?> updateOrder(
+      String orderId, Map<String, dynamic> payload) async {
     try {
       final updated = await ApiService.updateOrder(orderId, payload);
       _replaceOrder(updated);
@@ -594,7 +609,8 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateGarmentItem(String id, Map<String, dynamic> payload) async {
+  Future<bool> updateGarmentItem(
+      String id, Map<String, dynamic> payload) async {
     try {
       await ApiService.saveGarmentItem(payload, id: id);
       await loadDataFromBackend();
@@ -845,7 +861,10 @@ class AppProvider extends ChangeNotifier {
         dateKey(day),
         [
           for (final entry in marks.entries)
-            {'staff': int.tryParse(entry.key) ?? entry.key, 'status': entry.value},
+            {
+              'staff': int.tryParse(entry.key) ?? entry.key,
+              'status': entry.value
+            },
         ],
       );
       _mergeAttendance(day, saved);
@@ -1028,7 +1047,8 @@ enum OrderDateRange {
         return day == startOfToday;
       case OrderDateRange.thisWeek:
         // Week starts Monday, as it does on the live dashboard.
-        final startOfWeek = startOfToday.subtract(Duration(days: today.weekday - 1));
+        final startOfWeek =
+            startOfToday.subtract(Duration(days: today.weekday - 1));
         return !day.isBefore(startOfWeek) && !day.isAfter(startOfToday);
       case OrderDateRange.thisMonth:
         return when.year == today.year && when.month == today.month;

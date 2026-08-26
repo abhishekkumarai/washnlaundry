@@ -267,5 +267,17 @@ void main() {
       expect(find.text('Order ID (e.g. WA3P-00001)'), findsOneWidget);
       expect(find.textContaining('LB-1001'), findsNothing);
     });
+
+    testWidgets('the fixed-520px content shrinks to fit a phone width '
+        'without overflowing', (tester) async {
+      tester.view
+        ..physicalSize = const Size(390, 1200)
+        ..devicePixelRatio = 1.0;
+      final provider = AppProvider(autoLoad: false)..seedForTest();
+      await tester.pumpWidget(host(provider, const ScanScreen()));
+      await tester.pump();
+
+      expect(find.text('Scan QR Code'), findsOneWidget);
+    });
   });
 }

@@ -276,6 +276,41 @@ void main() {
     });
   });
 
+  group('CustomersScreen responsive layout', () {
+    Future<void> pumpAt(WidgetTester tester, double width) async {
+      tester.view
+        ..physicalSize = Size(width, 1200)
+        ..devicePixelRatio = 1.0;
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+    }
+
+    testWidgets('shows the table header at wide width', (tester) async {
+      await pumpAt(tester, 1400);
+
+      expect(find.text('CUSTOMER'), findsOneWidget);
+      expect(find.text('Export'), findsOneWidget);
+    });
+
+    testWidgets('shows cards instead of the table at phone width',
+        (tester) async {
+      await pumpAt(tester, 390);
+
+      expect(find.text('CUSTOMER'), findsNothing);
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Lifetime'), findsWidgets);
+    });
+
+    testWidgets('Add collapses to an icon-only button at phone width',
+        (tester) async {
+      await pumpAt(tester, 390);
+
+      expect(find.text('Add'), findsNothing);
+      expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+    });
+  });
+
   group('CustomerDetailScreen', () {
     testWidgets('shows the lifetime KPIs and member-since', (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
@@ -363,6 +398,46 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(CustomerDetailScreen), findsNothing);
       expect(find.text('All customers'), findsOneWidget);
+    });
+  });
+
+  group('CustomerDetailScreen responsive layout', () {
+    Future<void> pumpAt(WidgetTester tester, double width) async {
+      tester.view
+        ..physicalSize = Size(width, 1400)
+        ..devicePixelRatio = 1.0;
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(customers: roster, orders: [
+          order(id: 'o1', number: 'WA3P-00001', customerId: 'c1'),
+        ]);
+      await tester.pumpWidget(host(
+        provider,
+        CustomerDetailScreen(
+            customer: roster.first, onBack: () {}, onNewOrder: () {}),
+      ));
+      await tester.pump();
+    }
+
+    testWidgets('shows the breadcrumb and labeled New Order at wide width',
+        (tester) async {
+      await pumpAt(tester, 1400);
+
+      expect(find.text('Back to Customers'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'New Order'), findsOneWidget);
+      expect(find.text('ORDER'), findsOneWidget);
+    });
+
+    testWidgets(
+        'drops the breadcrumb and collapses New Order to an icon at phone width',
+        (tester) async {
+      await pumpAt(tester, 390);
+
+      expect(find.text('Back to Customers'), findsNothing);
+      expect(find.text('New Order'), findsNothing);
+      expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+      expect(find.text('Ramesh Kumar'), findsWidgets);
+      expect(find.text('ORDER'), findsNothing);
+      expect(find.text('#WA3P-00001'), findsOneWidget);
     });
   });
 }

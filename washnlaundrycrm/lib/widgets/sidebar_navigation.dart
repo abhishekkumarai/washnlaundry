@@ -7,19 +7,40 @@ import 'panel_card.dart';
 
 /// Left navigation rail.
 ///
-/// Responsive by itself, which is what lets every screen stay a plain
-/// `Row(children: [SidebarNavigation(), Expanded(...)])`:
+/// Above [railMinWidth], every screen wraps this in `AppShell`
+/// (`lib/widgets/app_shell.dart`), which renders it as a persistent rail:
 ///   * >= [expandedMinWidth] — full 240px rail, honouring the user's toggle
 ///   * below that            — 72px icon rail, toggle ignored
 ///   * below [railMinWidth]  — 60px icon rail, tighter padding
 ///
-/// Navigation is never hidden entirely, so there is no width at which the app
-/// becomes unnavigable.
+/// Below [railMinWidth], `AppShell` drops the rail entirely in favour of a
+/// slim hamburger bar that opens `AppDrawer`, which hosts this same widget
+/// with [inDrawer] set — see that flag's doc for what changes in that mode.
 class SidebarNavigation extends StatefulWidget {
-  const SidebarNavigation({super.key});
+  const SidebarNavigation({super.key, this.inDrawer = false});
+
+  /// True when hosted inside [AppDrawer] rather than the persistent rail.
+  /// Forces the full labeled (`expanded`) layout regardless of screen width,
+  /// fills whatever width the enclosing `Drawer` gives it instead of a fixed
+  /// rail width, drops the rail-only right border and collapse toggle (there
+  /// is nothing to "collapse" inside a drawer — you just close it), and pops
+  /// the drawer on nav-item tap.
+  final bool inDrawer;
 
   static const double expandedMinWidth = 1080;
   static const double railMinWidth = 700;
+
+  /// Below this, a screen's own content — tables, header actions — switches
+  /// to its phone-width layout (cards instead of a table, icon-only instead
+  /// of labeled buttons). Independent of the rail breakpoints above; kept
+  /// here so every screen references one shared constant instead of its own
+  /// private copy.
+  static const double contentWideBreakpoint = 760;
+
+  /// A second, wider threshold for content that only needs one stacking step
+  /// — two side-by-side panels collapsing to one column — rather than a full
+  /// table-to-card rebuild.
+  static const double contentStackBreakpoint = 900;
 
   static const double expandedWidth = 240;
   static const double railWidth = 72;
@@ -32,20 +53,90 @@ class SidebarNavigation extends StatefulWidget {
 
   // disabled: greyed out, marked "Soon", non-clickable
   static const List<Map<String, Object>> _navItems = [
-    {'label': 'Dashboard', 'icon': Icons.grid_view_rounded, 'index': 0, 'disabled': false},
-    {'label': 'New Order', 'icon': Icons.add_circle_outline_rounded, 'index': 1, 'disabled': false},
-    {'label': 'Orders', 'icon': Icons.shopping_bag_outlined, 'index': 2, 'disabled': false},
-    {'label': 'Customers', 'icon': Icons.people_outline_rounded, 'index': 3, 'disabled': false},
-    {'label': 'Services', 'icon': Icons.local_offer_outlined, 'index': 4, 'disabled': false},
-    {'label': 'Staff', 'icon': Icons.badge_outlined, 'index': 5, 'disabled': false},
-    {'label': 'Attendance', 'icon': Icons.calendar_today_rounded, 'index': 6, 'disabled': false},
-    {'label': 'Payroll', 'icon': Icons.credit_card_rounded, 'index': 7, 'disabled': false},
-    {'label': 'Expenses', 'icon': Icons.receipt_long_outlined, 'index': 8, 'disabled': false},
-    {'label': 'Reports', 'icon': Icons.bar_chart_rounded, 'index': 9, 'disabled': false},
-    {'label': 'Apps', 'icon': Icons.apps_rounded, 'index': 10, 'disabled': true},
-    {'label': 'Scan', 'icon': Icons.qr_code_scanner_rounded, 'index': 11, 'disabled': false},
-    {'label': 'Subscription', 'icon': Icons.workspace_premium_outlined, 'index': 12, 'disabled': true},
-    {'label': 'Settings', 'icon': Icons.settings_outlined, 'index': 13, 'disabled': true},
+    {
+      'label': 'Dashboard',
+      'icon': Icons.grid_view_rounded,
+      'index': 0,
+      'disabled': false
+    },
+    {
+      'label': 'New Order',
+      'icon': Icons.add_circle_outline_rounded,
+      'index': 1,
+      'disabled': false
+    },
+    {
+      'label': 'Orders',
+      'icon': Icons.shopping_bag_outlined,
+      'index': 2,
+      'disabled': false
+    },
+    {
+      'label': 'Customers',
+      'icon': Icons.people_outline_rounded,
+      'index': 3,
+      'disabled': false
+    },
+    {
+      'label': 'Services',
+      'icon': Icons.local_offer_outlined,
+      'index': 4,
+      'disabled': false
+    },
+    {
+      'label': 'Staff',
+      'icon': Icons.badge_outlined,
+      'index': 5,
+      'disabled': false
+    },
+    {
+      'label': 'Attendance',
+      'icon': Icons.calendar_today_rounded,
+      'index': 6,
+      'disabled': false
+    },
+    {
+      'label': 'Payroll',
+      'icon': Icons.credit_card_rounded,
+      'index': 7,
+      'disabled': false
+    },
+    {
+      'label': 'Expenses',
+      'icon': Icons.receipt_long_outlined,
+      'index': 8,
+      'disabled': false
+    },
+    {
+      'label': 'Reports',
+      'icon': Icons.bar_chart_rounded,
+      'index': 9,
+      'disabled': false
+    },
+    {
+      'label': 'Apps',
+      'icon': Icons.apps_rounded,
+      'index': 10,
+      'disabled': true
+    },
+    {
+      'label': 'Scan',
+      'icon': Icons.qr_code_scanner_rounded,
+      'index': 11,
+      'disabled': false
+    },
+    {
+      'label': 'Subscription',
+      'icon': Icons.workspace_premium_outlined,
+      'index': 12,
+      'disabled': true
+    },
+    {
+      'label': 'Settings',
+      'icon': Icons.settings_outlined,
+      'index': 13,
+      'disabled': true
+    },
   ];
 
   @override
@@ -80,35 +171,42 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     final provider = context.watch<AppProvider>();
     final screenWidth = MediaQuery.sizeOf(context).width;
 
-    final canExpand = screenWidth >= expandedMinWidth;
-    final expanded = canExpand && !provider.sidebarCollapsed;
-    final narrow = screenWidth < railMinWidth;
+    final canExpand = !widget.inDrawer && screenWidth >= expandedMinWidth;
+    final expanded =
+        widget.inDrawer || (canExpand && !provider.sidebarCollapsed);
+    final narrow = !widget.inDrawer && screenWidth < railMinWidth;
 
-    final width = expanded
-        ? expandedWidth
-        : narrow
-            ? narrowRailWidth
-            : railWidth;
+    final width = widget.inDrawer
+        ? double.infinity
+        : expanded
+            ? expandedWidth
+            : narrow
+                ? narrowRailWidth
+                : railWidth;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
       width: width,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(right: BorderSide(color: Color(0xFFE2E8F0))),
+        border: widget.inDrawer
+            ? null
+            : const Border(right: BorderSide(color: Color(0xFFE2E8F0))),
       ),
       child: Column(
         children: [
           _brand(context, expanded: expanded, canExpand: canExpand),
-          Expanded(child: _navList(provider, expanded: expanded, narrow: narrow)),
+          Expanded(
+              child: _navList(provider, expanded: expanded, narrow: narrow)),
           _profileFooter(context, expanded: expanded),
         ],
       ),
     );
   }
 
-  Widget _brand(BuildContext context, {required bool expanded, required bool canExpand}) {
+  Widget _brand(BuildContext context,
+      {required bool expanded, required bool canExpand}) {
     final mark = Container(
       width: 36,
       height: 36,
@@ -116,7 +214,8 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
         color: _brandBlue,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: const Icon(Icons.dry_cleaning_rounded, color: Colors.white, size: 22),
+      child:
+          const Icon(Icons.dry_cleaning_rounded, color: Colors.white, size: 22),
     );
 
     if (!expanded) {
@@ -132,7 +231,8 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                 padding: const EdgeInsets.only(top: 8),
                 constraints: const BoxConstraints(),
                 onPressed: () => context.read<AppProvider>().toggleSidebar(),
-                icon: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                icon: const Icon(Icons.chevron_right_rounded,
+                    color: Color(0xFF94A3B8)),
               ),
           ],
         ),
@@ -154,31 +254,42 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                   children: [
                     TextSpan(
                       text: 'WashN',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _ink, letterSpacing: -0.5),
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: _ink,
+                          letterSpacing: -0.5),
                     ),
                     TextSpan(
                       text: 'Laundry',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _brandBlue, letterSpacing: -0.5),
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: _brandBlue,
+                          letterSpacing: -0.5),
                     ),
                   ],
                 ),
               ),
             ),
           ),
-          IconButton(
-            tooltip: 'Collapse sidebar',
-            iconSize: 18,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            onPressed: () => context.read<AppProvider>().toggleSidebar(),
-            icon: const Icon(Icons.chevron_left_rounded, color: Color(0xFF94A3B8)),
-          ),
+          if (!widget.inDrawer)
+            IconButton(
+              tooltip: 'Collapse sidebar',
+              iconSize: 18,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () => context.read<AppProvider>().toggleSidebar(),
+              icon: const Icon(Icons.chevron_left_rounded,
+                  color: Color(0xFF94A3B8)),
+            ),
         ],
       ),
     );
   }
 
-  Widget _navList(AppProvider provider, {required bool expanded, required bool narrow}) {
+  Widget _navList(AppProvider provider,
+      {required bool expanded, required bool narrow}) {
     // Scrollbar so it's discoverable that the rail scrolls when 14 items don't
     // fit a short window.
     return Scrollbar(
@@ -187,45 +298,50 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
       child: ListView.builder(
         controller: _navScrollController,
         primary: false,
-      itemCount: _navItems.length,
-      padding: EdgeInsets.symmetric(horizontal: expanded ? 10 : 6, vertical: 4),
-      itemBuilder: (context, index) {
-        final item = _navItems[index];
-        final navIndex = item['index'] as int;
-        final disabled = item['disabled'] as bool;
-        final isSelected = !disabled && provider.currentNavIndex == navIndex;
+        itemCount: _navItems.length,
+        padding:
+            EdgeInsets.symmetric(horizontal: expanded ? 10 : 6, vertical: 4),
+        itemBuilder: (context, index) {
+          final item = _navItems[index];
+          final navIndex = item['index'] as int;
+          final disabled = item['disabled'] as bool;
+          final isSelected = !disabled && provider.currentNavIndex == navIndex;
 
-        final tile = _navTile(
-          context,
-          item: item,
-          isSelected: isSelected,
-          disabled: disabled,
-          expanded: expanded,
-          narrow: narrow,
-        );
-
-        // Group separator before "Apps".
-        if (index == 10) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (expanded)
-                const Padding(
-                  padding: EdgeInsets.only(left: 12, top: 8, bottom: 4),
-                  child: Text(
-                    'MORE',
-                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: _disabled, letterSpacing: 0.8),
-                  ),
-                )
-              else
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Divider(height: 1, color: Color(0xFFF1F5F9)),
-                ),
-              tile,
-            ],
+          final tile = _navTile(
+            context,
+            item: item,
+            isSelected: isSelected,
+            disabled: disabled,
+            expanded: expanded,
+            narrow: narrow,
           );
-        }
+
+          // Group separator before "Apps".
+          if (index == 10) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (expanded)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 12, top: 8, bottom: 4),
+                    child: Text(
+                      'MORE',
+                      style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: _disabled,
+                          letterSpacing: 0.8),
+                    ),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  ),
+                tile,
+              ],
+            );
+          }
           return tile;
         },
       ),
@@ -271,19 +387,25 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
               ),
               if (disabled)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text(
                     'Soon',
-                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8)),
+                    style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF94A3B8)),
                   ),
                 ),
             ],
           )
-        : Center(child: Icon(item['icon'] as IconData, size: narrow ? 18 : 19, color: iconColor));
+        : Center(
+            child: Icon(item['icon'] as IconData,
+                size: narrow ? 18 : 19, color: iconColor));
 
     final tile = Container(
       margin: const EdgeInsets.only(bottom: 2),
@@ -296,7 +418,12 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
-          onTap: disabled ? null : () => context.goSection(navIndex),
+          onTap: disabled
+              ? null
+              : () {
+                  context.goSection(navIndex);
+                  if (widget.inDrawer) Navigator.of(context).maybePop();
+                },
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: expanded ? 12 : 4,
@@ -338,12 +465,14 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
       backgroundColor: const Color(0xFFEEF2FF),
       child: Text(
         initialsFor(ownerName.isEmpty ? shopName : ownerName),
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _brandBlue),
+        style: const TextStyle(
+            fontSize: 11, fontWeight: FontWeight.bold, color: _brandBlue),
       ),
     );
 
     return Container(
-      padding: EdgeInsets.fromLTRB(expanded ? 12 : 6, 12, expanded ? 12 : 6, 12),
+      padding:
+          EdgeInsets.fromLTRB(expanded ? 12 : 6, 12, expanded ? 12 : 6, 12),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
       ),
@@ -359,7 +488,10 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                       Text(
                         title,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _ink),
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: _ink),
                       ),
                       Text(
                         ownerName.isEmpty ? 'Admin' : ownerName,
@@ -371,7 +503,8 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                 ),
                 IconButton(
                   tooltip: 'Sign out',
-                  icon: const Icon(Icons.logout_rounded, size: 17, color: Color(0xFF94A3B8)),
+                  icon: const Icon(Icons.logout_rounded,
+                      size: 17, color: Color(0xFF94A3B8)),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: signOut,
@@ -386,7 +519,8 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                 ),
                 IconButton(
                   tooltip: 'Sign out',
-                  icon: const Icon(Icons.logout_rounded, size: 16, color: Color(0xFF94A3B8)),
+                  icon: const Icon(Icons.logout_rounded,
+                      size: 16, color: Color(0xFF94A3B8)),
                   padding: const EdgeInsets.only(top: 8),
                   constraints: const BoxConstraints(),
                   onPressed: signOut,

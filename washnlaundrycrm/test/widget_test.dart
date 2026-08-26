@@ -150,6 +150,46 @@ void main() {
     });
   });
 
+  group('inDrawer mode', () {
+    testWidgets('renders expanded regardless of a narrow width', (tester) async {
+      final provider = AppProvider(autoLoad: false);
+      tester.view
+        ..physicalSize = const Size(390, 1400)
+        ..devicePixelRatio = 1.0;
+      await tester.pumpWidget(
+        wrap(provider, const SidebarNavigation(inDrawer: true)),
+      );
+
+      expect(
+        railWidth(tester) > SidebarNavigation.railWidth,
+        isTrue,
+        reason: 'inDrawer should force the full labeled layout, not the icon rail',
+      );
+      expect(find.text('Dashboard'), findsOneWidget);
+    });
+
+    testWidgets('does not offer the collapse toggle', (tester) async {
+      final provider = AppProvider(autoLoad: false);
+      await tester.pumpWidget(
+        wrap(provider, const SidebarNavigation(inDrawer: true)),
+      );
+
+      expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
+    });
+
+    testWidgets('tapping a nav tile still calls goSection', (tester) async {
+      final provider = AppProvider(autoLoad: false);
+      await tester.pumpWidget(
+        wrap(provider, const SidebarNavigation(inDrawer: true)),
+      );
+
+      await tester.tap(find.text('Orders'));
+      await tester.pump();
+
+      expect(provider.currentNavIndex, 2);
+    });
+  });
+
   testWidgets('disabled items are inert and marked Soon', (tester) async {
     final provider = AppProvider(autoLoad: false);
     await tester.pumpWidget(wrap(provider, const SidebarNavigation()));

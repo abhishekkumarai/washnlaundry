@@ -368,4 +368,45 @@ void main() {
           findsNothing);
     });
   });
+
+  group('header responsive layout', () {
+    Future<void> pumpAt(WidgetTester tester, double width, OrderModel o) async {
+      tester.view
+        ..physicalSize = Size(width, 1200)
+        ..devicePixelRatio = 1.0;
+      final provider = AppProvider(autoLoad: false)..seedForTest(orders: [o]);
+      await tester.pumpWidget(
+        host(provider, OrderDetailScreen(order: o, onBack: () {})),
+      );
+      await tester.pump();
+    }
+
+    testWidgets('shows the labeled header buttons at wide width',
+        (tester) async {
+      await pumpAt(tester, 1400, order());
+
+      expect(find.text('WhatsApp'), findsOneWidget);
+      expect(find.text('Edit'), findsOneWidget);
+      expect(find.text('Print Receipt'), findsOneWidget);
+      expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
+    });
+
+    testWidgets('collapses secondary actions into an overflow menu at phone width',
+        (tester) async {
+      await pumpAt(tester, 390, order());
+
+      expect(find.text('WhatsApp'), findsNothing);
+      expect(find.text('Print Receipt'), findsNothing);
+      expect(find.byIcon(Icons.more_vert_rounded), findsOneWidget);
+      // Update Status stays a visible primary action, not folded into the menu.
+      expect(find.byIcon(Icons.autorenew_rounded), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.text('WhatsApp'), findsOneWidget);
+      expect(find.text('Edit'), findsOneWidget);
+      expect(find.text('Print Receipt'), findsOneWidget);
+    });
+  });
 }

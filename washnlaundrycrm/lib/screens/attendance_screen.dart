@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
 import '../widgets/load_state.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
 
 /// `/attendance` in the live app. Not captured yet, so this follows our own
@@ -131,53 +132,69 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
-    final formattedDate = DateFormat('EEEE, dd MMMM yyyy').format(_selectedDate);
+    final formattedDate =
+        DateFormat('EEEE, dd MMMM yyyy').format(_selectedDate);
     final roster = provider.staff.where((s) => s.isActive).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Row(
-        children: [
-          const SidebarNavigation(),
-          Expanded(
-            child: Column(
+      drawer: const AppDrawer(),
+      body: AppShell(
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
+            return Column(
               children: [
-                // Top Header Bar
-                Container(
-                  height: 56,
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-                  ),
-                  child: Row(
-                    children: [
-                      const Text('Attendance', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                      const SizedBox(width: 8),
-                      Text(DateFormat('MMM yyyy').format(_selectedDate), style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-                      const Spacer(),
-
-                      // Calendar Date Picker Button
-                      OutlinedButton.icon(
-                        onPressed: _pickDate,
-                        icon: const Icon(Icons.calendar_month_rounded, size: 16, color: Color(0xFF1A4FD6)),
-                        label: Text(
-                          formattedDate,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF1A4FD6)),
-                          backgroundColor: const Color(0xFFEEF2FF),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
+                narrow ? _narrowHeader() : _wideHeader(formattedDate),
                 Expanded(child: _body(provider, roster, formattedDate)),
               ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _wideHeader(String formattedDate) {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Row(
+        children: [
+          const Text('Attendance',
+              style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
+          const SizedBox(width: 8),
+          Text(DateFormat('MMM yyyy').format(_selectedDate),
+              style:
+                  const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          const Spacer(),
+
+          // Calendar Date Picker Button
+          OutlinedButton.icon(
+            onPressed: _pickDate,
+            icon: const Icon(Icons.calendar_month_rounded,
+                size: 16, color: Color(0xFF1A4FD6)),
+            label: Text(
+              formattedDate,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A4FD6)),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFF1A4FD6)),
+              backgroundColor: const Color(0xFFEEF2FF),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
           ),
         ],
@@ -185,7 +202,67 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  Widget _body(AppProvider provider, List<StaffModel> roster, String formattedDate) {
+  /// Below [SidebarNavigation.contentWideBreakpoint]: title/month can't share a row with a button
+  /// whose label is a full weekday+date string. Stacks title+month above the
+  /// date-picker button (on its own full-width row, shortened to `d MMM
+  /// yyyy` — the weekday name is the part that doesn't fit and matters least).
+  Widget _narrowHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Attendance',
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A))),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(DateFormat('MMM yyyy').format(_selectedDate),
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF94A3B8))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _pickDate,
+              icon: const Icon(Icons.calendar_month_rounded,
+                  size: 16, color: Color(0xFF1A4FD6)),
+              label: Text(
+                DateFormat('d MMM yyyy').format(_selectedDate),
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A4FD6)),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF1A4FD6)),
+                backgroundColor: const Color(0xFFEEF2FF),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _body(
+      AppProvider provider, List<StaffModel> roster, String formattedDate) {
     // Page-level states track the whole-shop load, which is where the roster
     // comes from. A failed single-day fetch is reported inline instead — it
     // must not blank a roster that loaded perfectly well.
@@ -205,46 +282,60 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Daily Attendance Register', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                  Text('Mark staff presence for $formattedDate', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Daily Attendance Register',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A))),
+                    Text('Mark staff presence for $formattedDate',
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF64748B))),
+                  ],
+                ),
               ),
+              const SizedBox(width: 12),
               ElevatedButton.icon(
-                onPressed: (_saving || roster.isEmpty) ? null : () => _save(provider, roster),
+                onPressed: (_saving || roster.isEmpty)
+                    ? null
+                    : () => _save(provider, roster),
                 icon: _saving
                     ? const SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
                       )
-                    : const Icon(Icons.check_circle_outline_rounded, size: 16, color: Colors.white),
-                label: const Text('Save Register', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                    : const Icon(Icons.check_circle_outline_rounded,
+                        size: 16, color: Colors.white),
+                label: const Text('Save Register',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1A4FD6),
                   disabledBackgroundColor: const Color(0xFF94A3B8),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                   elevation: 0,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
-
           if (provider.attendanceError != null) ...[
             _dayError(provider.attendanceError!),
             const SizedBox(height: 16),
           ],
-
-          if (roster.isEmpty)
-            _emptyRoster()
-          else
-            _register(provider, roster),
+          if (roster.isEmpty) _emptyRoster() else _register(provider, roster),
         ],
       ),
     );
@@ -263,7 +354,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, size: 17, color: Color(0xFFDC2626)),
+          const Icon(Icons.error_outline_rounded,
+              size: 17, color: Color(0xFFDC2626)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(message,
@@ -273,7 +365,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             onPressed: () =>
                 context.read<AppProvider>().loadAttendanceFor(_selectedDate),
             child: const Text('Retry',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFDC2626))),
           ),
         ],
       ),
@@ -294,7 +389,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           Icon(Icons.groups_outlined, size: 34, color: Color(0xFF94A3B8)),
           SizedBox(height: 10),
           Text('No active staff to mark.',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
           SizedBox(height: 4),
           Text('Add someone on the Staff screen first.',
               style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
@@ -321,44 +419,81 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         itemBuilder: (context, idx) {
           final s = roster[idx];
           final mark = _pending[s.id] ?? saved[s.id];
-
-          return ListTile(
-            leading: CircleAvatar(
-              backgroundColor: const Color(0xFFEEF2FF),
-              child: Text(
-                s.name.isEmpty ? '?' : s.name[0].toUpperCase(),
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
-              ),
-            ),
-            title: Text(s.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            subtitle: Text(
-              mark == null ? '${s.role} • not marked' : s.role,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-            ),
-            trailing: Wrap(
-              spacing: 6,
-              children: _statuses.map((status) {
-                final isSel = mark == status;
-                return ChoiceChip(
-                  label: Text(
-                    _statusLabel(status),
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: isSel ? Colors.white : const Color(0xFF475569),
-                    ),
-                  ),
-                  selected: isSel,
-                  selectedColor: _statusColors[status],
-                  backgroundColor: const Color(0xFFF1F5F9),
-                  onSelected: (val) {
-                    if (val) setState(() => _pending[s.id] = status);
-                  },
-                );
-              }).toList(),
-            ),
-          );
+          return _registerRow(s, mark);
         },
+      ),
+    );
+  }
+
+  /// Replaces a `ListTile(trailing: Wrap(...))` that badly mislaid out at
+  /// narrow width — `ListTile` gives its `trailing` slot unconstrained
+  /// intrinsic width, and a `Wrap` inside it reported a huge intrinsic
+  /// width back, squeezing `title`/`subtitle` down to a couple of pixels
+  /// (the name rendered one letter per line). A plain Column sidesteps
+  /// ListTile's layout algorithm entirely and works at any width.
+  Widget _registerRow(StaffModel s, String? mark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: const Color(0xFFEEF2FF),
+                child: Text(
+                  s.name.isEmpty ? '?' : s.name[0].toUpperCase(),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(s.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A))),
+                    Text(
+                      mark == null ? '${s.role} • not marked' : s.role,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _statuses.map((status) {
+              final isSel = mark == status;
+              return ChoiceChip(
+                label: Text(
+                  _statusLabel(status),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isSel ? Colors.white : const Color(0xFF475569),
+                  ),
+                ),
+                selected: isSel,
+                selectedColor: _statusColors[status],
+                backgroundColor: const Color(0xFFF1F5F9),
+                onSelected: (val) {
+                  if (val) setState(() => _pending[s.id] = status);
+                },
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }

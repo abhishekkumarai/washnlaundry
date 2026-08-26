@@ -1507,3 +1507,85 @@ collision with this project's "laundrybill" only by way of a shared
 prefix). This project's backend uses SQLite per CLAUDE.md and has no
 Postgres dependency at all, so the suspension is a non-issue here —
 worth remembering only so it isn't mistaken for a real problem again.
+
+---
+
+## Session of 2026-08-26
+
+Opened with a large uncommitted diff already sitting in the working tree —
+every screen with a nav rail, `sidebar_navigation.dart`, `router.dart`, and a
+new untracked `lib/widgets/app_shell.dart` / `test/app_shell_test.dart`, none
+of it mentioned in this file yet. It turned out to be a finished implementation
+of the "Tablet (~600–1080 logical px)" step from CLAUDE.md's "Future steps"
+section, from a prior session that ended before committing or writing it up.
+Verified rather than redone from scratch: `flutter analyze` was clean (70 info-
+level lints, no errors — same baseline shape as before), `flutter test` passed
+420/420 including new responsive-specific suites, and a live smoke test
+(`flutter run -d web-server` against the seeded Django backend, driven through
+`claude-in-chrome`: demo-mode sign-in, Dashboard, Orders) showed real data
+rendering with no console errors. Browser window resizing wasn't controllable
+in this environment (`resize_window` didn't change `window.innerWidth` no
+matter what was requested — the Chrome window here appears to be a fixed-size,
+undecorated one), so the exact-pixel breakpoint behaviour was verified through
+the widget-test suite's `tester.view.physicalSize` harness instead of eyeballing
+a resized browser, which is in any case the more precise of the two.
+
+**What the diff actually contains:** `AppShell`/`AppDrawer` (new,
+`lib/widgets/app_shell.dart`) replace the old per-screen
+`Row(children: [SidebarNavigation(), Expanded(body)])` — all 14 screens that
+carry the rail now do `Scaffold(drawer: const AppDrawer(), body:
+AppShell(body: ...))` instead. Below `SidebarNavigation.railMinWidth` (700,
+unchanged), `AppShell` drops the persistent rail for a 44px hamburger bar
+that opens `AppDrawer`, hosting `SidebarNavigation(inDrawer: true)` — new
+`inDrawer` flag forces the full labeled layout, fills the drawer's width
+instead of a fixed rail width, drops the collapse toggle and rail border, and
+closes itself on nav-item tap. Below each screen's own content breakpoint,
+wide tables (Orders, Customers, Staff, Attendance, Payroll, Expenses,
+Reports) fall back to a card/list layout, primary header actions collapse to
+icon-only buttons, and secondary actions fold into an overflow menu; Services'
+category rail collapses to horizontal chips and its tab bar becomes
+horizontally scrollable; New Order's cart panel moves from beside the grid to
+below it and the grid's column count drops; Order Detail/Customer Detail
+stack their side-by-side panels. Every one of these has a widget test driving
+the target width via `tester.view.physicalSize`, matching the pattern
+CLAUDE.md's Constraints section already asked for.
+
+**One real gap found while verifying, fixed before committing:** the diff had
+each of 9 screens declare its own private `static const double _wideBreakpoint
+= 760;` — the exact "scattering magic numbers" CLAUDE.md's Tablet section
+explicitly said not to do (it says so because a screen's threshold silently
+drifting out of sync with its neighbours is a real bug class here — three of
+the doc comments on these constants literally said "same threshold as Orders'
+own breakpoint," i.e. the sameness was already load-bearing and undeclared).
+Centralized both breakpoints actually in play — `contentWideBreakpoint = 760`
+and a second, looser `contentStackBreakpoint = 900` (used by Reports and
+Customer Detail to collapse two side-by-side panels into one column without a
+full card rebuild) — onto `SidebarNavigation`, next to `expandedMinWidth` /
+`railMinWidth`, and repointed every screen at them. Deliberately left alone:
+`dashboard_screen.dart`'s own pre-existing `_wideBreakpoint = 990` (unrelated,
+predates this session) and the graduated 1/2/3/4-column grid functions in
+`services_screen.dart`/`new_order_screen.dart` (a different kind of
+breakpoint — a column-count ladder, not a single wide/narrow threshold — so
+aliasing their `900` to `contentStackBreakpoint` would have implied a false
+shared meaning). Re-ran `flutter analyze` and `flutter test` after the
+refactor: still 70 info-level lints / 0 errors, still 420/420 passing.
+
+Also found, not fixed: `garment_model.dart`, `order_model.dart`, `money.dart`,
+`app_provider.dart`, and `api_service.dart` all showed as modified in the
+original diff. Checked each — all five are pure `dart format` line-wrap
+reflows, no logic changed. Left as-is; they're presumably fallout from
+running `dart format` across the tree at some point in the prior session.
+
+Updated CLAUDE.md's "Future steps" section to describe the tablet work as
+done rather than "nothing here is done yet," including the breakpoint table
+and the centralization. Also corrected a now-stale claim in the Android
+section that a phone width gets "a 60px icon rail" — `AppShell` already gives
+it a drawer instead now. Flagged, not fixed: `SidebarNavigation`'s own
+internal `narrowRailWidth`/`narrow` branch (the 60px icon rail) is dead code
+in production now that `AppShell` intercepts every width below
+`railMinWidth` before `SidebarNavigation` itself ever sees it non-drawer —
+it only still executes inside tests that pump `SidebarNavigation` directly.
+Worth deleting once confirmed nothing else depends on it.
+
+Committed as one commit covering both the recovered session's work and this
+session's cleanup, since the two were verified and finished together.

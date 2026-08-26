@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
 import '../utils/navigation.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/dashboard_side_panels.dart';
 import '../widgets/kpi_cards_row.dart';
 import '../widgets/load_state.dart';
@@ -11,7 +12,6 @@ import '../widgets/quick_scan_card.dart';
 import '../widgets/recent_activity_card.dart';
 import '../widgets/revenue_analytics_card.dart';
 import '../widgets/revenue_chart_card.dart';
-import '../widgets/sidebar_navigation.dart';
 import '../widgets/store_health_card.dart';
 import '../widgets/top_header.dart';
 
@@ -29,21 +29,17 @@ class DashboardScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Row(
-        children: [
-          const SidebarNavigation(),
-          Expanded(
-            child: Column(
-              children: [
-                TopHeader(
-                  title: 'Dashboard',
-                  onNewOrderPressed: () => context.goSection(1),
-                ),
-                Expanded(child: _body(provider)),
-              ],
+      drawer: const AppDrawer(),
+      body: AppShell(
+        body: Column(
+          children: [
+            TopHeader(
+              title: 'Dashboard',
+              onNewOrderPressed: () => context.goSection(1),
             ),
-          ),
-        ],
+            Expanded(child: _body(provider)),
+          ],
+        ),
       ),
     );
   }

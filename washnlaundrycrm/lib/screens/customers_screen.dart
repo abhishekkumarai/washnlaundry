@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
 import '../utils/navigation.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
 import 'customer_detail_screen.dart';
@@ -87,13 +90,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Row(
-        children: [
-          const SidebarNavigation(),
-          Expanded(
-            child: Column(
+      drawer: const AppDrawer(),
+      body: AppShell(
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
+            return Column(
               children: [
-                _header(context, customers.length),
+                narrow
+                    ? _narrowHeader(context, customers.length)
+                    : _header(context, customers.length),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
@@ -102,15 +108,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       children: [
                         _kpiRow(customers),
                         const SizedBox(height: 20),
-                        _table(filtered, lastOrders, provider),
+                        _table(filtered, lastOrders, provider, narrow),
                       ],
                     ),
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -126,9 +132,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
       child: Row(
         children: [
           const Text('Customers',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
           const SizedBox(width: 8),
-          Text('$total Total', style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          Text('$total Total',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
           const Spacer(),
           SizedBox(
             width: 260,
@@ -138,8 +148,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
               style: const TextStyle(fontSize: 13),
               decoration: InputDecoration(
                 hintText: 'Search by name, phone, or email...',
-                hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+                hintStyle:
+                    const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    size: 18, color: Color(0xFF94A3B8)),
                 filled: true,
                 fillColor: const Color(0xFFF1F5F9),
                 contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -155,12 +167,17 @@ class _CustomersScreenState extends State<CustomersScreen> {
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Export is not available yet.')),
             ),
-            icon: const Icon(Icons.download_rounded, size: 16, color: Color(0xFF475569)),
+            icon: const Icon(Icons.download_rounded,
+                size: 16, color: Color(0xFF475569)),
             label: const Text('Export',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF334155))),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Color(0xFFE2E8F0)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
           ),
@@ -171,8 +188,98 @@ class _CustomersScreenState extends State<CustomersScreen> {
             label: const Text('Add'),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF1A4FD6),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Below [SidebarNavigation.contentWideBreakpoint]: the fixed 260px search box, title, and 2
+  /// buttons no longer fit in one row. Stacks title+icon-only Add, then a
+  /// full-width search field, then Export on its own row (only one
+  /// secondary action, so no need for a scrollable filter row like Orders').
+  Widget _narrowHeader(BuildContext context, int total) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Customers',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A))),
+              ),
+              Text('$total Total',
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 38,
+                height: 38,
+                child: FilledButton(
+                  onPressed: _showAddCustomer,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF1A4FD6),
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Icon(Icons.add_rounded, size: 18),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 38,
+            child: TextField(
+              onChanged: (v) => setState(() => _searchQuery = v),
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Search by name, phone, or email...',
+                hintStyle:
+                    const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    size: 18, color: Color(0xFF94A3B8)),
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Export is not available yet.')),
+            ),
+            icon: const Icon(Icons.download_rounded,
+                size: 16, color: Color(0xFF475569)),
+            label: const Text('Export',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF334155))),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
           ),
         ],
@@ -187,9 +294,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final isNew = customers.where(_isNewCustomer).length;
 
     final cards = [
-      _kpi('all', 'Total', '${customers.length}', Icons.people_outline_rounded, const Color(0xFF1A4FD6)),
-      _kpi('active', 'Active', '$active', Icons.verified_user_outlined, const Color(0xFF10B981)),
-      _kpi('new', 'New', '$isNew', Icons.person_add_alt_1_outlined, const Color(0xFFA855F7)),
+      _kpi('all', 'Total', '${customers.length}', Icons.people_outline_rounded,
+          const Color(0xFF1A4FD6)),
+      _kpi('active', 'Active', '$active', Icons.verified_user_outlined,
+          const Color(0xFF10B981)),
+      _kpi('new', 'New', '$isNew', Icons.person_add_alt_1_outlined,
+          const Color(0xFFA855F7)),
     ];
 
     return LayoutBuilder(
@@ -209,7 +319,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
   /// [tabKey] is one of 'all' / 'active' / 'new' — tapping a card makes it
   /// the active filter tab for the table below, same idea as the Orders
   /// screen's status chips.
-  Widget _kpi(String tabKey, String label, String value, IconData icon, Color color) {
+  Widget _kpi(
+      String tabKey, String label, String value, IconData icon, Color color) {
     final isSel = _kpiFilter == tabKey;
     return InkWell(
       onTap: () => setState(() => _kpiFilter = tabKey),
@@ -219,7 +330,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isSel ? color : const Color(0xFFE2E8F0), width: isSel ? 1.5 : 1),
+          border: Border.all(
+              color: isSel ? color : const Color(0xFFE2E8F0),
+              width: isSel ? 1.5 : 1),
         ),
         child: Row(
           children: [
@@ -235,10 +348,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF64748B))),
                 const SizedBox(height: 2),
                 Text(value,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A))),
               ],
             ),
           ],
@@ -251,6 +369,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     List<CustomerModel> customers,
     Map<String, DateTime> lastOrders,
     AppProvider provider,
+    bool narrow,
   ) {
     return Container(
       decoration: _panel,
@@ -265,7 +384,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 'new' => 'New customers',
                 _ => 'All customers',
               },
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A)),
             ),
           ),
           const Divider(height: 1, color: Color(0xFFE2E8F0)),
@@ -283,8 +405,22 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               'new' => 'No new customers this month.',
                               _ => 'No customers yet. Add one to get started.',
                             },
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  style:
+                      const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                 ),
+              ),
+            )
+          else if (narrow)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  for (final c in customers)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _customerCard(c, _lastOrderFor(c, lastOrders)),
+                    ),
+                ],
               ),
             )
           else ...[
@@ -302,11 +438,151 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 ],
               ),
             ),
-            for (final c in customers)
-              _row(c, _lastOrderFor(c, lastOrders)),
+            for (final c in customers) _row(c, _lastOrderFor(c, lastOrders)),
           ],
         ],
       ),
+    );
+  }
+
+  /// Narrow-mode replacement for [_row]: the same 5 fixed-flex columns
+  /// squeeze to unreadable slivers below [SidebarNavigation.contentWideBreakpoint], same bug class
+  /// Orders' table had — stacks avatar/name/phone on top, the remaining
+  /// fields as a 2-line summary below.
+  Widget _customerCard(CustomerModel c, DateTime? lastOrder) {
+    return InkWell(
+      onTap: () => setState(() => _selected = c),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: const Color(0xFFEEF2FF),
+                  child: Text(
+                    c.name.isNotEmpty ? c.name[0].toUpperCase() : 'C',
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A4FD6)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(c.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A))),
+                      Text(c.phone.isEmpty ? '—' : c.phone,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF94A3B8))),
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.more_vert_rounded,
+                      size: 20, color: Color(0xFF94A3B8)),
+                  tooltip: 'Customer options',
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  onSelected: (action) {
+                    if (action == 'edit') {
+                      _showCustomerDialog(existing: c);
+                    } else if (action == 'delete') {
+                      _showDeleteCustomerConfirm(c);
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined,
+                              size: 15, color: Color(0xFF64748B)),
+                          SizedBox(width: 8),
+                          Text('Edit', style: TextStyle(fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline_rounded,
+                              size: 15, color: Color(0xFFDC2626)),
+                          SizedBox(width: 8),
+                          Text('Delete',
+                              style: TextStyle(
+                                  fontSize: 13, color: Color(0xFFDC2626))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _cardStat('Area', c.area.trim().isEmpty ? '—' : c.area),
+                ),
+                Expanded(
+                  child: _cardStat('Orders', '${c.totalOrders}'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _cardStat('Lifetime',
+                      '${Money.symbol}${c.totalSpent.toStringAsFixed(0)}'),
+                ),
+                Expanded(
+                  child: _cardStat('Last Order',
+                      lastOrder == null ? '—' : relativeTime(lastOrder)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _cardStat(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+        const SizedBox(height: 2),
+        Text(value,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A))),
+      ],
     );
   }
 
@@ -330,7 +606,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     child: Text(
                       c.name.isNotEmpty ? c.name[0].toUpperCase() : 'C',
                       style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A4FD6)),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -341,10 +619,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         Text(c.name,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A))),
                         Text(c.phone.isEmpty ? '—' : c.phone,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                            style: const TextStyle(
+                                fontSize: 11, color: Color(0xFF94A3B8))),
                       ],
                     ),
                   ),
@@ -355,23 +636,28 @@ class _CustomersScreenState extends State<CustomersScreen> {
               flex: 3,
               child: Text(c.area.trim().isEmpty ? '—' : c.area,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                  style:
+                      const TextStyle(fontSize: 13, color: Color(0xFF475569))),
             ),
             Expanded(
               flex: 2,
               child: Text('${c.totalOrders}',
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                  style:
+                      const TextStyle(fontSize: 13, color: Color(0xFF475569))),
             ),
             Expanded(
               flex: 2,
               child: Text('${Money.symbol}${c.totalSpent.toStringAsFixed(0)}',
                   style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A))),
             ),
             Expanded(
               flex: 3,
               child: Text(lastOrder == null ? '—' : relativeTime(lastOrder),
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                  style:
+                      const TextStyle(fontSize: 13, color: Color(0xFF475569))),
             ),
             SizedBox(
               width: 68,
@@ -380,9 +666,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 children: [
                   PopupMenuButton<String>(
                     padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.more_vert_rounded, size: 18, color: Color(0xFF94A3B8)),
+                    icon: const Icon(Icons.more_vert_rounded,
+                        size: 18, color: Color(0xFF94A3B8)),
                     tooltip: 'Customer options',
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                     onSelected: (action) {
                       if (action == 'edit') {
                         _showCustomerDialog(existing: c);
@@ -395,7 +683,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         value: 'edit',
                         child: Row(
                           children: [
-                            Icon(Icons.edit_outlined, size: 15, color: Color(0xFF64748B)),
+                            Icon(Icons.edit_outlined,
+                                size: 15, color: Color(0xFF64748B)),
                             SizedBox(width: 8),
                             Text('Edit', style: TextStyle(fontSize: 13)),
                           ],
@@ -405,15 +694,19 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFDC2626)),
+                            Icon(Icons.delete_outline_rounded,
+                                size: 15, color: Color(0xFFDC2626)),
                             SizedBox(width: 8),
-                            Text('Delete', style: TextStyle(fontSize: 13, color: Color(0xFFDC2626))),
+                            Text('Delete',
+                                style: TextStyle(
+                                    fontSize: 13, color: Color(0xFFDC2626))),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFFCBD5E1)),
+                  const Icon(Icons.chevron_right_rounded,
+                      size: 20, color: Color(0xFFCBD5E1)),
                 ],
               ),
             ),
@@ -448,11 +741,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
         return StatefulBuilder(
           builder: (ctx, setDialogState) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Text(isEdit ? 'Edit Customer' : 'Add Customer',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A))),
             content: SizedBox(
-              width: 420,
+              width: math.min(420.0, MediaQuery.sizeOf(ctx).width - 48),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,10 +759,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       keyboard: TextInputType.phone),
                   _field('Email', emailController, 'name@example.com',
                       keyboard: TextInputType.emailAddress),
-                  _field('Area / Locality', areaController, 'e.g. HBR Layout, Bengaluru'),
+                  _field('Area / Locality', areaController,
+                      'e.g. HBR Layout, Bengaluru'),
                   if (error != null) ...[
                     const SizedBox(height: 6),
-                    Text(error!, style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
+                    Text(error!,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFFDC2626))),
                   ],
                 ],
               ),
@@ -473,7 +773,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
             actions: [
               TextButton(
                 onPressed: saving ? null : () => Navigator.pop(ctx, false),
-                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+                child: const Text('Cancel',
+                    style: TextStyle(color: Color(0xFF64748B))),
               ),
               FilledButton(
                 onPressed: saving
@@ -482,7 +783,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         final name = nameController.text.trim();
                         final phone = phoneController.text.trim();
                         if (name.isEmpty || phone.isEmpty) {
-                          setDialogState(() => error = 'Name and phone are both required.');
+                          setDialogState(() =>
+                              error = 'Name and phone are both required.');
                           return;
                         }
                         setDialogState(() {
@@ -496,7 +798,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           'area': areaController.text.trim(),
                         };
                         final ok = isEdit
-                            ? await provider.updateCustomer(existing.id, payload)
+                            ? await provider.updateCustomer(
+                                existing.id, payload)
                             : await provider.addCustomer(payload);
                         if (!ctx.mounted) return;
                         if (ok) {
@@ -511,10 +814,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       },
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF1A4FD6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 child: Text(
-                  saving ? 'Saving…' : (isEdit ? 'Save Changes' : 'Add Customer'),
+                  saving
+                      ? 'Saving…'
+                      : (isEdit ? 'Save Changes' : 'Add Customer'),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -526,7 +832,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     if (saved == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isEdit ? 'Customer updated.' : 'Customer added.')),
+        SnackBar(
+            content: Text(isEdit ? 'Customer updated.' : 'Customer added.')),
       );
     }
   }
@@ -538,7 +845,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Customer',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A))),
         content: Text(
           'Are you sure you want to delete "${c.name}"? Their past orders keep '
           'their own record of the name and phone number, but the link to this '
@@ -547,12 +857,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            child: const Text('Cancel',
+                style: TextStyle(color: Color(0xFF64748B))),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            child: const Text('Delete',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -563,7 +877,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'Deleted "${c.name}".' : (provider.error ?? 'Could not delete the customer.')),
+        content: Text(ok
+            ? 'Deleted "${c.name}".'
+            : (provider.error ?? 'Could not delete the customer.')),
       ),
     );
   }
@@ -581,7 +897,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
         children: [
           Text(label,
               style: const TextStyle(
-                  fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF475569))),
           const SizedBox(height: 6),
           TextField(
             controller: controller,
@@ -589,9 +907,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
             style: const TextStyle(fontSize: 13),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              hintStyle:
+                  const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),
         ],

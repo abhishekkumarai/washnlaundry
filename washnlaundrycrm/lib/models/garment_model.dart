@@ -285,7 +285,8 @@ class AttendanceModel {
     this.status = 'PRESENT',
   });
 
-  factory AttendanceModel.fromJson(Map<String, dynamic> json) => AttendanceModel(
+  factory AttendanceModel.fromJson(Map<String, dynamic> json) =>
+      AttendanceModel(
         id: json['id'].toString(),
         staffId: json['staff'].toString(),
         staffName: json['staff_name'] ?? '',
@@ -307,7 +308,8 @@ class ServiceAreaModel {
     this.isActive = true,
   });
 
-  factory ServiceAreaModel.fromJson(Map<String, dynamic> json) => ServiceAreaModel(
+  factory ServiceAreaModel.fromJson(Map<String, dynamic> json) =>
+      ServiceAreaModel(
         id: json['id'].toString(),
         name: json['name'] ?? '',
         pinCode: json['pin_code'] ?? '',
@@ -347,7 +349,8 @@ class PayrollEntryModel {
     this.status = 'UNPAID',
   });
 
-  factory PayrollEntryModel.fromJson(Map<String, dynamic> json) => PayrollEntryModel(
+  factory PayrollEntryModel.fromJson(Map<String, dynamic> json) =>
+      PayrollEntryModel(
         staffId: json['staff'].toString(),
         staffName: json['staff_name'] ?? '',
         role: json['role'] ?? '',
@@ -361,8 +364,9 @@ class PayrollEntryModel {
 
   /// "24" or "23.5" — half-days are real, so a whole number should not gain a
   /// misleading ".0".
-  String get daysWorkedLabel =>
-      daysWorked == daysWorked.roundToDouble() ? daysWorked.toInt().toString() : '$daysWorked';
+  String get daysWorkedLabel => daysWorked == daysWorked.roundToDouble()
+      ? daysWorked.toInt().toString()
+      : '$daysWorked';
 }
 
 /// One payout against a staff member's wages — a single `SalaryPayment` row,
@@ -389,7 +393,8 @@ class SalaryPaymentModel {
     this.note = '',
   });
 
-  factory SalaryPaymentModel.fromJson(Map<String, dynamic> json) => SalaryPaymentModel(
+  factory SalaryPaymentModel.fromJson(Map<String, dynamic> json) =>
+      SalaryPaymentModel(
         id: json['id'].toString(),
         staffId: json['staff'].toString(),
         staffName: json['staff_name'] ?? '',
@@ -420,11 +425,13 @@ class PayrollSummaryModel {
   });
 
   factory PayrollSummaryModel.fromJson(Map<String, dynamic> json) {
-    final totals = (json['totals'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final totals =
+        (json['totals'] as Map?)?.cast<String, dynamic>() ?? const {};
     return PayrollSummaryModel(
       month: DateTime.tryParse(json['month'] ?? ''),
       entries: ((json['entries'] as List?) ?? const [])
-          .map((e) => PayrollEntryModel.fromJson((e as Map).cast<String, dynamic>()))
+          .map((e) =>
+              PayrollEntryModel.fromJson((e as Map).cast<String, dynamic>()))
           .toList(),
       totalPayroll: (totals['total_payroll'] ?? 0).toDouble(),
       paid: (totals['paid'] ?? 0).toDouble(),
@@ -440,9 +447,11 @@ class ReportBreakdownModel {
   final String label;
   final int count;
 
-  const ReportBreakdownModel({this.key = '', required this.label, this.count = 0});
+  const ReportBreakdownModel(
+      {this.key = '', required this.label, this.count = 0});
 
-  factory ReportBreakdownModel.fromJson(Map<String, dynamic> json) => ReportBreakdownModel(
+  factory ReportBreakdownModel.fromJson(Map<String, dynamic> json) =>
+      ReportBreakdownModel(
         key: json['key'] ?? '',
         label: json['label'] ?? '',
         count: (json['count'] ?? 0).toInt(),
@@ -458,9 +467,11 @@ class ReportMonthModel {
   final double revenue;
   final double expenses;
 
-  const ReportMonthModel({this.label = '', this.revenue = 0, this.expenses = 0});
+  const ReportMonthModel(
+      {this.label = '', this.revenue = 0, this.expenses = 0});
 
-  factory ReportMonthModel.fromJson(Map<String, dynamic> json) => ReportMonthModel(
+  factory ReportMonthModel.fromJson(Map<String, dynamic> json) =>
+      ReportMonthModel(
         label: json['label'] ?? '',
         revenue: (json['revenue'] ?? 0).toDouble(),
         expenses: (json['expenses'] ?? 0).toDouble(),
@@ -559,9 +570,11 @@ class PaymentMixModel {
   final double amount;
   final double percent;
 
-  const PaymentMixModel({required this.method, this.amount = 0, this.percent = 0});
+  const PaymentMixModel(
+      {required this.method, this.amount = 0, this.percent = 0});
 
-  factory PaymentMixModel.fromJson(Map<String, dynamic> json) => PaymentMixModel(
+  factory PaymentMixModel.fromJson(Map<String, dynamic> json) =>
+      PaymentMixModel(
         method: json['method'] ?? '',
         amount: (json['amount'] ?? 0).toDouble(),
         percent: (json['percent'] ?? 0).toDouble(),
@@ -630,7 +643,8 @@ class ReportsModel {
   static double? _optionalDouble(dynamic value) =>
       value == null ? null : (value as num).toDouble();
 
-  static List<T> _list<T>(dynamic raw, T Function(Map<String, dynamic>) parse) =>
+  static List<T> _list<T>(
+          dynamic raw, T Function(Map<String, dynamic>) parse) =>
       ((raw as List?) ?? const [])
           .map((e) => parse((e as Map).cast<String, dynamic>()))
           .toList();
@@ -695,7 +709,8 @@ class TimeSlotModel {
 
   /// "9:00 AM - 11:00 AM". The server's [label] can't be used for the slot row
   /// because it carries the kind prefix ("Pickup 09:00 AM - 11:00 AM").
-  String get timeRangeLabel => '${formatTime(startTime)} - ${formatTime(endTime)}';
+  String get timeRangeLabel =>
+      '${formatTime(startTime)} - ${formatTime(endTime)}';
 
   /// "09:00:00" (Django `TimeField`) -> "9:00 AM".
   static String formatTime(String apiTime) {

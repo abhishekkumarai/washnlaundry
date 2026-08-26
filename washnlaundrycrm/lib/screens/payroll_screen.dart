@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +7,7 @@ import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
 import '../utils/navigation.dart';
 import '../widgets/load_state.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/top_header.dart';
 import '../utils/money.dart';
@@ -30,10 +33,19 @@ class _PayrollScreenState extends State<PayrollScreen> {
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   static const _monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
-
 
   String get _monthLabel =>
       '${_monthNames[_selectedMonth.month - 1]} ${_selectedMonth.year}';
@@ -48,7 +60,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
 
   void _stepMonth(int delta) {
     setState(() {
-      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + delta);
+      _selectedMonth =
+          DateTime(_selectedMonth.year, _selectedMonth.month + delta);
     });
     context.read<AppProvider>().loadPayrollFor(_selectedMonth);
   }
@@ -59,21 +72,17 @@ class _PayrollScreenState extends State<PayrollScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Row(
-        children: [
-          const SidebarNavigation(),
-          Expanded(
-            child: Column(
-              children: [
-                TopHeader(
-                  title: 'Payroll',
-                  onNewOrderPressed: () => context.goSection(1),
-                ),
-                Expanded(child: _body(provider)),
-              ],
+      drawer: const AppDrawer(),
+      body: AppShell(
+        body: Column(
+          children: [
+            TopHeader(
+              title: 'Payroll',
+              onNewOrderPressed: () => context.goSection(1),
             ),
-          ),
-        ],
+            Expanded(child: _body(provider)),
+          ],
+        ),
       ),
     );
   }
@@ -93,65 +102,97 @@ class _PayrollScreenState extends State<PayrollScreen> {
 
     final entries = payroll?.entries ?? const <PayrollEntryModel>[];
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _titleRow(),
-          const SizedBox(height: 20),
-
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSummaryCard('Total Payroll', '${Money.symbol}${_money(payroll?.totalPayroll)}',
-                  const Color(0xFF1A4FD6)),
-              const SizedBox(width: 12),
-              _buildSummaryCard('Paid', '${Money.symbol}${_money(payroll?.paid)}', const Color(0xFF10B981)),
-              const SizedBox(width: 12),
-              _buildSummaryCard('Pending Balance', '${Money.symbol}${_money(payroll?.pending)}',
-                  const Color(0xFFEF4444)),
-              const SizedBox(width: 12),
-              _buildSummaryCard('Staff Count', '${payroll?.staffCount ?? 0}',
-                  const Color(0xFFA855F7)),
+              _titleRow(narrow),
+              const SizedBox(height: 20),
+              LayoutBuilder(
+                builder: (context, kpiConstraints) {
+                  final perRow = kpiConstraints.maxWidth < 640 ? 2 : 4;
+                  const gap = 12.0;
+                  final width =
+                      (kpiConstraints.maxWidth - gap * (perRow - 1)) / perRow;
+                  final cards = [
+                    _buildSummaryCard(
+                        'Total Payroll',
+                        '${Money.symbol}${_money(payroll?.totalPayroll)}',
+                        const Color(0xFF1A4FD6)),
+                    _buildSummaryCard('Paid',
+                        '${Money.symbol}${_money(payroll?.paid)}',
+                        const Color(0xFF10B981)),
+                    _buildSummaryCard(
+                        'Pending Balance',
+                        '${Money.symbol}${_money(payroll?.pending)}',
+                        const Color(0xFFEF4444)),
+                    _buildSummaryCard('Staff Count',
+                        '${payroll?.staffCount ?? 0}',
+                        const Color(0xFFA855F7)),
+                  ];
+                  return Wrap(
+                    spacing: gap,
+                    runSpacing: gap,
+                    children: [
+                      for (final c in cards) SizedBox(width: width, child: c),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              if (provider.payrollError != null) ...[
+                _inlineError(provider.payrollError!),
+                const SizedBox(height: 16),
+              ],
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$_monthLabel Payroll Records',
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 16),
+                    if (entries.isEmpty)
+                      _empty()
+                    else if (narrow)
+                      Column(
+                        children: [
+                          for (final e in entries)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _payrollCard(e),
+                            ),
+                        ],
+                      )
+                    else
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: entries.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, idx) => _row(entries[idx]),
+                      ),
+                  ],
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 24),
-
-          if (provider.payrollError != null) ...[
-            _inlineError(provider.payrollError!),
-            const SizedBox(height: 16),
-          ],
-
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$_monthLabel Payroll Records',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                ),
-                const SizedBox(height: 16),
-                if (entries.isEmpty)
-                  _empty()
-                else
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: entries.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, idx) => _row(entries[idx]),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -159,45 +200,57 @@ class _PayrollScreenState extends State<PayrollScreen> {
   /// screen has never shown paise and showing them now would only add noise.
   static String _money(double? value) => (value ?? 0).round().toString();
 
-  Widget _titleRow() {
+  Widget _titleRow(bool narrow) {
+    const title = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Payroll',
+            style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A))),
+        Text('Calculate staff wages, attendance payout, and salary records',
+            style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+      ],
+    );
+    final monthNav = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded, size: 20),
+            onPressed: () => _stepMonth(-1),
+          ),
+          Text(
+            _monthLabel,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right_rounded, size: 20),
+            onPressed: () => _stepMonth(1),
+          ),
+        ],
+      ),
+    );
+
+    if (narrow) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [title, const SizedBox(height: 12), monthNav],
+      );
+    }
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Payroll', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            Text('Calculate staff wages, attendance payout, and salary records',
-                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-          ],
-        ),
-
-        // Month Navigation
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left_rounded, size: 20),
-                onPressed: () => _stepMonth(-1),
-              ),
-              Text(
-                _monthLabel,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right_rounded, size: 20),
-                onPressed: () => _stepMonth(1),
-              ),
-            ],
-          ),
-        ),
-      ],
+      children: [const Expanded(child: title), monthNav],
     );
   }
 
@@ -210,7 +263,10 @@ class _PayrollScreenState extends State<PayrollScreen> {
             Icon(Icons.payments_outlined, size: 32, color: Color(0xFF94A3B8)),
             SizedBox(height: 10),
             Text('No payroll for this month.',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A))),
             SizedBox(height: 4),
             Text('Mark attendance to build up wages.',
                 style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
@@ -231,15 +287,21 @@ class _PayrollScreenState extends State<PayrollScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, size: 17, color: Color(0xFFDC2626)),
+          const Icon(Icons.error_outline_rounded,
+              size: 17, color: Color(0xFFDC2626)),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(message, style: const TextStyle(fontSize: 12, color: Color(0xFFB91C1C))),
+            child: Text(message,
+                style: const TextStyle(fontSize: 12, color: Color(0xFFB91C1C))),
           ),
           TextButton(
-            onPressed: () => context.read<AppProvider>().loadPayrollFor(_selectedMonth),
+            onPressed: () =>
+                context.read<AppProvider>().loadPayrollFor(_selectedMonth),
             child: const Text('Retry',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFDC2626))),
           ),
         ],
       ),
@@ -271,8 +333,11 @@ class _PayrollScreenState extends State<PayrollScreen> {
                 radius: 18,
                 backgroundColor: const Color(0xFFEEF2FF),
                 child: Text(
-                  entry.staffName.isEmpty ? '?' : entry.staffName[0].toUpperCase(),
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
+                  entry.staffName.isEmpty
+                      ? '?'
+                      : entry.staffName[0].toUpperCase(),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -280,67 +345,209 @@ class _PayrollScreenState extends State<PayrollScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(entry.staffName,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                  Text('${entry.role} • ${Money.symbol}${entry.monthlyWage.round()}/month',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A))),
+                  Text(
+                      '${entry.role} • ${Money.symbol}${entry.monthlyWage.round()}/month',
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF64748B))),
                 ],
               ),
             ],
           ),
-
           Row(
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text('${Money.symbol}${_money(entry.totalSalary)}',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A))),
                   Text('Days worked: ${entry.daysWorkedLabel}',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF64748B))),
                 ],
               ),
               const SizedBox(width: 20),
-
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text('Paid ${Money.symbol}${_money(entry.paidAmount)}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF10B981))),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF10B981))),
                   Text('Due ${Money.symbol}${_money(entry.pendingAmount)}',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF64748B))),
                 ],
               ),
               const SizedBox(width: 20),
-
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: colour.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   entry.status,
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: colour),
+                  style: TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.bold, color: colour),
                 ),
               ),
               const SizedBox(width: 4),
-
               TextButton(
                 onPressed: () => _showPaymentHistory(entry),
                 child: const Text('History',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B))),
               ),
               const SizedBox(width: 4),
-
               TextButton(
-                onPressed: entry.pendingAmount <= 0 ? null : () => _showRecordPayment(entry),
+                onPressed: entry.pendingAmount <= 0
+                    ? null
+                    : () => _showRecordPayment(entry),
                 child: const Text('Record Payment',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style:
+                        TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  /// Narrow-mode replacement for [_row]: the left avatar+name block and the
+  /// right block (salary/days, paid/due, status pill, History/Record Payment
+  /// buttons) are both intrinsic-width with no flex anywhere — fine at
+  /// desktop width, but they overflow badly once this stacks to phone width.
+  Widget _payrollCard(PayrollEntryModel entry) {
+    final colour = _statusColor(entry.status);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: const Color(0xFFEEF2FF),
+                child: Text(
+                  entry.staffName.isEmpty
+                      ? '?'
+                      : entry.staffName[0].toUpperCase(),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(entry.staffName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A))),
+                    Text(
+                        '${entry.role} • ${Money.symbol}${entry.monthlyWage.round()}/month',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF64748B))),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colour.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  entry.status,
+                  style: TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.bold, color: colour),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _cardStat(
+                    'Salary (${entry.daysWorkedLabel})',
+                    '${Money.symbol}${_money(entry.totalSalary)}'),
+              ),
+              Expanded(
+                child: _cardStat('Paid',
+                    '${Money.symbol}${_money(entry.paidAmount)}'),
+              ),
+              Expanded(
+                child: _cardStat(
+                    'Due', '${Money.symbol}${_money(entry.pendingAmount)}'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _showPaymentHistory(entry),
+                  child: const Text('History'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(
+                  onPressed: entry.pendingAmount <= 0
+                      ? null
+                      : () => _showRecordPayment(entry),
+                  child: const Text('Record Payment'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _cardStat(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+        const SizedBox(height: 2),
+        Text(value,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A))),
+      ],
     );
   }
 
@@ -351,7 +558,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
     final provider = context.read<AppProvider>();
     final methodChoices = provider.paymentMethods;
     String methodLabel(String raw) => methodChoices
-        .firstWhere((c) => c.value == raw, orElse: () => ChoiceModel(value: raw, label: raw))
+        .firstWhere((c) => c.value == raw,
+            orElse: () => ChoiceModel(value: raw, label: raw))
         .label;
 
     await showDialog<void>(
@@ -359,9 +567,12 @@ class _PayrollScreenState extends State<PayrollScreen> {
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('${entry.staffName} — Payment History',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A))),
         content: SizedBox(
-          width: 420,
+          width: math.min(420.0, MediaQuery.sizeOf(dialogContext).width - 48),
           child: FutureBuilder<List<SalaryPaymentModel>>(
             future: provider.fetchSalaryHistory(entry.staffId),
             builder: (context, snapshot) {
@@ -376,7 +587,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text(
                     'Could not load payment history: ${snapshot.error}',
-                    style: const TextStyle(fontSize: 13, color: Color(0xFFDC2626)),
+                    style:
+                        const TextStyle(fontSize: 13, color: Color(0xFFDC2626)),
                   ),
                 );
               }
@@ -386,7 +598,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
                   padding: EdgeInsets.symmetric(vertical: 32),
                   child: Center(
                     child: Text('No payments recorded yet.',
-                        style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+                        style:
+                            TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
                   ),
                 );
               }
@@ -395,7 +608,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: payments.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  separatorBuilder: (_, __) =>
+                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
                   itemBuilder: (context, i) {
                     final p = payments[i];
                     return Padding(
@@ -408,27 +622,37 @@ class _PayrollScreenState extends State<PayrollScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  p.month == null ? '—' : DateFormat('MMMM yyyy').format(p.month!),
+                                  p.month == null
+                                      ? '—'
+                                      : DateFormat('MMMM yyyy')
+                                          .format(p.month!),
                                   style: const TextStyle(
-                                      fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0F172A)),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   '${methodLabel(p.method)}'
                                   '${p.paidOn == null ? '' : ' · ${DateFormat('MMM d, yyyy').format(p.paidOn!)}'}',
-                                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Color(0xFF64748B)),
                                 ),
                                 if (p.note.trim().isNotEmpty) ...[
                                   const SizedBox(height: 2),
                                   Text(p.note.trim(),
-                                      style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF94A3B8))),
                                 ],
                               ],
                             ),
                           ),
                           Text('${Money.symbol}${p.amount.round()}',
                               style: const TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF10B981))),
                         ],
                       ),
                     );
@@ -441,7 +665,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Close', style: TextStyle(color: Color(0xFF64748B))),
+            child:
+                const Text('Close', style: TextStyle(color: Color(0xFF64748B))),
           ),
         ],
       ),
@@ -464,13 +689,15 @@ class _PayrollScreenState extends State<PayrollScreen> {
         builder: (dialogContext, setDialogState) => AlertDialog(
           title: Text('Pay ${entry.staffName}'),
           content: SizedBox(
-            width: 360,
+            width: math.min(360.0, MediaQuery.sizeOf(dialogContext).width - 48),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('$_monthLabel • ${Money.symbol}${_money(entry.pendingAmount)} outstanding',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                Text(
+                    '$_monthLabel • ${Money.symbol}${_money(entry.pendingAmount)} outstanding',
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF64748B))),
                 const SizedBox(height: 16),
                 TextField(
                   controller: amountController,
@@ -492,7 +719,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
                     for (final m in methodChoices)
                       DropdownMenuItem(value: m.value, child: Text(m.label)),
                   ],
-                  onChanged: (value) => setDialogState(() => method = value ?? method),
+                  onChanged: (value) =>
+                      setDialogState(() => method = value ?? method),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -504,7 +732,9 @@ class _PayrollScreenState extends State<PayrollScreen> {
                 ),
                 if (error != null) ...[
                   const SizedBox(height: 12),
-                  Text(error!, style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
+                  Text(error!,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFFDC2626))),
                 ],
               ],
             ),
@@ -518,22 +748,25 @@ class _PayrollScreenState extends State<PayrollScreen> {
               onPressed: () async {
                 final amount = double.tryParse(amountController.text.trim());
                 if (amount == null || amount <= 0) {
-                  setDialogState(() => error = 'Enter an amount greater than zero.');
+                  setDialogState(
+                      () => error = 'Enter an amount greater than zero.');
                   return;
                 }
-                final ok = await context.read<AppProvider>().recordSalaryPayment(
-                      staffId: entry.staffId,
-                      month: _selectedMonth,
-                      amount: amount,
-                      method: method,
-                      note: noteController.text,
-                    );
+                final ok =
+                    await context.read<AppProvider>().recordSalaryPayment(
+                          staffId: entry.staffId,
+                          month: _selectedMonth,
+                          amount: amount,
+                          method: method,
+                          note: noteController.text,
+                        );
                 if (!dialogContext.mounted) return;
                 if (ok) {
                   Navigator.of(dialogContext).pop(true);
                 } else {
                   setDialogState(() => error =
-                      context.read<AppProvider>().payrollError ?? 'Could not record the payment.');
+                      context.read<AppProvider>().payrollError ??
+                          'Could not record the payment.');
                 }
               },
               child: const Text('Record Payment'),
@@ -557,22 +790,27 @@ class _PayrollScreenState extends State<PayrollScreen> {
   }
 
   Widget _buildSummaryCard(String label, String value, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF64748B))),
-            const SizedBox(height: 8),
-            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF64748B))),
+          const SizedBox(height: 8),
+          Text(value,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+        ],
       ),
     );
   }

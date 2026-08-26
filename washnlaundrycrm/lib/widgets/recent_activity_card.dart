@@ -162,7 +162,8 @@ class RecentActivityCard extends StatelessWidget {
                       child: Text(
                         order.deliveryTypeLabel,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF10B981)),
+                        style: const TextStyle(
+                            fontSize: 11.5, color: Color(0xFF10B981)),
                       ),
                     ),
                   ],
@@ -184,7 +185,8 @@ class RecentActivityCard extends StatelessWidget {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: statusColor(order.status).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(20),
@@ -192,7 +194,8 @@ class RecentActivityCard extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.circle, size: 5, color: statusColor(order.status)),
+                        Icon(Icons.circle,
+                            size: 5, color: statusColor(order.status)),
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
@@ -223,7 +226,8 @@ class RecentActivityCard extends StatelessWidget {
                       shop: context.read<AppProvider>().shop,
                     ),
                   ),
-                  icon: const Icon(Icons.receipt_outlined, size: 17, color: Color(0xFF1A4FD6)),
+                  icon: const Icon(Icons.receipt_outlined,
+                      size: 17, color: Color(0xFF1A4FD6)),
                 ),
               ),
             ],

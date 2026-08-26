@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
 import '../utils/navigation.dart';
-import '../widgets/sidebar_navigation.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/top_header.dart';
 import '../utils/money.dart';
 
@@ -34,60 +34,63 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   static Color _colorFor(String category) =>
       _categoryColors[category] ?? const Color(0xFF64748B);
 
-  static String _methodLabel(AppProvider provider, String raw) => provider.paymentMethods
-      .firstWhere((c) => c.value == raw, orElse: () => ChoiceModel(value: raw, label: raw))
-      .label;
+  static String _methodLabel(AppProvider provider, String raw) =>
+      provider.paymentMethods
+          .firstWhere((c) => c.value == raw,
+              orElse: () => ChoiceModel(value: raw, label: raw))
+          .label;
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
     final all = provider.expenses;
 
-    final categories = <String>{for (final e in all) e.category}.toList()..sort();
-    final visible =
-        _category == 'All' ? all : all.where((e) => e.category == _category).toList();
+    final categories = <String>{for (final e in all) e.category}.toList()
+      ..sort();
+    final visible = _category == 'All'
+        ? all
+        : all.where((e) => e.category == _category).toList();
 
     final total = all.fold<double>(0, (sum, e) => sum + e.amount);
     final now = DateTime.now();
     final thisMonth = all
-        .where((e) => e.date != null && e.date!.year == now.year && e.date!.month == now.month)
+        .where((e) =>
+            e.date != null &&
+            e.date!.year == now.year &&
+            e.date!.month == now.month)
         .fold<double>(0, (sum, e) => sum + e.amount);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Row(
-        children: [
-          const SidebarNavigation(),
-          Expanded(
-            child: Column(
-              children: [
-                TopHeader(
-                  title: 'Expenses',
-                  onNewOrderPressed: () => context.goSection(1),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _titleRow(),
-                        const SizedBox(height: 20),
-                        _summaryRow(total, thisMonth, all.length),
-                        const SizedBox(height: 20),
-                        if (categories.isNotEmpty) ...[
-                          _filterChips(categories),
-                          const SizedBox(height: 16),
-                        ],
-                        _list(visible, provider),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+      drawer: const AppDrawer(),
+      body: AppShell(
+        body: Column(
+          children: [
+            TopHeader(
+              title: 'Expenses',
+              onNewOrderPressed: () => context.goSection(1),
             ),
-          ),
-        ],
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _titleRow(),
+                    const SizedBox(height: 20),
+                    _summaryRow(total, thisMonth, all.length),
+                    const SizedBox(height: 20),
+                    if (categories.isNotEmpty) ...[
+                      _filterChips(categories),
+                      const SizedBox(height: 16),
+                    ],
+                    _list(visible, provider),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -100,7 +103,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Expenses Log',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A))),
               SizedBox(height: 2),
               Text('Log shop operational expenses, rent, detergents, & repairs',
                   style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
@@ -113,7 +119,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           label: const Text('Add Expense'),
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFF1A4FD6),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
         ),
@@ -123,11 +130,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Widget _summaryRow(double total, double thisMonth, int count) {
     final cards = [
-      _summaryCard('This month', '${Money.symbol}${thisMonth.toStringAsFixed(0)}',
-          Icons.calendar_month_rounded, const Color(0xFFDC2626)),
+      _summaryCard(
+          'This month',
+          '${Money.symbol}${thisMonth.toStringAsFixed(0)}',
+          Icons.calendar_month_rounded,
+          const Color(0xFFDC2626)),
       _summaryCard('Total logged', '${Money.symbol}${total.toStringAsFixed(0)}',
           Icons.account_balance_wallet_outlined, const Color(0xFF1A4FD6)),
-      _summaryCard('Entries', '$count', Icons.receipt_long_outlined, const Color(0xFF8B5CF6)),
+      _summaryCard('Entries', '$count', Icons.receipt_long_outlined,
+          const Color(0xFF8B5CF6)),
     ];
 
     return LayoutBuilder(
@@ -163,12 +174,16 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF64748B))),
                 const SizedBox(height: 2),
                 Text(value,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A))),
               ],
             ),
           ),
@@ -196,9 +211,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             backgroundColor: Colors.white,
             selectedColor: const Color(0xFF1A4FD6),
             side: BorderSide(
-              color: _category == c ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0),
+              color: _category == c
+                  ? const Color(0xFF1A4FD6)
+                  : const Color(0xFFE2E8F0),
             ),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           ),
       ],
     );
@@ -240,7 +258,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   Container(
                     padding: const EdgeInsets.all(9),
                     decoration: BoxDecoration(
-                      color: _colorFor(expenses[i].category).withValues(alpha: 0.12),
+                      color: _colorFor(expenses[i].category)
+                          .withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(Icons.receipt_long_outlined,
@@ -254,14 +273,18 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         Text(expenses[i].title,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A))),
                         const SizedBox(height: 3),
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
                               decoration: BoxDecoration(
-                                color: _colorFor(expenses[i].category).withValues(alpha: 0.12),
+                                color: _colorFor(expenses[i].category)
+                                    .withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(expenses[i].category,
@@ -276,7 +299,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                 '${_methodLabel(provider, expenses[i].paymentMethod)} · '
                                 '${expenses[i].date == null ? 'No date' : DateFormat('MMM d, yyyy').format(expenses[i].date!)}',
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                style: const TextStyle(
+                                    fontSize: 11, color: Color(0xFF64748B)),
                               ),
                             ),
                           ],
@@ -285,14 +309,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text('${Money.symbol}${expenses[i].amount.toStringAsFixed(0)}',
+                  Text(
+                      '${Money.symbol}${expenses[i].amount.toStringAsFixed(0)}',
                       style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFEF4444))),
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFEF4444))),
                   PopupMenuButton<String>(
                     padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.more_vert_rounded, size: 18, color: Color(0xFF94A3B8)),
+                    icon: const Icon(Icons.more_vert_rounded,
+                        size: 18, color: Color(0xFF94A3B8)),
                     tooltip: 'Expense options',
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                     onSelected: (action) {
                       if (action == 'edit') {
                         _showExpenseDialog(existing: expenses[i]);
@@ -305,7 +334,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         value: 'edit',
                         child: Row(
                           children: [
-                            Icon(Icons.edit_outlined, size: 15, color: Color(0xFF64748B)),
+                            Icon(Icons.edit_outlined,
+                                size: 15, color: Color(0xFF64748B)),
                             SizedBox(width: 8),
                             Text('Edit', style: TextStyle(fontSize: 13)),
                           ],
@@ -315,9 +345,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFDC2626)),
+                            Icon(Icons.delete_outline_rounded,
+                                size: 15, color: Color(0xFFDC2626)),
                             SizedBox(width: 8),
-                            Text('Delete', style: TextStyle(fontSize: 13, color: Color(0xFFDC2626))),
+                            Text('Delete',
+                                style: TextStyle(
+                                    fontSize: 13, color: Color(0xFFDC2626))),
                           ],
                         ),
                       ),
@@ -343,8 +376,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   Future<void> _showExpenseDialog({ExpenseModel? existing}) async {
     final isEdit = existing != null;
     final titleController = TextEditingController(text: existing?.title ?? '');
-    final amountController =
-        TextEditingController(text: existing == null ? '' : existing.amount.toStringAsFixed(0));
+    final amountController = TextEditingController(
+        text: existing == null ? '' : existing.amount.toStringAsFixed(0));
     final provider = context.read<AppProvider>();
 
     // Vocabularies come from `/api/meta/` now. This screen used to hold its
@@ -357,7 +390,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       context: context,
       builder: (ctx) {
         var category = existing?.category ??
-            (categoryChoices.isEmpty ? 'Supplies' : categoryChoices.first.value);
+            (categoryChoices.isEmpty
+                ? 'Supplies'
+                : categoryChoices.first.value);
         var method = existing?.paymentMethod ?? methodChoices.first.value;
         var date = existing?.date ?? DateTime.now();
         String? error;
@@ -365,9 +400,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
         return StatefulBuilder(
           builder: (ctx, setDialogState) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Text(isEdit ? 'Edit Expense' : 'Add Expense',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A))),
             content: SizedBox(
               width: 440,
               child: SingleChildScrollView(
@@ -379,13 +418,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     TextField(
                       controller: titleController,
                       style: const TextStyle(fontSize: 13),
-                      decoration: _fieldDecoration('e.g. Commercial detergent (50L)'),
+                      decoration:
+                          _fieldDecoration('e.g. Commercial detergent (50L)'),
                     ),
                     const SizedBox(height: 14),
                     _label('Amount (${Money.symbol})'),
                     TextField(
                       controller: amountController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       style: const TextStyle(fontSize: 13),
                       decoration: _fieldDecoration('0'),
                     ),
@@ -394,26 +435,32 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     DropdownButtonFormField<String>(
                       initialValue: category,
                       isDense: true,
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                      style: const TextStyle(
+                          fontSize: 13, color: Color(0xFF0F172A)),
                       decoration: _fieldDecoration(''),
                       items: [
                         for (final c in categoryChoices)
-                          DropdownMenuItem(value: c.value, child: Text(c.label)),
+                          DropdownMenuItem(
+                              value: c.value, child: Text(c.label)),
                       ],
-                      onChanged: (v) => setDialogState(() => category = v ?? category),
+                      onChanged: (v) =>
+                          setDialogState(() => category = v ?? category),
                     ),
                     const SizedBox(height: 14),
                     _label('Payment method'),
                     DropdownButtonFormField<String>(
                       initialValue: method,
                       isDense: true,
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+                      style: const TextStyle(
+                          fontSize: 13, color: Color(0xFF0F172A)),
                       decoration: _fieldDecoration(''),
                       items: [
                         for (final m in methodChoices)
-                          DropdownMenuItem(value: m.value, child: Text(m.label)),
+                          DropdownMenuItem(
+                              value: m.value, child: Text(m.label)),
                       ],
-                      onChanged: (v) => setDialogState(() => method = v ?? method),
+                      onChanged: (v) =>
+                          setDialogState(() => method = v ?? method),
                     ),
                     const SizedBox(height: 14),
                     _label('Date'),
@@ -435,12 +482,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         minimumSize: const Size(double.infinity, 44),
                         foregroundColor: const Color(0xFF334155),
                         side: const BorderSide(color: Color(0xFFCBD5E1)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                     if (error != null) ...[
                       const SizedBox(height: 10),
-                      Text(error!, style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
+                      Text(error!,
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFFDC2626))),
                     ],
                   ],
                 ),
@@ -449,20 +499,24 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             actions: [
               TextButton(
                 onPressed: saving ? null : () => Navigator.pop(ctx, false),
-                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+                child: const Text('Cancel',
+                    style: TextStyle(color: Color(0xFF64748B))),
               ),
               FilledButton(
                 onPressed: saving
                     ? null
                     : () async {
                         final title = titleController.text.trim();
-                        final amount = double.tryParse(amountController.text.trim());
+                        final amount =
+                            double.tryParse(amountController.text.trim());
                         if (title.isEmpty) {
-                          setDialogState(() => error = 'Give the expense a title.');
+                          setDialogState(
+                              () => error = 'Give the expense a title.');
                           return;
                         }
                         if (amount == null || amount <= 0) {
-                          setDialogState(() => error = 'Enter an amount greater than zero.');
+                          setDialogState(() =>
+                              error = 'Enter an amount greater than zero.');
                           return;
                         }
                         setDialogState(() {
@@ -485,16 +539,20 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         } else {
                           setDialogState(() {
                             saving = false;
-                            error = provider.error ?? 'Could not save the expense.';
+                            error =
+                                provider.error ?? 'Could not save the expense.';
                           });
                         }
                       },
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF1A4FD6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 child: Text(
-                  saving ? 'Saving…' : (isEdit ? 'Save Changes' : 'Add Expense'),
+                  saving
+                      ? 'Saving…'
+                      : (isEdit ? 'Save Changes' : 'Add Expense'),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -506,7 +564,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
     if (saved == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isEdit ? 'Expense updated.' : 'Expense logged.')),
+        SnackBar(
+            content: Text(isEdit ? 'Expense updated.' : 'Expense logged.')),
       );
     }
   }
@@ -518,17 +577,25 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Expense',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-        content: Text('Are you sure you want to delete "${e.title}"? This action cannot be undone.'),
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A))),
+        content: Text(
+            'Are you sure you want to delete "${e.title}"? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            child: const Text('Cancel',
+                style: TextStyle(color: Color(0xFF64748B))),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            child: const Text('Delete',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -539,7 +606,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok ? 'Deleted "${e.title}".' : (provider.error ?? 'Could not delete the expense.')),
+        content: Text(ok
+            ? 'Deleted "${e.title}".'
+            : (provider.error ?? 'Could not delete the expense.')),
       ),
     );
   }
@@ -548,13 +617,16 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         padding: const EdgeInsets.only(bottom: 6),
         child: Text(text,
             style: const TextStyle(
-                fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF475569))),
       );
 
   InputDecoration _fieldDecoration(String hint) => InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       );
 }

@@ -22,8 +22,9 @@ class RevenueChartCard extends StatelessWidget {
     final series = provider.revenueSeries;
     final days = series.map((p) => '${p.day}').toList();
 
-    final double peak =
-        series.isEmpty ? 0 : series.map((p) => p.amount).reduce((a, b) => a > b ? a : b);
+    final double peak = series.isEmpty
+        ? 0
+        : series.map((p) => p.amount).reduce((a, b) => a > b ? a : b);
     final double total = series.fold(0.0, (sum, p) => sum + p.amount);
 
     // Headroom above the tallest bar so it never touches the container top.
@@ -49,7 +50,10 @@ class RevenueChartCard extends StatelessWidget {
                 children: const [
                   Text(
                     'Revenue',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A)),
                   ),
                   SizedBox(height: 4),
                   Text(
@@ -65,21 +69,24 @@ class RevenueChartCard extends StatelessWidget {
                   // days", so a single day's figure never belonged here.
                   Text(
                     formatRupees(total),
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A)),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     provider.revenueTodayChange == null
                         ? '— vs prior'
                         : '${formatPercent(provider.revenueTodayChange!.abs())} vs prior',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                    style:
+                        const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                   ),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 24),
-
           if (series.isEmpty)
             const SizedBox(
               height: 180,
@@ -91,83 +98,95 @@ class RevenueChartCard extends StatelessWidget {
               ),
             )
           else
-          ClipRect(
-            child: SizedBox(
-              height: 180,
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: maxY,
-                  barTouchData: barTouchDataEnabled(series),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (double value, TitleMeta meta) {
-                          int index = value.toInt();
-                          if (index >= 0 && index < days.length) {
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 6.0),
-                              child: Text(
-                                days[index],
-                                style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 36,
-                        getTitlesWidget: (double value, TitleMeta meta) {
-                          if (value == 0) return const Text('0', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)));
-                          final third = maxY / 3;
-                          if ((value - third).abs() < (third * 0.2)) {
-                            return Text('${(third / 1000).toStringAsFixed(1)}k', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)));
-                          }
-                          if ((value - (third * 2)).abs() < (third * 0.2)) {
-                            return Text('${((third * 2) / 1000).toStringAsFixed(1)}k', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)));
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  ),
-                  gridData: const FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    getDrawingHorizontalLine: getHorizontalLine,
-                  ),
-                  borderData: FlBorderData(show: false),
-                  barGroups: List.generate(series.length, (index) {
-                    final val = series[index].amount;
-                    return BarChartGroupData(
-                      x: index,
-                      barRods: [
-                        BarChartRodData(
-                          // A day with no revenue still draws a stub, so the
-                          // axis reads as 14 days rather than a gap.
-                          toY: val == 0 ? 4 : val,
-                          color: const Color(0xFF1A4FD6),
-                          width: 12,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(4),
-                            topRight: Radius.circular(4),
-                          ),
+            ClipRect(
+              child: SizedBox(
+                height: 180,
+                child: BarChart(
+                  BarChartData(
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: maxY,
+                    barTouchData: barTouchDataEnabled(series),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          getTitlesWidget: (double value, TitleMeta meta) {
+                            int index = value.toInt();
+                            if (index >= 0 && index < days.length) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 6.0),
+                                child: Text(
+                                  days[index],
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Color(0xFF94A3B8)),
+                                ),
+                              );
+                            }
+                            return const Text('');
+                          },
                         ),
-                      ],
-                    );
-                  }),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 36,
+                          getTitlesWidget: (double value, TitleMeta meta) {
+                            if (value == 0)
+                              return const Text('0',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Color(0xFF94A3B8)));
+                            final third = maxY / 3;
+                            if ((value - third).abs() < (third * 0.2)) {
+                              return Text(
+                                  '${(third / 1000).toStringAsFixed(1)}k',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Color(0xFF94A3B8)));
+                            }
+                            if ((value - (third * 2)).abs() < (third * 0.2)) {
+                              return Text(
+                                  '${((third * 2) / 1000).toStringAsFixed(1)}k',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Color(0xFF94A3B8)));
+                            }
+                            return const Text('');
+                          },
+                        ),
+                      ),
+                      topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    gridData: const FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      getDrawingHorizontalLine: getHorizontalLine,
+                    ),
+                    borderData: FlBorderData(show: false),
+                    barGroups: List.generate(series.length, (index) {
+                      final val = series[index].amount;
+                      return BarChartGroupData(
+                        x: index,
+                        barRods: [
+                          BarChartRodData(
+                            // A day with no revenue still draws a stub, so the
+                            // axis reads as 14 days rather than a gap.
+                            toY: val == 0 ? 4 : val,
+                            color: const Color(0xFF1A4FD6),
+                            width: 12,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(4),
+                              topRight: Radius.circular(4),
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -185,14 +204,16 @@ class RevenueChartCard extends StatelessWidget {
       enabled: true,
       touchTooltipData: BarTouchTooltipData(
         getTooltipItem: (group, groupIndex, rod, rodIndex) {
-          final point = group.x >= 0 && group.x < series.length ? series[group.x] : null;
+          final point =
+              group.x >= 0 && group.x < series.length ? series[group.x] : null;
           // The rod's height is floored at 4 for empty days, so report the
           // point's real amount rather than reading it back off the bar.
           final label = point == null ? '' : '${point.date}\n';
           final amount = point?.amount ?? rod.toY;
           return BarTooltipItem(
             '$label${formatRupees(amount)}',
-            const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+            const TextStyle(
+                color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
           );
         },
       ),

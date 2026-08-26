@@ -100,7 +100,8 @@ class OrderChannelsCard extends StatelessWidget {
                     children: [
                       Text(
                         label,
-                        style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155)),
+                        style: const TextStyle(
+                            fontSize: 12.5, color: Color(0xFF334155)),
                       ),
                       Text(
                         '${count(key)}',
@@ -119,7 +120,8 @@ class OrderChannelsCard extends StatelessWidget {
                       value: total == 0 ? 0 : count(key) / total,
                       minHeight: 5,
                       backgroundColor: const Color(0xFFF1F5F9),
-                      valueColor: const AlwaysStoppedAnimation(Color(0xFF1A4FD6)),
+                      valueColor:
+                          const AlwaysStoppedAnimation(Color(0xFF1A4FD6)),
                     ),
                   ),
                 ],
@@ -173,9 +175,11 @@ class StaffAttendanceCard extends StatelessWidget {
         children: [
           Text(
             '$value',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(
+                fontSize: 20, fontWeight: FontWeight.bold, color: color),
           ),
-          Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+          Text(label,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
         ],
       ),
     );

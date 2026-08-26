@@ -10,10 +10,26 @@ class OrderPipelineCard extends StatelessWidget {
     final provider = Provider.of<AppProvider>(context);
 
     final stages = [
-      {'label': 'Received', 'count': provider.pipelineReceived, 'color': const Color(0xFF64748B)},
-      {'label': 'Processing', 'count': provider.pipelineProcessing, 'color': const Color(0xFF1A4FD6)},
-      {'label': 'Ready', 'count': provider.pipelineReady, 'color': const Color(0xFF10B981)},
-      {'label': 'Out for delivery', 'count': provider.pipelineOutForDelivery, 'color': const Color(0xFF0284C7)},
+      {
+        'label': 'Received',
+        'count': provider.pipelineReceived,
+        'color': const Color(0xFF64748B)
+      },
+      {
+        'label': 'Processing',
+        'count': provider.pipelineProcessing,
+        'color': const Color(0xFF1A4FD6)
+      },
+      {
+        'label': 'Ready',
+        'count': provider.pipelineReady,
+        'color': const Color(0xFF10B981)
+      },
+      {
+        'label': 'Out for delivery',
+        'count': provider.pipelineOutForDelivery,
+        'color': const Color(0xFF0284C7)
+      },
     ];
 
     // The headline is the pipeline's own total, not "orders today" — an order
@@ -40,7 +56,10 @@ class OrderPipelineCard extends StatelessWidget {
                 children: const [
                   Text(
                     'Order pipeline',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A)),
                   ),
                   Text(
                     'Live across stages',
@@ -50,7 +69,10 @@ class OrderPipelineCard extends StatelessWidget {
               ),
               Text(
                 '$inPipeline',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A)),
               ),
             ],
           ),
@@ -80,7 +102,9 @@ class OrderPipelineCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: (st['count'] as int) > 0 ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                            color: (st['count'] as int) > 0
+                                ? const Color(0xFF0F172A)
+                                : const Color(0xFF64748B),
                           ),
                         ),
                       ],
@@ -90,7 +114,9 @@ class OrderPipelineCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: (st['count'] as int) > 0 ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                        color: (st['count'] as int) > 0
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFF64748B),
                       ),
                     ),
                   ],

@@ -247,4 +247,47 @@ void main() {
       expect(find.text('Filters'), findsOneWidget);
     });
   });
+
+  group('OrdersScreen responsive layout', () {
+    Future<void> pumpAt(WidgetTester tester, double width) async {
+      tester.view
+        ..physicalSize = Size(width, 1200)
+        ..devicePixelRatio = 1.0;
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(
+          orders: orders,
+          categories: const [
+            GarmentCategoryModel(id: 'c1', name: 'Ironing'),
+            GarmentCategoryModel(id: 'c2', name: 'Wash & Fold'),
+          ],
+        );
+      await tester.pumpWidget(host(provider, const OrdersScreen()));
+      await tester.pump();
+    }
+
+    testWidgets('shows the table header at wide width', (tester) async {
+      await pumpAt(tester, 1400);
+
+      expect(find.text('ORDER'), findsOneWidget);
+      // The narrow card's "Updated {time}" label doesn't exist in the table
+      // row, which shows the bare relative time instead.
+      expect(find.textContaining('Updated '), findsNothing);
+    });
+
+    testWidgets('shows cards instead of the table at phone width',
+        (tester) async {
+      await pumpAt(tester, 390);
+
+      expect(find.text('ORDER'), findsNothing);
+      expect(find.textContaining('Updated '), findsWidgets);
+    });
+
+    testWidgets('New Order collapses to an icon-only button at phone width',
+        (tester) async {
+      await pumpAt(tester, 390);
+
+      expect(find.text('New Order'), findsNothing);
+      expect(find.byIcon(Icons.add), findsWidgets);
+    });
+  });
 }

@@ -134,7 +134,8 @@ class _LoginScreenState extends State<LoginScreen> {
               Expanded(child: Divider(color: _border)),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 10),
-                child: Text('OR', style: TextStyle(fontSize: 12, color: _muted)),
+                child:
+                    Text('OR', style: TextStyle(fontSize: 12, color: _muted)),
               ),
               Expanded(child: Divider(color: _border)),
             ],
@@ -147,7 +148,8 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: 6),
         TextField(
           keyboardType: TextInputType.emailAddress,
-          decoration: _fieldDecoration(hint: 'you@example.com', icon: Icons.mail_outline_rounded),
+          decoration: _fieldDecoration(
+              hint: 'you@example.com', icon: Icons.mail_outline_rounded),
         ),
         const SizedBox(height: 14),
         _fieldLabel('Password'),
@@ -159,11 +161,14 @@ class _LoginScreenState extends State<LoginScreen> {
             icon: Icons.lock_outline_rounded,
             suffixIcon: IconButton(
               icon: Icon(
-                _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                _obscurePassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
                 size: 18,
                 color: _muted,
               ),
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              onPressed: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
             ),
           ),
         ),
@@ -176,7 +181,10 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: EdgeInsets.symmetric(vertical: 4),
               child: Text(
                 'Forgot password?',
-                style: TextStyle(fontSize: 12, color: _brandBlue, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: _brandBlue,
+                    fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -190,11 +198,15 @@ class _LoginScreenState extends State<LoginScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: _brandBlue,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
             child: Text(
               _authTab == 0 ? 'Sign In' : 'Create Account',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white),
             ),
           ),
         ),
@@ -203,7 +215,8 @@ class _LoginScreenState extends State<LoginScreen> {
         // layout, but there is no mobile-OTP flow behind it yet.
         const Text(
           'Sign in with mobile number instead',
-          style: TextStyle(fontSize: 12, color: _disabled, fontWeight: FontWeight.w600),
+          style: TextStyle(
+              fontSize: 12, color: _disabled, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 20),
         Row(
@@ -225,14 +238,17 @@ class _LoginScreenState extends State<LoginScreen> {
           height: 44,
           child: OutlinedButton.icon(
             onPressed: auth.signInAsDemo,
-            icon: const Icon(Icons.play_circle_outline_rounded, size: 18, color: _brandBlue),
+            icon: const Icon(Icons.play_circle_outline_rounded,
+                size: 18, color: _brandBlue),
             label: const Text(
               'Try Demo Mode',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _brandBlue),
+              style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600, color: _brandBlue),
             ),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Color(0xFFCBD5E1)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
           ),
         ),
@@ -242,19 +258,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _fieldLabel(String text) => Align(
         alignment: Alignment.centerLeft,
-        child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+        child: Text(text,
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF475569))),
       );
 
-  InputDecoration _fieldDecoration({required String hint, required IconData icon, Widget? suffixIcon}) {
+  InputDecoration _fieldDecoration(
+      {required String hint, required IconData icon, Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
       prefixIcon: Icon(icon, size: 18, color: _muted),
       suffixIcon: suffixIcon,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _border)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _brandBlue)),
+      border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _border)),
+      enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _border)),
+      focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _brandBlue)),
     );
   }
 
@@ -290,7 +317,12 @@ class _LoginScreenState extends State<LoginScreen> {
             color: isSel ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             boxShadow: isSel
-                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4, offset: const Offset(0, 1))]
+                ? [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1))
+                  ]
                 : null,
           ),
           child: Text(
@@ -314,7 +346,8 @@ class _LoginScreenState extends State<LoginScreen> {
           color: _brandBlue,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: const Icon(Icons.dry_cleaning_rounded, color: Colors.white, size: 32),
+        child: const Icon(Icons.dry_cleaning_rounded,
+            color: Colors.white, size: 32),
       );
 
   Widget _wordmark() => RichText(
@@ -322,11 +355,19 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             TextSpan(
               text: 'WashN',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: _ink, letterSpacing: -0.5),
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: _ink,
+                  letterSpacing: -0.5),
             ),
             TextSpan(
               text: 'Laundry',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: _brandBlue, letterSpacing: -0.5),
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: _brandBlue,
+                  letterSpacing: -0.5),
             ),
           ],
         ),

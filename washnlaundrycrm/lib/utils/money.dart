@@ -24,8 +24,10 @@ class Money {
   /// Point the formatter at a shop. Blank values keep the defaults, so a shop
   /// that has not set a currency still renders sensibly.
   static void configure({String? symbol, String? locale}) {
-    if (symbol != null && symbol.trim().isNotEmpty) Money.symbol = symbol.trim();
-    if (locale != null && locale.trim().isNotEmpty) Money.locale = locale.trim();
+    if (symbol != null && symbol.trim().isNotEmpty)
+      Money.symbol = symbol.trim();
+    if (locale != null && locale.trim().isNotEmpty)
+      Money.locale = locale.trim();
   }
 
   /// Restores the defaults. Tests use this so one test's shop cannot leak into

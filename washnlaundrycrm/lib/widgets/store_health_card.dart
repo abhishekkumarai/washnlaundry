@@ -90,10 +90,13 @@ class StoreHealthCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    _metric('On-Time Delivery', formatPercent(health['on_time_delivery'])),
-                    _metric('On-Time Pickup', formatPercent(health['on_time_pickup'])),
+                    _metric('On-Time Delivery',
+                        formatPercent(health['on_time_delivery'])),
+                    _metric('On-Time Pickup',
+                        formatPercent(health['on_time_pickup'])),
                     _metric('Order Flow', formatPercent(health['order_flow'])),
-                    _metric('Collection Rate', formatPercent(health['collection_rate'])),
+                    _metric('Collection Rate',
+                        formatPercent(health['collection_rate'])),
                   ],
                 ),
               ),
@@ -107,7 +110,8 @@ class StoreHealthCard extends StatelessWidget {
             children: [
               Text(
                 '$onSchedule active orders on schedule',
-                style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                style:
+                    const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
               ),
               GestureDetector(
                 onTap: () => context.goSection(9),
@@ -122,7 +126,8 @@ class StoreHealthCard extends StatelessWidget {
                       ),
                     ),
                     SizedBox(width: 3),
-                    Icon(Icons.arrow_forward, size: 12, color: Color(0xFF1A4FD6)),
+                    Icon(Icons.arrow_forward,
+                        size: 12, color: Color(0xFF1A4FD6)),
                   ],
                 ),
               ),
@@ -139,7 +144,8 @@ class StoreHealthCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+          Text(label,
+              style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
           Text(
             value,
             style: const TextStyle(

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -6,9 +8,9 @@ import '../providers/app_provider.dart';
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
 import '../utils/navigation.dart';
-import '../widgets/sidebar_navigation.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/receipt_dialog.dart';
-import '../widgets/panel_card.dart';
+import '../widgets/sidebar_navigation.dart';
 import '../utils/money.dart';
 
 class NewOrderScreen extends StatefulWidget {
@@ -61,14 +63,16 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   late final TextEditingController _deliveryChargeController;
 
   bool get _isCarriedDelivery =>
-      _deliveryType == DeliveryType.homeDelivery || _deliveryType == DeliveryType.online;
+      _deliveryType == DeliveryType.homeDelivery ||
+      _deliveryType == DeliveryType.online;
 
   @override
   void initState() {
     super.initState();
     _notesController = TextEditingController();
     _discountController = TextEditingController(text: '0');
-    _deliveryChargeController = TextEditingController(text: _deliveryFee.toStringAsFixed(0));
+    _deliveryChargeController =
+        TextEditingController(text: _deliveryFee.toStringAsFixed(0));
   }
 
   @override
@@ -159,253 +163,380 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           _selectedCategory.isEmpty || item.categoryName == _selectedCategory;
       final matchesSearch = _searchQuery.isEmpty ||
           item.name.toLowerCase().contains(_searchQuery.toLowerCase());
-      final categoryIsActive = !inactiveCategoryNames.contains(item.categoryName);
-      return item.isActive && categoryIsActive && matchesCategory && matchesSearch;
+      final categoryIsActive =
+          !inactiveCategoryNames.contains(item.categoryName);
+      return item.isActive &&
+          categoryIsActive &&
+          matchesCategory &&
+          matchesSearch;
     }).toList();
 
     final subtotal = _subtotalFor(garments);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: Row(
+    // Header + (grid or checkout review) — the left/top region either beside
+    // the cart panel (wide) or above it (narrow, see SidebarNavigation.contentWideBreakpoint below).
+    // `narrow` shrink-wraps the item grid/review instead of scrolling on
+    // their own, since narrow mode puts the whole screen in one outer
+    // SingleChildScrollView rather than splitting the height with the cart
+    // section — see that branch below for why a flex split doesn't work.
+    Widget buildMain({required bool narrow}) {
+      return Column(
+        mainAxisSize: narrow ? MainAxisSize.min : MainAxisSize.max,
         children: [
-          const SidebarNavigation(),
-
-          // Main Center View
-          Expanded(
-            child: Column(
-              children: [
-                // Top Header Bar
-                Container(
-                  height: 64,
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF475569)),
-                        onPressed: () => context.goSection(0),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'New Order',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.help_outline_rounded, color: Color(0xFF64748B)),
-                        onPressed: () {},
-                      ),
-                      const SizedBox(width: 8),
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: const Color(0xFF1A4FD6),
-                        child: Text(
-                          initialsFor((provider.shop?['owner_name'] as String?) ??
-                              (provider.shop?['name'] as String?)),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                if (_showCheckoutReview)
-                  Expanded(child: _buildCheckoutReview())
-                else ...[
-                  // Search & Filter Row
-                  Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      children: [
-                        // Search Bar
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: TextField(
-                            onChanged: (val) => setState(() => _searchQuery = val),
-                            decoration: const InputDecoration(
-                              hintText: 'Search items or scan a tag...',
-                              hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                              prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 20),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(vertical: 14),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-
-                        // Filter Pills Row
-                        SizedBox(
-                          height: 38,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: categoryNames.length + 1,
-                            separatorBuilder: (_, __) => const SizedBox(width: 8),
-                            itemBuilder: (context, idx) {
-                              final label = idx == 0 ? 'All' : categoryNames[idx - 1];
-                              final value = idx == 0 ? '' : categoryNames[idx - 1];
-                              final isSel = value == _selectedCategory;
-                              return ChoiceChip(
-                                label: Text(label, style: TextStyle(fontSize: 12, fontWeight: isSel ? FontWeight.bold : FontWeight.w500, color: isSel ? Colors.white : const Color(0xFF334155))),
-                                selected: isSel,
-                                selectedColor: const Color(0xFF1A4FD6),
-                                backgroundColor: Colors.white,
-                                side: BorderSide(color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                onSelected: (_) => setState(() => _selectedCategory = value),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Items Grid
-                  Expanded(
-                    child: _buildItemGrid(provider, filteredItems),
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          // Right Cart Panel Sidebar (Width: 320)
+          // Top Header Bar
           Container(
-            width: 320,
+            height: 64,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             decoration: const BoxDecoration(
               color: Colors.white,
-              border: Border(left: BorderSide(color: Color(0xFFE2E8F0))),
+              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                // Cart Header Title
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Row(
-                    children: [
-                      const Text('Current order', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEEF2FF),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text('$_totalItems', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
-                      ),
-                    ],
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded,
+                      color: Color(0xFF475569)),
+                  onPressed: () => context.goSection(0),
                 ),
-                const Divider(height: 1),
-
-                if (!_showCheckoutReview) ...[
-                  // Customer Selection Box
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: _customerCard(),
-                  ),
-
-                  // Cart Items List / Empty State
-                  Expanded(
-                    child: _cartQuantities.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(20),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFF1F5F9),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.shopping_bag_outlined, size: 32, color: Color(0xFF94A3B8)),
-                                ),
-                                const SizedBox(height: 12),
-                                const Text('No items yet', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                const Text('Tap products to add them to the order', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-                              ],
-                            ),
-                          )
-                        : ListView(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            children: _cartItems(garments).map((item) {
-                              return ListTile(
-                                title: Text(item.itemTitle, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                subtitle: Text('${item.quantity}x @ ${Money.symbol}${item.unitPrice.toInt()}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                                trailing: Text('${Money.symbol}${item.totalPrice.toInt()}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                              );
-                            }).toList(),
-                          ),
-                  ),
-
-                  // Cart Summary Footer & Checkout Button — just the totals at
-                  // this stage. Fulfilment/Payment/Notes/Discount live on the
-                  // Checkout review screen, matching the real app's two-step
-                  // flow instead of collecting everything up front.
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Subtotal', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-                            Text('${Money.symbol}${subtotal.toInt()}', style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A))),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Total', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                            Text('${Money.symbol}${subtotal.toInt()}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: (subtotal == 0 || _submitting)
-                                ? null
-                                : () => setState(() {
-                                      _readyBy ??= DateTime.now().add(const Duration(days: 1));
-                                      _showCheckoutReview = true;
-                                    }),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1A4FD6),
-                              disabledBackgroundColor: const Color(0xFFCBD5E1),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: Text(
-                              'Checkout • ${Money.symbol}${subtotal.toInt()}',
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else
-                  Expanded(child: _buildOrderSummary(provider, garments, subtotal)),
+                const SizedBox(width: 8),
+                const Text(
+                  'New Order',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A)),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.help_outline_rounded,
+                      color: Color(0xFF64748B)),
+                  onPressed: () {},
+                ),
               ],
             ),
           ),
+
+          if (_showCheckoutReview)
+            narrow
+                ? _buildCheckoutReview()
+                : Expanded(child: _buildCheckoutReview())
+          else ...[
+            // Search & Filter Row
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                children: [
+                  // Search Bar
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: TextField(
+                      onChanged: (val) => setState(() => _searchQuery = val),
+                      decoration: const InputDecoration(
+                        hintText: 'Search items or scan a tag...',
+                        hintStyle:
+                            TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        prefixIcon: Icon(Icons.search_rounded,
+                            color: Color(0xFF94A3B8), size: 20),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Filter Pills Row
+                  SizedBox(
+                    height: 38,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: categoryNames.length + 1,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, idx) {
+                        final label = idx == 0 ? 'All' : categoryNames[idx - 1];
+                        final value = idx == 0 ? '' : categoryNames[idx - 1];
+                        final isSel = value == _selectedCategory;
+                        return ChoiceChip(
+                          label: Text(label,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight:
+                                      isSel ? FontWeight.bold : FontWeight.w500,
+                                  color: isSel
+                                      ? Colors.white
+                                      : const Color(0xFF334155))),
+                          selected: isSel,
+                          selectedColor: const Color(0xFF1A4FD6),
+                          backgroundColor: Colors.white,
+                          side: BorderSide(
+                              color: isSel
+                                  ? const Color(0xFF1A4FD6)
+                                  : const Color(0xFFE2E8F0)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20)),
+                          onSelected: (_) =>
+                              setState(() => _selectedCategory = value),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Items Grid
+            narrow
+                ? _buildItemGrid(provider, filteredItems, shrinkWrap: true)
+                : Expanded(child: _buildItemGrid(provider, filteredItems)),
+          ],
         ],
+      );
+    }
+
+    // Customer card + (cart list/footer or checkout summary) — the
+    // right/bottom region. Below SidebarNavigation.contentWideBreakpoint this is boxed and stacked
+    // under buildMain instead of beside it; `narrow` shrink-wraps its inner
+    // lists for the same reason as buildMain above.
+    Widget buildCart({required bool narrow}) {
+      return Column(
+        mainAxisSize: narrow ? MainAxisSize.min : MainAxisSize.max,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cart Header Title
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                const Text('Current order',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A))),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text('$_totalItems',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A4FD6))),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          if (!_showCheckoutReview) ...[
+            // Customer Selection Box
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _customerCard(),
+            ),
+
+            // Cart Items List / Empty State
+            narrow
+                ? _cartItemsBody(garments, shrinkWrap: true)
+                : Expanded(child: _cartItemsBody(garments)),
+
+            // Cart Summary Footer & Checkout Button — just the totals at
+            // this stage. Fulfilment/Payment/Notes/Discount live on the
+            // Checkout review screen, matching the real app's two-step
+            // flow instead of collecting everything up front.
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Subtotal',
+                          style: TextStyle(
+                              fontSize: 13, color: Color(0xFF64748B))),
+                      Text('${Money.symbol}${subtotal.toInt()}',
+                          style: const TextStyle(
+                              fontSize: 13, color: Color(0xFF0F172A))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A))),
+                      Text('${Money.symbol}${subtotal.toInt()}',
+                          style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A))),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: (subtotal == 0 || _submitting)
+                          ? null
+                          : () => setState(() {
+                                _readyBy ??=
+                                    DateTime.now().add(const Duration(days: 1));
+                                _showCheckoutReview = true;
+                              }),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A4FD6),
+                        disabledBackgroundColor: const Color(0xFFCBD5E1),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        'Checkout • ${Money.symbol}${subtotal.toInt()}',
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else
+            narrow
+                ? _buildOrderSummary(provider, garments, subtotal,
+                    shrinkWrap: true)
+                : Expanded(
+                    child: _buildOrderSummary(provider, garments, subtotal)),
+        ],
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      drawer: const AppDrawer(),
+      body: AppShell(
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth >= SidebarNavigation.contentWideBreakpoint) {
+              return Row(
+                children: [
+                  // Main Center View
+                  Expanded(child: buildMain(narrow: false)),
+
+                  // Right Cart Panel Sidebar (Width: 320)
+                  Container(
+                    width: 320,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border:
+                          Border(left: BorderSide(color: Color(0xFFE2E8F0))),
+                    ),
+                    child: buildCart(narrow: false),
+                  ),
+                ],
+              );
+            }
+
+            // Below SidebarNavigation.contentWideBreakpoint the 320px cart panel has nowhere to go
+            // beside the grid, so it moves below it instead. Both sections'
+            // own fixed chrome (headers, customer card, footer) already
+            // comes close to using up a real phone's full height on its
+            // own — measured against a real 360dp-wide/800dp-tall phone
+            // (Pixel-class `wm density` 480, i.e. devicePixelRatio 3) — so a
+            // fixed flex split between them always clips one side or the
+            // other. Instead the whole thing is one scroll view, and each
+            // section shrink-wraps its own inner list rather than trying to
+            // fill a fixed share of the height.
+            return SingleChildScrollView(
+              child: Column(
+                children: [
+                  buildMain(narrow: true),
+                  const SizedBox(height: 20),
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: buildCart(narrow: true),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
+    );
+  }
+
+  /// The pre-checkout cart's item list or its empty state. `shrinkWrap`
+  /// sizes the list to its content instead of expecting a bounded parent —
+  /// see the narrow-mode branch in [build] for why that's needed there.
+  Widget _cartItemsBody(List<GarmentItemModel> garments,
+      {bool shrinkWrap = false}) {
+    if (_cartQuantities.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.shopping_bag_outlined,
+                  size: 32, color: Color(0xFF94A3B8)),
+            ),
+            const SizedBox(height: 12),
+            const Text('No items yet',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A))),
+            const Text('Tap products to add them to the order',
+                style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+          ],
+        ),
+      );
+    }
+    return ListView(
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: _cartItems(garments).map((item) {
+        return ListTile(
+          title: Text(item.itemTitle,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
+          subtitle: Text(
+              '${item.quantity}x @ ${Money.symbol}${item.unitPrice.toInt()}',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+          trailing: Text('${Money.symbol}${item.totalPrice.toInt()}',
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
+        );
+      }).toList(),
     );
   }
 
@@ -426,7 +557,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             backgroundColor: const Color(0xFFE2E8F0),
             child: Text(
               _customerName.isEmpty ? 'W' : _customerName[0].toUpperCase(),
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: Color(0xFF475569)),
             ),
           ),
           const SizedBox(width: 12),
@@ -434,10 +566,16 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_customerName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis),
+                Text(_customerName,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A)),
+                    overflow: TextOverflow.ellipsis),
                 Text(
                   _customer == null ? 'Tap to add a customer' : _customerPhone,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                  style:
+                      const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                 ),
               ],
             ),
@@ -446,7 +584,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             onPressed: _pickCustomer,
             child: Text(
               _customer == null ? 'Add' : 'Change',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A4FD6)),
             ),
           ),
         ],
@@ -466,7 +607,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.6, color: Color(0xFF64748B))),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.6,
+                  color: Color(0xFF64748B))),
           const SizedBox(height: 12),
           child,
         ],
@@ -484,7 +630,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     return GestureDetector(
       onTap: () => setState(() {
         _deliveryType = type;
-        final carried = type == DeliveryType.homeDelivery || type == DeliveryType.online;
+        final carried =
+            type == DeliveryType.homeDelivery || type == DeliveryType.online;
         _deliveryCharge = carried ? _deliveryFee : 0;
         _deliveryChargeController.text = _deliveryCharge.toStringAsFixed(0);
       }),
@@ -494,13 +641,23 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         decoration: BoxDecoration(
           color: isSel ? const Color(0xFFEEF2FF) : Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
+          border: Border.all(
+              color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
         ),
         child: Column(
           children: [
-            Icon(icon, size: 20, color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
+            Icon(icon,
+                size: 20,
+                color:
+                    isSel ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
             const SizedBox(height: 6),
-            Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF334155))),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isSel
+                        ? const Color(0xFF1A4FD6)
+                        : const Color(0xFF334155))),
           ],
         ),
       ),
@@ -519,12 +676,22 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         children: [
           TextButton.icon(
             onPressed: () => setState(() => _showCheckoutReview = false),
-            icon: const Icon(Icons.arrow_back_rounded, size: 16, color: Color(0xFF475569)),
-            label: const Text('Back to items', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-            style: TextButton.styleFrom(padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
+            icon: const Icon(Icons.arrow_back_rounded,
+                size: 16, color: Color(0xFF475569)),
+            label: const Text('Back to items',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF475569))),
+            style: TextButton.styleFrom(
+                padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
           ),
           const SizedBox(height: 4),
-          const Text('Checkout', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          const Text('Checkout',
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
           const SizedBox(height: 20),
           _customerCard(),
           const SizedBox(height: 16),
@@ -544,7 +711,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                       .map((type) => Expanded(
                             child: Padding(
                               padding: const EdgeInsets.only(right: 8),
-                              child: _fulfilmentCard(type, DeliveryType.label(type)),
+                              child: _fulfilmentCard(
+                                  type, DeliveryType.label(type)),
                             ),
                           ))
                       .toList(),
@@ -552,21 +720,31 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today_rounded, size: 16, color: Color(0xFF64748B)),
+                    const Icon(Icons.calendar_today_rounded,
+                        size: 16, color: Color(0xFF64748B)),
                     const SizedBox(width: 8),
-                    const Text('Ready by', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    const Text('Ready by',
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                     const Spacer(),
                     Text(
                       DateFormat('EEE, d MMM, yyyy').format(_readyBy!),
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A)),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, size: 20, color: Color(0xFF64748B)),
-                      onPressed: () => setState(() => _readyBy = _readyBy!.subtract(const Duration(days: 1))),
+                      icon: const Icon(Icons.remove_circle_outline,
+                          size: 20, color: Color(0xFF64748B)),
+                      onPressed: () => setState(() => _readyBy =
+                          _readyBy!.subtract(const Duration(days: 1))),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.add_circle_outline, size: 20, color: Color(0xFF64748B)),
-                      onPressed: () => setState(() => _readyBy = _readyBy!.add(const Duration(days: 1))),
+                      icon: const Icon(Icons.add_circle_outline,
+                          size: 20, color: Color(0xFF64748B)),
+                      onPressed: () => setState(() =>
+                          _readyBy = _readyBy!.add(const Duration(days: 1))),
                     ),
                   ],
                 ),
@@ -582,8 +760,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Collect payment now', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                      Text('Mark this order as paid', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                      Text('Collect payment now',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A))),
+                      Text('Mark this order as paid',
+                          style: TextStyle(
+                              fontSize: 11, color: Color(0xFF94A3B8))),
                     ],
                   ),
                 ),
@@ -604,9 +788,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               style: const TextStyle(fontSize: 13),
               decoration: InputDecoration(
                 hintText: 'e.g., Ring bell twice',
-                hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                hintStyle:
+                    const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ),
@@ -618,40 +805,65 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   /// The right rail once Checkout has been tapped: items, Subtotal, an
   /// editable Discount, Total, and the actual submit button.
-  Widget _buildOrderSummary(AppProvider provider, List<GarmentItemModel> garments, double subtotal) {
-    final total = (subtotal + _deliveryCharge - _discountAmount).clamp(0, double.infinity).toDouble();
+  Widget _buildOrderSummary(
+      AppProvider provider, List<GarmentItemModel> garments, double subtotal,
+      {bool shrinkWrap = false}) {
+    final total = (subtotal + _deliveryCharge - _discountAmount)
+        .clamp(0, double.infinity)
+        .toDouble();
 
     Widget summaryLine(String label, double amount) => Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-              Text('${Money.symbol}${amount.toInt()}', style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A))),
+              Text(label,
+                  style:
+                      const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+              Text('${Money.symbol}${amount.toInt()}',
+                  style:
+                      const TextStyle(fontSize: 13, color: Color(0xFF0F172A))),
             ],
           ),
         );
 
+    final itemsList = ListView(
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      children: _cartItems(garments).map((item) {
+        return ListTile(
+          title: Text(item.itemTitle,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
+          subtitle: Text(
+              '${item.quantity}x @ ${Money.symbol}${item.unitPrice.toInt()}',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+          trailing: Text('${Money.symbol}${item.totalPrice.toInt()}',
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
+        );
+      }).toList(),
+    );
+
     return Column(
+      mainAxisSize: shrinkWrap ? MainAxisSize.min : MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
           padding: EdgeInsets.all(20.0),
-          child: Text('Order Summary', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          child: Text('Order Summary',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
         ),
         const Divider(height: 1),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            children: _cartItems(garments).map((item) {
-              return ListTile(
-                title: Text(item.itemTitle, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                subtitle: Text('${item.quantity}x @ ${Money.symbol}${item.unitPrice.toInt()}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                trailing: Text('${Money.symbol}${item.totalPrice.toInt()}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              );
-            }).toList(),
-          ),
-        ),
+        shrinkWrap ? itemsList : Expanded(child: itemsList),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: const BoxDecoration(
@@ -667,23 +879,30 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Delivery', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                      const Text('Delivery',
+                          style: TextStyle(
+                              fontSize: 13, color: Color(0xFF64748B))),
                       SizedBox(
                         width: 100,
                         height: 32,
                         child: TextField(
                           controller: _deliveryChargeController,
                           textAlign: TextAlign.right,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           style: const TextStyle(fontSize: 13),
                           decoration: InputDecoration(
                             prefixText: '${Money.symbol} ',
-                            prefixStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                            prefixStyle: const TextStyle(
+                                fontSize: 13, color: Color(0xFF64748B)),
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 6),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8)),
                           ),
-                          onChanged: (v) => setState(() => _deliveryCharge = double.tryParse(v) ?? 0),
+                          onChanged: (v) => setState(
+                              () => _deliveryCharge = double.tryParse(v) ?? 0),
                         ),
                       ),
                     ],
@@ -693,23 +912,29 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Discount', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                  const Text('Discount',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
                   SizedBox(
                     width: 100,
                     height: 32,
                     child: TextField(
                       controller: _discountController,
                       textAlign: TextAlign.right,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       style: const TextStyle(fontSize: 13),
                       decoration: InputDecoration(
                         prefixText: '${Money.symbol} ',
-                        prefixStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                        prefixStyle: const TextStyle(
+                            fontSize: 13, color: Color(0xFF64748B)),
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 6),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
-                      onChanged: (v) => setState(() => _discountAmount = double.tryParse(v) ?? 0),
+                      onChanged: (v) => setState(
+                          () => _discountAmount = double.tryParse(v) ?? 0),
                     ),
                   ),
                 ],
@@ -718,28 +943,44 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Total', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                  Text('${Money.symbol}${total.toInt()}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  const Text('Total',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A))),
+                  Text('${Money.symbol}${total.toInt()}',
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A))),
                 ],
               ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _submitting ? null : () => _checkout(provider, garments, subtotal),
+                  onPressed: _submitting
+                      ? null
+                      : () => _checkout(provider, garments, subtotal),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1A4FD6),
                     disabledBackgroundColor: const Color(0xFFCBD5E1),
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _submitting
                       ? const SizedBox(
                           height: 18,
                           width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text('Place order', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                      : const Text('Place order',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white)),
                 ),
               ),
             ],
@@ -749,7 +990,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     );
   }
 
-  Widget _buildItemGrid(AppProvider provider, List<GarmentItemModel> items) {
+  Widget _buildItemGrid(AppProvider provider, List<GarmentItemModel> items,
+      {bool shrinkWrap = false}) {
     if (provider.isLoading && provider.garments.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -776,17 +1018,38 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 0.76,
-      ),
-      itemCount: items.length,
-      itemBuilder: (context, idx) => _itemCard(items[idx]),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = _gridColumnsFor(constraints.maxWidth);
+        return GridView.builder(
+          shrinkWrap: shrinkWrap,
+          physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            // 0.76 holds up down to 2 columns (a card is still narrow enough
+            // there to need the height). At 1 column the card gets nearly
+            // the full screen width, so the same ratio makes it needlessly
+            // tall (~420dp+) relative to a phone's viewport — widen it.
+            childAspectRatio: columns == 1 ? 1.3 : 0.76,
+          ),
+          itemCount: items.length,
+          itemBuilder: (context, idx) => _itemCard(items[idx]),
+        );
+      },
     );
+  }
+
+  /// The grid's own available width, independent of whether the cart panel
+  /// beside it (wide) or below it (narrow, see [SidebarNavigation.contentWideBreakpoint]) is what
+  /// made that width small.
+  static int _gridColumnsFor(double width) {
+    if (width < 380) return 1;
+    if (width < 620) return 2;
+    if (width < 900) return 3;
+    return 4;
   }
 
   Widget _emptyState({
@@ -801,11 +1064,16 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(color: Color(0xFFF1F5F9), shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+                color: Color(0xFFF1F5F9), shape: BoxShape.circle),
             child: Icon(icon, size: 32, color: const Color(0xFF94A3B8)),
           ),
           const SizedBox(height: 12),
-          Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
           const SizedBox(height: 4),
           SizedBox(
             width: 320,
@@ -831,7 +1099,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: qty > 0 ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
+        border: Border.all(
+            color: qty > 0 ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -857,8 +1126,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                         child: Image.network(
                           item.imageUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              Center(child: Icon(art.icon, size: 48, color: art.color)),
+                          errorBuilder: (_, __, ___) => Center(
+                              child:
+                                  Icon(art.icon, size: 48, color: art.color)),
                         ),
                       ),
                     )
@@ -869,7 +1139,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     right: 8,
                     child: Text(
                       item.turnaroundLabel,
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)),
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF94A3B8)),
                     ),
                   ),
                 ],
@@ -879,12 +1152,30 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           const SizedBox(height: 10),
 
           // Name & Price
-          Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          Text(item.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
           Row(
             children: [
-              Text('${Money.symbol}${_priceFor(item).toInt()}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
+              Flexible(
+                child: Text('${Money.symbol}${_priceFor(item).toInt()}',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A4FD6))),
+              ),
               const SizedBox(width: 4),
-              Text(item.unitLabel, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+              Flexible(
+                child: Text(item.unitLabel,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF94A3B8))),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -897,13 +1188,24 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: const [
-                    Icon(Icons.bolt_rounded, size: 14, color: Color(0xFFF59E0B)),
-                    Text('EXPRESS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-                  ],
+                Expanded(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.bolt_rounded,
+                          size: 14, color: Color(0xFFF59E0B)),
+                      SizedBox(width: 4),
+                      Flexible(
+                        child: Text('EXPRESS',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF64748B))),
+                      ),
+                    ],
+                  ),
                 ),
                 Transform.scale(
                   scale: 0.7,
@@ -911,7 +1213,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     value: isExpress,
                     activeColor: const Color(0xFF1A4FD6),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    onChanged: (val) => setState(() => _expressToggles[item.id] = val),
+                    onChanged: (val) =>
+                        setState(() => _expressToggles[item.id] = val),
                   ),
                 ),
               ],
@@ -924,13 +1227,19 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               ? SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () => setState(() => _cartQuantities[item.id] = 1),
+                    onPressed: () =>
+                        setState(() => _cartQuantities[item.id] = 1),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFFE2E8F0)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
-                    child: const Text('+ Add to List', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
+                    child: const Text('+ Add to List',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A4FD6))),
                   ),
                 )
               : Container(
@@ -943,7 +1252,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.remove, size: 16, color: Color(0xFF1A4FD6)),
+                        icon: const Icon(Icons.remove,
+                            size: 16, color: Color(0xFF1A4FD6)),
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 32, minHeight: 32),
                         onPressed: () => setState(() {
                           if (qty > 1) {
                             _cartQuantities[item.id] = qty - 1;
@@ -952,10 +1265,19 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                           }
                         }),
                       ),
-                      Text('$qty', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
+                      Text('$qty',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1A4FD6))),
                       IconButton(
-                        icon: const Icon(Icons.add, size: 16, color: Color(0xFF1A4FD6)),
-                        onPressed: () => setState(() => _cartQuantities[item.id] = qty + 1),
+                        icon: const Icon(Icons.add,
+                            size: 16, color: Color(0xFF1A4FD6)),
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 32, minHeight: 32),
+                        onPressed: () =>
+                            setState(() => _cartQuantities[item.id] = qty + 1),
                       ),
                     ],
                   ),
@@ -985,10 +1307,13 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     final items = _cartItems(garments);
     if (items.isEmpty) return;
 
-    final anyExpress = _cartQuantities.keys.any((id) => _expressToggles[id] == true);
+    final anyExpress =
+        _cartQuantities.keys.any((id) => _expressToggles[id] == true);
     // Matches the backend's own formula (serializers.py: subtotal + delivery
     // - discount) so the payload and what the server computes agree.
-    final total = (subtotal + _deliveryCharge - _discountAmount).clamp(0, double.infinity).toDouble();
+    final total = (subtotal + _deliveryCharge - _discountAmount)
+        .clamp(0, double.infinity)
+        .toDouble();
     final paid = _markPaid ? total : 0.0;
     final notes = _notesController.text.trim();
 
@@ -1011,7 +1336,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       'due_amount': total - paid,
       'express': anyExpress,
       if (notes.isNotEmpty) 'notes': notes,
-      if (_readyBy != null) 'scheduled_date': DateFormat('yyyy-MM-dd').format(_readyBy!),
+      if (_readyBy != null)
+        'scheduled_date': DateFormat('yyyy-MM-dd').format(_readyBy!),
       'items': items.map((i) => i.toJson()).toList(),
     };
 
@@ -1074,7 +1400,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       'shirt': _ItemArt(Icons.dry_cleaning_rounded, Color(0xFF3B82F6)),
       't-shirt': _ItemArt(Icons.checkroom_rounded, Color(0xFFF97316)),
       'kurta': _ItemArt(Icons.strikethrough_s_rounded, Color(0xFF06B6D4)),
-      'pant': _ItemArt(Icons.airline_seat_legroom_extra_rounded, Color(0xFFD97706)),
+      'pant':
+          _ItemArt(Icons.airline_seat_legroom_extra_rounded, Color(0xFFD97706)),
       'jeans': _ItemArt(Icons.checkroom_outlined, Color(0xFF2563EB)),
       'shorts': _ItemArt(Icons.dry_cleaning_outlined, Color(0xFF10B981)),
       'saree': _ItemArt(Icons.woman_rounded, Color(0xFFEC4899)),
@@ -1189,11 +1516,17 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
         decoration: BoxDecoration(
           color: selected ? const Color(0xFFEEF2FF) : Colors.white,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: selected ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
+          border: Border.all(
+              color:
+                  selected ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
         ),
         child: Text(
           label,
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: selected ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color:
+                  selected ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
         ),
       ),
     );
@@ -1210,7 +1543,11 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF475569))),
           const SizedBox(height: 6),
           TextField(
             controller: controller,
@@ -1218,10 +1555,13 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
             style: const TextStyle(fontSize: 13),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+              hintStyle:
+                  const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),
         ],
@@ -1237,11 +1577,12 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
       return c.name.toLowerCase().contains(q) || c.phone.contains(q);
     }).toList();
 
+    final size = MediaQuery.sizeOf(context);
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: SizedBox(
-        width: 440,
-        height: 520,
+        width: math.min(440.0, size.width - 48),
+        height: math.min(520.0, size.height - 96),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1249,11 +1590,16 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
               padding: const EdgeInsets.fromLTRB(20, 20, 12, 8),
               child: Row(
                 children: [
-                  const Text('Bill to', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  const Text('Bill to',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A))),
                   const Spacer(),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8)),
+                    icon: const Icon(Icons.close_rounded,
+                        color: Color(0xFF94A3B8)),
                   ),
                 ],
               ),
@@ -1262,9 +1608,13 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  Expanded(child: _tab('Existing customer', !_showNewCustomerForm, () => setState(() => _showNewCustomerForm = false))),
+                  Expanded(
+                      child: _tab('Existing customer', !_showNewCustomerForm,
+                          () => setState(() => _showNewCustomerForm = false))),
                   const SizedBox(width: 8),
-                  Expanded(child: _tab('New customer', _showNewCustomerForm, () => setState(() => _showNewCustomerForm = true))),
+                  Expanded(
+                      child: _tab('New customer', _showNewCustomerForm,
+                          () => setState(() => _showNewCustomerForm = true))),
                 ],
               ),
             ),
@@ -1276,13 +1626,21 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _newCustomerField('Full Name', _nameController, 'e.g. Ramesh Kumar'),
-                      _newCustomerField('Phone Number', _phoneController, '+919876543210', keyboard: TextInputType.phone),
-                      _newCustomerField('Email', _emailController, 'name@example.com', keyboard: TextInputType.emailAddress),
-                      _newCustomerField('Area / Locality', _areaController, 'e.g. HBR Layout, Bengaluru'),
+                      _newCustomerField(
+                          'Full Name', _nameController, 'e.g. Ramesh Kumar'),
+                      _newCustomerField(
+                          'Phone Number', _phoneController, '+919876543210',
+                          keyboard: TextInputType.phone),
+                      _newCustomerField(
+                          'Email', _emailController, 'name@example.com',
+                          keyboard: TextInputType.emailAddress),
+                      _newCustomerField('Area / Locality', _areaController,
+                          'e.g. HBR Layout, Bengaluru'),
                       if (_error != null) ...[
                         const SizedBox(height: 4),
-                        Text(_error!, style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
+                        Text(_error!,
+                            style: const TextStyle(
+                                fontSize: 12, color: Color(0xFFDC2626))),
                       ],
                     ],
                   ),
@@ -1298,9 +1656,12 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF1A4FD6),
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: Text(_saving ? 'Adding…' : 'Add Customer', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    child: Text(_saving ? 'Adding…' : 'Add Customer',
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ),
@@ -1312,10 +1673,13 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                   onChanged: (v) => setState(() => _query = v),
                   decoration: InputDecoration(
                     hintText: 'Search by name or phone',
-                    hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
+                    hintStyle:
+                        const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                    prefixIcon: const Icon(Icons.search_rounded,
+                        size: 20, color: Color(0xFF94A3B8)),
                     isDense: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
               ),
@@ -1323,7 +1687,9 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
               Expanded(
                 child: matches.isEmpty
                     ? const Center(
-                        child: Text('No matching customers', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                        child: Text('No matching customers',
+                            style: TextStyle(
+                                fontSize: 12, color: Color(0xFF94A3B8))),
                       )
                     : ListView.builder(
                         itemCount: matches.length,
@@ -1335,11 +1701,20 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                               backgroundColor: const Color(0xFFE2E8F0),
                               child: Text(
                                 c.name.isEmpty ? '?' : c.name[0].toUpperCase(),
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF475569)),
                               ),
                             ),
-                            title: Text(c.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                            subtitle: Text(c.phone, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            title: Text(c.name,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A))),
+                            subtitle: Text(c.phone,
+                                style: const TextStyle(
+                                    fontSize: 11, color: Color(0xFF64748B))),
                             onTap: () => Navigator.pop(context, c),
                           );
                         },
@@ -1360,9 +1735,14 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFFE2E8F0)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: const Text('Bill to walk-in customer', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                    child: const Text('Bill to walk-in customer',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF475569))),
                   ),
                 ),
               ),
@@ -1392,30 +1772,44 @@ class _OrderPlacedDialog extends StatelessWidget {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
-        width: 380,
+        width: math.min(380.0, MediaQuery.sizeOf(context).width - 48),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(color: Color(0xFFDCFCE7), shape: BoxShape.circle),
-              child: const Icon(Icons.check_rounded, color: Color(0xFF16A34A), size: 32),
+              decoration: const BoxDecoration(
+                  color: Color(0xFFDCFCE7), shape: BoxShape.circle),
+              child: const Icon(Icons.check_rounded,
+                  color: Color(0xFF16A34A), size: 32),
             ),
             const SizedBox(height: 16),
-            const Text('Order Placed!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            const Text('Order Placed!',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A))),
             const SizedBox(height: 4),
-            const Text('Your order has been created successfully', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            const Text('Your order has been created successfully',
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8)),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Order ID', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  const Text('Order ID',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                   const SizedBox(width: 8),
-                  Text('#${order.orderNumber}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  Text('#${order.orderNumber}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A))),
                 ],
               ),
             ),
@@ -1427,19 +1821,31 @@ class _OrderPlacedDialog extends StatelessWidget {
             _summaryRow('Order Type', DeliveryType.label(order.deliveryType)),
             _summaryRow(
               'Payment',
-              isPaid ? 'Paid' : 'Balance Due: ${Money.symbol}${order.dueAmount.toInt()}',
-              valueColor: isPaid ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+              isPaid
+                  ? 'Paid'
+                  : 'Balance Due: ${Money.symbol}${order.dueAmount.toInt()}',
+              valueColor:
+                  isPaid ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
             ),
             if (order.scheduledDate != null)
-              _summaryRow('Ready by', DateFormat('MMM d, yyyy').format(order.scheduledDate!)),
+              _summaryRow('Ready by',
+                  DateFormat('MMM d, yyyy').format(order.scheduledDate!)),
             const SizedBox(height: 8),
             const Divider(height: 1),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                Text('${Money.symbol}${order.totalAmount.toInt()}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
+                const Text('Total',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A))),
+                Text('${Money.symbol}${order.totalAmount.toInt()}',
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A4FD6))),
               ],
             ),
             const SizedBox(height: 20),
@@ -1449,12 +1855,18 @@ class _OrderPlacedDialog extends StatelessWidget {
                 // Cart/review state was already reset before this dialog was
                 // shown, so this just needs to close itself.
                 onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
-                label: const Text('New Order', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                icon: const Icon(Icons.add_rounded,
+                    size: 18, color: Colors.white),
+                label: const Text('New Order',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1A4FD6),
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ),
@@ -1469,10 +1881,15 @@ class _OrderPlacedDialog extends StatelessWidget {
                     ),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       side: const BorderSide(color: Color(0xFFE2E8F0)),
                     ),
-                    child: const Text('View Receipt', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                    child: const Text('View Receipt',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF334155))),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -1484,10 +1901,15 @@ class _OrderPlacedDialog extends StatelessWidget {
                     },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       side: const BorderSide(color: Color(0xFFE2E8F0)),
                     ),
-                    child: const Text('Order Details', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                    child: const Text('Order Details',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF334155))),
                   ),
                 ),
               ],
@@ -1504,8 +1926,13 @@ class _OrderPlacedDialog extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-          Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: valueColor ?? const Color(0xFF0F172A))),
+          Text(label,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: valueColor ?? const Color(0xFF0F172A))),
         ],
       ),
     );

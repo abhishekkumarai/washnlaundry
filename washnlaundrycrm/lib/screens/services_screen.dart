@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../utils/money.dart';
 
@@ -24,12 +27,14 @@ class _ServicesScreenState extends State<ServicesScreen> {
   // provider — these three fields are only the half-filled form above the list.
   String? _pickupStartTime;
   String? _pickupEndTime;
-  final TextEditingController _pickupCapacityController = TextEditingController();
+  final TextEditingController _pickupCapacityController =
+      TextEditingController();
   int _pickupBuffer = 0;
 
   String? _deliveryStartTime;
   String? _deliveryEndTime;
-  final TextEditingController _deliveryCapacityController = TextEditingController();
+  final TextEditingController _deliveryCapacityController =
+      TextEditingController();
   int _deliveryBuffer = 0;
 
   /// 15-minute increments from 6:00 AM to 10:00 PM, matching the live app's
@@ -47,13 +52,41 @@ class _ServicesScreenState extends State<ServicesScreen> {
   // dialog lets you pick) so a user-created category renders with the icon it
   // chose instead of a neutral fallback.
   static const Map<String, Map<String, dynamic>> _categoryStyles = {
-    'Iron':     {'icon': Icons.dry_cleaning_rounded,           'color': Color(0xFF1A4FD6), 'bg': Color(0xFFEEF2FF)},
-    'Laundry':  {'icon': Icons.local_laundry_service_rounded,  'color': Color(0xFF0284C7), 'bg': Color(0xFFE0F2FE)},
-    'WashIron': {'icon': Icons.iron_rounded,                   'color': Color(0xFFD97706), 'bg': Color(0xFFFEF3C7)},
-    'Sparkles': {'icon': Icons.auto_awesome_rounded,           'color': Color(0xFF7C3AED), 'bg': Color(0xFFF3E8FF)},
-    'Home':     {'icon': Icons.home_work_rounded,              'color': Color(0xFFA855F7), 'bg': Color(0xFFF3E8FF)},
-    'Shoe':     {'icon': Icons.roller_skating_rounded,         'color': Color(0xFF10B981), 'bg': Color(0xFFECFDF5)},
-    'Star':     {'icon': Icons.workspace_premium_rounded,      'color': Color(0xFFEC4899), 'bg': Color(0xFFFCE7F3)},
+    'Iron': {
+      'icon': Icons.dry_cleaning_rounded,
+      'color': Color(0xFF1A4FD6),
+      'bg': Color(0xFFEEF2FF)
+    },
+    'Laundry': {
+      'icon': Icons.local_laundry_service_rounded,
+      'color': Color(0xFF0284C7),
+      'bg': Color(0xFFE0F2FE)
+    },
+    'WashIron': {
+      'icon': Icons.iron_rounded,
+      'color': Color(0xFFD97706),
+      'bg': Color(0xFFFEF3C7)
+    },
+    'Sparkles': {
+      'icon': Icons.auto_awesome_rounded,
+      'color': Color(0xFF7C3AED),
+      'bg': Color(0xFFF3E8FF)
+    },
+    'Home': {
+      'icon': Icons.home_work_rounded,
+      'color': Color(0xFFA855F7),
+      'bg': Color(0xFFF3E8FF)
+    },
+    'Shoe': {
+      'icon': Icons.roller_skating_rounded,
+      'color': Color(0xFF10B981),
+      'bg': Color(0xFFECFDF5)
+    },
+    'Star': {
+      'icon': Icons.workspace_premium_rounded,
+      'color': Color(0xFFEC4899),
+      'bg': Color(0xFFFCE7F3)
+    },
   };
 
   static const Map<String, dynamic> _fallbackStyle = {
@@ -89,7 +122,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
       _currentItems = const [];
       return;
     }
-    if (_selectedCategoryIndex >= _categories.length) _selectedCategoryIndex = 0;
+    if (_selectedCategoryIndex >= _categories.length)
+      _selectedCategoryIndex = 0;
 
     final categoryName = _categories[_selectedCategoryIndex]['title'] as String;
     final query = _searchQuery.toLowerCase();
@@ -133,19 +167,20 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Row(
-        children: [
-          const SidebarNavigation(),
-          Expanded(
-            child: Column(
+      drawer: const AppDrawer(),
+      body: AppShell(
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
+            return Column(
               children: [
-                _buildHeader(),
-                _buildTabBar(),
-                Expanded(child: _buildBody()),
+                narrow ? _buildNarrowHeader() : _buildHeader(),
+                _buildTabBar(narrow),
+                Expanded(child: _buildBody(narrow)),
               ],
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -160,7 +195,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
       ),
       child: Row(
         children: [
-          const Text('Services', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          const Text('Services',
+              style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
           const SizedBox(width: 8),
           Text(
             '${_categories.length} Items · ${_categories.fold<int>(0, (sum, c) => sum + (c['count'] as int))} items',
@@ -176,7 +215,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   onChanged: (v) => setState(() => _showInactive = v ?? false),
                 ),
-                const Text('Show Inactive', style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                const Text('Show Inactive',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
               ],
             ),
             const SizedBox(width: 12),
@@ -194,7 +234,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 decoration: const InputDecoration(
                   hintText: 'Search items...',
                   hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                  prefixIcon: Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+                  prefixIcon: Icon(Icons.search_rounded,
+                      size: 18, color: Color(0xFF94A3B8)),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(vertical: 9),
                 ),
@@ -208,12 +249,130 @@ class _ServicesScreenState extends State<ServicesScreen> {
             ElevatedButton.icon(
               onPressed: () => _showAddItemModal(context),
               icon: const Icon(Icons.add, size: 16, color: Colors.white),
-              label: const Text('+ New Service', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+              label: const Text('+ New Service',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1A4FD6),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
                 elevation: 0,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Below [SidebarNavigation.contentWideBreakpoint]: title+count+icon-only "New Service" on one row,
+  /// full-width search below (Items tab only), and a horizontal-scroll row
+  /// for Show Inactive/Download/Import — same shape as Orders'/Staff's narrow
+  /// headers.
+  Widget _buildNarrowHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Services',
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A))),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${_categories.length} Items · ${_categories.fold<int>(0, (sum, c) => sum + (c['count'] as int))} items',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF94A3B8)),
+                ),
+              ),
+              if (_selectedTopTab == 0)
+                SizedBox(
+                  width: 38,
+                  height: 38,
+                  child: ElevatedButton(
+                    onPressed: () => _showAddItemModal(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A4FD6),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    child:
+                        const Icon(Icons.add, size: 18, color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
+          if (_selectedTopTab == 0) ...[
+            const SizedBox(height: 10),
+            Container(
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextField(
+                onChanged: (v) => setState(() => _searchQuery = v),
+                style: const TextStyle(fontSize: 13),
+                decoration: const InputDecoration(
+                  hintText: 'Search items...',
+                  hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  prefixIcon: Icon(Icons.search_rounded,
+                      size: 18, color: Color(0xFF94A3B8)),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 9),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () =>
+                        setState(() => _showInactive = !_showInactive),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Checkbox(
+                          value: _showInactive,
+                          activeColor: const Color(0xFF1A4FD6),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          onChanged: (v) =>
+                              setState(() => _showInactive = v ?? false),
+                        ),
+                        const SizedBox(width: 4),
+                        const Text('Show Inactive',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF475569))),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _headerButton(Icons.download_outlined, 'Download'),
+                  const SizedBox(width: 8),
+                  _headerButton(Icons.upload_outlined, 'Import'),
+                ],
               ),
             ),
           ],
@@ -226,7 +385,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
     return OutlinedButton.icon(
       onPressed: () {},
       icon: Icon(icon, size: 15, color: const Color(0xFF475569)),
-      label: Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF334155), fontWeight: FontWeight.w500)),
+      label: Text(label,
+          style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF334155),
+              fontWeight: FontWeight.w500)),
       style: OutlinedButton.styleFrom(
         side: const BorderSide(color: Color(0xFFE2E8F0)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -235,21 +398,36 @@ class _ServicesScreenState extends State<ServicesScreen> {
     );
   }
 
-  Widget _buildTabBar() {
+  Widget _buildTabBar(bool narrow) {
+    final tabs = [
+      _buildTab(0, Icons.checkroom_outlined, 'Items'),
+      _buildTab(1, Icons.location_on_outlined, 'Service Areas'),
+      _buildTab(2, Icons.access_time_rounded, 'Pickup'),
+      _buildTab(3, Icons.local_shipping_outlined, 'Delivery'),
+    ];
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-      child: Row(
-        children: [
-          _buildTab(0, Icons.checkroom_outlined, 'Items'),
-          const SizedBox(width: 8),
-          _buildTab(1, Icons.location_on_outlined, 'Service Areas'),
-          const SizedBox(width: 8),
-          _buildTab(2, Icons.access_time_rounded, 'Pickup'),
-          const SizedBox(width: 8),
-          _buildTab(3, Icons.local_shipping_outlined, 'Delivery'),
-        ],
-      ),
+      padding: EdgeInsets.symmetric(horizontal: narrow ? 16 : 24, vertical: 10),
+      // ListView, not a plain Row: at phone width the 4 pills (one with a
+      // 2-word label) no longer fit — same reasoning as Staff's sub-tab bar.
+      child: narrow
+          ? SizedBox(
+              height: 38,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: tabs.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, i) => tabs[i],
+              ),
+            )
+          : Row(
+              children: [
+                for (var i = 0; i < tabs.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  tabs[i],
+                ],
+              ],
+            ),
     );
   }
 
@@ -262,31 +440,45 @@ class _ServicesScreenState extends State<ServicesScreen> {
         decoration: BoxDecoration(
           color: sel ? const Color(0xFFEEF2FF) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: sel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
+          border: Border.all(
+              color: sel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 15, color: sel ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
+            Icon(icon,
+                size: 15,
+                color: sel ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(fontSize: 13, fontWeight: sel ? FontWeight.w600 : FontWeight.w500, color: sel ? const Color(0xFF1A4FD6) : const Color(0xFF334155))),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: sel ? FontWeight.w600 : FontWeight.w500,
+                    color: sel
+                        ? const Color(0xFF1A4FD6)
+                        : const Color(0xFF334155))),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(bool narrow) {
     switch (_selectedTopTab) {
-      case 0: return _buildItemsView();
-      case 1: return _buildServiceAreasView();
-      case 2: return _buildScheduleView(isPickup: true);
-      case 3: return _buildScheduleView(isPickup: false);
-      default: return _buildItemsView();
+      case 0:
+        return _buildItemsView(narrow);
+      case 1:
+        return _buildServiceAreasView();
+      case 2:
+        return _buildScheduleView(isPickup: true, narrow: narrow);
+      case 3:
+        return _buildScheduleView(isPickup: false, narrow: narrow);
+      default:
+        return _buildItemsView(narrow);
     }
   }
 
   // ─── TAB 1: Items ───────────────────────────────────────────────────
-  Widget _buildItemsView() {
+  Widget _buildItemsView(bool narrow) {
     // A fresh database has no categories at all, and every card below indexes
     // _categories[_selectedCategoryIndex] — so this has to come first.
     if (_categories.isEmpty) return _buildNoCategoriesView();
@@ -294,146 +486,231 @@ class _ServicesScreenState extends State<ServicesScreen> {
     final cat = _categories[_selectedCategoryIndex];
     final items = _currentItems;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Left: Category sidebar
-        Container(
-          width: 264,
-          color: Colors.white,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.only(left: 20, top: 16, bottom: 10),
-                child: Text('SERVICE CATEGORIES', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8), letterSpacing: 0.8)),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  itemCount: _categories.length,
-                  itemBuilder: (ctx, i) {
-                    final c = _categories[i];
-                    final sel = _selectedCategoryIndex == i;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedCategoryIndex = i),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 6),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: sel ? const Color(0xFFEEF2FF) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: sel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
+    final categoryRail = Container(
+      width: 264,
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 20, top: 16, bottom: 10),
+            child: Text('SERVICE CATEGORIES',
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF94A3B8),
+                    letterSpacing: 0.8)),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              itemCount: _categories.length,
+              itemBuilder: (ctx, i) {
+                final c = _categories[i];
+                final sel = _selectedCategoryIndex == i;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedCategoryIndex = i),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color:
+                          sel ? const Color(0xFFEEF2FF) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: sel
+                              ? const Color(0xFF1A4FD6)
+                              : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                              color: c['bg'] as Color,
+                              borderRadius: BorderRadius.circular(8)),
+                          child: Icon(c['icon'] as IconData,
+                              size: 18, color: c['color'] as Color),
                         ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 36, height: 36,
-                              decoration: BoxDecoration(color: c['bg'] as Color, borderRadius: BorderRadius.circular(8)),
-                              child: Icon(c['icon'] as IconData, size: 18, color: c['color'] as Color),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(c['title'] as String, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: sel ? const Color(0xFF1A4FD6) : const Color(0xFF0F172A))),
-                                  Text('${c['count']} items · ${c['range']}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              width: 8, height: 8,
-                              decoration: BoxDecoration(
-                                color: (c['isActive'] as bool? ?? true)
-                                    ? const Color(0xFF10B981)
-                                    : const Color(0xFF94A3B8),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(c['title'] as String,
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: sel
+                                          ? const Color(0xFF1A4FD6)
+                                          : const Color(0xFF0F172A))),
+                              Text('${c['count']} items · ${c['range']}',
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF64748B))),
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const Divider(height: 1, color: Color(0xFFE2E8F0)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                child: GestureDetector(
-                  onTap: () => _showAddCategoryModal(context),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.add, size: 15, color: Color(0xFF1A4FD6)),
-                      SizedBox(width: 6),
-                      // The rail is a fixed 264px, so the label has to be
-                      // allowed to shrink rather than overflow it.
-                      Expanded(
-                        child: Text(
-                          'New service category',
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1A4FD6)),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: (c['isActive'] as bool? ?? true)
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF94A3B8),
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: GestureDetector(
+              onTap: () => _showAddCategoryModal(context),
+              child: const Row(
+                children: [
+                  Icon(Icons.add, size: 15, color: Color(0xFF1A4FD6)),
+                  SizedBox(width: 6),
+                  // The rail is a fixed 264px, so the label has to be
+                  // allowed to shrink rather than overflow it.
+                  Expanded(
+                    child: Text(
+                      'New service category',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A4FD6)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // Narrow mode: the 264px vertical rail alone would eat almost the whole
+    // phone width, leaving no room for the grid — same bug class as Orders'
+    // original table. Collapses to a horizontal-scroll chip row instead,
+    // matching New Order's category `ChoiceChip` row.
+    final categoryChips = SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final c = _categories[i];
+          final sel = _selectedCategoryIndex == i;
+          return ChoiceChip(
+            label: Text(c['title'] as String),
+            selected: sel,
+            onSelected: (_) => setState(() => _selectedCategoryIndex = i),
+            avatar: Icon(c['icon'] as IconData,
+                size: 16, color: sel ? Colors.white : c['color'] as Color),
+            selectedColor: const Color(0xFF1A4FD6),
+            labelStyle: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: sel ? Colors.white : const Color(0xFF0F172A)),
+          );
+        },
+      ),
+    );
+
+    final itemsGrid = SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Category header row
+          _buildCategoryHeader(cat),
+          const SizedBox(height: 20),
+
+          // Items row header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Items (${items.length})',
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A))),
+              GestureDetector(
+                onTap: () => _showAddItemModal(context),
+                child: const Row(
+                  children: [
+                    Icon(Icons.add, size: 15, color: Color(0xFF1A4FD6)),
+                    SizedBox(width: 4),
+                    Text('Add Item',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1A4FD6))),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
 
-        // Right: Items grid
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Category header row
-                _buildCategoryHeader(cat),
-                const SizedBox(height: 20),
-
-                // Items row header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Items (${items.length})', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
-                    GestureDetector(
-                      onTap: () => _showAddItemModal(context),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.add, size: 15, color: Color(0xFF1A4FD6)),
-                          SizedBox(width: 4),
-                          Text('Add Item', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1A4FD6))),
-                        ],
-                      ),
-                    ),
-                  ],
+          // Items grid
+          LayoutBuilder(
+            builder: (context, gridConstraints) {
+              final crossAxisCount = gridConstraints.maxWidth < 380
+                  ? 1
+                  : gridConstraints.maxWidth < 620
+                      ? 2
+                      : gridConstraints.maxWidth < 900
+                          ? 3
+                          : 4;
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.78,
                 ),
-                const SizedBox(height: 16),
-
-                // Items grid
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 0.78,
-                  ),
-                  itemCount: items.length + 1,
-                  itemBuilder: (ctx, i) {
-                    if (i == items.length) return _buildAddNewItemCard();
-                    return _buildItemCard(items[i]);
-                  },
-                ),
-              ],
-            ),
+                itemCount: items.length + 1,
+                itemBuilder: (ctx, i) {
+                  if (i == items.length) return _buildAddNewItemCard();
+                  return _buildItemCard(items[i]);
+                },
+              );
+            },
           ),
-        ),
+        ],
+      ),
+    );
+
+    if (narrow) {
+      return Column(
+        children: [
+          const SizedBox(height: 12),
+          categoryChips,
+          const SizedBox(height: 4),
+          Expanded(child: itemsGrid),
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        categoryRail,
+        Expanded(child: itemsGrid),
       ],
     );
   }
@@ -445,20 +722,31 @@ class _ServicesScreenState extends State<ServicesScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.category_outlined, size: 48, color: Color(0xFFCBD5E1)),
+          const Icon(Icons.category_outlined,
+              size: 48, color: Color(0xFFCBD5E1)),
           const SizedBox(height: 14),
-          const Text('No services', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+          const Text('No services',
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0F172A))),
           const SizedBox(height: 6),
-          const Text('Create services to organize your items.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+          const Text('Create services to organize your items.',
+              style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
           const SizedBox(height: 18),
           ElevatedButton.icon(
             onPressed: () => _showAddCategoryModal(context),
             icon: const Icon(Icons.add, size: 16, color: Colors.white),
-            label: const Text('New service category', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+            label: const Text('New service category',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1A4FD6),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
               elevation: 0,
             ),
           ),
@@ -468,6 +756,138 @@ class _ServicesScreenState extends State<ServicesScreen> {
   }
 
   Widget _buildCategoryHeader(Map<String, dynamic> cat) {
+    final iconAndTitle = Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+              color: cat['bg'] as Color,
+              borderRadius: BorderRadius.circular(10)),
+          child: Icon(cat['icon'] as IconData,
+              size: 22, color: cat['color'] as Color),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(cat['title'] as String,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A))),
+                  ),
+                  const SizedBox(width: 10),
+                  Builder(builder: (_) {
+                    final active = cat['isActive'] as bool? ?? true;
+                    final color = active
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF94A3B8);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? const Color(0xFFECFDF5)
+                            : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.circle, size: 6, color: color),
+                          const SizedBox(width: 4),
+                          Text(active ? 'Active' : 'Inactive',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: color)),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+              Text('${cat['count']} items in ${cat['title']}',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF64748B))),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    final priceAndActions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            const Text('Price range',
+                style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+            Text(cat['range'] as String,
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A))),
+          ],
+        ),
+        const SizedBox(width: 16),
+        IconButton(
+          icon: const Icon(Icons.edit_outlined,
+              size: 18, color: Color(0xFF64748B)),
+          tooltip: 'Edit Category',
+          onPressed: () => _showEditCategoryModal(context, cat),
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert_rounded,
+              size: 18, color: Color(0xFF64748B)),
+          tooltip: 'More actions',
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          onSelected: (action) {
+            if (action == 'edit') {
+              _showEditCategoryModal(context, cat);
+            } else if (action == 'delete') {
+              _showDeleteCategoryConfirm(context, cat);
+            }
+          },
+          itemBuilder: (ctx) => [
+            const PopupMenuItem(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(Icons.edit_outlined,
+                      size: 16, color: Color(0xFF64748B)),
+                  SizedBox(width: 8),
+                  Text('Edit category', style: TextStyle(fontSize: 13)),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(Icons.delete_outline_rounded,
+                      size: 16, color: Color(0xFFDC2626)),
+                  SizedBox(width: 8),
+                  Text('Delete category',
+                      style:
+                          TextStyle(fontSize: 13, color: Color(0xFFDC2626))),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
@@ -475,94 +895,27 @@ class _ServicesScreenState extends State<ServicesScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(color: cat['bg'] as Color, borderRadius: BorderRadius.circular(10)),
-            child: Icon(cat['icon'] as IconData, size: 22, color: cat['color'] as Color),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Below this the price-range/edit/menu cluster crowds the title
+          // column to near-zero — stack them on their own row instead.
+          if (constraints.maxWidth < 500) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(cat['title'] as String, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    const SizedBox(width: 10),
-                    Builder(builder: (_) {
-                      final active = cat['isActive'] as bool? ?? true;
-                      final color = active ? const Color(0xFF10B981) : const Color(0xFF94A3B8);
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: active ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.circle, size: 6, color: color),
-                            const SizedBox(width: 4),
-                            Text(active ? 'Active' : 'Inactive', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
-                ),
-                Text('${cat['count']} items in ${cat['title']}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                iconAndTitle,
+                const SizedBox(height: 14),
+                priceAndActions,
               ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            );
+          }
+          return Row(
             children: [
-              const Text('Price range', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-              Text(cat['range'] as String, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              Expanded(child: iconAndTitle),
+              priceAndActions,
             ],
-          ),
-          const SizedBox(width: 16),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
-            tooltip: 'Edit Category',
-            onPressed: () => _showEditCategoryModal(context, cat),
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded, size: 18, color: Color(0xFF64748B)),
-            tooltip: 'More actions',
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            onSelected: (action) {
-              if (action == 'edit') {
-                _showEditCategoryModal(context, cat);
-              } else if (action == 'delete') {
-                _showDeleteCategoryConfirm(context, cat);
-              }
-            },
-            itemBuilder: (ctx) => [
-              const PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)),
-                    SizedBox(width: 8),
-                    Text('Edit category', style: TextStyle(fontSize: 13)),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFDC2626)),
-                    SizedBox(width: 8),
-                    Text('Delete category', style: TextStyle(fontSize: 13, color: Color(0xFFDC2626))),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -570,7 +923,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
   Widget _itemImagePlaceholder() => Container(
         color: const Color(0xFFF1F5F9),
         child: const Center(
-          child: Icon(Icons.checkroom_rounded, color: Color(0xFFCBD5E1), size: 32),
+          child:
+              Icon(Icons.checkroom_rounded, color: Color(0xFFCBD5E1), size: 32),
         ),
       );
 
@@ -589,7 +943,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
             child: Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(12)),
                   child: SizedBox(
                     width: double.infinity,
                     // Most catalogue items have no photo — Image.network('')
@@ -600,27 +955,38 @@ class _ServicesScreenState extends State<ServicesScreen> {
                             item['img'] as String,
                             width: double.infinity,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _itemImagePlaceholder(),
+                            errorBuilder: (_, __, ___) =>
+                                _itemImagePlaceholder(),
                           ),
                   ),
                 ),
                 // Active / Inactive badge top-right
                 Positioned(
-                  top: 8, right: 8,
+                  top: 8,
+                  right: 8,
                   child: Builder(builder: (_) {
                     final active = item['active'] as bool;
-                    final fg = active ? const Color(0xFF10B981) : const Color(0xFF94A3B8);
+                    final fg = active
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF94A3B8);
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 3),
                       decoration: BoxDecoration(
-                        color: active ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                        color: active
+                            ? const Color(0xFFECFDF5)
+                            : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
                         children: [
                           Icon(Icons.circle, size: 5, color: fg),
                           const SizedBox(width: 3),
-                          Text(active ? 'Active' : 'Inactive', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: fg)),
+                          Text(active ? 'Active' : 'Inactive',
+                              style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: fg)),
                         ],
                       ),
                     );
@@ -628,39 +994,49 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 ),
                 // Edit & 3-dots button bottom-right
                 Positioned(
-                  bottom: 8, right: 8,
+                  bottom: 8,
+                  right: 8,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
                         onTap: () => _showEditItemModal(context, item),
                         child: Container(
-                          width: 28, height: 28,
+                          width: 28,
+                          height: 28,
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(6),
                             boxShadow: [
-                              BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4),
+                              BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 4),
                             ],
                           ),
-                          child: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF64748B)),
+                          child: const Icon(Icons.edit_outlined,
+                              size: 14, color: Color(0xFF64748B)),
                         ),
                       ),
                       const SizedBox(width: 4),
                       Container(
-                        width: 28, height: 28,
+                        width: 28,
+                        height: 28,
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(6),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4),
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 4),
                           ],
                         ),
                         child: PopupMenuButton<String>(
                           padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.more_vert_rounded, size: 15, color: Color(0xFF64748B)),
+                          icon: const Icon(Icons.more_vert_rounded,
+                              size: 15, color: Color(0xFF64748B)),
                           tooltip: 'Item options',
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
                           onSelected: (action) {
                             if (action == 'edit') {
                               _showEditItemModal(context, item);
@@ -673,9 +1049,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
                               value: 'edit',
                               child: Row(
                                 children: [
-                                  Icon(Icons.edit_outlined, size: 15, color: Color(0xFF64748B)),
+                                  Icon(Icons.edit_outlined,
+                                      size: 15, color: Color(0xFF64748B)),
                                   SizedBox(width: 8),
-                                  Text('Edit item', style: TextStyle(fontSize: 13)),
+                                  Text('Edit item',
+                                      style: TextStyle(fontSize: 13)),
                                 ],
                               ),
                             ),
@@ -683,9 +1061,13 @@ class _ServicesScreenState extends State<ServicesScreen> {
                               value: 'delete',
                               child: Row(
                                 children: [
-                                  Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFDC2626)),
+                                  Icon(Icons.delete_outline_rounded,
+                                      size: 15, color: Color(0xFFDC2626)),
                                   SizedBox(width: 8),
-                                  Text('Delete item', style: TextStyle(fontSize: 13, color: Color(0xFFDC2626))),
+                                  Text('Delete item',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFFDC2626))),
                                 ],
                               ),
                             ),
@@ -704,26 +1086,45 @@ class _ServicesScreenState extends State<ServicesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item['name'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                Text(item['name'] as String,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A))),
                 const SizedBox(height: 4),
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                      child: Text(item['unit'] as String, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(4)),
+                      child: Text(item['unit'] as String,
+                          style: const TextStyle(
+                              fontSize: 10, color: Color(0xFF64748B))),
                     ),
                     const SizedBox(width: 4),
-                    const Icon(Icons.access_time_rounded, size: 11, color: Color(0xFF94A3B8)),
+                    const Icon(Icons.access_time_rounded,
+                        size: 11, color: Color(0xFF94A3B8)),
                     const SizedBox(width: 2),
-                    Text(item['turnaround'] as String, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                    Text(item['turnaround'] as String,
+                        style: const TextStyle(
+                            fontSize: 10, color: Color(0xFF94A3B8))),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Text('${Money.symbol}${(item['price'] as double).toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    Text(' / ${item['unitShort']}', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                    Text(
+                        '${Money.symbol}${(item['price'] as double).toStringAsFixed(0)}',
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A))),
+                    Text(' / ${item['unitShort']}',
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF94A3B8))),
                   ],
                 ),
               ],
@@ -741,14 +1142,16 @@ class _ServicesScreenState extends State<ServicesScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2E8F0), style: BorderStyle.solid),
+          border: Border.all(
+              color: const Color(0xFFE2E8F0), style: BorderStyle.solid),
         ),
         child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.add, size: 28, color: Color(0xFF94A3B8)),
             SizedBox(height: 8),
-            Text('Add new item', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+            Text('Add new item',
+                style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
           ],
         ),
       ),
@@ -775,16 +1178,26 @@ class _ServicesScreenState extends State<ServicesScreen> {
             Row(
               children: [
                 Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.location_on_outlined, size: 20, color: Color(0xFF1A4FD6)),
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.location_on_outlined,
+                      size: 20, color: Color(0xFF1A4FD6)),
                 ),
                 const SizedBox(width: 14),
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Service Areas', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    Text('Areas where you offer pickup/delivery', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    Text('Service Areas',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A))),
+                    Text('Areas where you offer pickup/delivery',
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                   ],
                 ),
               ],
@@ -794,12 +1207,19 @@ class _ServicesScreenState extends State<ServicesScreen> {
             // Detect location button
             OutlinedButton.icon(
               onPressed: () {},
-              icon: const Icon(Icons.near_me_rounded, size: 15, color: Color(0xFF1A4FD6)),
-              label: const Text('Detect My Location', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF1A4FD6))),
+              icon: const Icon(Icons.near_me_rounded,
+                  size: 15, color: Color(0xFF1A4FD6)),
+              label: const Text('Detect My Location',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1A4FD6))),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFF1A4FD6)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
             ),
             const SizedBox(height: 14),
@@ -819,9 +1239,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       style: const TextStyle(fontSize: 13),
                       decoration: const InputDecoration(
                         hintText: 'Enter area name',
-                        hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        hintStyle:
+                            TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
                     ),
                   ),
@@ -830,11 +1252,17 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 ElevatedButton.icon(
                   onPressed: () => _addServiceArea(areas),
                   icon: const Icon(Icons.add, size: 15, color: Colors.white),
-                  label: const Text('Add', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                  label: const Text('Add',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1A4FD6),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                     elevation: 0,
                   ),
                 ),
@@ -853,9 +1281,12 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 ),
                 child: const Column(
                   children: [
-                    Icon(Icons.location_off_outlined, size: 40, color: Color(0xFF94A3B8)),
+                    Icon(Icons.location_off_outlined,
+                        size: 40, color: Color(0xFF94A3B8)),
                     SizedBox(height: 10),
-                    Text('No areas added yet', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                    Text('No areas added yet',
+                        style:
+                            TextStyle(fontSize: 13, color: Color(0xFF64748B))),
                   ],
                 ),
               )
@@ -863,12 +1294,18 @@ class _ServicesScreenState extends State<ServicesScreen> {
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
-                children: areas.map((a) => Chip(
-                  label: Text(a.name, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1A4FD6))),
-                  backgroundColor: const Color(0xFFEEF2FF),
-                  deleteIcon: const Icon(Icons.close_rounded, size: 15, color: Color(0xFF1A4FD6)),
-                  onDeleted: () => _deleteServiceArea(a),
-                )).toList(),
+                children: areas
+                    .map((a) => Chip(
+                          label: Text(a.name,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1A4FD6))),
+                          backgroundColor: const Color(0xFFEEF2FF),
+                          deleteIcon: const Icon(Icons.close_rounded,
+                              size: 15, color: Color(0xFF1A4FD6)),
+                          onDeleted: () => _deleteServiceArea(a),
+                        ))
+                    .toList(),
               ),
           ],
         ),
@@ -881,14 +1318,16 @@ class _ServicesScreenState extends State<ServicesScreen> {
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: const Color(0xFFDC2626)),
+      SnackBar(
+          content: Text(message), backgroundColor: const Color(0xFFDC2626)),
     );
   }
 
   void _showSuccess(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: const Color(0xFF10B981)),
+      SnackBar(
+          content: Text(message), backgroundColor: const Color(0xFF10B981)),
     );
   }
 
@@ -924,10 +1363,13 @@ class _ServicesScreenState extends State<ServicesScreen> {
   }
 
   // ─── TAB 3 & 4: Pickup / Delivery Schedule ───────────────────────────
-  Widget _buildScheduleView({required bool isPickup}) {
+  Widget _buildScheduleView({required bool isPickup, required bool narrow}) {
     final title = isPickup ? 'Pickup Schedule' : 'Delivery Schedule';
-    final subtitle = isPickup ? 'Time slots for home pickup' : 'Time slots for home delivery';
-    final icon = isPickup ? Icons.access_time_rounded : Icons.local_shipping_outlined;
+    final subtitle = isPickup
+        ? 'Time slots for home pickup'
+        : 'Time slots for home delivery';
+    final icon =
+        isPickup ? Icons.access_time_rounded : Icons.local_shipping_outlined;
     final provider = context.watch<AppProvider>();
     final slots = isPickup ? provider.pickupSlots : provider.deliverySlots;
     final startTime = isPickup ? _pickupStartTime : _deliveryStartTime;
@@ -952,22 +1394,33 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 Row(
                   children: [
                     Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(10)),
-                      child: Icon(icon, size: 20, color: const Color(0xFF10B981)),
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(10)),
+                      child:
+                          Icon(icon, size: 20, color: const Color(0xFF10B981)),
                     ),
                     const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                        Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                        Text(title,
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A))),
+                        Text(subtitle,
+                            style: const TextStyle(
+                                fontSize: 12, color: Color(0xFF64748B))),
                       ],
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                const Text('Changes save automatically.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const Text('Changes save automatically.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
               ],
             ),
           ),
@@ -984,7 +1437,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Buffer (minutes) before slot', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                const Text('Buffer (minutes) before slot',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A))),
                 const SizedBox(height: 10),
                 SizedBox(
                   width: 120,
@@ -997,13 +1454,17 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       keyboardType: TextInputType.number,
                       style: const TextStyle(fontSize: 14),
                       decoration: InputDecoration(
-                        hintText: isPickup ? '$_pickupBuffer' : '$_deliveryBuffer',
+                        hintText:
+                            isPickup ? '$_pickupBuffer' : '$_deliveryBuffer',
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
                       ),
                       onChanged: (v) => setState(() {
-                        if (isPickup) _pickupBuffer = int.tryParse(v) ?? 0;
-                        else _deliveryBuffer = int.tryParse(v) ?? 0;
+                        if (isPickup)
+                          _pickupBuffer = int.tryParse(v) ?? 0;
+                        else
+                          _deliveryBuffer = int.tryParse(v) ?? 0;
                       }),
                     ),
                   ),
@@ -1011,9 +1472,10 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 const SizedBox(height: 6),
                 Text(
                   isPickup
-                    ? 'e.g. 30 = user cannot book 9–10 AM slot after 8:30 AM'
-                    : 'e.g. 30 = user cannot book 9–10 AM slot after 8:30 AM',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                      ? 'e.g. 30 = user cannot book 9–10 AM slot after 8:30 AM'
+                      : 'e.g. 30 = user cannot book 9–10 AM slot after 8:30 AM',
+                  style:
+                      const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                 ),
               ],
             ),
@@ -1031,91 +1493,143 @@ class _ServicesScreenState extends State<ServicesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Add time slot', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                const Text('Add time slot',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A))),
                 const SizedBox(height: 14),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    // Start time dropdown
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Start time', style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
-                        const SizedBox(height: 6),
-                        _buildTimeDropdown(
-                          value: startTime,
-                          hint: 'Select start',
-                          onChanged: (v) => setState(() {
-                            if (isPickup) _pickupStartTime = v;
-                            else _deliveryStartTime = v;
-                          }),
+                Builder(builder: (context) {
+                  final startField = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Start time',
+                          style: TextStyle(
+                              fontSize: 12, color: Color(0xFF475569))),
+                      const SizedBox(height: 6),
+                      _buildTimeDropdown(
+                        value: startTime,
+                        hint: 'Select start',
+                        onChanged: (v) => setState(() {
+                          if (isPickup) {
+                            _pickupStartTime = v;
+                          } else {
+                            _deliveryStartTime = v;
+                          }
+                        }),
+                      ),
+                    ],
+                  );
+                  final endField = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('End time',
+                          style: TextStyle(
+                              fontSize: 12, color: Color(0xFF475569))),
+                      const SizedBox(height: 6),
+                      _buildTimeDropdown(
+                        value: endTime,
+                        hint: 'Select end',
+                        onChanged: (v) => setState(() {
+                          if (isPickup) {
+                            _pickupEndTime = v;
+                          } else {
+                            _deliveryEndTime = v;
+                          }
+                        }),
+                      ),
+                    ],
+                  );
+                  final capacityField = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Capacity',
+                          style: TextStyle(
+                              fontSize: 12, color: Color(0xFF475569))),
+                      const SizedBox(height: 6),
+                      Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
-                    // End time dropdown
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('End time', style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
-                        const SizedBox(height: 6),
-                        _buildTimeDropdown(
-                          value: endTime,
-                          hint: 'Select end',
-                          onChanged: (v) => setState(() {
-                            if (isPickup) _pickupEndTime = v;
-                            else _deliveryEndTime = v;
-                          }),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
-                    // Capacity
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Capacity', style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
-                          const SizedBox(height: 6),
-                          Container(
-                            height: 42,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: TextField(
-                              controller: isPickup ? _pickupCapacityController : _deliveryCapacityController,
-                              keyboardType: TextInputType.number,
-                              style: const TextStyle(fontSize: 13),
-                              decoration: const InputDecoration(
-                                hintText: 'Unlimited',
-                                hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              ),
-                            ),
+                        child: TextField(
+                          controller: isPickup
+                              ? _pickupCapacityController
+                              : _deliveryCapacityController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(fontSize: 13),
+                          decoration: const InputDecoration(
+                            hintText: 'Unlimited',
+                            hintStyle: TextStyle(
+                                fontSize: 13, color: Color(0xFF94A3B8)),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 12),
                           ),
-                        ],
+                        ),
                       ),
+                    ],
+                  );
+                  final saveButton = ElevatedButton.icon(
+                    onPressed: () =>
+                        _addTimeSlot(isPickup: isPickup, existing: slots),
+                    icon: const Icon(Icons.add, size: 15, color: Colors.white),
+                    label: const Text('Save',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A4FD6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                      minimumSize: const Size(0, 42),
                     ),
-                    const SizedBox(width: 12),
-                    // Save button
-                    ElevatedButton.icon(
-                      onPressed: () => _addTimeSlot(isPickup: isPickup, existing: slots),
-                      icon: const Icon(Icons.add, size: 15, color: Colors.white),
-                      label: const Text('Save', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1A4FD6),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        elevation: 0,
-                        minimumSize: const Size(0, 42),
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+
+                  if (narrow) {
+                    return Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: startField),
+                            const SizedBox(width: 12),
+                            Expanded(child: endField),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(child: capacityField),
+                            const SizedBox(width: 12),
+                            saveButton,
+                          ],
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      startField,
+                      const SizedBox(width: 12),
+                      endField,
+                      const SizedBox(width: 12),
+                      Expanded(child: capacityField),
+                      const SizedBox(width: 12),
+                      saveButton,
+                    ],
+                  );
+                }),
                 const SizedBox(height: 8),
-                const Text('Max orders per day for this slot; leave empty for unlimited', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                const Text(
+                    'Max orders per day for this slot; leave empty for unlimited',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
               ],
             ),
           ),
@@ -1133,9 +1647,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
               ),
               child: const Column(
                 children: [
-                  Icon(Icons.schedule_outlined, size: 36, color: Color(0xFF94A3B8)),
+                  Icon(Icons.schedule_outlined,
+                      size: 36, color: Color(0xFF94A3B8)),
                   SizedBox(height: 10),
-                  Text('No time slots added yet', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                  Text('No time slots added yet',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
                 ],
               ),
             ),
@@ -1154,32 +1670,99 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   topLeft: Radius.circular(idx == 0 ? 12 : 0),
                   topRight: Radius.circular(idx == 0 ? 12 : 0),
                   bottomLeft: Radius.circular(idx == slots.length - 1 ? 12 : 0),
-                  bottomRight: Radius.circular(idx == slots.length - 1 ? 12 : 0),
+                  bottomRight:
+                      Radius.circular(idx == slots.length - 1 ? 12 : 0),
                 ),
               ),
-              child: Row(
-                children: [
-                  Switch(
-                    value: slot.isActive,
-                    activeColor: const Color(0xFF1A4FD6),
-                    onChanged: (v) => _setSlotActive(slot, v),
-                  ),
-                  const SizedBox(width: 10),
-                  const Icon(Icons.access_time_rounded, size: 16, color: Color(0xFF64748B)),
-                  const SizedBox(width: 8),
-                  Text(slot.timeRangeLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
-                  const SizedBox(width: 16),
-                  const Text('Capacity:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                  const SizedBox(width: 4),
-                  Text(slot.capacityLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF1A4FD6))),
-                  const Spacer(),
-                  IconButton(icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)), onPressed: () {}),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFF64748B)),
-                    onPressed: () => _deleteTimeSlot(slot),
-                  ),
-                ],
-              ),
+              child: narrow
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Switch(
+                              value: slot.isActive,
+                              activeColor: const Color(0xFF1A4FD6),
+                              onChanged: (v) => _setSlotActive(slot, v),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.access_time_rounded,
+                                size: 16, color: Color(0xFF64748B)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(slot.timeRangeLabel,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF0F172A))),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Text('Capacity:',
+                                style: TextStyle(
+                                    fontSize: 12, color: Color(0xFF64748B))),
+                            const SizedBox(width: 4),
+                            Text(slot.capacityLabel,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF1A4FD6))),
+                            const Spacer(),
+                            IconButton(
+                                icon: const Icon(Icons.edit_outlined,
+                                    size: 16, color: Color(0xFF64748B)),
+                                onPressed: () {}),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded,
+                                  size: 16, color: Color(0xFF64748B)),
+                              onPressed: () => _deleteTimeSlot(slot),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Switch(
+                          value: slot.isActive,
+                          activeColor: const Color(0xFF1A4FD6),
+                          onChanged: (v) => _setSlotActive(slot, v),
+                        ),
+                        const SizedBox(width: 10),
+                        const Icon(Icons.access_time_rounded,
+                            size: 16, color: Color(0xFF64748B)),
+                        const SizedBox(width: 8),
+                        Text(slot.timeRangeLabel,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF0F172A))),
+                        const SizedBox(width: 16),
+                        const Text('Capacity:',
+                            style: TextStyle(
+                                fontSize: 12, color: Color(0xFF64748B))),
+                        const SizedBox(width: 4),
+                        Text(slot.capacityLabel,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF1A4FD6))),
+                        const Spacer(),
+                        IconButton(
+                            icon: const Icon(Icons.edit_outlined,
+                                size: 16, color: Color(0xFF64748B)),
+                            onPressed: () {}),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              size: 16, color: Color(0xFF64748B)),
+                          onPressed: () => _deleteTimeSlot(slot),
+                        ),
+                      ],
+                    ),
             );
           }),
         ],
@@ -1187,7 +1770,10 @@ class _ServicesScreenState extends State<ServicesScreen> {
     );
   }
 
-  Widget _buildTimeDropdown({required String? value, required String hint, required ValueChanged<String?> onChanged}) {
+  Widget _buildTimeDropdown(
+      {required String? value,
+      required String hint,
+      required ValueChanged<String?> onChanged}) {
     return Container(
       height: 42,
       decoration: BoxDecoration(
@@ -1198,9 +1784,15 @@ class _ServicesScreenState extends State<ServicesScreen> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
-          hint: Text(hint, style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
-          items: _timeOptions.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))).toList(),
+          hint: Text(hint,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              size: 18, color: Color(0xFF64748B)),
+          items: _timeOptions
+              .map((t) => DropdownMenuItem(
+                  value: t,
+                  child: Text(t, style: const TextStyle(fontSize: 13))))
+              .toList(),
           onChanged: onChanged,
         ),
       ),
@@ -1227,7 +1819,9 @@ class _ServicesScreenState extends State<ServicesScreen> {
     }
 
     final rawCapacity =
-        (isPickup ? _pickupCapacityController : _deliveryCapacityController).text.trim();
+        (isPickup ? _pickupCapacityController : _deliveryCapacityController)
+            .text
+            .trim();
     int? capacity;
     if (rawCapacity.isNotEmpty) {
       capacity = int.tryParse(rawCapacity);
@@ -1318,10 +1912,14 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
             setModalState(() {
               nameError = name.isEmpty ? 'Item name is required' : null;
-              priceError = (price == null || price <= 0) ? 'Enter a valid price' : null;
-              submitError = categoryId == null ? 'Please select a service category first' : null;
+              priceError =
+                  (price == null || price <= 0) ? 'Enter a valid price' : null;
+              submitError = categoryId == null
+                  ? 'Please select a service category first'
+                  : null;
             });
-            if (nameError != null || priceError != null || submitError != null) return;
+            if (nameError != null || priceError != null || submitError != null)
+              return;
 
             setModalState(() => saving = true);
             final provider = context.read<AppProvider>();
@@ -1348,19 +1946,28 @@ class _ServicesScreenState extends State<ServicesScreen> {
           }
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Add New Service / Garment Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const Expanded(
+                  child: Text('Add New Service / Garment Item',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A))),
+                ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  icon: const Icon(Icons.close_rounded,
+                      size: 20, color: Color(0xFF94A3B8)),
                   onPressed: () => Navigator.pop(ctx),
                 ),
               ],
             ),
             content: SizedBox(
-              width: 440,
+              width: math.min(440.0, MediaQuery.sizeOf(ctx).width - 48),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1369,30 +1976,34 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   _modalDropdown<String>(
                     value: selectedCat,
                     items: _categories
-                        .map((c) => DropdownMenuItem(value: c['title'] as String, child: Text(c['title'] as String)))
+                        .map((c) => DropdownMenuItem(
+                            value: c['title'] as String,
+                            child: Text(c['title'] as String)))
                         .toList(),
                     onChanged: (v) {
                       if (v != null) setModalState(() => selectedCat = v);
                     },
                   ),
                   const SizedBox(height: 14),
-
                   _modalLabel('Item Name *'),
                   TextField(
                     controller: nameCtrl,
                     decoration: InputDecoration(
                       hintText: 'e.g. Jacket / Blazer',
-                      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                      hintStyle: const TextStyle(
+                          fontSize: 13, color: Color(0xFF94A3B8)),
                       errorText: nameError,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                     onChanged: (_) {
-                      if (nameError != null) setModalState(() => nameError = null);
+                      if (nameError != null)
+                        setModalState(() => nameError = null);
                     },
                   ),
                   const SizedBox(height: 14),
-
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1406,13 +2017,17 @@ class _ServicesScreenState extends State<ServicesScreen> {
                               keyboardType: TextInputType.number,
                               decoration: InputDecoration(
                                 hintText: 'e.g. 150',
-                                hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                                hintStyle: const TextStyle(
+                                    fontSize: 13, color: Color(0xFF94A3B8)),
                                 errorText: priceError,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8)),
                               ),
                               onChanged: (_) {
-                                if (priceError != null) setModalState(() => priceError = null);
+                                if (priceError != null)
+                                  setModalState(() => priceError = null);
                               },
                             ),
                           ],
@@ -1427,10 +2042,13 @@ class _ServicesScreenState extends State<ServicesScreen> {
                             _modalDropdown<String>(
                               value: selectedUnit,
                               items: PricingUnit.all
-                                  .map((u) => DropdownMenuItem(value: u, child: Text(PricingUnit.label(u))))
+                                  .map((u) => DropdownMenuItem(
+                                      value: u,
+                                      child: Text(PricingUnit.label(u))))
                                   .toList(),
                               onChanged: (v) {
-                                if (v != null) setModalState(() => selectedUnit = v);
+                                if (v != null)
+                                  setModalState(() => selectedUnit = v);
                               },
                             ),
                           ],
@@ -1439,18 +2057,17 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
-
                   _modalLabel('Turnaround Time'),
                   _modalDropdown<int>(
                     value: turnaroundDays,
                     items: List.generate(7, (i) => i + 1)
-                        .map((d) => DropdownMenuItem(value: d, child: Text('${d}d')))
+                        .map((d) =>
+                            DropdownMenuItem(value: d, child: Text('${d}d')))
                         .toList(),
                     onChanged: (v) {
                       if (v != null) setModalState(() => turnaroundDays = v);
                     },
                   ),
-
                   if (submitError != null) ...[
                     const SizedBox(height: 14),
                     _modalErrorBanner(submitError!),
@@ -1461,17 +2078,25 @@ class _ServicesScreenState extends State<ServicesScreen> {
             actions: [
               TextButton(
                 onPressed: saving ? null : () => Navigator.pop(ctx),
-                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+                child: const Text('Cancel',
+                    style: TextStyle(color: Color(0xFF64748B))),
               ),
               ElevatedButton(
                 onPressed: saving ? null : save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1A4FD6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
                 child: saving
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Save Item', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('Save Item',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ],
           );
@@ -1496,7 +2121,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
         builder: (ctx, setModalState) {
           Future<void> save() async {
             final name = nameCtrl.text.trim();
-            setModalState(() => nameError = name.isEmpty ? 'Please enter a service name.' : null);
+            setModalState(() => nameError =
+                name.isEmpty ? 'Please enter a service name.' : null);
             if (nameError != null) return;
 
             setModalState(() => saving = true);
@@ -1519,24 +2145,34 @@ class _ServicesScreenState extends State<ServicesScreen> {
             Navigator.pop(ctx);
             // Jump to the category that was just created.
             final index = provider.categories.indexWhere((c) => c.id == id);
-            if (index >= 0 && mounted) setState(() => _selectedCategoryIndex = index);
+            if (index >= 0 && mounted)
+              setState(() => _selectedCategoryIndex = index);
             _showSuccess('Added "$name"');
           }
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('New Service', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const Expanded(
+                  child: Text('New Service',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A))),
+                ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  icon: const Icon(Icons.close_rounded,
+                      size: 20, color: Color(0xFF94A3B8)),
                   onPressed: () => Navigator.pop(ctx),
                 ),
               ],
             ),
             content: SizedBox(
-              width: 400,
+              width: math.min(400.0, MediaQuery.sizeOf(ctx).width - 48),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1546,38 +2182,47 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     controller: nameCtrl,
                     decoration: InputDecoration(
                       hintText: 'e.g., Dry Clean',
-                      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                      hintStyle: const TextStyle(
+                          fontSize: 13, color: Color(0xFF94A3B8)),
                       errorText: nameError,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                     onChanged: (_) {
-                      if (nameError != null) setModalState(() => nameError = null);
+                      if (nameError != null)
+                        setModalState(() => nameError = null);
                     },
                   ),
                   const SizedBox(height: 8),
-
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
                     activeColor: const Color(0xFF1A4FD6),
-                    title: const Text('Active', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
-                    subtitle: const Text('Show in items list', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                    title: const Text('Active',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A))),
+                    subtitle: const Text('Show in items list',
+                        style:
+                            TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                     value: isActive,
                     onChanged: (v) => setModalState(() => isActive = v),
                   ),
                   const SizedBox(height: 6),
-
                   _modalLabel('Turnaround Days'),
                   TextField(
                     controller: turnaroundCtrl,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
-
                   if (submitError != null) ...[
                     const SizedBox(height: 10),
                     _modalErrorBanner(submitError!),
@@ -1588,17 +2233,25 @@ class _ServicesScreenState extends State<ServicesScreen> {
             actions: [
               TextButton(
                 onPressed: saving ? null : () => Navigator.pop(ctx),
-                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+                child: const Text('Cancel',
+                    style: TextStyle(color: Color(0xFF64748B))),
               ),
               ElevatedButton(
                 onPressed: saving ? null : save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1A4FD6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
                 child: saving
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Add Service', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('Add Service',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ],
           );
@@ -1606,8 +2259,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
       ),
     );
   }
-
-
 
   void _showEditCategoryModal(BuildContext context, Map<String, dynamic> cat) {
     final nameCtrl = TextEditingController(text: cat['title'] as String);
@@ -1627,7 +2278,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
         builder: (ctx, setModalState) {
           Future<void> save() async {
             final name = nameCtrl.text.trim();
-            setModalState(() => nameError = name.isEmpty ? 'Please enter a service name.' : null);
+            setModalState(() => nameError =
+                name.isEmpty ? 'Please enter a service name.' : null);
             if (nameError != null) return;
 
             setModalState(() => saving = true);
@@ -1642,7 +2294,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
             if (!ok) {
               setModalState(() {
                 saving = false;
-                submitError = provider.error ?? 'Failed to update service category.';
+                submitError =
+                    provider.error ?? 'Failed to update service category.';
               });
               return;
             }
@@ -1651,19 +2304,28 @@ class _ServicesScreenState extends State<ServicesScreen> {
           }
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Edit Service', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const Expanded(
+                  child: Text('Edit Service',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A))),
+                ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  icon: const Icon(Icons.close_rounded,
+                      size: 20, color: Color(0xFF94A3B8)),
                   onPressed: () => Navigator.pop(ctx),
                 ),
               ],
             ),
             content: SizedBox(
-              width: 400,
+              width: math.min(400.0, MediaQuery.sizeOf(ctx).width - 48),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1673,38 +2335,47 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     controller: nameCtrl,
                     decoration: InputDecoration(
                       hintText: 'e.g., Dry Clean',
-                      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                      hintStyle: const TextStyle(
+                          fontSize: 13, color: Color(0xFF94A3B8)),
                       errorText: nameError,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                     onChanged: (_) {
-                      if (nameError != null) setModalState(() => nameError = null);
+                      if (nameError != null)
+                        setModalState(() => nameError = null);
                     },
                   ),
                   const SizedBox(height: 8),
-
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
                     activeColor: const Color(0xFF1A4FD6),
-                    title: const Text('Active', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
-                    subtitle: const Text('Show in items list', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                    title: const Text('Active',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A))),
+                    subtitle: const Text('Show in items list',
+                        style:
+                            TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                     value: isActive,
                     onChanged: (v) => setModalState(() => isActive = v),
                   ),
                   const SizedBox(height: 6),
-
                   _modalLabel('Turnaround Days'),
                   TextField(
                     controller: turnaroundCtrl,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
-
                   if (submitError != null) ...[
                     const SizedBox(height: 10),
                     _modalErrorBanner(submitError!),
@@ -1715,17 +2386,25 @@ class _ServicesScreenState extends State<ServicesScreen> {
             actions: [
               TextButton(
                 onPressed: saving ? null : () => Navigator.pop(ctx),
-                child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+                child: const Text('Cancel',
+                    style: TextStyle(color: Color(0xFF64748B))),
               ),
               ElevatedButton(
                 onPressed: saving ? null : save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1A4FD6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
                 child: saving
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('Save Changes',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ],
           );
@@ -1734,17 +2413,24 @@ class _ServicesScreenState extends State<ServicesScreen> {
     );
   }
 
-  void _showDeleteCategoryConfirm(BuildContext context, Map<String, dynamic> cat) {
+  void _showDeleteCategoryConfirm(
+      BuildContext context, Map<String, dynamic> cat) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Category', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-        content: Text('Are you sure you want to delete "${cat['title']}"? All associated items will also be deleted.'),
+        title: const Text('Delete Category',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A))),
+        content: Text(
+            'Are you sure you want to delete "${cat['title']}"? All associated items will also be deleted.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            child: const Text('Cancel',
+                style: TextStyle(color: Color(0xFF64748B))),
           ),
           FilledButton(
             onPressed: () async {
@@ -1758,8 +2444,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 _showError(provider.error ?? 'Could not delete category');
               }
             },
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            child: const Text('Delete',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -1771,12 +2460,18 @@ class _ServicesScreenState extends State<ServicesScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-        content: Text('Are you sure you want to delete "${item['name']}"? This action cannot be undone.'),
+        title: const Text('Delete Item',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A))),
+        content: Text(
+            'Are you sure you want to delete "${item['name']}"? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            child: const Text('Cancel',
+                style: TextStyle(color: Color(0xFF64748B))),
           ),
           FilledButton(
             onPressed: () async {
@@ -1789,8 +2484,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 _showError(provider.error ?? 'Could not delete item');
               }
             },
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
+            child: const Text('Delete',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -1799,18 +2497,22 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   void _showEditItemModal(BuildContext context, Map<String, dynamic> item) {
     final nameCtrl = TextEditingController(text: item['name'] as String? ?? '');
-    final priceCtrl = TextEditingController(text: ((item['price'] as num?) ?? 0).toStringAsFixed(0));
+    final priceCtrl = TextEditingController(
+        text: ((item['price'] as num?) ?? 0).toStringAsFixed(0));
     final imgCtrl = TextEditingController(text: item['img'] as String? ?? '');
     // The item's own category, not whatever tab the sidebar happens to be
     // on — the two only ever coincided by construction (see the comment
     // where 'categoryName' is set), which made this fragile rather than
     // actually correct.
-    String selectedCat = item['categoryName'] as String? ?? _categories[_selectedCategoryIndex]['title'] as String;
+    String selectedCat = item['categoryName'] as String? ??
+        _categories[_selectedCategoryIndex]['title'] as String;
     String selectedUnit = PricingUnit.all.firstWhere(
       (u) => PricingUnit.label(u) == item['unit'],
       orElse: () => PricingUnit.piece,
     );
-    int turnaroundDays = int.tryParse((item['turnaround'] as String? ?? '').replaceAll('d', '').trim()) ?? 1;
+    int turnaroundDays = int.tryParse(
+            (item['turnaround'] as String? ?? '').replaceAll('d', '').trim()) ??
+        1;
     bool isActive = (item['active'] as bool?) ?? true;
 
     String? nameError;
@@ -1833,10 +2535,14 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
             setModalState(() {
               nameError = name.isEmpty ? 'Item name is required' : null;
-              priceError = (price == null || price <= 0) ? 'Enter a valid price' : null;
-              submitError = categoryId == null ? 'Please select a service category' : null;
+              priceError =
+                  (price == null || price <= 0) ? 'Enter a valid price' : null;
+              submitError = categoryId == null
+                  ? 'Please select a service category'
+                  : null;
             });
-            if (nameError != null || priceError != null || submitError != null) return;
+            if (nameError != null || priceError != null || submitError != null)
+              return;
 
             setModalState(() => saving = true);
             final provider = context.read<AppProvider>();
@@ -1863,19 +2569,28 @@ class _ServicesScreenState extends State<ServicesScreen> {
           }
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Edit Service / Item', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const Expanded(
+                  child: Text('Edit Service / Item',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A))),
+                ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  icon: const Icon(Icons.close_rounded,
+                      size: 20, color: Color(0xFF94A3B8)),
                   onPressed: () => Navigator.pop(ctx),
                 ),
               ],
             ),
             content: SizedBox(
-              width: 440,
+              width: math.min(440.0, MediaQuery.sizeOf(ctx).width - 48),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1885,30 +2600,34 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     _modalDropdown<String>(
                       value: selectedCat,
                       items: _categories
-                          .map((c) => DropdownMenuItem(value: c['title'] as String, child: Text(c['title'] as String)))
+                          .map((c) => DropdownMenuItem(
+                              value: c['title'] as String,
+                              child: Text(c['title'] as String)))
                           .toList(),
                       onChanged: (v) {
                         if (v != null) setModalState(() => selectedCat = v);
                       },
                     ),
                     const SizedBox(height: 14),
-
                     _modalLabel('Item Name *'),
                     TextField(
                       controller: nameCtrl,
                       decoration: InputDecoration(
                         hintText: 'e.g. Jacket / Blazer',
-                        hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        hintStyle: const TextStyle(
+                            fontSize: 13, color: Color(0xFF94A3B8)),
                         errorText: nameError,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                       onChanged: (_) {
-                        if (nameError != null) setModalState(() => nameError = null);
+                        if (nameError != null)
+                          setModalState(() => nameError = null);
                       },
                     ),
                     const SizedBox(height: 14),
-
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1922,13 +2641,17 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                 keyboardType: TextInputType.number,
                                 decoration: InputDecoration(
                                   hintText: 'e.g. 150',
-                                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                                  hintStyle: const TextStyle(
+                                      fontSize: 13, color: Color(0xFF94A3B8)),
                                   errorText: priceError,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 10),
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8)),
                                 ),
                                 onChanged: (_) {
-                                  if (priceError != null) setModalState(() => priceError = null);
+                                  if (priceError != null)
+                                    setModalState(() => priceError = null);
                                 },
                               ),
                             ],
@@ -1943,10 +2666,13 @@ class _ServicesScreenState extends State<ServicesScreen> {
                               _modalDropdown<String>(
                                 value: selectedUnit,
                                 items: PricingUnit.all
-                                    .map((u) => DropdownMenuItem(value: u, child: Text(PricingUnit.label(u))))
+                                    .map((u) => DropdownMenuItem(
+                                        value: u,
+                                        child: Text(PricingUnit.label(u))))
                                     .toList(),
                                 onChanged: (v) {
-                                  if (v != null) setModalState(() => selectedUnit = v);
+                                  if (v != null)
+                                    setModalState(() => selectedUnit = v);
                                 },
                               ),
                             ],
@@ -1955,7 +2681,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
-
                     Row(
                       children: [
                         Expanded(
@@ -1966,10 +2691,12 @@ class _ServicesScreenState extends State<ServicesScreen> {
                               _modalDropdown<int>(
                                 value: turnaroundDays,
                                 items: List.generate(7, (i) => i + 1)
-                                    .map((d) => DropdownMenuItem(value: d, child: Text('${d}d')))
+                                    .map((d) => DropdownMenuItem(
+                                        value: d, child: Text('${d}d')))
                                     .toList(),
                                 onChanged: (v) {
-                                  if (v != null) setModalState(() => turnaroundDays = v);
+                                  if (v != null)
+                                    setModalState(() => turnaroundDays = v);
                                 },
                               ),
                             ],
@@ -1986,9 +2713,12 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                 dense: true,
                                 activeColor: const Color(0xFF1A4FD6),
                                 title: Text(isActive ? 'Active' : 'Inactive',
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600)),
                                 value: isActive,
-                                onChanged: (v) => setModalState(() => isActive = v),
+                                onChanged: (v) =>
+                                    setModalState(() => isActive = v),
                               ),
                             ],
                           ),
@@ -1996,18 +2726,19 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
-
                     _modalLabel('Image URL (optional)'),
                     TextField(
                       controller: imgCtrl,
                       decoration: InputDecoration(
                         hintText: 'https://images.unsplash.com/...',
-                        hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        hintStyle: const TextStyle(
+                            fontSize: 13, color: Color(0xFF94A3B8)),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
-
                     if (submitError != null) ...[
                       const SizedBox(height: 14),
                       _modalErrorBanner(submitError!),
@@ -2032,32 +2763,44 @@ class _ServicesScreenState extends State<ServicesScreen> {
                           ? null
                           : () async {
                               final provider = context.read<AppProvider>();
-                              final ok = await provider.deleteGarmentItem('${item['id']}');
+                              final ok = await provider
+                                  .deleteGarmentItem('${item['id']}');
                               if (!ctx.mounted) return;
                               Navigator.pop(ctx);
                               if (ok) {
                                 _showSuccess('Deleted "${item['name']}"');
                               } else {
-                                _showError(provider.error ?? 'Could not delete item');
+                                _showError(
+                                    provider.error ?? 'Could not delete item');
                               }
                             },
-                      child: const Text('Delete', style: TextStyle(color: Color(0xFFDC2626))),
+                      child: const Text('Delete',
+                          style: TextStyle(color: Color(0xFFDC2626))),
                     ),
                     const Spacer(),
                     TextButton(
                       onPressed: saving ? null : () => Navigator.pop(ctx),
-                      child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+                      child: const Text('Cancel',
+                          style: TextStyle(color: Color(0xFF64748B))),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
                       onPressed: saving ? null : save,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1A4FD6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
                       child: saving
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Text('Save Changes',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -2073,7 +2816,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   Widget _modalLabel(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+        child: Text(text,
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF475569))),
       );
 
   Widget _modalDropdown<T>({
@@ -2092,7 +2839,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
         child: DropdownButton<T>(
           value: value,
           isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              size: 18, color: Color(0xFF64748B)),
           items: items,
           onChanged: onChanged,
         ),
@@ -2111,10 +2859,13 @@ class _ServicesScreenState extends State<ServicesScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFDC2626)),
+            const Icon(Icons.error_outline_rounded,
+                size: 16, color: Color(0xFFDC2626)),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(message, style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
+              child: Text(message,
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFFDC2626))),
             ),
           ],
         ),

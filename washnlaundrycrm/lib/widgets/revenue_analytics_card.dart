@@ -14,9 +14,11 @@ class RevenueAnalyticsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
     final analytics =
-        provider.stats['revenue_analytics'] as Map<String, dynamic>? ?? const {};
+        provider.stats['revenue_analytics'] as Map<String, dynamic>? ??
+            const {};
 
-    final progress = (analytics['collection_progress'] as num?)?.toDouble() ?? 0;
+    final progress =
+        (analytics['collection_progress'] as num?)?.toDouble() ?? 0;
     final netProfit = (analytics['net_profit'] as num?)?.toDouble() ?? 0;
 
     return PanelCard(
@@ -74,9 +76,12 @@ class RevenueAnalyticsCard extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              _figure('Sales', formatRupees(analytics['sales']), const Color(0xFF0F172A)),
-              _figure('Collected', formatRupees(analytics['collected']), const Color(0xFF10B981)),
-              _figure('Uncollected', formatRupees(analytics['uncollected']), const Color(0xFFD97706)),
+              _figure('Sales', formatRupees(analytics['sales']),
+                  const Color(0xFF0F172A)),
+              _figure('Collected', formatRupees(analytics['collected']),
+                  const Color(0xFF10B981)),
+              _figure('Uncollected', formatRupees(analytics['uncollected']),
+                  const Color(0xFFD97706)),
             ],
           ),
           const SizedBox(height: 12),
@@ -92,7 +97,9 @@ class RevenueAnalyticsCard extends StatelessWidget {
               _figure(
                 'Net Profit',
                 formatRupees(netProfit),
-                netProfit >= 0 ? const Color(0xFF10B981) : const Color(0xFFDC2626),
+                netProfit >= 0
+                    ? const Color(0xFF10B981)
+                    : const Color(0xFFDC2626),
               ),
             ],
           ),
@@ -128,11 +135,13 @@ class RevenueAnalyticsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8))),
+          Text(label,
+              style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8))),
           const SizedBox(height: 2),
           Text(
             value,
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(
+                fontSize: 15, fontWeight: FontWeight.bold, color: color),
           ),
         ],
       ),

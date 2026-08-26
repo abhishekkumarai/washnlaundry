@@ -115,9 +115,11 @@ class ApiService {
 
   // ── Orders ─────────────────────────────────────────────────────────────────
 
-  static Future<List<OrderModel>> fetchOrders({String? status, String? search}) async {
+  static Future<List<OrderModel>> fetchOrders(
+      {String? status, String? search}) async {
     final data = await _send('GET', '/orders/', query: {
-      if (status != null && status.isNotEmpty && status != 'ALL') 'status': status,
+      if (status != null && status.isNotEmpty && status != 'ALL')
+        'status': status,
       if (search != null && search.isNotEmpty) 'search': search,
     });
     return _asList(data).map(OrderModel.fromJson).toList();
@@ -148,14 +150,16 @@ class ApiService {
   }
 
   /// Edits the order header — customer, fulfilment type, expected date, notes.
-  static Future<OrderModel> updateOrder(String id, Map<String, dynamic> payload) async {
+  static Future<OrderModel> updateOrder(
+      String id, Map<String, dynamic> payload) async {
     final data = await _send('PATCH', '/orders/$id/', body: payload);
     return OrderModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
   /// The "Collect Payment" action on the order detail screen.
   static Future<OrderModel> collectPayment(String id, double amount) async {
-    final data = await _send('POST', '/orders/$id/payment/', body: {'amount': amount});
+    final data =
+        await _send('POST', '/orders/$id/payment/', body: {'amount': amount});
     return OrderModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
@@ -215,12 +219,14 @@ class ApiService {
     return _asList(data).map(CustomerModel.fromJson).toList();
   }
 
-  static Future<CustomerModel> createCustomer(Map<String, dynamic> payload) async {
+  static Future<CustomerModel> createCustomer(
+      Map<String, dynamic> payload) async {
     final data = await _send('POST', '/customers/', body: payload);
     return CustomerModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<CustomerModel> updateCustomer(String id, Map<String, dynamic> payload) async {
+  static Future<CustomerModel> updateCustomer(
+      String id, Map<String, dynamic> payload) async {
     final data = await _send('PATCH', '/customers/$id/', body: payload);
     return CustomerModel.fromJson((data as Map).cast<String, dynamic>());
   }
@@ -240,7 +246,8 @@ class ApiService {
     return StaffModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<StaffModel> updateStaff(String id, Map<String, dynamic> payload) async {
+  static Future<StaffModel> updateStaff(
+      String id, Map<String, dynamic> payload) async {
     final data = await _send('PATCH', '/staff/$id/', body: payload);
     return StaffModel.fromJson((data as Map).cast<String, dynamic>());
   }
@@ -250,12 +257,14 @@ class ApiService {
     return _asList(data).map(ExpenseModel.fromJson).toList();
   }
 
-  static Future<ExpenseModel> createExpense(Map<String, dynamic> payload) async {
+  static Future<ExpenseModel> createExpense(
+      Map<String, dynamic> payload) async {
     final data = await _send('POST', '/expenses/', body: payload);
     return ExpenseModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<ExpenseModel> updateExpense(String id, Map<String, dynamic> payload) async {
+  static Future<ExpenseModel> updateExpense(
+      String id, Map<String, dynamic> payload) async {
     final data = await _send('PATCH', '/expenses/$id/', body: payload);
     return ExpenseModel.fromJson((data as Map).cast<String, dynamic>());
   }
@@ -291,7 +300,8 @@ class ApiService {
 
   /// [month] is `YYYY-MM`. Wages are derived from the attendance register
   /// server-side, so this is one call rather than staff + attendance + payments.
-  static Future<PayrollSummaryModel> fetchPayroll({required String month}) async {
+  static Future<PayrollSummaryModel> fetchPayroll(
+      {required String month}) async {
     final data = await _send('GET', '/payroll/', query: {'month': month});
     return PayrollSummaryModel.fromJson((data as Map).cast<String, dynamic>());
   }
@@ -305,7 +315,8 @@ class ApiService {
   static Future<List<SalaryPaymentModel>> fetchSalaryPayments({
     required String staffId,
   }) async {
-    final data = await _send('GET', '/salary-payments/', query: {'staff': staffId});
+    final data =
+        await _send('GET', '/salary-payments/', query: {'staff': staffId});
     return _asList(data).map(SalaryPaymentModel.fromJson).toList();
   }
 

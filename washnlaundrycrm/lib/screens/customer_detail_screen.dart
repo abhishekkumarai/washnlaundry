@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
 import '../providers/app_provider.dart';
+import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
 import '../utils/money.dart';
@@ -55,13 +56,14 @@ class CustomerDetailScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Row(
-        children: [
-          const SidebarNavigation(),
-          Expanded(
-            child: Column(
+      drawer: const AppDrawer(),
+      body: AppShell(
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
+            return Column(
               children: [
-                _header(context),
+                narrow ? _narrowHeader(context) : _header(context),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
@@ -73,14 +75,15 @@ class CustomerDetailScreen extends StatelessWidget {
                         _kpiRow(lastOrder),
                         const SizedBox(height: 20),
                         LayoutBuilder(
-                          builder: (context, constraints) {
+                          builder: (context, innerConstraints) {
                             // Below this the two panels stop fitting side by
                             // side and the tables start clipping.
-                            final stacked = constraints.maxWidth < 900;
+                            final stacked = innerConstraints.maxWidth <
+                                SidebarNavigation.contentStackBreakpoint;
                             if (stacked) {
                               return Column(
                                 children: [
-                                  _orderHistory(orders),
+                                  _orderHistory(orders, narrow),
                                   const SizedBox(height: 20),
                                   _contactCard(),
                                 ],
@@ -89,7 +92,9 @@ class CustomerDetailScreen extends StatelessWidget {
                             return Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(flex: 2, child: _orderHistory(orders)),
+                                Expanded(
+                                    flex: 2,
+                                    child: _orderHistory(orders, narrow)),
                                 const SizedBox(width: 20),
                                 Expanded(child: _contactCard()),
                               ],
@@ -101,9 +106,9 @@ class CustomerDetailScreen extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -125,10 +130,14 @@ class CustomerDetailScreen extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               child: Row(
                 children: [
-                  Icon(Icons.arrow_back_rounded, size: 18, color: Color(0xFF1A4FD6)),
+                  Icon(Icons.arrow_back_rounded,
+                      size: 18, color: Color(0xFF1A4FD6)),
                   SizedBox(width: 6),
                   Text('Back to Customers',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A4FD6))),
                 ],
               ),
             ),
@@ -142,7 +151,10 @@ class CustomerDetailScreen extends StatelessWidget {
             child: Text(
               customer.name,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A)),
             ),
           ),
           const Spacer(),
@@ -153,7 +165,63 @@ class CustomerDetailScreen extends StatelessWidget {
               label: const Text('New Order'),
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF1A4FD6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Below [SidebarNavigation.contentWideBreakpoint]: drops the "Back to Customers" text, the
+  /// divider, and the "Customers / " breadcrumb (the back arrow already
+  /// implies all three) and collapses New Order to an icon-only button, so
+  /// the customer's name — the one thing that actually varies — gets the
+  /// room it needs instead of being squeezed by fixed chrome.
+  Widget _narrowHeader(BuildContext context) {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: onBack,
+            borderRadius: BorderRadius.circular(8),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Icon(Icons.arrow_back_rounded,
+                  size: 18, color: Color(0xFF1A4FD6)),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              customer.name,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A)),
+            ),
+          ),
+          if (onNewOrder != null)
+            SizedBox(
+              width: 38,
+              height: 38,
+              child: FilledButton(
+                onPressed: onNewOrder,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A4FD6),
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Icon(Icons.add_rounded, size: 18),
               ),
             ),
         ],
@@ -173,7 +241,10 @@ class CustomerDetailScreen extends StatelessWidget {
             backgroundColor: const Color(0xFF1A4FD6),
             child: Text(
               customer.name.isNotEmpty ? customer.name[0].toUpperCase() : 'C',
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+              style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white),
             ),
           ),
           const SizedBox(width: 16),
@@ -182,16 +253,21 @@ class CustomerDetailScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(customer.name,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A))),
                 const SizedBox(height: 4),
                 Text(
                   customer.phone.isEmpty ? 'No phone on file' : customer.phone,
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                  style:
+                      const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                 ),
                 if (since != null) ...[
                   const SizedBox(height: 2),
                   Text('Member since ${DateFormat('MMM yyyy').format(since)}',
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF94A3B8))),
                 ],
               ],
             ),
@@ -205,7 +281,10 @@ class CustomerDetailScreen extends StatelessWidget {
               ),
               child: Text(
                 '${Money.symbol}${customer.dueAmount.toStringAsFixed(0)} due',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFDC2626)),
               ),
             ),
         ],
@@ -215,12 +294,18 @@ class CustomerDetailScreen extends StatelessWidget {
 
   Widget _kpiRow(DateTime? lastOrder) {
     final cards = [
-      _kpi('Lifetime value', '${Money.symbol}${customer.totalSpent.toStringAsFixed(0)}',
-          Icons.account_balance_wallet_outlined, const Color(0xFF10B981)),
+      _kpi(
+          'Lifetime value',
+          '${Money.symbol}${customer.totalSpent.toStringAsFixed(0)}',
+          Icons.account_balance_wallet_outlined,
+          const Color(0xFF10B981)),
       _kpi('Total Orders', '${customer.totalOrders}',
           Icons.shopping_bag_outlined, const Color(0xFF1A4FD6)),
-      _kpi('Avg order value', '${Money.symbol}${customer.avgOrderValue.toStringAsFixed(0)}',
-          Icons.trending_up_rounded, const Color(0xFFA855F7)),
+      _kpi(
+          'Avg order value',
+          '${Money.symbol}${customer.avgOrderValue.toStringAsFixed(0)}',
+          Icons.trending_up_rounded,
+          const Color(0xFFA855F7)),
       _kpi('Last order', lastOrder == null ? '—' : relativeTime(lastOrder),
           Icons.access_time_rounded, const Color(0xFFF59E0B)),
     ];
@@ -263,7 +348,8 @@ class CustomerDetailScreen extends StatelessWidget {
                 child: Text(
                   label,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                 ),
               ),
             ],
@@ -272,14 +358,17 @@ class CustomerDetailScreen extends StatelessWidget {
           Text(
             value,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A)),
           ),
         ],
       ),
     );
   }
 
-  Widget _orderHistory(List<OrderModel> orders) {
+  Widget _orderHistory(List<OrderModel> orders, bool narrow) {
     return Container(
       decoration: _panel,
       child: Column(
@@ -290,16 +379,23 @@ class CustomerDetailScreen extends StatelessWidget {
             child: Row(
               children: [
                 const Text('Order History',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A))),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: const Color(0xFFEEF2FF),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text('${orders.length}',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A4FD6))),
                 ),
               ],
             ),
@@ -313,6 +409,19 @@ class CustomerDetailScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
               ),
             )
+          else if (narrow)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  for (final o in orders)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _orderCard(o),
+                    ),
+                ],
+              ),
+            )
           else ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -323,13 +432,16 @@ class CustomerDetailScreen extends StatelessWidget {
                   Expanded(flex: 3, child: _ColHead('DATE')),
                   Expanded(flex: 2, child: _ColHead('ITEMS')),
                   Expanded(flex: 3, child: _ColHead('STATUS')),
-                  Expanded(flex: 2, child: _ColHead('TOTAL', align: TextAlign.right)),
+                  Expanded(
+                      flex: 2,
+                      child: _ColHead('TOTAL', align: TextAlign.right)),
                 ],
               ),
             ),
             for (final o in orders)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: const BoxDecoration(
                   border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
                 ),
@@ -339,18 +451,23 @@ class CustomerDetailScreen extends StatelessWidget {
                       flex: 3,
                       child: Text('#${o.orderNumber}',
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6))),
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1A4FD6))),
                     ),
                     Expanded(
                       flex: 3,
                       child: Text(DateFormat('MMM d, yyyy').format(o.createdAt),
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                          style: const TextStyle(
+                              fontSize: 13, color: Color(0xFF475569))),
                     ),
                     Expanded(
                       flex: 2,
                       child: Text('${o.items.length}',
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                          style: const TextStyle(
+                              fontSize: 13, color: Color(0xFF475569))),
                     ),
                     Expanded(
                       flex: 3,
@@ -361,14 +478,67 @@ class CustomerDetailScreen extends StatelessWidget {
                     ),
                     Expanded(
                       flex: 2,
-                      child: Text('${Money.symbol}${o.totalAmount.toStringAsFixed(0)}',
+                      child: Text(
+                          '${Money.symbol}${o.totalAmount.toStringAsFixed(0)}',
                           textAlign: TextAlign.right,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A))),
                     ),
                   ],
                 ),
               ),
           ],
+        ],
+      ),
+    );
+  }
+
+  /// Narrow-mode replacement for the table row inside [_orderHistory]: the
+  /// same 5 fixed-flex columns get unreadably cramped once this panel spans
+  /// the full phone width instead of half a desktop screen.
+  Widget _orderCard(OrderModel o) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('#${o.orderNumber}',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A4FD6))),
+              ),
+              StatusPill(status: o.status),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(DateFormat('MMM d, yyyy').format(o.createdAt),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('${o.items.length} item${o.items.length == 1 ? '' : 's'}',
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              Text('${Money.symbol}${o.totalAmount.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A))),
+            ],
+          ),
         ],
       ),
     );
@@ -382,7 +552,11 @@ class CustomerDetailScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('CONTACT & ADDRESSES',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.6, color: Color(0xFF64748B))),
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.6,
+                  color: Color(0xFF64748B))),
           const SizedBox(height: 14),
           _contactRow(Icons.phone_outlined, 'Phone', customer.phone),
           _contactRow(Icons.mail_outline_rounded, 'Email', customer.email),
@@ -407,13 +581,17 @@ class CustomerDetailScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF94A3B8))),
                 const SizedBox(height: 2),
                 Text(
                   shown,
                   style: TextStyle(
                     fontSize: 13,
-                    color: empty ? const Color(0xFFCBD5E1) : const Color(0xFF0F172A),
+                    color: empty
+                        ? const Color(0xFFCBD5E1)
+                        : const Color(0xFF0F172A),
                     fontStyle: empty ? FontStyle.italic : FontStyle.normal,
                   ),
                 ),

@@ -188,6 +188,36 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Ramesh Kumar — Payment History'), findsNothing);
     });
+
+    group('responsive layout', () {
+      Future<void> pumpAt(WidgetTester tester, double width) async {
+        tester.view
+          ..physicalSize = Size(width, 1400)
+          ..devicePixelRatio = 1.0;
+        final provider = AppProvider(autoLoad: false)..seedForTest(payroll: summary);
+        await tester.pumpWidget(host(provider, const PayrollScreen()));
+        await tester.pump();
+      }
+
+      testWidgets('shows History/Record Payment as text buttons at wide width',
+          (tester) async {
+        await pumpAt(tester, 1900);
+
+        expect(find.widgetWithText(TextButton, 'History'), findsWidgets);
+        expect(find.widgetWithText(TextButton, 'Record Payment'), findsWidgets);
+      });
+
+      testWidgets('stacks records into cards with full-width action buttons '
+          'at phone width', (tester) async {
+        await pumpAt(tester, 390);
+
+        expect(find.widgetWithText(TextButton, 'History'), findsNothing);
+        expect(find.widgetWithText(OutlinedButton, 'History'), findsWidgets);
+        expect(find.widgetWithText(FilledButton, 'Record Payment'),
+            findsWidgets);
+        expect(find.text('Ramesh Kumar'), findsOneWidget);
+      });
+    });
   });
 
   group('PayrollSummaryModel', () {

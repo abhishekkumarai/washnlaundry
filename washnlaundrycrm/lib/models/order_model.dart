@@ -211,12 +211,14 @@ class OrderModel {
   String get sourceLabel => OrderSource.label(source);
 
   /// What the timeline writes after "Created by".
-  String get createdByLabel => createdBy.trim().isEmpty ? sourceLabel : createdBy.trim();
+  String get createdByLabel =>
+      createdBy.trim().isEmpty ? sourceLabel : createdBy.trim();
 
   /// True when nobody delivers this order — the customer collects it.
   /// Drives the step-bar wording and which fulfilment panel is shown.
   bool get isCollectedInStore =>
-      deliveryType == DeliveryType.storePickup || deliveryType == DeliveryType.homePickup;
+      deliveryType == DeliveryType.storePickup ||
+      deliveryType == DeliveryType.homePickup;
 
   /// The four stages the live step bar shows, in order. `Out for Delivery` is
   /// deliberately absent: the real app collapses it into the Timeline, and a

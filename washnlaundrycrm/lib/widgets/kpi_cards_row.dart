@@ -69,8 +69,7 @@ class KpiCardsRow extends StatelessWidget {
         'title': 'Customers',
         'value': '${provider.customersTotal}',
         'subtext': '+${provider.customersNewToday ?? 0} new today',
-        'subtextColor':
-            (provider.customersNewToday ?? 0) > 0 ? _up : _muted,
+        'subtextColor': (provider.customersNewToday ?? 0) > 0 ? _up : _muted,
         'icon': Icons.credit_card_outlined,
         'iconBg': const Color(0xFFF3E8FF),
         'iconColor': const Color(0xFFA855F7),
@@ -88,20 +87,26 @@ class KpiCardsRow extends StatelessWidget {
 
         if (crossAxisCount == 5) {
           return Row(
-            children: cards.map((c) => Expanded(child: Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: _buildCard(c),
-            ))).toList(),
+            children: cards
+                .map((c) => Expanded(
+                        child: Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: _buildCard(c),
+                    )))
+                .toList(),
           );
         }
 
         return Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: cards.map((c) => SizedBox(
-            width: (constraints.maxWidth - (crossAxisCount - 1) * 12) / crossAxisCount,
-            child: _buildCard(c),
-          )).toList(),
+          children: cards
+              .map((c) => SizedBox(
+                    width: (constraints.maxWidth - (crossAxisCount - 1) * 12) /
+                        crossAxisCount,
+                    child: _buildCard(c),
+                  ))
+              .toList(),
         );
       },
     );
@@ -128,18 +133,26 @@ class KpiCardsRow extends StatelessWidget {
                   color: c['iconBg'] as Color,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(c['icon'] as IconData, size: 18, color: c['iconColor'] as Color),
+                child: Icon(c['icon'] as IconData,
+                    size: 18, color: c['iconColor'] as Color),
               ),
               Text(
                 c['title'] as String,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF64748B)),
               ),
             ],
           ),
           const SizedBox(height: 14),
           Text(
             c['value'] as String,
-            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), height: 1.1),
+            style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A),
+                height: 1.1),
           ),
           const SizedBox(height: 8),
           Text(

@@ -62,7 +62,8 @@ class ErrorState extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1A4FD6),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 13),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 26, vertical: 13),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -89,7 +90,8 @@ class LoadingState extends StatelessWidget {
       child: SizedBox(
         width: 30,
         height: 30,
-        child: CircularProgressIndicator(strokeWidth: 3, color: Color(0xFF1A4FD6)),
+        child:
+            CircularProgressIndicator(strokeWidth: 3, color: Color(0xFF1A4FD6)),
       ),
     );
   }

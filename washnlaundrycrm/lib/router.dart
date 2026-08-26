@@ -18,7 +18,7 @@ import 'screens/reports_screen.dart';
 import 'screens/scan_screen.dart';
 import 'screens/services_screen.dart';
 import 'screens/staff_screen.dart';
-import 'widgets/sidebar_navigation.dart';
+import 'widgets/app_shell.dart';
 
 /// Updates `AppProvider.currentNavIndex` to match the matched route.
 ///
@@ -49,12 +49,8 @@ Widget _section(BuildContext context, int navIndex, Widget screen) {
 /// other screen has instead of a bare spinner or bare error text.
 Widget _ordersFrame(Widget body) => Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Row(
-        children: [
-          const SidebarNavigation(),
-          Expanded(child: body),
-        ],
-      ),
+      drawer: const AppDrawer(),
+      body: AppShell(body: body),
     );
 
 /// The section routes, keyed the same way [AppProvider.routePaths] already
@@ -115,7 +111,8 @@ List<RouteBase> appRoutes() => [
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text('Order not found',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: () => c.go('/orders'),

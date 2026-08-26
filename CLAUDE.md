@@ -215,35 +215,48 @@ To inspect the live app, drive Chrome via the claude-in-chrome tools. Notes from
 ## Future steps — one codebase, three form factors
 
 The target is **the same Flutter app running as an Android app, as web, and in a tablet
-layout**, each adapting to its form factor rather than being a separate build. Nothing
-here is done yet; this is the direction, not a description of the code.
+layout**, each adapting to its form factor rather than being a separate build.
 
 ### Where it stands
 
 `android/`, `web/` and `windows/` are scaffolded (no `ios/`). Only web has ever been
-built or run. The one genuinely responsive piece is `SidebarNavigation`, which switches
-on `MediaQuery.sizeOf(context).width`:
+built or run.
 
-| Width | Rail |
+**Tablet-width responsive layout is done** (session of 2026-08-26). Every screen that
+carries the nav rail now wraps its `Scaffold` in `AppShell` / `AppDrawer`
+(`lib/widgets/app_shell.dart`) instead of the old inline
+`Row(children: [SidebarNavigation(), Expanded(body)])`:
+
+| Width | Nav |
 |---|---|
-| ≥ `expandedMinWidth` (1080) | 240px, label + icon, honours the collapse toggle |
-| 700–1080 | 72px icon rail, toggle ignored |
-| < `railMinWidth` (700) | 60px icon rail, tighter padding |
+| ≥ `expandedMinWidth` (1080) | 240px labeled rail, honours the collapse toggle |
+| `railMinWidth` (700) – 1080 | 72px icon rail, toggle ignored |
+| < `railMinWidth` (700) | Rail is dropped entirely; a 44px hamburger bar opens `AppDrawer`, which hosts `SidebarNavigation(inDrawer: true)` — full labeled list, no collapse toggle, closes itself on tap |
 
-Navigation is never hidden, so there is no width at which the app becomes unusable. But
-that is the *only* widget doing this — outside `dashboard_screen.dart`, no screen uses
-`MediaQuery` or `LayoutBuilder` at all. Everything else is a fixed desktop layout that
-merely gets narrower.
+Below `SidebarNavigation.contentWideBreakpoint` (760, shared by every screen — Orders,
+Customers, Staff, Attendance, Payroll, Expenses, Reports, Services, New Order, Order
+Detail, Customer Detail), wide tables fall back to a card/list layout, primary header
+actions (New Order, Add) collapse to icon-only buttons, and secondary actions fold into
+an overflow menu. `SidebarNavigation.contentStackBreakpoint` (900) is the second,
+looser threshold a few screens (Reports, Customer Detail) use to collapse two
+side-by-side panels into one column without a full card rebuild. Both constants live on
+`SidebarNavigation` next to `expandedMinWidth`/`railMinWidth` precisely so no screen
+needs its own private copy — a first pass had each screen declare its own
+`_wideBreakpoint = 760`, which this session's cleanup centralized. The dashboard's own
+`_wideBreakpoint = 990` (pre-existing, in `dashboard_screen.dart`) is a separate,
+unrelated threshold and was deliberately left alone.
+
+Every layout change has a widget test driving `tester.view.physicalSize` at the
+target width — `app_shell_test.dart` (new) covers the rail/drawer swap itself; each
+screen's own test file covers its phone-width behaviour.
+
+Not yet done: a genuinely graduated tablet-only layout (e.g. a 2-column dashboard grid
+between phone and desktop) — today every screen is binary (wide/narrow), not
+three-tier. `services_screen.dart`'s and `new_order_screen.dart`'s item grids do have a
+graduated column count (1/2/3/4 at 380/620/900), but that's a per-grid column function,
+not the same "content breakpoint" concept, and was left as-is.
 
 ### What each target needs
-
-**Tablet (~600–1080 logical px).** Cheapest of the three and the right first move,
-because it forces the layout work the other two also need. The rail already collapses;
-the content does not. Wide tables (Orders, Customers, Staff, Attendance, Payroll) need a
-card/list fallback below a breakpoint, and the dashboard's multi-column panel grid needs
-to reflow to one column. Pick the breakpoints once, put them next to
-`expandedMinWidth` / `railMinWidth`, and reuse them everywhere rather than scattering
-magic numbers.
 
 **Android.** Two things block it, in order:
 
@@ -254,9 +267,16 @@ magic numbers.
    `kDebugMode`-gated dev convenience for `flutter run` reaching a local `manage.py
    runserver` — see `ApiService.baseUrl`'s doc comment — but that's debug-only and
    doesn't extend to a release APK.)
-2. **Phone widths are below every breakpoint the app was designed for.** A 60px icon rail
-   is wrong on a phone; that wants a bottom navigation bar or a drawer, which is a
-   different navigation shell, not a narrower one.
+2. ~~Phone widths are below every breakpoint the app was designed for~~ — no longer
+   true now that `AppShell` gives widths below `railMinWidth` a drawer instead of a
+   squeezed rail (see "Where it stands" above). What's left for Android specifically:
+   the drawer's hamburger-bar shell hasn't been checked against a *phone-shaped* window
+   (only tested down to narrow desktop/tablet widths so far), and `SidebarNavigation`'s
+   own internal 60px "narrow rail" branch (`narrowRailWidth`, gated on the same
+   `railMinWidth` `AppShell` already switches on) is now dead in production — `AppShell`
+   never renders `SidebarNavigation` non-drawer below that width, so that branch only
+   still fires in tests that pump `SidebarNavigation` directly. Worth deleting once
+   confirmed nothing else depends on it.
 
 The router is no longer a blocker here — `go_router` (see the Frontend section) gives the
 Android system back button a real Navigator to pop, which the old `switch`-on-`currentNavIndex`

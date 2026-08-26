@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:washnlaundrycrm/models/garment_model.dart';
 import 'package:washnlaundrycrm/providers/app_provider.dart';
@@ -178,6 +179,38 @@ void main() {
         find.widgetWithText(ElevatedButton, 'Save Register'),
       );
       expect(button.onPressed, isNull);
+    });
+
+    group('responsive layout', () {
+      Future<void> pumpAt(WidgetTester tester, double width) async {
+        tester.view
+          ..physicalSize = Size(width, 1200)
+          ..devicePixelRatio = 1.0;
+        final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
+        await tester.pumpWidget(host(provider, const AttendanceScreen()));
+        await tester.pump();
+      }
+
+      testWidgets('shows the full date on the picker button at wide width',
+          (tester) async {
+        await pumpAt(tester, 1400);
+
+        final formatted =
+            DateFormat('EEEE, dd MMMM yyyy').format(DateTime.now());
+        expect(find.text(formatted), findsOneWidget);
+      });
+
+      testWidgets(
+          'shortens the date button and stacks it below the title at phone '
+          'width', (tester) async {
+        await pumpAt(tester, 390);
+
+        final full = DateFormat('EEEE, dd MMMM yyyy').format(DateTime.now());
+        final short = DateFormat('d MMM yyyy').format(DateTime.now());
+        expect(find.text(full), findsNothing);
+        expect(find.text(short), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
     });
   });
 

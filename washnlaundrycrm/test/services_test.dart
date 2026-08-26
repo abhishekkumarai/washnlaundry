@@ -402,4 +402,42 @@ void main() {
       expect(find.text('Pick a start and an end time'), findsOneWidget);
     });
   });
+
+  group('ServicesScreen responsive layout', () {
+    Future<void> pumpAt(WidgetTester tester, double width) async {
+      tester.view
+        ..physicalSize = Size(width, 1200)
+        ..devicePixelRatio = 1.0;
+      await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
+      await tester.pump();
+    }
+
+    testWidgets('shows the category rail and labeled New Service at wide width',
+        (tester) async {
+      await pumpAt(tester, 1900);
+
+      expect(find.text('SERVICE CATEGORIES'), findsOneWidget);
+      expect(find.text('+ New Service'), findsOneWidget);
+    });
+
+    testWidgets(
+        'collapses the category rail to chips and New Service to an icon '
+        'at phone width', (tester) async {
+      await pumpAt(tester, 390);
+
+      expect(find.text('SERVICE CATEGORIES'), findsNothing);
+      expect(find.text('+ New Service'), findsNothing);
+      expect(find.byType(ChoiceChip), findsWidgets);
+      expect(find.text('Ironing'), findsWidgets);
+    });
+
+    testWidgets('the tab bar scrolls horizontally at phone width instead of '
+        'overflowing', (tester) async {
+      await pumpAt(tester, 390);
+
+      expect(find.text('Items'), findsOneWidget);
+      expect(find.text('Service Areas'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

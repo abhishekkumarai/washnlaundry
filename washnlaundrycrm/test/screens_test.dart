@@ -192,5 +192,40 @@ void main() {
       expect(find.text('Add Staff'), findsWidgets);
       expect(find.widgetWithText(TextField, 'Ramesh Kumar'), findsNothing);
     });
+
+    group('responsive layout', () {
+      Future<void> pumpAt(WidgetTester tester, double width) async {
+        tester.view
+          ..physicalSize = Size(width, 1200)
+          ..devicePixelRatio = 1.0;
+        final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
+        await tester.pumpWidget(host(provider, const StaffScreen()));
+        await tester.pump();
+      }
+
+      testWidgets('shows the table header at wide width', (tester) async {
+        await pumpAt(tester, 1400);
+
+        expect(find.text('STAFF MEMBER'), findsOneWidget);
+        expect(find.text('Add Staff'), findsWidgets);
+      });
+
+      testWidgets('shows cards instead of the table at phone width',
+          (tester) async {
+        await pumpAt(tester, 390);
+
+        expect(find.text('STAFF MEMBER'), findsNothing);
+        expect(find.text('Ramesh Kumar'), findsOneWidget);
+        expect(find.text('Wage'), findsWidgets);
+      });
+
+      testWidgets('Add Staff collapses to an icon-only button at phone width',
+          (tester) async {
+        await pumpAt(tester, 390);
+
+        expect(find.text('Add Staff'), findsNothing);
+        expect(find.byIcon(Icons.add), findsOneWidget);
+      });
+    });
   });
 }

@@ -175,6 +175,44 @@ void main() {
         isNull,
       );
     });
+
+    group('responsive layout', () {
+      Future<void> pumpAt(WidgetTester tester, double width) async {
+        tester.view
+          ..physicalSize = Size(width, 1800)
+          ..devicePixelRatio = 1.0;
+        final provider = AppProvider(autoLoad: false)..seedForTest(reports: report);
+        await tester.pumpWidget(host(provider, const ReportsScreen()));
+        await tester.pump();
+      }
+
+      testWidgets('shows Print/Export PDF as labeled buttons at wide width',
+          (tester) async {
+        await pumpAt(tester, 2200);
+
+        expect(find.widgetWithText(OutlinedButton, 'Print'), findsOneWidget);
+        expect(find.widgetWithText(ElevatedButton, 'Export PDF'),
+            findsOneWidget);
+        expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
+      });
+
+      testWidgets(
+          'collapses Print/Export PDF into an overflow menu at phone width',
+          (tester) async {
+        await pumpAt(tester, 390);
+
+        expect(find.widgetWithText(OutlinedButton, 'Print'), findsNothing);
+        expect(find.widgetWithText(ElevatedButton, 'Export PDF'), findsNothing);
+        expect(find.byIcon(Icons.more_vert_rounded), findsOneWidget);
+        // The period buttons move to their own row, but stay reachable.
+        expect(find.widgetWithText(OutlinedButton, 'This Month'), findsOneWidget);
+
+        await tester.tap(find.byIcon(Icons.more_vert_rounded));
+        await tester.pumpAndSettle();
+        expect(find.text('Print'), findsOneWidget);
+        expect(find.text('Export PDF'), findsOneWidget);
+      });
+    });
   });
 
   group('ReportsModel', () {

@@ -583,4 +583,54 @@ void main() {
       expect(button.onPressed, isNull);
     });
   });
+
+  group('Responsive layout (cart panel + item grid)', () {
+    Future<void> pumpAt(WidgetTester tester, double width) async {
+      tester.view
+        ..physicalSize = Size(width, 1400)
+        ..devicePixelRatio = 1.0;
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(garments: _catalogue);
+      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pump();
+    }
+
+    testWidgets('cart sits beside the grid at wide width', (tester) async {
+      await pumpAt(tester, 1400);
+
+      final gridBottom = tester.getBottomLeft(find.byType(GridView)).dy;
+      final cartTop = tester.getTopLeft(find.text('Current order')).dy;
+
+      // Side-by-side: the cart header starts near the top, well before the
+      // grid (which fills the full column height) ends.
+      expect(cartTop, lessThan(gridBottom));
+    });
+
+    testWidgets('cart stacks below the grid at phone width', (tester) async {
+      await pumpAt(tester, 390);
+
+      final gridBottom = tester.getBottomLeft(find.byType(GridView)).dy;
+      final cartTop = tester.getTopLeft(find.text('Current order')).dy;
+
+      // Stacked: the cart section starts at or after where the grid ends.
+      expect(cartTop, greaterThanOrEqualTo(gridBottom));
+    });
+
+    int columnsAt(WidgetTester tester) {
+      final delegate = tester.widget<GridView>(find.byType(GridView)).gridDelegate
+          as SliverGridDelegateWithFixedCrossAxisCount;
+      return delegate.crossAxisCount;
+    }
+
+    testWidgets('the grid uses fewer columns at phone width than at desktop width',
+        (tester) async {
+      await pumpAt(tester, 1400);
+      final wideColumns = columnsAt(tester);
+
+      await pumpAt(tester, 390);
+      final narrowColumns = columnsAt(tester);
+
+      expect(narrowColumns, lessThan(wideColumns));
+    });
+  });
 }

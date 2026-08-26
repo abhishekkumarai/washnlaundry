@@ -52,7 +52,8 @@ class PanelCard extends StatelessWidget {
                         padding: const EdgeInsets.only(top: 2),
                         child: Text(
                           subtitle!,
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF94A3B8)),
                         ),
                       ),
                   ],
@@ -71,8 +72,9 @@ class PanelCard extends StatelessWidget {
 
 /// Renders a percentage, or an em dash when the metric has no data yet.
 /// "—" and "0%" mean very different things on this dashboard.
-String formatPercent(dynamic value) =>
-    value == null ? '—' : '${(value as num).toStringAsFixed(value % 1 == 0 ? 0 : 1)}%';
+String formatPercent(dynamic value) => value == null
+    ? '—'
+    : '${(value as num).toStringAsFixed(value % 1 == 0 ? 0 : 1)}%';
 
 /// Formats an amount in the shop's currency, grouped ("₹4,850") to match
 /// Reports — the symbol used to be a bare '₹' here and in a dozen other
@@ -155,7 +157,8 @@ class StatRow extends StatelessWidget {
                   if (caption != null)
                     Text(
                       caption!,
-                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
+                      style: const TextStyle(
+                          fontSize: 10.5, color: Color(0xFF94A3B8)),
                     ),
                 ],
               ),
