@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
-import '../utils/navigation.dart';
 import '../widgets/load_state.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -31,6 +30,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
   // The current month, not a hardcoded July 2026 that went stale the moment it
   // was typed.
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  String _searchQuery = '';
 
   static const _monthNames = [
     'January',
@@ -78,7 +78,9 @@ class _PayrollScreenState extends State<PayrollScreen> {
           children: [
             TopHeader(
               title: 'Payroll',
-              onNewOrderPressed: () => context.goSection(1),
+              actionLabel: 'New Payroll',
+              actionIcon: Icons.payments_outlined,
+              onActionPressed: () => _showNewPayrollDialog(provider),
             ),
             Expanded(child: _body(provider)),
           ],
@@ -100,7 +102,16 @@ class _PayrollScreenState extends State<PayrollScreen> {
       return const LoadingState();
     }
 
-    final entries = payroll?.entries ?? const <PayrollEntryModel>[];
+    final allEntries = payroll?.entries ?? const <PayrollEntryModel>[];
+    final query = _searchQuery.trim().toLowerCase();
+    final entries = query.isEmpty
+        ? allEntries
+        : allEntries
+            .where((e) =>
+                e.staffName.toLowerCase().contains(query) ||
+                e.role.toLowerCase().contains(query))
+            .toList();
+    final searching = query.isNotEmpty;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -167,7 +178,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
                     ),
                     const SizedBox(height: 16),
                     if (entries.isEmpty)
-                      _empty()
+                      _empty(searching: searching)
                     else if (narrow)
                       Column(
                         children: [
@@ -245,31 +256,74 @@ class _PayrollScreenState extends State<PayrollScreen> {
     if (narrow) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [title, const SizedBox(height: 12), monthNav],
+        children: [
+          title,
+          const SizedBox(height: 12),
+          _searchField(),
+          const SizedBox(height: 12),
+          monthNav,
+        ],
       );
     }
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [const Expanded(child: title), monthNav],
+      children: [
+        const Expanded(child: title),
+        SizedBox(width: 220, child: _searchField()),
+        const SizedBox(width: 12),
+        monthNav,
+      ],
     );
   }
 
-  Widget _empty() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 36),
+  Widget _searchField() {
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: TextField(
+        onChanged: (v) => setState(() => _searchQuery = v),
+        style: const TextStyle(fontSize: 13),
+        textAlign: TextAlign.center,
+        decoration: const InputDecoration(
+          hintText: 'Search staff...',
+          hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+          prefixIcon:
+              Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(vertical: 9),
+        ),
+      ),
+    );
+  }
+
+  Widget _empty({required bool searching}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 36),
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.payments_outlined, size: 32, color: Color(0xFF94A3B8)),
-            SizedBox(height: 10),
-            Text('No payroll for this month.',
-                style: TextStyle(
+            const Icon(Icons.payments_outlined,
+                size: 32, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 10),
+            Text(
+                searching
+                    ? 'No staff match "${_searchQuery.trim()}".'
+                    : 'No payroll for this month.',
+                style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF0F172A))),
-            SizedBox(height: 4),
-            Text('Mark attendance to build up wages.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            const SizedBox(height: 4),
+            Text(
+                searching
+                    ? 'Try a different name or role.'
+                    : 'Mark attendance to build up wages.',
+                style:
+                    const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
           ],
         ),
       ),
@@ -671,6 +725,81 @@ class _PayrollScreenState extends State<PayrollScreen> {
         ],
       ),
     );
+  }
+
+  /// The header's "New Payroll" action. There's no bare "create a payroll"
+  /// concept — payroll rows are derived from attendance, not created — so
+  /// this is a staff picker in front of the same [_showRecordPayment] dialog
+  /// each row's own "Record Payment" button opens, rather than a duplicate
+  /// form.
+  Future<void> _showNewPayrollDialog(AppProvider provider) async {
+    final entries = provider.payroll?.entries ?? const <PayrollEntryModel>[];
+    if (entries.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content:
+                Text('No staff payroll for this month yet. Mark attendance first.')),
+      );
+      return;
+    }
+
+    final selected = await showDialog<PayrollEntryModel>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('New Payroll — $_monthLabel',
+            style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A))),
+        content: SizedBox(
+          width: math.min(400.0, MediaQuery.sizeOf(dialogContext).width - 48),
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: entries.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, idx) {
+              final e = entries[idx];
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: const Color(0xFFEEF2FF),
+                  child: Text(
+                    e.staffName.isEmpty ? '?' : e.staffName[0].toUpperCase(),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, color: Color(0xFF1A4FD6)),
+                  ),
+                ),
+                title: Text(e.staffName,
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(e.role),
+                trailing: Text(
+                  'Due ${Money.symbol}${_money(e.pendingAmount)}',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: e.pendingAmount > 0
+                          ? const Color(0xFFEF4444)
+                          : const Color(0xFF10B981)),
+                ),
+                onTap: () => Navigator.of(dialogContext).pop(e),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child:
+                const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+        ],
+      ),
+    );
+
+    if (selected != null && mounted) {
+      await _showRecordPayment(selected);
+    }
   }
 
   Future<void> _showRecordPayment(PayrollEntryModel entry) async {

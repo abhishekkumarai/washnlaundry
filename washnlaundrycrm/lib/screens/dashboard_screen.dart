@@ -35,7 +35,7 @@ class DashboardScreen extends StatelessWidget {
           children: [
             TopHeader(
               title: 'Dashboard',
-              onNewOrderPressed: () => context.goSection(1),
+              onActionPressed: () => context.goSection(1),
             ),
             Expanded(child: _body(provider)),
           ],

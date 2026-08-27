@@ -3,8 +3,10 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
-import '../utils/navigation.dart';
+import '../utils/csv.dart';
+import '../utils/csv_download.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/sidebar_navigation.dart';
 import '../widgets/top_header.dart';
 import '../utils/money.dart';
 
@@ -21,6 +23,7 @@ class ExpensesScreen extends StatefulWidget {
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
   String _category = 'All';
+  String _searchQuery = '';
 
   static const _categoryColors = {
     'Supplies': Color(0xFF1A4FD6),
@@ -47,9 +50,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
     final categories = <String>{for (final e in all) e.category}.toList()
       ..sort();
-    final visible = _category == 'All'
-        ? all
-        : all.where((e) => e.category == _category).toList();
+    final query = _searchQuery.trim().toLowerCase();
+    final visible = all.where((e) {
+      final matchesCategory = _category == 'All' || e.category == _category;
+      final matchesSearch = query.isEmpty ||
+          e.title.toLowerCase().contains(query) ||
+          e.category.toLowerCase().contains(query) ||
+          _methodLabel(provider, e.paymentMethod).toLowerCase().contains(query);
+      return matchesCategory && matchesSearch;
+    }).toList();
 
     final total = all.fold<double>(0, (sum, e) => sum + e.amount);
     final now = DateTime.now();
@@ -68,25 +77,33 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           children: [
             TopHeader(
               title: 'Expenses',
-              onNewOrderPressed: () => context.goSection(1),
+              actionLabel: 'Add Expense',
+              actionIcon: Icons.add_rounded,
+              onActionPressed: _showAddExpense,
             ),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _titleRow(),
-                    const SizedBox(height: 20),
-                    _summaryRow(total, thisMonth, all.length),
-                    const SizedBox(height: 20),
-                    if (categories.isNotEmpty) ...[
-                      _filterChips(categories),
-                      const SizedBox(height: 16),
-                    ],
-                    _list(visible, provider),
-                  ],
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final narrow = constraints.maxWidth <
+                      SidebarNavigation.contentWideBreakpoint;
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _titleRow(narrow, visible),
+                        const SizedBox(height: 20),
+                        _summaryRow(total, thisMonth, all.length),
+                        const SizedBox(height: 20),
+                        if (categories.isNotEmpty) ...[
+                          _filterChips(categories),
+                          const SizedBox(height: 16),
+                        ],
+                        _list(visible, provider),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -95,24 +112,64 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  Widget _titleRow() {
-    return Row(
-      children: [
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _titleRow(bool narrow, List<ExpenseModel> visible) {
+    const titleBlock = Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Expenses Log',
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A))),
+          SizedBox(height: 2),
+          Text('Log shop operational expenses, rent, detergents, & repairs',
+              style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+        ],
+      ),
+    );
+
+    if (narrow) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Text('Expenses Log',
-                  style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A))),
-              SizedBox(height: 2),
-              Text('Log shop operational expenses, rent, detergents, & repairs',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+              titleBlock,
+              SizedBox(
+                width: 38,
+                height: 38,
+                child: FilledButton(
+                  onPressed: _showAddExpense,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF1A4FD6),
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Icon(Icons.add_rounded, size: 18),
+                ),
+              ),
             ],
           ),
-        ),
+          const SizedBox(height: 10),
+          _searchField(),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: _exportButton(visible),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        titleBlock,
+        SizedBox(width: 240, child: _searchField()),
+        const SizedBox(width: 14),
+        _exportButton(visible),
+        const SizedBox(width: 8),
         FilledButton.icon(
           onPressed: _showAddExpense,
           icon: const Icon(Icons.add_rounded, size: 18),
@@ -126,6 +183,81 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         ),
       ],
     );
+  }
+
+  Widget _searchField() {
+    return SizedBox(
+      height: 38,
+      child: TextField(
+        onChanged: (v) => setState(() => _searchQuery = v),
+        style: const TextStyle(fontSize: 13),
+        textAlign: TextAlign.center,
+        decoration: InputDecoration(
+          hintText: 'Search by title, category, or method...',
+          hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+          prefixIcon: const Icon(Icons.search_rounded,
+              size: 18, color: Color(0xFF94A3B8)),
+          filled: true,
+          fillColor: const Color(0xFFF1F5F9),
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _exportButton(List<ExpenseModel> visible) {
+    return OutlinedButton.icon(
+      onPressed: () => _exportExpensesCsv(visible),
+      icon: const Icon(Icons.download_rounded,
+          size: 16, color: Color(0xFF475569)),
+      label: const Text('Export',
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF334155))),
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      ),
+    );
+  }
+
+  /// Exports exactly what's on screen — the currently category-filtered and
+  /// searched rows — same convention as Orders'/Customers' Export.
+  void _exportExpensesCsv(List<ExpenseModel> expenses) {
+    if (expenses.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No expenses to export.')),
+      );
+      return;
+    }
+
+    final provider = context.read<AppProvider>();
+    final rows = <List<Object?>>[
+      const ['Title', 'Category', 'Amount', 'Payment Method', 'Date'],
+      for (final e in expenses)
+        [
+          e.title,
+          e.category,
+          e.amount,
+          _methodLabel(provider, e.paymentMethod),
+          e.date == null ? '' : DateFormat('yyyy-MM-dd').format(e.date!),
+        ],
+    ];
+
+    final filename =
+        'expenses_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+    final ok = downloadCsv(filename, buildCsv(rows));
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Export is only available in the web app.')),
+      );
+    }
   }
 
   Widget _summaryRow(double total, double thisMonth, int count) {
@@ -232,9 +364,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           child: Text(
             provider.isLoading
                 ? 'Loading expenses…'
-                : _category == 'All'
-                    ? 'No expenses logged yet.'
-                    : 'No $_category expenses logged.',
+                : _searchQuery.trim().isNotEmpty
+                    ? 'No expenses match "${_searchQuery.trim()}".'
+                    : _category == 'All'
+                        ? 'No expenses logged yet.'
+                        : 'No $_category expenses logged.',
             style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
           ),
         ),

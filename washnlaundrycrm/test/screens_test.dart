@@ -126,7 +126,7 @@ void main() {
     });
 
     testWidgets('the edit dialog offers an active toggle', (tester) async {
-      // Without this, "Show Inactive" could never match anything.
+      // Without this, a staff member could never be marked inactive at all.
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
@@ -156,8 +156,11 @@ void main() {
       );
     });
 
-    testWidgets('inactive members are hidden until Show Inactive is ticked',
-        (tester) async {
+    testWidgets(
+        'inactive members are hidden from All Staff but reachable via the '
+        'Inactive tab', (tester) async {
+      // The "Show Inactive" checkbox that used to reveal them on this tab is
+      // gone — the dedicated "Inactive" sub-tab is the only way to see them now.
       final provider = AppProvider(autoLoad: false)
         ..seedForTest(staff: [
           ...roster,
@@ -173,8 +176,9 @@ void main() {
       await tester.pump();
 
       expect(find.text('Retired Person'), findsNothing);
+      expect(find.byType(Checkbox), findsNothing);
 
-      await tester.tap(find.byType(Checkbox).first);
+      await tester.tap(find.text('Inactive'));
       await tester.pump();
 
       expect(find.text('Retired Person'), findsOneWidget);

@@ -8,7 +8,7 @@ import 'package:washnlaundrycrm/widgets/top_header.dart';
 /// Customer Detail already use for their own copy of this button.
 void main() {
   Future<void> pumpAt(WidgetTester tester, double width,
-      {required VoidCallback onNewOrderPressed}) async {
+      {required VoidCallback onActionPressed}) async {
     tester.view
       ..physicalSize = Size(width, 800)
       ..devicePixelRatio = 1.0;
@@ -16,14 +16,14 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
-        body: TopHeader(title: 'Dashboard', onNewOrderPressed: onNewOrderPressed),
+        body: TopHeader(title: 'Dashboard', onActionPressed: onActionPressed),
       ),
     ));
   }
 
   testWidgets('shows the labeled button at desktop width', (tester) async {
     var pressed = false;
-    await pumpAt(tester, 1400, onNewOrderPressed: () => pressed = true);
+    await pumpAt(tester, 1400, onActionPressed: () => pressed = true);
 
     expect(find.text('New Order'), findsOneWidget);
     expect(find.byIcon(Icons.add), findsOneWidget);
@@ -35,7 +35,7 @@ void main() {
   testWidgets('collapses to an icon-only button below the content breakpoint',
       (tester) async {
     var pressed = false;
-    await pumpAt(tester, 600, onNewOrderPressed: () => pressed = true);
+    await pumpAt(tester, 600, onActionPressed: () => pressed = true);
 
     expect(find.text('New Order'), findsNothing);
     expect(find.byIcon(Icons.add), findsOneWidget);

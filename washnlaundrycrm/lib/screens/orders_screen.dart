@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../models/order_model.dart';
+import '../utils/csv.dart';
+import '../utils/csv_download.dart';
 import '../utils/navigation.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -137,7 +139,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
       AppProvider provider, List<OrderModel> filteredOrders, bool narrow) {
     return Column(
       children: [
-        narrow ? _narrowHeaderBar(provider) : _wideHeaderBar(provider),
+        narrow
+            ? _narrowHeaderBar(provider, filteredOrders)
+            : _wideHeaderBar(provider, filteredOrders),
 
         // Filter Tabs Scrollable Row
         Padding(
@@ -615,7 +619,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   /// The wide-mode header — title/count, date dropdown, a 240px search box,
   /// Filters, Export, New Order — all in one unwrapped Row. Unchanged from
   /// before the phone layout existed.
-  Widget _wideHeaderBar(AppProvider provider) {
+  Widget _wideHeaderBar(AppProvider provider, List<OrderModel> filteredOrders) {
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -652,6 +656,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
             child: TextField(
               onChanged: (val) => setState(() => _searchQuery = val),
+              textAlign: TextAlign.center,
               decoration: const InputDecoration(
                 hintText: 'Search by order ID, phone, or name...',
                 hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
@@ -665,7 +670,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           const SizedBox(width: 12),
           _filtersButton(),
           const SizedBox(width: 8),
-          _exportButton(),
+          _exportButton(filteredOrders),
           const SizedBox(width: 8),
           _newOrderButton(iconOnly: false),
         ],
@@ -677,7 +682,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   /// unwrapped: title + icon-only New Order, a full-width search box, then
   /// the date/Filters/Export controls in their own horizontal scroll (same
   /// pattern the status tabs below already use).
-  Widget _narrowHeaderBar(AppProvider provider) {
+  Widget _narrowHeaderBar(AppProvider provider, List<OrderModel> filteredOrders) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: const BoxDecoration(
@@ -716,6 +721,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
             ),
             child: TextField(
               onChanged: (val) => setState(() => _searchQuery = val),
+              textAlign: TextAlign.center,
               decoration: const InputDecoration(
                 hintText: 'Search by order ID, phone, or name...',
                 hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
@@ -736,7 +742,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 const SizedBox(width: 8),
                 _filtersButton(),
                 const SizedBox(width: 8),
-                _exportButton(),
+                _exportButton(filteredOrders),
               ],
             ),
           ),
@@ -800,9 +806,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  Widget _exportButton() {
+  Widget _exportButton(List<OrderModel> filteredOrders) {
     return OutlinedButton.icon(
-      onPressed: () {},
+      onPressed: () => _exportOrdersCsv(filteredOrders),
       icon: const Icon(Icons.download_rounded,
           size: 16, color: Color(0xFF475569)),
       label: const Text('Export',
@@ -816,6 +822,69 @@ class _OrdersScreenState extends State<OrdersScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
     );
+  }
+
+  /// Exports exactly what's on screen — the currently filtered/searched
+  /// rows, not the whole shop — matching what "Export" means on every other
+  /// list-with-filters screen (a report of what you're looking at).
+  void _exportOrdersCsv(List<OrderModel> orders) {
+    if (orders.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No orders to export.')),
+      );
+      return;
+    }
+
+    final rows = <List<Object?>>[
+      const [
+        'Order Number',
+        'Customer Name',
+        'Phone',
+        'Status',
+        'Payment Status',
+        'Payment Method',
+        'Delivery Type',
+        'Source',
+        'Subtotal',
+        'Delivery Charge',
+        'Discount',
+        'Total Amount',
+        'Paid Amount',
+        'Due Amount',
+        'Created At',
+        'Scheduled Date',
+      ],
+      for (final o in orders)
+        [
+          o.orderNumber,
+          o.customerName,
+          o.customerPhone,
+          o.statusLabel,
+          o.paymentStatusLabel,
+          o.paymentMethod,
+          o.deliveryTypeLabel,
+          o.sourceLabel,
+          o.subtotal,
+          o.deliveryCharge,
+          o.discountAmount,
+          o.totalAmount,
+          o.paidAmount,
+          o.dueAmount,
+          DateFormat('yyyy-MM-dd HH:mm').format(o.createdAt),
+          o.scheduledDate == null
+              ? ''
+              : DateFormat('yyyy-MM-dd').format(o.scheduledDate!),
+        ],
+    ];
+
+    final filename =
+        'orders_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+    final ok = downloadCsv(filename, buildCsv(rows));
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Export is only available in the web app.')),
+      );
+    }
   }
 
   /// `iconOnly` drops the label for the narrow header, matching the same

@@ -3,16 +3,25 @@ import 'package:flutter/material.dart';
 import 'sidebar_navigation.dart';
 
 class TopHeader extends StatelessWidget {
-  final VoidCallback onNewOrderPressed;
+  final VoidCallback onActionPressed;
 
   /// The screen this header sits on. It used to always read "Dashboard", on
   /// Expenses and Payroll too.
   final String title;
 
+  /// The primary button's label and icon. Used to be hardcoded to "New
+  /// Order" everywhere, including Expenses and Payroll, where clicking it
+  /// dropped you into the New Order POS instead of doing anything relevant
+  /// to that screen.
+  final String actionLabel;
+  final IconData actionIcon;
+
   const TopHeader({
     super.key,
-    required this.onNewOrderPressed,
+    required this.onActionPressed,
     required this.title,
+    this.actionLabel = 'New Order',
+    this.actionIcon = Icons.add,
   });
 
   @override
@@ -46,7 +55,7 @@ class TopHeader extends StatelessWidget {
                 // A "Pro · Active" plan badge used to sit here. There are no
                 // plan tiers — `Shop.plan` was dropped in migration 0008 — so
                 // it measured nothing. Removed rather than wired.
-                narrow ? _iconOnlyNewOrderButton() : _labeledNewOrderButton(),
+                narrow ? _iconOnlyActionButton() : _labeledActionButton(),
                 const SizedBox(width: 12),
                 IconButton(
                   onPressed: () {},
@@ -62,13 +71,13 @@ class TopHeader extends StatelessWidget {
     );
   }
 
-  Widget _labeledNewOrderButton() {
+  Widget _labeledActionButton() {
     return ElevatedButton.icon(
-      onPressed: onNewOrderPressed,
-      icon: const Icon(Icons.add, size: 16, color: Colors.white),
-      label: const Text(
-        'New Order',
-        style: TextStyle(
+      onPressed: onActionPressed,
+      icon: Icon(actionIcon, size: 16, color: Colors.white),
+      label: Text(
+        actionLabel,
+        style: const TextStyle(
             fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
       ),
       style: ElevatedButton.styleFrom(
@@ -80,14 +89,14 @@ class TopHeader extends StatelessWidget {
     );
   }
 
-  Widget _iconOnlyNewOrderButton() {
+  Widget _iconOnlyActionButton() {
     return Tooltip(
-      message: 'New Order',
+      message: actionLabel,
       child: SizedBox(
         width: 38,
         height: 38,
         child: ElevatedButton(
-          onPressed: onNewOrderPressed,
+          onPressed: onActionPressed,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF1A4FD6),
             padding: EdgeInsets.zero,
@@ -95,7 +104,7 @@ class TopHeader extends StatelessWidget {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          child: const Icon(Icons.add, size: 18, color: Colors.white),
+          child: Icon(actionIcon, size: 18, color: Colors.white),
         ),
       ),
     );

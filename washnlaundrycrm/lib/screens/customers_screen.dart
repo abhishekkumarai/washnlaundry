@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
+import '../utils/csv.dart';
+import '../utils/csv_download.dart';
 import '../utils/navigation.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -98,8 +101,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
             return Column(
               children: [
                 narrow
-                    ? _narrowHeader(context, customers.length)
-                    : _header(context, customers.length),
+                    ? _narrowHeader(context, customers.length, filtered)
+                    : _header(context, customers.length, filtered),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
@@ -121,7 +124,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
-  Widget _header(BuildContext context, int total) {
+  Widget _header(
+      BuildContext context, int total, List<CustomerModel> filtered) {
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -146,6 +150,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             child: TextField(
               onChanged: (v) => setState(() => _searchQuery = v),
               style: const TextStyle(fontSize: 13),
+              textAlign: TextAlign.center,
               decoration: InputDecoration(
                 hintText: 'Search by name, phone, or email...',
                 hintStyle:
@@ -164,9 +169,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           ),
           const SizedBox(width: 14),
           OutlinedButton.icon(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Export is not available yet.')),
-            ),
+            onPressed: () => _exportCustomersCsv(filtered),
             icon: const Icon(Icons.download_rounded,
                 size: 16, color: Color(0xFF475569)),
             label: const Text('Export',
@@ -202,7 +205,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
   /// buttons no longer fit in one row. Stacks title+icon-only Add, then a
   /// full-width search field, then Export on its own row (only one
   /// secondary action, so no need for a scrollable filter row like Orders').
-  Widget _narrowHeader(BuildContext context, int total) {
+  Widget _narrowHeader(
+      BuildContext context, int total, List<CustomerModel> filtered) {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: const BoxDecoration(
@@ -247,6 +251,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             child: TextField(
               onChanged: (v) => setState(() => _searchQuery = v),
               style: const TextStyle(fontSize: 13),
+              textAlign: TextAlign.center,
               decoration: InputDecoration(
                 hintText: 'Search by name, phone, or email...',
                 hintStyle:
@@ -265,9 +270,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Export is not available yet.')),
-            ),
+            onPressed: () => _exportCustomersCsv(filtered),
             icon: const Icon(Icons.download_rounded,
                 size: 16, color: Color(0xFF475569)),
             label: const Text('Export',
@@ -717,6 +720,56 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Future<void> _showAddCustomer() => _showCustomerDialog();
+
+  /// Exports exactly what's on screen — the currently searched/tab-filtered
+  /// rows, not the whole customer list — same convention as Orders' Export.
+  void _exportCustomersCsv(List<CustomerModel> customers) {
+    if (customers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No customers to export.')),
+      );
+      return;
+    }
+
+    final rows = <List<Object?>>[
+      const [
+        'Name',
+        'Phone',
+        'Email',
+        'Address',
+        'Area',
+        'Total Orders',
+        'Total Spent',
+        'Due Amount',
+        'Avg Order Value',
+        'Customer Since',
+      ],
+      for (final c in customers)
+        [
+          c.name,
+          c.phone,
+          c.email,
+          c.address,
+          c.area,
+          c.totalOrders,
+          c.totalSpent,
+          c.dueAmount,
+          c.avgOrderValue,
+          c.createdAt == null
+              ? ''
+              : DateFormat('yyyy-MM-dd').format(c.createdAt!),
+        ],
+    ];
+
+    final filename =
+        'customers_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
+    final ok = downloadCsv(filename, buildCsv(rows));
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Export is only available in the web app.')),
+      );
+    }
+  }
 
   /// [existing] null adds a customer; non-null edits it in place. Same dialog
   /// either way — only the title, button label, and which provider call fires

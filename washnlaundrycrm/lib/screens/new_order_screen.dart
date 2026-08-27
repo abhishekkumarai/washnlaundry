@@ -235,6 +235,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     ),
                     child: TextField(
                       onChanged: (val) => setState(() => _searchQuery = val),
+                      textAlign: TextAlign.center,
                       decoration: const InputDecoration(
                         hintText: 'Search items or scan a tag...',
                         hintStyle:
@@ -1672,6 +1673,7 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                 child: TextField(
                   autofocus: true,
                   onChanged: (v) => setState(() => _query = v),
+                  textAlign: TextAlign.center,
                   decoration: InputDecoration(
                     hintText: 'Search by name or phone',
                     hintStyle:

@@ -17,7 +17,6 @@ class StaffScreen extends StatefulWidget {
 class _StaffScreenState extends State<StaffScreen> {
   int _selectedTab = 0; // 0: All Staff, 1: Active, 2: Inactive
   String _searchQuery = '';
-  bool _showInactive = false;
 
   static const _subTabTitles = ['All Staff', 'Active', 'Inactive'];
 
@@ -88,7 +87,7 @@ class _StaffScreenState extends State<StaffScreen> {
       bool matchesTab = true;
       switch (_selectedTab) {
         case 0: // Roster / All
-          matchesTab = _showInactive || s['status'] == 'ACTIVE';
+          matchesTab = s['status'] == 'ACTIVE';
           break;
         case 1: // Active
           matchesTab = s['status'] == 'ACTIVE';
@@ -426,33 +425,6 @@ class _StaffScreenState extends State<StaffScreen> {
           ),
           const SizedBox(width: 14),
 
-          // The label is part of the hit target, not just the box.
-          InkWell(
-            borderRadius: BorderRadius.circular(6),
-            onTap: () => setState(() => _showInactive = !_showInactive),
-            child: Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Checkbox(
-                    value: _showInactive,
-                    activeColor: const Color(0xFF1A4FD6),
-                    materialTapTargetSize:
-                        MaterialTapTargetSize.shrinkWrap,
-                    onChanged: (v) =>
-                        setState(() => _showInactive = v ?? false),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text('Show Inactive',
-                      style: TextStyle(
-                          fontSize: 13, color: Color(0xFF475569))),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-
           ElevatedButton.icon(
             onPressed: () => _showStaffModal(context),
             icon: const Icon(Icons.add, size: 16, color: Colors.white),
@@ -475,10 +447,9 @@ class _StaffScreenState extends State<StaffScreen> {
     );
   }
 
-  /// Below [SidebarNavigation.contentWideBreakpoint]: title+count+search+"Show Inactive"+Add Staff no
+  /// Below [SidebarNavigation.contentWideBreakpoint]: title+count+search+Add Staff no
   /// longer fit in one row even with the search box's own `Expanded`. Stacks
-  /// title+count+icon-only Add, then a full-width search field, then "Show
-  /// Inactive" on its own row (it fits alone at phone width).
+  /// title+count+icon-only Add, then a full-width search field.
   Widget _narrowHeaderBar() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -524,26 +495,6 @@ class _StaffScreenState extends State<StaffScreen> {
           ),
           const SizedBox(height: 10),
           _searchField(),
-          const SizedBox(height: 8),
-          InkWell(
-            borderRadius: BorderRadius.circular(6),
-            onTap: () => setState(() => _showInactive = !_showInactive),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Checkbox(
-                  value: _showInactive,
-                  activeColor: const Color(0xFF1A4FD6),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  onChanged: (v) =>
-                      setState(() => _showInactive = v ?? false),
-                ),
-                const SizedBox(width: 6),
-                const Text('Show Inactive',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -560,6 +511,7 @@ class _StaffScreenState extends State<StaffScreen> {
       child: TextField(
         onChanged: (v) => setState(() => _searchQuery = v),
         style: const TextStyle(fontSize: 13),
+        textAlign: TextAlign.center,
         decoration: const InputDecoration(
           hintText: 'Search staff...',
           hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),

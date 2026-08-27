@@ -167,7 +167,7 @@ void main() {
       await tester.pumpWidget(host(provider, const ExpensesScreen()));
       await tester.pump();
 
-      await tester.tap(find.text('Add Expense'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Add Expense'));
       await tester.pumpAndSettle();
 
       await tester.tap(_dialogSubmit());
@@ -181,7 +181,7 @@ void main() {
       await tester.pumpWidget(host(provider, const ExpensesScreen()));
       await tester.pump();
 
-      await tester.tap(find.text('Add Expense'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Add Expense'));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField).first, 'Broom');
@@ -198,7 +198,7 @@ void main() {
       await tester.pumpWidget(host(provider, const ExpensesScreen()));
       await tester.pump();
 
-      await tester.tap(find.text('Add Expense'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Add Expense'));
       await tester.pumpAndSettle();
 
       expect(find.text('Date'), findsOneWidget);
@@ -279,6 +279,99 @@ void main() {
 
       expect(find.text('Delete Expense'), findsNothing);
       expect(find.text('Commercial Detergent (50L)'), findsOneWidget);
+    });
+
+    testWidgets('search filters by title, category, or payment method',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField).first, 'detergent');
+      await tester.pump();
+
+      expect(find.text('Commercial Detergent (50L)'), findsOneWidget);
+      expect(find.text('Monthly Shop Rent'), findsNothing);
+      expect(find.text('Diesel for Delivery Van'), findsNothing);
+
+      await tester.enterText(find.byType(TextField).first, 'transport');
+      await tester.pump();
+
+      expect(find.text('Diesel for Delivery Van'), findsOneWidget);
+      expect(find.text('Commercial Detergent (50L)'), findsNothing);
+    });
+
+    testWidgets('a search matching nothing says so, scoped to the query',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField).first, 'zzzz');
+      await tester.pump();
+
+      expect(find.text('No expenses match "zzzz".'), findsOneWidget);
+    });
+
+    testWidgets(
+        'was a dead/placeholder Export — now downloads the filtered rows as CSV',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Export'));
+      await tester.pump();
+
+      // `flutter test` runs on the VM, not web, so `downloadCsv` resolves to
+      // the non-web stub.
+      expect(find.text('Export is not available yet.'), findsNothing);
+      expect(find.text('Export is only available in the web app.'), findsOneWidget);
+    });
+
+    testWidgets('Export with an empty filtered list says so instead of '
+        'downloading an empty file', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField).first, 'zzzz');
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Export'));
+      await tester.pump();
+
+      expect(find.text('No expenses to export.'), findsOneWidget);
+    });
+
+    group('responsive layout', () {
+      Future<void> pumpAt(WidgetTester tester, double width) async {
+        tester.view
+          ..physicalSize = Size(width, 1400)
+          ..devicePixelRatio = 1.0;
+        final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+        await tester.pumpWidget(host(provider, const ExpensesScreen()));
+        await tester.pump();
+      }
+
+      testWidgets('shows a labeled Add Expense and Export at wide width',
+          (tester) async {
+        await pumpAt(tester, 1600);
+
+        expect(find.widgetWithText(FilledButton, 'Add Expense'), findsOneWidget);
+        expect(find.widgetWithText(OutlinedButton, 'Export'), findsOneWidget);
+      });
+
+      testWidgets(
+          'collapses Add Expense to an icon and keeps search/Export full-width '
+          'at phone width', (tester) async {
+        await pumpAt(tester, 390);
+
+        expect(find.widgetWithText(FilledButton, 'Add Expense'), findsNothing);
+        expect(find.byIcon(Icons.add_rounded), findsWidgets);
+        expect(find.widgetWithText(OutlinedButton, 'Export'), findsOneWidget);
+        expect(find.text('Commercial Detergent (50L)'), findsOneWidget);
+      });
     });
   });
 }

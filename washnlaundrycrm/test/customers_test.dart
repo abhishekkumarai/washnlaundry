@@ -440,4 +440,40 @@ void main() {
       expect(find.text('#WA3P-00001'), findsOneWidget);
     });
   });
+
+  group('CustomersScreen Export', () {
+    testWidgets(
+        'was a placeholder snackbar — now exports the filtered rows as CSV',
+        (tester) async {
+      // `flutter test` runs on the VM, not web, so `downloadCsv` resolves to
+      // the non-web stub and reports it couldn't trigger a real download —
+      // this pins that the button is wired up (builds the CSV, calls the
+      // download hook) rather than always showing "Export is not available
+      // yet."
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Export'));
+      await tester.pump();
+
+      expect(find.text('Export is not available yet.'), findsNothing);
+      expect(find.text('Export is only available in the web app.'), findsOneWidget);
+    });
+
+    testWidgets('a search matching nobody says so instead of exporting nothing',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField).first, 'zzzz');
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Export'));
+      await tester.pump();
+
+      expect(find.text('No customers to export.'), findsOneWidget);
+    });
+  });
 }

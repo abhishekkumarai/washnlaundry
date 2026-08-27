@@ -4,11 +4,22 @@ import 'package:provider/provider.dart';
 import 'package:washnlaundrycrm/models/garment_model.dart';
 import 'package:washnlaundrycrm/providers/app_provider.dart';
 import 'package:washnlaundrycrm/screens/payroll_screen.dart';
+import 'package:washnlaundrycrm/widgets/top_header.dart';
 
 Widget host(AppProvider provider, Widget child) => ChangeNotifierProvider.value(
       value: provider,
       child: MaterialApp(home: child),
     );
+
+const _monthNames = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+String _currentMonthLabel() {
+  final now = DateTime.now();
+  return '${_monthNames[now.month - 1]} ${now.year}';
+}
 
 void main() {
   setUp(() {
@@ -147,7 +158,13 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Record Payment').first);
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byType(TextField).first, '0');
+      // Scoped to the dialog: the page behind it now also has a search
+      // `TextField` (Payroll's own search box), so an unscoped `.first`
+      // would grab that one instead.
+      await tester.enterText(
+          find.descendant(
+              of: find.byType(AlertDialog), matching: find.byType(TextField)).first,
+          '0');
       await tester.tap(find.widgetWithText(FilledButton, 'Record Payment'));
       await tester.pump();
 
@@ -162,7 +179,8 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Record Payment').first);
       await tester.pumpAndSettle();
 
-      final field = tester.widget<TextField>(find.byType(TextField).first);
+      final field = tester.widget<TextField>(find.descendant(
+          of: find.byType(AlertDialog), matching: find.byType(TextField)).first);
       expect(field.controller!.text, '5600');
     });
 
@@ -187,6 +205,95 @@ void main() {
       await tester.tap(find.text('Close'));
       await tester.pumpAndSettle();
       expect(find.text('Ramesh Kumar — Payment History'), findsNothing);
+    });
+
+    testWidgets(
+        'the header "New Payroll" button opens a staff picker, not the New '
+        'Order screen', (tester) async {
+      // The header used to be a shared TopHeader hardcoded to "New Order",
+      // which on this screen dropped the user into the New Order POS instead
+      // of doing anything payroll-related.
+      final provider = AppProvider(autoLoad: false)..seedForTest(payroll: summary);
+      await tester.pumpWidget(host(provider, const PayrollScreen()));
+      await tester.pump();
+
+      // "New Order" still legitimately appears as a sidebar nav item at this
+      // width — scope the check to the header itself, whose button used to
+      // be a shared, hardcoded "New Order".
+      final header = find.byType(TopHeader);
+      expect(find.descendant(of: header, matching: find.text('New Order')),
+          findsNothing);
+      expect(find.descendant(of: header, matching: find.text('New Payroll')),
+          findsOneWidget);
+
+      await tester.tap(find.descendant(of: header, matching: find.text('New Payroll')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('New Payroll — ${_currentMonthLabel()}'), findsOneWidget);
+      // Both names also still show in the row list behind the dialog.
+      expect(find.text('Ramesh Kumar'), findsWidgets);
+      expect(find.text('Sunil Paswan'), findsWidgets);
+
+      await tester.tap(find.descendant(
+          of: find.byType(AlertDialog), matching: find.text('Sunil Paswan')));
+      await tester.pumpAndSettle();
+
+      // Sunil is fully PAID, so the record-payment dialog opens prefilled
+      // with nothing outstanding.
+      expect(find.text('Pay Sunil Paswan'), findsOneWidget);
+      final field = tester.widget<TextField>(find.descendant(
+          of: find.byType(AlertDialog), matching: find.byType(TextField)).first);
+      expect(field.controller!.text, '0');
+    });
+
+    testWidgets('"New Payroll" with no payroll yet says so instead of opening '
+        'an empty dialog', (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(payroll: const PayrollSummaryModel());
+      await tester.pumpWidget(host(provider, const PayrollScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('New Payroll'));
+      await tester.pump();
+
+      expect(
+          find.text('No staff payroll for this month yet. Mark attendance first.'),
+          findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('search filters rows by staff name or role', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(payroll: summary);
+      await tester.pumpWidget(host(provider, const PayrollScreen()));
+      await tester.pump();
+
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Sunil Paswan'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).first, 'ramesh');
+      await tester.pump();
+
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Sunil Paswan'), findsNothing);
+
+      await tester.enterText(find.byType(TextField).first, 'steam press');
+      await tester.pump();
+
+      expect(find.text('Ramesh Kumar'), findsNothing);
+      expect(find.text('Sunil Paswan'), findsOneWidget);
+    });
+
+    testWidgets('a search matching nobody says so, not "no payroll"',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(payroll: summary);
+      await tester.pumpWidget(host(provider, const PayrollScreen()));
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField).first, 'zzzz');
+      await tester.pump();
+
+      expect(find.text('No staff match "zzzz".'), findsOneWidget);
+      expect(find.text('No payroll for this month.'), findsNothing);
     });
 
     group('responsive layout', () {
