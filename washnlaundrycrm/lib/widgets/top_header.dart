@@ -3,7 +3,12 @@ import 'package:flutter/material.dart';
 import 'sidebar_navigation.dart';
 
 class TopHeader extends StatelessWidget {
-  final VoidCallback onActionPressed;
+  /// Null omits the primary button entirely — for a screen whose own body
+  /// already has a dedicated control for the same action, so the header
+  /// would otherwise render a second, redundant one. Expenses is the one
+  /// case of this today: its in-page "Add Expense" button predates this
+  /// header ever having an action at all, so the header doesn't get one.
+  final VoidCallback? onActionPressed;
 
   /// The screen this header sits on. It used to always read "Dashboard", on
   /// Expenses and Payroll too.
@@ -12,13 +17,13 @@ class TopHeader extends StatelessWidget {
   /// The primary button's label and icon. Used to be hardcoded to "New
   /// Order" everywhere, including Expenses and Payroll, where clicking it
   /// dropped you into the New Order POS instead of doing anything relevant
-  /// to that screen.
+  /// to that screen. Unused when [onActionPressed] is null.
   final String actionLabel;
   final IconData actionIcon;
 
   const TopHeader({
     super.key,
-    required this.onActionPressed,
+    this.onActionPressed,
     required this.title,
     this.actionLabel = 'New Order',
     this.actionIcon = Icons.add,
@@ -55,8 +60,10 @@ class TopHeader extends StatelessWidget {
                 // A "Pro · Active" plan badge used to sit here. There are no
                 // plan tiers — `Shop.plan` was dropped in migration 0008 — so
                 // it measured nothing. Removed rather than wired.
-                narrow ? _iconOnlyActionButton() : _labeledActionButton(),
-                const SizedBox(width: 12),
+                if (onActionPressed != null) ...[
+                  narrow ? _iconOnlyActionButton() : _labeledActionButton(),
+                  const SizedBox(width: 12),
+                ],
                 IconButton(
                   onPressed: () {},
                   icon: const Icon(Icons.help_outline_rounded,
@@ -71,6 +78,7 @@ class TopHeader extends StatelessWidget {
     );
   }
 
+  /// Only ever built when [onActionPressed] is non-null — see the call site.
   Widget _labeledActionButton() {
     return ElevatedButton.icon(
       onPressed: onActionPressed,

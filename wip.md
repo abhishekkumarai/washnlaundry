@@ -1691,3 +1691,79 @@ Services' "Show Inactive" toggle as if it still existed. Neither affected
 behavior — comment-only — but both were corrected before this diff was
 committed. Re-ran the full suite after those fixes: Flutter 422/422,
 `flutter analyze` clean, same baseline throughout.
+
+## Session of 2026-08-27 — Payroll/Expenses header fix, then a redundant-button recheck
+
+Started from a `todo.md` the user had been building up across the session:
+`TopHeader`'s primary button was hardcoded "New Order" on every screen that
+embeds it (Dashboard, Payroll, Expenses), so clicking it on Payroll or
+Expenses incorrectly opened the New Order POS. Fixed by giving `TopHeader`
+a per-screen `actionLabel`/`actionIcon`/`onActionPressed` instead of a fixed
+"New Order": Payroll got "New Payroll" (opens a staff picker, then the
+existing per-row record-payment dialog for whoever's picked), Expenses got
+"Add Expense" wired to the same handler its own in-page button already
+used. Also folded in, across the same session: the Staff "Show Inactive"
+checkbox removed (mirroring the Services fix below — the "All Staff" tab
+now just filters on `status == 'ACTIVE'`, inactive staff stay reachable via
+the "Inactive" sub-tab); every search bar's text centered app-wide; a real
+CSV export added to Orders and Customers (new `lib/utils/csv.dart` +
+`csv_download.dart`, web-only download trigger via `package:web` with a
+VM-safe stub); and, after being asked to review Expenses "based on your
+expertise," two more gaps found and fixed there — no CSV export at all
+(added, same utils) and no narrow-width responsive header (added, matching
+every other list screen's icon-only-collapse-below-`contentWideBreakpoint`
+pattern). Also fixed: Reports' Net Profit indicator (KPI card icon, gauge
+ring, margin %, and the ₹ figure) was hardcoded green regardless of sign —
+now red when `netProfit < 0`, the same convention the change-vs-last-period
+label underneath it already used. Full suite after that round: 438/438.
+Two commits, pushed to `origin/main`.
+
+### The Expenses "Add Expense" fix above was itself a redundant duplicate
+
+The user then asked to "remove redundant 2nd payroll" and, when the same
+ask was raised for Expenses, said to recheck for the pattern across every
+screen before fixing anything — this codebase already has two prior
+sessions' worth of history on exactly this mistake (Staff's KPI cards had a
+second, undocumented `onTap` duplicating the sub-tab bar's filtering,
+removed pre-2026-08-19; Services' header "+ New Service" duplicated the
+pre-existing "+ Add Item" link inside the items grid, removed 2026-08-26)
+— so "wire the header button to whatever the page already does" is a known
+trap, not a one-off guess.
+
+An audit of every screen (grepping `TopHeader` usages and every
+hand-rolled header for two always-simultaneously-visible controls sharing
+an identical handler) found exactly one real instance — and it was the fix
+from earlier in this same session: Expenses had *two* header layers
+(`TopHeader`'s new "Add Expense" action, plus the pre-existing in-page
+`_titleRow()` button) both calling `_showAddExpense`, always visible
+together at every width. Payroll's "New Payroll" is not the same pattern —
+it opens a staff picker before landing on the record-payment dialog, a
+different, page-level action from any single row's "Record Payment"
+(scoped to one staff member, no picker) — so nothing there needed
+changing. Dashboard, Orders, Customers, Staff, Attendance, Reports,
+Services, New Order, Order Detail, Customer Detail, Settings, Scan, and
+Login were all clean: each hand-rolled header renders exactly one control
+per action, split into mutually exclusive wide/narrow branches.
+
+Fixed the one real case the same way the Services and Staff precedents
+did — kept the pre-existing control, removed the newly-introduced
+duplicate, rather than merging both into one handler. `TopHeader.
+onActionPressed` is now nullable (`VoidCallback?`); when null, the header
+renders just the title and the help icon, no action button at all.
+`expenses_screen.dart`'s `TopHeader` call dropped `actionLabel`/
+`actionIcon`/`onActionPressed` entirely — Dashboard and Payroll are
+unaffected, since they still pass a real callback.
+
+`top_header_test.dart` gained `'omits the action button entirely when
+onActionPressed is null'`. `expenses_test.dart` gained `'the header has no
+Add Expense button of its own — the in-page one is the only control'`
+(asserts exactly one `FilledButton` labeled "Add Expense" and zero
+`ElevatedButton`s with that label, since `TopHeader`'s action renders as an
+`ElevatedButton.icon`), and its `_dialogSubmit()` helper's doc comment —
+which used to justify scoping to the dialog by pointing at "the header's
+'Add Expense' button" — was reworded now that the header has none; the
+scoping itself is still needed, just for the in-page button instead. Full
+suite after: 440/440 (438 + 2 new), `flutter analyze` clean. Verified live
+in the rebuilt Docker frontend: the Expenses header now reads just
+"Expenses" plus the help icon, and the in-page "Add Expense" button still
+opens the same dialog correctly.

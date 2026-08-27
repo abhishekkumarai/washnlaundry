@@ -10,9 +10,11 @@ Widget host(AppProvider provider, Widget child) => ChangeNotifierProvider.value(
       child: MaterialApp(home: child),
     );
 
-/// The dialog's submit button. Scoped to the dialog because the header's
-/// "Add Expense" button carries the same label, and the sidebar's Attendance
-/// item carries the same calendar icon.
+/// The dialog's submit button. Scoped to the dialog because the in-page
+/// "Add Expense" button behind it (in `_titleRow`) carries the same label —
+/// `TopHeader` deliberately has no button of its own here, since that in-page
+/// one already existed (see `top_header_test.dart`'s "omits the action
+/// button" test).
 Finder _dialogSubmit() => find.descendant(
       of: find.byType(AlertDialog),
       matching: find.widgetWithText(FilledButton, 'Add Expense'),
@@ -66,6 +68,21 @@ void main() {
   ];
 
   group('ExpensesScreen', () {
+    testWidgets(
+        'the header has no Add Expense button of its own — the in-page one '
+        'is the only control', (tester) async {
+      // TopHeader used to render a second "Add Expense" button that did the
+      // exact same thing as the pre-existing in-page one — a redundant
+      // duplicate, the same pattern already caught and removed on Services
+      // and Staff (see wip.md). Only one should exist now.
+      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pump();
+
+      expect(find.widgetWithText(FilledButton, 'Add Expense'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Add Expense'), findsNothing);
+    });
+
     testWidgets('renders the ledger from the provider, not a literal',
         (tester) async {
       // The screen used to build four fake expenses inside build().

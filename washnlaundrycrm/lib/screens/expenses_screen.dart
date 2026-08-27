@@ -75,12 +75,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       body: AppShell(
         body: Column(
           children: [
-            TopHeader(
-              title: 'Expenses',
-              actionLabel: 'Add Expense',
-              actionIcon: Icons.add_rounded,
-              onActionPressed: _showAddExpense,
-            ),
+            // No action button here — the in-page "Add Expense" button in
+            // _titleRow below is the one, pre-existing control for this;
+            // giving the header its own copy would just be a second button
+            // doing the same job (the same redundant-duplicate pattern this
+            // codebase has already caught and removed on Services and
+            // Staff — see wip.md).
+            const TopHeader(title: 'Expenses'),
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {

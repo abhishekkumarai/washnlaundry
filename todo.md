@@ -128,16 +128,32 @@
   - Added widget tests: search filtering, empty-search-result message,
     Export (dead-button-fixed, empty-list message), and a new
     `responsive layout` group covering the narrow-width stacking.
-- [ ] Payroll page: "remove redundant 2nd payroll" — user's exact wording;
-      **still needs clarification, not started**. Candidates: the "New
-      Payroll" header button added earlier this session vs. each row's own
-      "Record Payment" action; or something else not yet identified.
-- [ ] Expenses page: "redundant 2nd" control — same situation as Payroll
-      above, **still needs clarification, not started**. Best guess by
-      analogy: the header's "Add Expense" button (added when `TopHeader`
-      was made configurable) duplicates the in-page "Add Expense" button,
-      which opens the identical dialog — but this is a guess, not
-      confirmed with the user.
+- [x] "Remove redundant 2nd payroll/Expenses" — resolved by an audit of
+      every screen, not just Payroll/Expenses (see `wip.md`'s "Session of
+      2026-08-27" for the full writeup).
+  - **Payroll: not actually redundant, nothing changed.** "New Payroll"
+    opens a staff picker before landing on the record-payment dialog — a
+    different, page-level action from any single row's "Record Payment"
+    (scoped to one staff member, no picker involved).
+  - **Expenses: confirmed redundant, fixed.** The "Add Expense" fix earlier
+    in this same session had itself created a duplicate — `TopHeader`'s new
+    action button and the pre-existing in-page `_titleRow()` button both
+    called `_showAddExpense`, always visible together. This is the same
+    mistake two earlier sessions already caught and fixed elsewhere (Staff
+    KPI cards duplicating the sub-tab filter; Services' header "+ New
+    Service" duplicating "+ Add Item") — codebase convention is to remove
+    the newly-introduced duplicate and keep the pre-existing control, not
+    merge both into one handler. `TopHeader.onActionPressed` is now
+    nullable; Expenses' `TopHeader` call passes none, so the header renders
+    just the title + help icon and the in-page "Add Expense" button is the
+    only control.
+  - Every other screen (Dashboard, Orders, Customers, Staff, Attendance,
+    Reports, Services, New Order, Order Detail, Customer Detail, Settings,
+    Scan, Login) audited clean — no redundant duplicates found.
+  - Added `top_header_test.dart`'s "omits the action button entirely when
+    onActionPressed is null" and `expenses_test.dart`'s "the header has no
+    Add Expense button of its own". Full suite: 440/440. Verified live in
+    the rebuilt Docker frontend.
 - [x] Reports page: Net Profit indicator now turns red when negative, green
       when positive — was hardcoded green regardless of sign.
   - `reports_screen.dart` L441-443 (KPI card's icon/accent color) and the

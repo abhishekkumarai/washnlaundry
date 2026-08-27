@@ -44,4 +44,19 @@ void main() {
     await tester.tap(find.byIcon(Icons.add));
     expect(pressed, isTrue);
   });
+
+  testWidgets(
+      'omits the action button entirely when onActionPressed is null',
+      (tester) async {
+    // Expenses' own body already has an "Add Expense" button — passing one
+    // here too would just be a second control doing the same job.
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(body: TopHeader(title: 'Expenses')),
+    ));
+
+    expect(find.text('New Order'), findsNothing);
+    expect(find.byIcon(Icons.add), findsNothing);
+    expect(find.text('Expenses'), findsOneWidget);
+    expect(find.byIcon(Icons.help_outline_rounded), findsOneWidget);
+  });
 }
