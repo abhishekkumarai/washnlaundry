@@ -19,7 +19,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
   int _selectedTopTab = 0; // 0: Items, 1: Service Areas, 2: Pickup, 3: Delivery
   int _selectedCategoryIndex = 0;
   String _searchQuery = '';
-  bool _showInactive = false;
 
   final TextEditingController _areaController = TextEditingController();
 
@@ -130,7 +129,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
     _currentItems = provider.garments
         .where((g) => g.categoryName == categoryName)
-        .where((g) => _showInactive || g.isActive)
+        .where((g) => g.isActive)
         .where((g) => query.isEmpty || g.name.toLowerCase().contains(query))
         .map((g) => <String, dynamic>{
               'id': g.id,
@@ -206,20 +205,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
             style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
           ),
           const Spacer(),
-          if (_selectedTopTab == 0) ...[
-            Row(
-              children: [
-                Checkbox(
-                  value: _showInactive,
-                  activeColor: const Color(0xFF1A4FD6),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  onChanged: (v) => setState(() => _showInactive = v ?? false),
-                ),
-                const Text('Show Inactive',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
-              ],
-            ),
-            const SizedBox(width: 12),
+          if (_selectedTopTab == 0)
             Container(
               width: 180,
               height: 36,
@@ -230,6 +216,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
               ),
               child: TextField(
                 onChanged: (v) => setState(() => _searchQuery = v),
+                textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 13),
                 decoration: const InputDecoration(
                   hintText: 'Search items...',
@@ -241,38 +228,14 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            _headerButton(Icons.download_outlined, 'Download'),
-            const SizedBox(width: 8),
-            _headerButton(Icons.upload_outlined, 'Import'),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              onPressed: () => _showAddItemModal(context),
-              icon: const Icon(Icons.add, size: 16, color: Colors.white),
-              label: const Text('+ New Service',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1A4FD6),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 
-  /// Below [SidebarNavigation.contentWideBreakpoint]: title+count+icon-only "New Service" on one row,
-  /// full-width search below (Items tab only), and a horizontal-scroll row
-  /// for Show Inactive/Download/Import — same shape as Orders'/Staff's narrow
-  /// headers.
+  /// Below [SidebarNavigation.contentWideBreakpoint]: title+count on one row,
+  /// full-width search below (Items tab only) — same shape as Orders'/Staff's
+  /// narrow headers.
   Widget _buildNarrowHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -299,23 +262,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       fontSize: 12, color: Color(0xFF94A3B8)),
                 ),
               ),
-              if (_selectedTopTab == 0)
-                SizedBox(
-                  width: 38,
-                  height: 38,
-                  child: ElevatedButton(
-                    onPressed: () => _showAddItemModal(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1A4FD6),
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
-                    ),
-                    child:
-                        const Icon(Icons.add, size: 18, color: Colors.white),
-                  ),
-                ),
             ],
           ),
           if (_selectedTopTab == 0) ...[
@@ -329,6 +275,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
               ),
               child: TextField(
                 onChanged: (v) => setState(() => _searchQuery = v),
+                textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 13),
                 decoration: const InputDecoration(
                   hintText: 'Search items...',
@@ -340,60 +287,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 36,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  InkWell(
-                    borderRadius: BorderRadius.circular(6),
-                    onTap: () =>
-                        setState(() => _showInactive = !_showInactive),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Checkbox(
-                          value: _showInactive,
-                          activeColor: const Color(0xFF1A4FD6),
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          onChanged: (v) =>
-                              setState(() => _showInactive = v ?? false),
-                        ),
-                        const SizedBox(width: 4),
-                        const Text('Show Inactive',
-                            style: TextStyle(
-                                fontSize: 13, color: Color(0xFF475569))),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  _headerButton(Icons.download_outlined, 'Download'),
-                  const SizedBox(width: 8),
-                  _headerButton(Icons.upload_outlined, 'Import'),
-                ],
-              ),
-            ),
           ],
         ],
-      ),
-    );
-  }
-
-  Widget _headerButton(IconData icon, String label) {
-    return OutlinedButton.icon(
-      onPressed: () {},
-      icon: Icon(icon, size: 15, color: const Color(0xFF475569)),
-      label: Text(label,
-          style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF334155),
-              fontWeight: FontWeight.w500)),
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }

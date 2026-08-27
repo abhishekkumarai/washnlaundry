@@ -1589,3 +1589,105 @@ Worth deleting once confirmed nothing else depends on it.
 
 Committed as one commit covering both the recovered session's work and this
 session's cleanup, since the two were verified and finished together.
+
+---
+
+## Session of 2026-08-26, continued — icon-only New Order, Services header cleanup
+
+Same session, after the tablet-layout commit above landed. Two follow-up asks
+from the user, live-testing both Docker web and a real Android emulator as
+each change went in — this is the diff that was left uncommitted afterward
+(picked up and finished in the next session, see below).
+
+### Docker + Android both brought up as a baseline first
+
+Asked to "restart the docker and android app." Rebuilt both containers
+(the running images predated the tablet-layout commit), then booted the
+`Medium_Phone_API_35` emulator and built/installed the debug APK with
+`--dart-define=API_BASE_URL=http://10.0.2.2:8000/api` so it talks to the
+same Dockerized backend. It landed on the Dashboard showing the same real
+numbers as the web build, and the new drawer/hamburger layout from the
+tablet-responsive work rendered correctly at real phone width — the first
+time that layout had been seen live rather than only through
+`tester.view.physicalSize`.
+
+### `TopHeader`'s New Order button collapses to icon-only
+
+Asked to make "+New Order" on Dashboard icon-only, "and similarly at other
+places too" — `TopHeader` is the shared widget behind Dashboard, Payroll and
+Expenses (Orders, Staff, Services, Customer Detail already had their own
+icon-only treatment for their own add buttons), so fixing the one shared
+widget covered all three in one change. `top_header.dart`'s `build` now
+wraps its button row in a `LayoutBuilder` and picks
+`_iconOnlyNewOrderButton()` vs. `_labeledNewOrderButton()` off
+`constraints.maxWidth < SidebarNavigation.contentWideBreakpoint` — the same
+760px threshold every other screen's narrow header already uses, not a new
+one.
+
+New `test/top_header_test.dart`: labeled button + tap fires the callback at
+1400px, icon-only + tooltip "New Order" + tap still fires the callback at
+600px. Full suite after: Flutter 422/422 (420 + 2 new), `flutter analyze`
+clean (same 70-issue info-level baseline). Live-verified on the Android
+emulator: rebuilt, reinstalled, confirmed the button renders icon-only next
+to the help icon at phone width and tapping it navigates to New Order.
+Separately confirmed on Docker web too, once asked — this is plain shared
+Dart with no `kIsWeb`/`Platform` branching, so there was never a second
+"web version" to implement; rebuilding the frontend image and grepping the
+served `main.dart.js` for the new tooltip string was enough to confirm the
+same compiled code is what's live.
+
+### Services header simplified — the "same button" report was two different buttons
+
+Follow-up, with phone screenshots: "in the services section, the new order
+should be the same as dashboard... is it not getting imported everywhere."
+Turned out to be a real UI inconsistency, but not the one first assumed —
+the Services header's blue "+" is **"New Service"** (adds a catalogue item),
+a completely different action from Dashboard's "New Order," which only
+*looked* like the same button (same `0xFF1A4FD6` blue, same 38×38 icon-only
+shape at narrow width, just an 8px vs. 10px corner radius and no tooltip).
+That near-identical styling with no tooltip to disambiguate is what read as
+"the same button, inconsistently wired."
+
+Rather than reconcile two visually-similar-but-different buttons, removed
+the redundant one: the header's own "+ New Service" (plus the Download and
+Import buttons beside it, which never did anything, and the "Show Inactive"
+checkbox) are gone from both `_buildHeader` (wide) and `_buildNarrowHeader`
+(phone-width) in `services_screen.dart`. The per-category **"+ Add Item"**
+link that already sits next to "Items (N)" inside the items grid
+(`services_screen.dart:545`, pre-existing, calls the same
+`_showAddItemModal`) is now the only way to add an item — one control
+instead of two doing overlapping jobs. Inactive items are now
+**unconditionally** hidden from the Items list (`_currentItems`'s filter
+dropped `_showInactive ||`, keeping just `g.isActive`) rather than hidden
+behind a checkbox nobody could tell was linked to anything, since removing
+the toggle meant there was no longer a way to reveal them from this screen
+at all. `_showInactive` and the now-unused `_headerButton` helper were
+deleted; a stale doc comment above `_buildNarrowHeader` describing the
+removed Download/Import row was rewritten to match.
+
+`services_test.dart`: the catalogue gained a third, always-active item (so
+"the active ones still render" has something to assert against once the
+inactive-toggle path is gone), `'inactive items are hidden until Show
+Inactive is ticked'` became `'inactive items are always hidden from the
+Items list'` (dropped the checkbox-tap steps entirely), and the two
+responsive-layout tests asserting `'+ New Service'` findsOneWidget/findsNothing
+were cut down to just asserting the category rail's own wide/narrow
+behavior. Full suite after: Flutter 422/422, `flutter analyze` clean (same
+baseline). Live-verified on both the Android emulator (narrow: header reads
+just "Services · 7 Items · 79 items" plus a full-width, centered-placeholder
+search box — no +, Download, Import, or Show Inactive; "+ Add Item" still
+opens the modal, pre-scoped to the category you're on) and Docker web at
+desktop width (same header shape, search right-aligned instead of
+full-width).
+
+### Left uncommitted, picked up next session
+
+The session ended without a commit or a wip.md write-up — this section was
+written after the fact, once the next session found the diff still sitting
+in the working tree. That session also caught and fixed two stale comments
+this one left behind: `app_provider.dart`'s `loadDataFromBackend` and
+`new_order_screen.dart`'s `filteredItems` both had doc comments referring to
+Services' "Show Inactive" toggle as if it still existed. Neither affected
+behavior — comment-only — but both were corrected before this diff was
+committed. Re-ran the full suite after those fixes: Flutter 422/422,
+`flutter analyze` clean, same baseline throughout.

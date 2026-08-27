@@ -157,7 +157,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     // Inactive items (or items whose whole category is inactive) stay
     // orderable if already in the cart (the cart reads off the full
     // `garments` list, not this one) — only the browsing grid hides them,
-    // matching the "Show Inactive" filter on the Services screen.
+    // matching Services' Items list, which now always hides inactive items
+    // too rather than offering a toggle to reveal them.
     final filteredItems = garments.where((item) {
       final matchesCategory =
           _selectedCategory.isEmpty || item.categoryName == _selectedCategory;

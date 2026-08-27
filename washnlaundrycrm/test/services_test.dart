@@ -52,6 +52,16 @@ final _catalogue = [
     'turnaround_days': 1,
     'is_active': false,
   }),
+  GarmentItemModel.fromJson({
+    'id': 4,
+    'category': 1,
+    'category_name': 'Ironing',
+    'name': 'Sofa Cover',
+    'price': 300.0,
+    'unit': 'SET',
+    'turnaround_days': 1,
+    'is_active': true,
+  }),
 ];
 
 AppProvider _seeded({
@@ -94,9 +104,6 @@ void main() {
     testWidgets('price tags and chips use each item own unit', (tester) async {
       await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
       await tester.pump();
-      // Retired Item (the 'set'-unit row) is inactive and hidden by default.
-      await tester.tap(find.byType(Checkbox));
-      await tester.pump();
 
       // The card used to hardcode "/ pc" and "Per piece" for every row.
       expect(find.text(' / pc'), findsWidgets);
@@ -105,24 +112,13 @@ void main() {
       expect(find.text('Per kg'), findsOneWidget);
     });
 
-    testWidgets('inactive items are hidden until Show Inactive is ticked',
+    testWidgets('inactive items are always hidden from the Items list',
         (tester) async {
-      // Both the item-level filter and the "Show Inactive" checkbox used to
-      // do nothing — every item showed regardless, so there was no way to
-      // actually confirm disabling one had any visible effect.
       await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
       await tester.pump();
 
       expect(find.text('Retired Item'), findsNothing);
       expect(find.text('Inactive'), findsNothing);
-
-      await tester.tap(find.byType(Checkbox));
-      await tester.pump();
-
-      expect(find.text('Retired Item'), findsOneWidget);
-      expect(find.text('Inactive'), findsOneWidget);
-      // Two active item badges, plus the category header's own Active pill.
-      expect(find.text('Active'), findsNWidgets(3));
     });
 
     testWidgets('an inactive category reads Inactive, not a hardcoded Active',
@@ -220,7 +216,7 @@ void main() {
     Future<void> openModal(WidgetTester tester) async {
       await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
       await tester.pump();
-      await tester.tap(find.text('+ New Service'));
+      await tester.tap(find.text('Add Item'));
       await tester.pumpAndSettle();
     }
 
@@ -412,21 +408,17 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('shows the category rail and labeled New Service at wide width',
-        (tester) async {
+    testWidgets('shows the category rail at wide width', (tester) async {
       await pumpAt(tester, 1900);
 
       expect(find.text('SERVICE CATEGORIES'), findsOneWidget);
-      expect(find.text('+ New Service'), findsOneWidget);
     });
 
-    testWidgets(
-        'collapses the category rail to chips and New Service to an icon '
-        'at phone width', (tester) async {
+    testWidgets('collapses the category rail to chips at phone width',
+        (tester) async {
       await pumpAt(tester, 390);
 
       expect(find.text('SERVICE CATEGORIES'), findsNothing);
-      expect(find.text('+ New Service'), findsNothing);
       expect(find.byType(ChoiceChip), findsWidgets);
       expect(find.text('Ironing'), findsWidgets);
     });
