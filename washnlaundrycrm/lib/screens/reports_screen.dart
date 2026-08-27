@@ -438,9 +438,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
           Icons.receipt_long_outlined,
           const Color(0xFFEF4444),
           const Color(0xFFFEF2F2)),
-      _buildMetricCard('Net Profit', _money(r.netProfit), marginSub,
-          Icons.account_balance_wallet_outlined, const Color(0xFF10B981),
-          const Color(0xFFECFDF5)),
+      _buildMetricCard(
+          'Net Profit',
+          _money(r.netProfit),
+          marginSub,
+          Icons.account_balance_wallet_outlined,
+          r.netProfit >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+          r.netProfit >= 0 ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2)),
       _buildMetricCard(
           'Orders',
           '${r.orderCount}',
@@ -583,7 +587,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
           );
 
-    // Net Profit gauge
+    // Net Profit gauge — one color for the whole panel (ring, margin %, and
+    // the profit figure itself), so a loss reads as loss everywhere at once
+    // rather than green optimism next to a negative number.
+    final profitColor =
+        r.netProfit >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
     final netProfitPanel = Container(
             height: 290,
             padding: const EdgeInsets.all(20),
@@ -614,8 +622,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           value: ((r.margin ?? 0) / 100).clamp(0.0, 1.0),
                           strokeWidth: 14,
                           backgroundColor: const Color(0xFFF1F5F9),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFF10B981)),
+                          valueColor: AlwaysStoppedAnimation<Color>(profitColor),
                         ),
                       ),
                       Column(
@@ -623,10 +630,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         children: [
                           Text(
                             r.margin == null ? '—' : '${r.margin!.round()}%',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFF10B981)),
+                                color: profitColor),
                           ),
                           const Text('margin',
                               style: TextStyle(
@@ -641,10 +648,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   child: Column(
                     children: [
                       Text(_money(r.netProfit),
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF10B981))),
+                              color: profitColor)),
                       Text(
                         ReportsModel.changeLabel(r.netProfitChange) ??
                             'no prior period',

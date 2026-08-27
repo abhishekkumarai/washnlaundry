@@ -157,6 +157,56 @@ void main() {
       );
     });
 
+    testWidgets(
+        'Net Profit turns red when the shop ran at a loss, not permanently green',
+        (tester) async {
+      // Net Profit's icon, gauge ring, margin %, and figure used to be a
+      // hardcoded green regardless of sign — a shop running at a loss still
+      // saw the "healthy" color.
+      const loss = ReportsModel(
+        revenue: 1000,
+        expenses: 1500,
+        netProfit: -500,
+        margin: -50,
+      );
+      final provider = AppProvider(autoLoad: false)..seedForTest(reports: loss);
+      await tester.pumpWidget(host(provider, const ReportsScreen()));
+      await tester.pump();
+
+      final cardIcon = tester.widget<Icon>(
+          find.byIcon(Icons.account_balance_wallet_outlined));
+      expect(cardIcon.color, const Color(0xFFEF4444));
+
+      final ring = tester.widget<CircularProgressIndicator>(
+          find.byType(CircularProgressIndicator));
+      expect(
+        (ring.valueColor as AlwaysStoppedAnimation<Color>).value,
+        const Color(0xFFEF4444),
+      );
+
+      final marginText =
+          tester.widget<Text>(find.text('-50%').first);
+      expect(marginText.style?.color, const Color(0xFFEF4444));
+    });
+
+    testWidgets('Net Profit stays green when the shop is profitable',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(reports: report);
+      await tester.pumpWidget(host(provider, const ReportsScreen()));
+      await tester.pump();
+
+      final cardIcon = tester.widget<Icon>(
+          find.byIcon(Icons.account_balance_wallet_outlined));
+      expect(cardIcon.color, const Color(0xFF10B981));
+
+      final ring = tester.widget<CircularProgressIndicator>(
+          find.byType(CircularProgressIndicator));
+      expect(
+        (ring.valueColor as AlwaysStoppedAnimation<Color>).value,
+        const Color(0xFF10B981),
+      );
+    });
+
     testWidgets('Print and Export PDF stay disabled', (tester) async {
       // Neither has been captured from the live app, so there is nothing to
       // clone them against. Disabled beats a dead button.
