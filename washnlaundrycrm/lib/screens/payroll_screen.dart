@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
 import '../widgets/load_state.dart';
@@ -121,7 +122,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _titleRow(narrow),
+              _titleRow(narrow, provider),
               const SizedBox(height: 20),
               LayoutBuilder(
                 builder: (context, kpiConstraints) {
@@ -211,10 +212,68 @@ class _PayrollScreenState extends State<PayrollScreen> {
   /// screen has never shown paise and showing them now would only add noise.
   static String _money(double? value) => (value ?? 0).round().toString();
 
-  Widget _titleRow(bool narrow) {
-    const title = Text(
-        'Calculate staff wages, attendance payout, and salary records',
-        style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)));
+  Widget _titleRow(bool narrow, AppProvider provider) {
+    final title = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Flexible(
+          child: Text(
+              'Calculate staff wages, attendance payout, and salary records',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+        ),
+        IconButton(
+          onPressed: _showHelp,
+          icon: const Icon(Icons.help_outline_rounded,
+              size: 16, color: Color(0xFF94A3B8)),
+          tooltip: 'How Payroll is calculated',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+        ),
+      ],
+    );
+    final hasPending =
+        (provider.payroll?.entries ?? const <PayrollEntryModel>[])
+            .any((e) => e.pendingAmount > 0);
+
+    Widget advanceAndPayAll({required bool compact}) => Row(
+          mainAxisSize: compact ? MainAxisSize.max : MainAxisSize.min,
+          children: [
+            if (compact)
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showAddAdvance(provider),
+                  icon: const Icon(Icons.add_card_rounded, size: 16),
+                  label: const Text('Advance'),
+                ),
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: () => _showAddAdvance(provider),
+                icon: const Icon(Icons.add_card_rounded, size: 16),
+                label: const Text('Add advance'),
+              ),
+            const SizedBox(width: 8),
+            if (compact)
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: hasPending
+                      ? () => _confirmPayAllPending(provider)
+                      : null,
+                  icon: const Icon(Icons.payments_rounded, size: 16),
+                  label: const Text('Pay all'),
+                ),
+              )
+            else
+              FilledButton.icon(
+                onPressed:
+                    hasPending ? () => _confirmPayAllPending(provider) : null,
+                icon: const Icon(Icons.payments_rounded, size: 16),
+                label: const Text('Pay all pending'),
+              ),
+          ],
+        );
     final monthNav = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -252,6 +311,8 @@ class _PayrollScreenState extends State<PayrollScreen> {
           const SizedBox(height: 12),
           _searchField(),
           const SizedBox(height: 12),
+          advanceAndPayAll(compact: true),
+          const SizedBox(height: 12),
           monthNav,
         ],
       );
@@ -259,8 +320,10 @@ class _PayrollScreenState extends State<PayrollScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Expanded(child: title),
+        Expanded(child: title),
         SizedBox(width: 220, child: _searchField()),
+        const SizedBox(width: 12),
+        advanceAndPayAll(compact: false),
         const SizedBox(width: 12),
         monthNav,
       ],
@@ -423,6 +486,25 @@ class _PayrollScreenState extends State<PayrollScreen> {
                   Text('Days worked: ${entry.daysWorkedLabel}',
                       style: const TextStyle(
                           fontSize: 11, color: Color(0xFF64748B))),
+                  Text(
+                      'P ${entry.presentDays} • H ${entry.halfDays} • L ${entry.leaveDays}',
+                      style: const TextStyle(
+                          fontSize: 10, color: Color(0xFF94A3B8))),
+                ],
+              ),
+              const SizedBox(width: 20),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                      'Advances ${Money.symbol}${_money(entry.advancesAmount)}',
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF64748B))),
+                  Text('Net pay ${Money.symbol}${_money(entry.netPay)}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0F172A))),
                 ],
               ),
               const SizedBox(width: 20),
@@ -454,6 +536,13 @@ class _PayrollScreenState extends State<PayrollScreen> {
                 ),
               ),
               const SizedBox(width: 4),
+              IconButton(
+                onPressed: () => _showSalarySlip(entry),
+                icon: const Icon(Icons.description_outlined, size: 18),
+                tooltip: 'Salary slip',
+                visualDensity: VisualDensity.compact,
+                color: const Color(0xFF64748B),
+              ),
               TextButton(
                 onPressed: () => _showPaymentHistory(entry),
                 child: const Text('History',
@@ -548,9 +637,22 @@ class _PayrollScreenState extends State<PayrollScreen> {
             children: [
               Expanded(
                 child: _cardStat(
-                    'Salary (${entry.daysWorkedLabel})',
+                    'Salary (P${entry.presentDays} H${entry.halfDays} L${entry.leaveDays})',
                     '${Money.symbol}${_money(entry.totalSalary)}'),
               ),
+              Expanded(
+                child: _cardStat('Advances',
+                    '${Money.symbol}${_money(entry.advancesAmount)}'),
+              ),
+              Expanded(
+                child: _cardStat(
+                    'Net pay', '${Money.symbol}${_money(entry.netPay)}'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
               Expanded(
                 child: _cardStat('Paid',
                     '${Money.symbol}${_money(entry.paidAmount)}'),
@@ -558,6 +660,14 @@ class _PayrollScreenState extends State<PayrollScreen> {
               Expanded(
                 child: _cardStat(
                     'Due', '${Money.symbol}${_money(entry.pendingAmount)}'),
+              ),
+              Expanded(
+                child: IconButton(
+                  onPressed: () => _showSalarySlip(entry),
+                  icon: const Icon(Icons.description_outlined, size: 18),
+                  tooltip: 'Salary slip',
+                  color: const Color(0xFF64748B),
+                ),
               ),
             ],
           ),
@@ -925,6 +1035,364 @@ class _PayrollScreenState extends State<PayrollScreen> {
     }
   }
 
+  Future<void> _showHelp() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('How Payroll is calculated',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: math.min(420.0, MediaQuery.sizeOf(dialogContext).width - 48),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _HelpLine('Salary',
+                  'The attendance register for the month × a daily rate '
+                      '(monthly wage ÷ days in that month). A Half Day counts '
+                      'as half a day; Leave and Absent are unpaid.'),
+              SizedBox(height: 12),
+              _HelpLine('Advances',
+                  'Money handed out against this month\'s wages before it\'s '
+                      'due. It comes straight off Salary to give Net pay — use '
+                      '"Add advance" to record one.'),
+              SizedBox(height: 12),
+              _HelpLine('Net pay',
+                  'Salary minus Advances — what the staff member is actually '
+                      'still owed for the month.'),
+              SizedBox(height: 12),
+              _HelpLine('Paid / Due',
+                  'Paid is the total of every "Record Payment" made against '
+                      'Net pay this month; Due is whatever is left. Paying it '
+                      'off also logs a matching Salary expense automatically.'),
+              SizedBox(height: 12),
+              _HelpLine('Status',
+                  'PAID once Due reaches ₹0, PARTIAL once something has been '
+                      'paid but Due remains, otherwise UNPAID.'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Global — lets any staff member be picked, not scoped to one row, since
+  /// this mirrors the header-level "Add advance" action rather than a
+  /// per-row one.
+  Future<void> _showAddAdvance(AppProvider provider) async {
+    final roster = provider.staff.where((s) => s.isActive).toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    if (roster.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No active staff to advance money to.')),
+      );
+      return;
+    }
+
+    var selectedStaffId = roster.first.id;
+    final amountController = TextEditingController();
+    final methodChoices = provider.paymentMethods;
+    var method = methodChoices.first.value;
+    String? error;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Add advance — $_monthLabel'),
+          content: SizedBox(
+            width: math.min(380.0, MediaQuery.sizeOf(dialogContext).width - 48),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: selectedStaffId,
+                  decoration: const InputDecoration(
+                    labelText: 'Staff',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final s in roster)
+                      DropdownMenuItem(value: s.id, child: Text(s.name)),
+                  ],
+                  onChanged: (value) => setDialogState(
+                      () => selectedStaffId = value ?? selectedStaffId),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Amount',
+                    prefixText: '${Money.symbol} ',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: method,
+                  decoration: const InputDecoration(
+                    labelText: 'Paid via',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final m in methodChoices)
+                      DropdownMenuItem(value: m.value, child: Text(m.label)),
+                  ],
+                  onChanged: (value) =>
+                      setDialogState(() => method = value ?? method),
+                ),
+                const SizedBox(height: 8),
+                const Text("The advance is deducted from this month's net pay.",
+                    style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                if (error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(error!,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFFDC2626))),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final amount = double.tryParse(amountController.text.trim());
+                if (amount == null || amount <= 0) {
+                  setDialogState(
+                      () => error = 'Enter an amount greater than zero.');
+                  return;
+                }
+                final ok = await context.read<AppProvider>().recordSalaryAdvance(
+                      staffId: selectedStaffId,
+                      month: _selectedMonth,
+                      amount: amount,
+                      method: method,
+                    );
+                if (!dialogContext.mounted) return;
+                if (ok) {
+                  Navigator.of(dialogContext).pop(true);
+                } else {
+                  setDialogState(() => error =
+                      context.read<AppProvider>().payrollError ??
+                          'Could not record the advance.');
+                }
+              },
+              child: const Text('Save advance'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    amountController.dispose();
+
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Advance recorded'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmPayAllPending(AppProvider provider) async {
+    final pendingCount = (provider.payroll?.entries ?? const <PayrollEntryModel>[])
+        .where((e) => e.pendingAmount > 0)
+        .length;
+    if (pendingCount == 0) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Pay all pending?'),
+        content: Text(
+            'This records a full payment for $pendingCount staff member'
+            '${pendingCount == 1 ? '' : 's'} with a balance still due for '
+            '$_monthLabel.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Pay all'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final paidCount = await provider.payAllPending(_selectedMonth);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(paidCount == pendingCount
+            ? 'Paid $paidCount staff member${paidCount == 1 ? '' : 's'}'
+            : 'Paid $paidCount of $pendingCount — ${provider.payrollError ?? 'stopped on an error'}'),
+        backgroundColor:
+            paidCount == pendingCount ? const Color(0xFF10B981) : const Color(0xFFDC2626),
+      ),
+    );
+  }
+
+  /// The real app's "Salary slip" panel, as a dialog here rather than a side
+  /// panel — Payroll has no persistent side rail to dock one in, and every
+  /// other per-row detail view on this screen (History, Record Payment) is
+  /// already a dialog.
+  Future<void> _showSalarySlip(PayrollEntryModel entry) async {
+    final provider = context.read<AppProvider>();
+    StaffModel? staff;
+    for (final s in provider.staff) {
+      if (s.id == entry.staffId) {
+        staff = s;
+        break;
+      }
+    }
+    final totalDays = entry.presentDays + entry.halfDays + entry.leaveDays;
+    final staffPhone = staff?.phone ?? '';
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('${entry.staffName} — Salary Slip',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: math.min(360.0, MediaQuery.sizeOf(dialogContext).width - 48),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _slipRow('Role', entry.role),
+              if (staffPhone.isNotEmpty) _slipRow('Phone', staffPhone),
+              _slipRow('Pay period', _monthLabel),
+              const SizedBox(height: 8),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              const Text('Attendance summary',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _slipStat('Present', '${entry.presentDays}'),
+                  _slipStat('Half day', '${entry.halfDays}'),
+                  _slipStat('Leave', '${entry.leaveDays}'),
+                  _slipStat('Total days', '$totalDays'),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              _slipRow('Base salary',
+                  '${Money.symbol}${_money(entry.totalSalary)}'),
+              const SizedBox(height: 6),
+              const Divider(height: 1),
+              const SizedBox(height: 6),
+              _slipRow('Advances',
+                  '-${Money.symbol}${_money(entry.advancesAmount)}',
+                  valueColor: const Color(0xFFDC2626)),
+              const SizedBox(height: 6),
+              _slipRow('Net pay', '${Money.symbol}${_money(entry.netPay)}',
+                  bold: true),
+              const SizedBox(height: 6),
+              _slipRow('Paid', '${Money.symbol}${_money(entry.paidAmount)}'),
+              _slipRow('Due', '${Money.symbol}${_money(entry.pendingAmount)}'),
+              const SizedBox(height: 6),
+              _slipRow('Payment status', entry.status, bold: true),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => _toast('Sent to the printer.'),
+            child: const Text('Print'),
+          ),
+          FilledButton.icon(
+            onPressed: staffPhone.isEmpty
+                ? null
+                : () => _sendSlipOnWhatsApp(staffPhone, entry),
+            icon: const Icon(Icons.chat_rounded, size: 16),
+            label: const Text('Send on WhatsApp'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _slipRow(String label, String value,
+      {bool bold = false, Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: bold ? FontWeight.bold : FontWeight.w500,
+                  color: valueColor ?? const Color(0xFF0F172A))),
+        ],
+      ),
+    );
+  }
+
+  Widget _slipStat(String label, String value) {
+    return Column(
+      children: [
+        Text(value,
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A))),
+        Text(label,
+            style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+      ],
+    );
+  }
+
+  void _sendSlipOnWhatsApp(String phone, PayrollEntryModel entry) async {
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    final msg = Uri.encodeComponent(
+        'Hi ${entry.staffName},\nYour salary slip for $_monthLabel:\n'
+        'Base salary: ${Money.symbol}${_money(entry.totalSalary)}\n'
+        'Advances: -${Money.symbol}${_money(entry.advancesAmount)}\n'
+        'Net pay: ${Money.symbol}${_money(entry.netPay)}\n'
+        'Paid: ${Money.symbol}${_money(entry.paidAmount)}\n'
+        'Due: ${Money.symbol}${_money(entry.pendingAmount)}');
+    final url = Uri.parse('https://wa.me/91$cleanPhone?text=$msg');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    }
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Widget _buildSummaryCard(String label, String value, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -948,6 +1416,31 @@ class _PayrollScreenState extends State<PayrollScreen> {
                   fontSize: 20, fontWeight: FontWeight.bold, color: color)),
         ],
       ),
+    );
+  }
+}
+
+/// One term + explanation line in the help dialog.
+class _HelpLine extends StatelessWidget {
+  final String term;
+  final String explanation;
+
+  const _HelpLine(this.term, this.explanation);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(term,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A))),
+        const SizedBox(height: 2),
+        Text(explanation,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+      ],
     );
   }
 }

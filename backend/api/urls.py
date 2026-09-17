@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     ShopViewSet, CustomerViewSet, GarmentCategoryViewSet,
     GarmentItemViewSet, OrderViewSet, ExpenseViewSet,
-    StaffViewSet, AttendanceViewSet, SalaryPaymentViewSet,
+    StaffViewSet, AttendanceViewSet, SalaryPaymentViewSet, SalaryAdvanceViewSet,
     ServiceAreaViewSet, TimeSlotViewSet, dashboard_stats, payroll_summary,
     reports, meta,
 )
@@ -19,6 +19,7 @@ router.register(r'expenses', ExpenseViewSet)
 router.register(r'staff', StaffViewSet)
 router.register(r'attendance', AttendanceViewSet, basename='attendance')
 router.register(r'salary-payments', SalaryPaymentViewSet, basename='salarypayment')
+router.register(r'salary-advances', SalaryAdvanceViewSet, basename='salaryadvance')
 router.register(r'service-areas', ServiceAreaViewSet)
 router.register(r'time-slots', TimeSlotViewSet, basename='timeslot')
 

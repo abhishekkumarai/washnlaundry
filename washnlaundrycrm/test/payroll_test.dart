@@ -44,7 +44,9 @@ void main() {
         role: 'Head Washer',
         monthlyWage: 16900,
         daysWorked: 24,
+        presentDays: 24,
         totalSalary: 15600,
+        netPay: 15600,
         paidAmount: 10000,
         pendingAmount: 5600,
         status: 'PARTIAL',
@@ -55,7 +57,10 @@ void main() {
         role: 'Steam Press Master',
         monthlyWage: 15600,
         daysWorked: 23.5,
+        presentDays: 23,
+        halfDays: 1,
         totalSalary: 14100,
+        netPay: 14100,
         paidAmount: 14100,
         status: 'PAID',
       ),
@@ -65,6 +70,11 @@ void main() {
     pending: 5600,
     staffCount: 2,
   );
+
+  const staffRoster = [
+    StaffModel(id: '1', name: 'Ramesh Kumar', role: 'Head Washer', phone: '9876543210'),
+    StaffModel(id: '2', name: 'Sunil Paswan', role: 'Steam Press Master', phone: '9123456780'),
+  ];
 
   group('PayrollScreen', () {
     testWidgets('rows come from the provider, not a literal', (tester) async {
@@ -344,6 +354,110 @@ void main() {
         expect(find.text('Ramesh Kumar'), findsOneWidget);
       });
     });
+
+    testWidgets('the help icon explains how figures are calculated',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(payroll: summary);
+      await tester.pumpWidget(host(provider, const PayrollScreen()));
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('How Payroll is calculated'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('How Payroll is calculated'), findsOneWidget);
+      expect(find.text('Net pay'), findsWidgets);
+
+      await tester.tap(find.text('Got it'));
+      await tester.pumpAndSettle();
+      expect(find.text('How Payroll is calculated'), findsNothing);
+    });
+
+    testWidgets('Add advance opens a dialog and rejects a zero amount',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(payroll: summary, staff: staffRoster);
+      await tester.pumpWidget(host(provider, const PayrollScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Add advance'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Add advance —'), findsOneWidget);
+
+      await tester.enterText(
+          find.descendant(
+              of: find.byType(AlertDialog), matching: find.byType(TextField)).first,
+          '0');
+      await tester.tap(find.widgetWithText(FilledButton, 'Save advance'));
+      await tester.pump();
+
+      expect(find.text('Enter an amount greater than zero.'), findsOneWidget);
+    });
+
+    testWidgets('Pay all pending is disabled once nothing is outstanding',
+        (tester) async {
+      const settled = PayrollSummaryModel(
+        entries: [
+          PayrollEntryModel(
+            staffId: '2',
+            staffName: 'Sunil Paswan',
+            role: 'Steam Press Master',
+            totalSalary: 14100,
+            netPay: 14100,
+            paidAmount: 14100,
+            status: 'PAID',
+          ),
+        ],
+        totalPayroll: 14100,
+        paid: 14100,
+        staffCount: 1,
+      );
+      final provider = AppProvider(autoLoad: false)..seedForTest(payroll: settled);
+      await tester.pumpWidget(host(provider, const PayrollScreen()));
+      await tester.pump();
+
+      final button =
+          tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Pay all pending'));
+      expect(button.onPressed, isNull);
+    });
+
+    testWidgets('Pay all pending asks for confirmation before paying',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(payroll: summary);
+      await tester.pumpWidget(host(provider, const PayrollScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Pay all pending'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pay all pending?'), findsOneWidget);
+      expect(find.textContaining('1 staff member'), findsOneWidget);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Pay all pending?'), findsNothing);
+    });
+
+    testWidgets('the salary slip shows the attendance breakdown and net pay',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(payroll: summary, staff: staffRoster);
+      await tester.pumpWidget(host(provider, const PayrollScreen()));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.description_outlined).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ramesh Kumar — Salary Slip'), findsOneWidget);
+      expect(find.text('9876543210'), findsOneWidget);
+      // Net pay row — Ramesh's summary fixture has no advance, so net pay
+      // equals the gross total_salary of 15600.
+      expect(find.text('₹15600'), findsWidgets);
+
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ramesh Kumar — Salary Slip'), findsNothing);
+    });
   });
 
   group('PayrollSummaryModel', () {
@@ -388,6 +502,42 @@ void main() {
     test('daysWorkedLabel drops a pointless .0 but keeps a real half', () {
       expect(const PayrollEntryModel(staffId: '1', staffName: 'A', daysWorked: 24).daysWorkedLabel, '24');
       expect(const PayrollEntryModel(staffId: '1', staffName: 'A', daysWorked: 23.5).daysWorkedLabel, '23.5');
+    });
+
+    test('parses the attendance breakdown, advances and net pay', () {
+      final model = PayrollSummaryModel.fromJson({
+        'entries': [
+          {
+            'staff': 3,
+            'staff_name': 'Geeta Devi',
+            'present_days': 18,
+            'half_days': 2,
+            'leave_days': 1,
+            'total_salary': 14350,
+            'advances_amount': 1000,
+            'net_pay': 13350,
+            'paid_amount': 0,
+            'pending_amount': 13350,
+            'status': 'UNPAID',
+          },
+        ],
+      });
+
+      final entry = model.entries.single;
+      expect(entry.presentDays, 18);
+      expect(entry.halfDays, 2);
+      expect(entry.leaveDays, 1);
+      expect(entry.advancesAmount, 1000);
+      expect(entry.netPay, 13350);
+    });
+
+    test('net_pay falls back to total_salary for an older payload shape', () {
+      final model = PayrollSummaryModel.fromJson({
+        'entries': [
+          {'staff': 1, 'staff_name': 'A', 'total_salary': 5000},
+        ],
+      });
+      expect(model.entries.single.netPay, 5000);
     });
   });
 

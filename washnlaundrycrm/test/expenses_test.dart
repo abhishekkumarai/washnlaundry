@@ -90,9 +90,11 @@ void main() {
       await tester.pumpWidget(host(provider, const ExpensesScreen()));
       await tester.pump();
 
+      // Both of this month's rows render; last month's Diesel entry is
+      // scoped out by the month nav (defaults to the current month) —
+      // covered separately by the month-nav tests below.
       expect(find.text('Commercial Detergent (50L)'), findsOneWidget);
       expect(find.text('Monthly Shop Rent'), findsOneWidget);
-      expect(find.text('Diesel for Delivery Van'), findsOneWidget);
       expect(find.text('Electricity Bill (Commercial)'), findsNothing);
     });
 
@@ -101,9 +103,9 @@ void main() {
       await tester.pumpWidget(host(provider, const ExpensesScreen()));
       await tester.pump();
 
-      expect(find.text('₹33700'), findsOneWidget); // total of all three
+      expect(find.text('₹33700'), findsOneWidget); // all-time total, all three
       expect(find.text('₹31500'), findsOneWidget); // this month only
-      expect(find.text('3'), findsOneWidget); // entry count
+      expect(find.text('2'), findsOneWidget); // entry count, this month only
     });
 
     testWidgets('payment method labels come from the served vocabulary, not a naive title-case',
@@ -119,14 +121,53 @@ void main() {
       expect(find.textContaining('Bank Transfer ·'), findsOneWidget);
     });
 
-    testWidgets('the month total ignores older entries', (tester) async {
+    testWidgets('the month total and list both ignore older entries',
+        (tester) async {
       final provider = AppProvider(autoLoad: false)
         ..seedForTest(expenses: [ledger.last]); // last month only
       await tester.pumpWidget(host(provider, const ExpensesScreen()));
       await tester.pump();
 
-      expect(find.text('₹0'), findsOneWidget); // this month
-      expect(find.text('₹2200'), findsWidgets); // total + the row
+      expect(find.text('₹0'), findsOneWidget); // this month card
+      expect(find.text('₹2200'), findsOneWidget); // all-time card only — no row
+      expect(find.text('Diesel for Delivery Van'), findsNothing);
+    });
+
+    testWidgets('stepping the month nav back reveals older entries',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pump();
+
+      expect(find.text('Diesel for Delivery Van'), findsNothing);
+
+      await tester.tap(find.byTooltip('Previous month'));
+      await tester.pump();
+
+      expect(find.text('Diesel for Delivery Van'), findsOneWidget);
+      expect(find.text('Commercial Detergent (50L)'), findsNothing);
+      expect(find.text('Monthly Shop Rent'), findsNothing);
+    });
+
+    testWidgets('a category chip does not carry over across a month change',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(FilterChip, 'Rent'));
+      await tester.pump();
+      expect(find.text('Commercial Detergent (50L)'), findsNothing);
+
+      await tester.tap(find.byTooltip('Previous month'));
+      await tester.pump();
+      await tester.tap(find.byTooltip('Next month'));
+      await tester.pump();
+
+      // Back on the original month — the stale 'Rent' selection must not
+      // still be filtering it.
+      expect(find.text('Commercial Detergent (50L)'), findsOneWidget);
+      expect(find.text('Monthly Shop Rent'), findsOneWidget);
     });
 
     testWidgets('a category chip narrows the list', (tester) async {
@@ -157,12 +198,13 @@ void main() {
       expect(find.widgetWithText(FilterChip, 'Rent'), findsNothing);
     });
 
-    testWidgets('an empty ledger says so', (tester) async {
+    testWidgets('an empty ledger says so, scoped to the selected month',
+        (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(expenses: []);
       await tester.pumpWidget(host(provider, const ExpensesScreen()));
       await tester.pump();
 
-      expect(find.text('No expenses logged yet.'), findsOneWidget);
+      expect(find.textContaining('No expenses logged in'), findsOneWidget);
     });
 
     testWidgets('a filter matching nothing names the category', (tester) async {
@@ -176,7 +218,7 @@ void main() {
       provider.seedForTest(expenses: [ledger.first]);
       await tester.pump();
 
-      expect(find.text('No Rent expenses logged.'), findsOneWidget);
+      expect(find.textContaining('No Rent expenses logged in'), findsOneWidget);
     });
 
     testWidgets('the add dialog rejects an empty title', (tester) async {
@@ -309,8 +351,10 @@ void main() {
 
       expect(find.text('Commercial Detergent (50L)'), findsOneWidget);
       expect(find.text('Monthly Shop Rent'), findsNothing);
-      expect(find.text('Diesel for Delivery Van'), findsNothing);
 
+      // Diesel is last month's entry — step the month nav back so it's in
+      // scope before searching for it.
+      await tester.tap(find.byTooltip('Previous month'));
       await tester.enterText(find.byType(TextField).first, 'transport');
       await tester.pump();
 

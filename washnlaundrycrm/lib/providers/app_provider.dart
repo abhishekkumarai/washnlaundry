@@ -969,6 +969,55 @@ class AppProvider extends ChangeNotifier {
   Future<List<SalaryPaymentModel>> fetchSalaryHistory(String staffId) =>
       ApiService.fetchSalaryPayments(staffId: staffId);
 
+  /// Records an advance against [month]'s wages — comes off net pay rather
+  /// than being logged as money already paid. See [recordSalaryPayment].
+  Future<bool> recordSalaryAdvance({
+    required String staffId,
+    required DateTime month,
+    required double amount,
+    String method = 'CASH',
+    String note = '',
+  }) async {
+    try {
+      await ApiService.recordSalaryAdvance({
+        'staff': int.tryParse(staffId) ?? staffId,
+        'month': '${monthKey(month)}-01',
+        'amount': amount,
+        'method': method,
+        if (note.trim().isNotEmpty) 'note': note.trim(),
+      });
+      await loadPayrollFor(month);
+      return _payrollError == null;
+    } on ApiException catch (e) {
+      _payrollError = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Settles every entry with a pending balance in one go — the header's
+  /// "Pay all pending" action. Pays sequentially rather than in parallel so
+  /// one failure doesn't leave a half-applied burst of concurrent requests,
+  /// and stops at the first failure rather than pressing on past it.
+  /// Returns how many entries were actually paid.
+  Future<int> payAllPending(DateTime month) async {
+    final pending = (_payroll?.entries ?? const <PayrollEntryModel>[])
+        .where((e) => e.pendingAmount > 0)
+        .toList();
+    var paidCount = 0;
+    for (final entry in pending) {
+      final ok = await recordSalaryPayment(
+        staffId: entry.staffId,
+        month: month,
+        amount: entry.pendingAmount,
+        note: 'Paid via Pay all pending',
+      );
+      if (!ok) break;
+      paidCount++;
+    }
+    return paidCount;
+  }
+
   // ── Reports ────────────────────────────────────────────────────────────────
 
   Future<void> loadReportsFor(DateTime from, DateTime to) async {

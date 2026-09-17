@@ -12,7 +12,7 @@ from rest_framework.response import Response
 from . import customer_import
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
-    Expense, Staff, Attendance, SalaryPayment, ServiceArea, TimeSlot,
+    Expense, Staff, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
     OrderStatus, PaymentStatus, DeliveryType, OrderSource, PricingUnit,
     PaymentMethod, ExpenseCategory,
 )
@@ -20,7 +20,8 @@ from .serializers import (
     ShopSerializer, CustomerSerializer, GarmentCategorySerializer,
     GarmentItemSerializer, OrderSerializer, OrderItemSerializer,
     ExpenseSerializer, StaffSerializer, AttendanceSerializer,
-    SalaryPaymentSerializer, ServiceAreaSerializer, TimeSlotSerializer,
+    SalaryPaymentSerializer, SalaryAdvanceSerializer, ServiceAreaSerializer,
+    TimeSlotSerializer,
 )
 
 
@@ -407,6 +408,22 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
         return qs
 
 
+class SalaryAdvanceViewSet(viewsets.ModelViewSet):
+    """An advance against a month's wages — see `SalaryAdvance` for how this
+    differs from a `SalaryPayment`."""
+    serializer_class = SalaryAdvanceSerializer
+
+    def get_queryset(self):
+        qs = SalaryAdvance.objects.select_related('staff').all()
+        month = parse_month(self.request.query_params.get('month'))
+        if month:
+            qs = qs.filter(month=month)
+        staff = self.request.query_params.get('staff')
+        if staff:
+            qs = qs.filter(staff_id=staff)
+        return qs
+
+
 def parse_month(raw):
     """'2026-08' or '2026-08-11' -> date(2026, 8, 1). None if unparseable."""
     if not raw:
@@ -424,21 +441,37 @@ def payroll_summary(request):
     what each state is worth) times a per-day rate — `Staff.monthly_wage`
     divided by however many days the month being paid actually has, so a day
     is worth slightly more in February than in a 31-day month for the same
-    monthly wage. What was actually paid comes from SalaryPayment. Neither
-    number is stored on Staff, so nothing here can drift out of step with the
-    register.
+    monthly wage. Advances (`SalaryAdvance`) come off that to give net pay —
+    matching the real app's "the advance is deducted from this month's net
+    pay". What was actually paid comes from SalaryPayment. None of these
+    numbers are stored on Staff, so nothing here can drift out of step with
+    the register.
+
+    The roster is every staff member who is currently ACTIVE *or* has
+    attendance/advance/payment activity in the requested month — an
+    INACTIVE staff member with a wage still owed for a month they actually
+    worked must stay reachable here, not vanish the moment they're marked
+    inactive.
     """
     month = parse_month(request.query_params.get('month')) or timezone.localdate().replace(day=1)
     # First day of the following month, without needing calendar arithmetic.
     next_month = (month + timedelta(days=32)).replace(day=1)
     days_in_month = (next_month - month).days
 
-    roster = Staff.objects.filter(status='ACTIVE').order_by('name')
+    month_attendance = Attendance.objects.filter(date__gte=month, date__lt=next_month)
 
     days = {}
-    attendance = Attendance.objects.filter(date__gte=month, date__lt=next_month)
-    for record in attendance:
+    present = {}
+    half = {}
+    leave = {}
+    for record in month_attendance:
         days[record.staff_id] = days.get(record.staff_id, 0.0) + record.day_value
+        if record.status == Attendance.PRESENT:
+            present[record.staff_id] = present.get(record.staff_id, 0) + 1
+        elif record.status == Attendance.HALF_DAY:
+            half[record.staff_id] = half.get(record.staff_id, 0) + 1
+        elif record.status == Attendance.LEAVE:
+            leave[record.staff_id] = leave.get(record.staff_id, 0) + 1
 
     paid = {
         row['staff_id']: row['total']
@@ -446,18 +479,32 @@ def payroll_summary(request):
         .values('staff_id')
         .annotate(total=Sum('amount'))
     }
+    advanced = {
+        row['staff_id']: row['total']
+        for row in SalaryAdvance.objects.filter(month=month)
+        .values('staff_id')
+        .annotate(total=Sum('amount'))
+    }
+
+    active_ids = set(Staff.objects.filter(status='ACTIVE').values_list('id', flat=True))
+    active_with_activity_ids = (
+        set(days) | set(paid) | set(advanced) | active_ids
+    )
+    roster = Staff.objects.filter(id__in=active_with_activity_ids).order_by('name')
 
     entries = []
     for member in roster:
         days_worked = round(days.get(member.id, 0.0), 1)
         daily_rate = member.monthly_wage / days_in_month
         total_salary = round(days_worked * daily_rate, 2)
+        advances_amount = round(advanced.get(member.id, 0.0), 2)
+        net_pay = round(max(total_salary - advances_amount, 0.0), 2)
         paid_amount = round(paid.get(member.id, 0.0), 2)
-        pending = round(max(total_salary - paid_amount, 0.0), 2)
+        pending = round(max(net_pay - paid_amount, 0.0), 2)
 
         # Same three-way rule the order payment action uses, so PAID/PARTIAL/
         # UNPAID mean the same thing everywhere in the app.
-        if total_salary <= 0:
+        if net_pay <= 0:
             status_value = PaymentStatus.UNPAID
         elif pending <= 0:
             status_value = PaymentStatus.PAID
@@ -472,7 +519,12 @@ def payroll_summary(request):
             'role': member.role,
             'monthly_wage': member.monthly_wage,
             'days_worked': days_worked,
+            'present_days': present.get(member.id, 0),
+            'half_days': half.get(member.id, 0),
+            'leave_days': leave.get(member.id, 0),
             'total_salary': total_salary,
+            'advances_amount': advances_amount,
+            'net_pay': net_pay,
             'paid_amount': paid_amount,
             'pending_amount': pending,
             'status': status_value,
@@ -482,7 +534,7 @@ def payroll_summary(request):
         'month': month.isoformat(),
         'entries': entries,
         'totals': {
-            'total_payroll': round(sum(e['total_salary'] for e in entries), 2),
+            'total_payroll': round(sum(e['net_pay'] for e in entries), 2),
             'paid': round(sum(e['paid_amount'] for e in entries), 2),
             'pending': round(sum(e['pending_amount'] for e in entries), 2),
             'staff_count': len(entries),

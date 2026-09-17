@@ -334,7 +334,17 @@ class PayrollEntryModel {
   final String role;
   final double monthlyWage;
   final double daysWorked;
+  final int presentDays;
+  final int halfDays;
+  final int leaveDays;
+
+  /// Gross — attendance × daily rate, before advances come off.
   final double totalSalary;
+  final double advancesAmount;
+
+  /// [totalSalary] minus [advancesAmount], floored at 0. What's actually owed
+  /// — [pendingAmount] is this minus [paidAmount], not [totalSalary] minus it.
+  final double netPay;
   final double paidAmount;
   final double pendingAmount;
 
@@ -347,7 +357,12 @@ class PayrollEntryModel {
     this.role = '',
     this.monthlyWage = 0,
     this.daysWorked = 0,
+    this.presentDays = 0,
+    this.halfDays = 0,
+    this.leaveDays = 0,
     this.totalSalary = 0,
+    this.advancesAmount = 0,
+    this.netPay = 0,
     this.paidAmount = 0,
     this.pendingAmount = 0,
     this.status = 'UNPAID',
@@ -360,7 +375,12 @@ class PayrollEntryModel {
         role: json['role'] ?? '',
         monthlyWage: (json['monthly_wage'] ?? 0).toDouble(),
         daysWorked: (json['days_worked'] ?? 0).toDouble(),
+        presentDays: (json['present_days'] ?? 0) as int,
+        halfDays: (json['half_days'] ?? 0) as int,
+        leaveDays: (json['leave_days'] ?? 0) as int,
         totalSalary: (json['total_salary'] ?? 0).toDouble(),
+        advancesAmount: (json['advances_amount'] ?? 0).toDouble(),
+        netPay: (json['net_pay'] ?? json['total_salary'] ?? 0).toDouble(),
         paidAmount: (json['paid_amount'] ?? 0).toDouble(),
         pendingAmount: (json['pending_amount'] ?? 0).toDouble(),
         status: json['status'] ?? 'UNPAID',

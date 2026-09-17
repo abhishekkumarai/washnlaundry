@@ -364,7 +364,7 @@ void main() {
       expect(find.text('₹65'), findsNothing);
 
       // Switching back to a pickup type drops the fee and hides the field.
-      await tester.tap(find.text('Shop Pickup'));
+      await tester.tap(find.text('Walk-In'));
       await tester.pumpAndSettle();
 
       expect(find.byType(TextField), findsNWidgets(2));
@@ -382,9 +382,9 @@ void main() {
       expect(find.byType(Switch), findsNothing);
     });
 
-    testWidgets('Shop Pickup shows a Ready at label, no slot chips',
+    testWidgets('Walk-In shows a Ready at label, no slot chips',
         (tester) async {
-      // Shop Pickup is the default fulfilment type, so this is what Checkout
+      // Walk-In is the default fulfilment type, so this is what Checkout
       // review shows without tapping anything.
       await pumpWithItemInCart(tester);
       await tester.tap(find.text('Checkout • ₹15'));
@@ -459,7 +459,7 @@ void main() {
       }
     });
 
-    testWidgets('switching back to Shop Pickup drops the slot chips again',
+    testWidgets('switching back to Walk-In drops the slot chips again',
         (tester) async {
       await pumpWithItemInCart(tester);
       await tester.tap(find.text('Checkout • ₹15'));
@@ -468,7 +468,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ChoiceChip), findsNWidgets(13));
 
-      await tester.tap(find.text('Shop Pickup'));
+      await tester.tap(find.text('Walk-In'));
       await tester.pumpAndSettle();
 
       expect(find.byType(ChoiceChip), findsNothing);

@@ -1097,7 +1097,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         Expanded(
                           child: _optionCard(
                             icon: Icons.storefront_rounded,
-                            title: 'Shop Pickup',
+                            title: 'Walk-In',
                             subtitle: 'Customer picks up',
                             selected: orderType == DeliveryType.storePickup,
                             onTap: () => setDialogState(

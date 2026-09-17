@@ -20,7 +20,7 @@ from django.utils import timezone  # noqa: E402
 
 from api.models import (  # noqa: E402
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem, OrderAuditLog,
-    Expense, Staff, Attendance, SalaryPayment, ServiceArea, TimeSlot,
+    Expense, Staff, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
     OrderStatus, PaymentStatus, DeliveryType, OrderSource, PricingUnit,
 )
 
@@ -126,6 +126,7 @@ def seed():
     GarmentCategory.objects.all().delete()
     Expense.objects.all().delete()
     Attendance.objects.all().delete()
+    SalaryAdvance.objects.all().delete()
     SalaryPayment.objects.all().delete()
     Staff.objects.all().delete()
     TimeSlot.objects.all().delete()
@@ -401,8 +402,11 @@ def seed():
             )
             salary_payments += 1
 
-        # This month: every third person gets nothing (UNPAID), the rest get an
-        # advance (PARTIAL).
+        # This month: every third person gets nothing (UNPAID), the rest get a
+        # payment (PARTIAL) — and the first of those also has a SalaryAdvance
+        # on top, so the Payroll screen's Advances/Net pay columns show a
+        # real, non-zero value on first run rather than every demo shop
+        # looking like nobody ever takes an advance.
         if index % 3 != 0:
             SalaryPayment.objects.create(
                 staff=staff,
@@ -410,9 +414,18 @@ def seed():
                 amount=5000.0,
                 paid_on=timezone.now() - timedelta(days=2),
                 method='CASH',
-                note='Advance',
+                note='Partial payment',
             )
             salary_payments += 1
+            if index % 3 == 1:
+                SalaryAdvance.objects.create(
+                    staff=staff,
+                    month=this_month,
+                    amount=1000.0,
+                    paid_on=timezone.now() - timedelta(days=5),
+                    method='CASH',
+                    note='Advance against this month',
+                )
 
     print('Seeding Expenses...')
     # Trailing int is "days ago", so the log spans the current and previous

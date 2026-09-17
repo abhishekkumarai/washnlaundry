@@ -5,7 +5,8 @@ from rest_framework import serializers
 
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem, OrderAuditLog,
-    OrderStatus, Expense, Staff, Attendance, SalaryPayment, ServiceArea, TimeSlot,
+    OrderStatus, Expense, Staff, Attendance, SalaryPayment, SalaryAdvance,
+    ServiceArea, TimeSlot,
 )
 
 
@@ -175,19 +176,35 @@ class SalaryPaymentSerializer(serializers.ModelSerializer):
         )
         daily_rate = staff.monthly_wage / days_in_month
         total_salary = round(days_worked * daily_rate, 2)
+        advances = SalaryAdvance.objects.filter(staff=staff, month=month) \
+            .aggregate(total=Sum('amount'))['total'] or 0.0
+        net_pay = round(max(total_salary - advances, 0.0), 2)
 
         other_payments = SalaryPayment.objects.filter(staff=staff, month=month)
         if self.instance:
             other_payments = other_payments.exclude(pk=self.instance.pk)
         already_paid = other_payments.aggregate(total=Sum('amount'))['total'] or 0.0
 
-        if round(already_paid + amount, 2) > total_salary:
-            remaining = round(max(total_salary - already_paid, 0.0), 2)
+        if round(already_paid + amount, 2) > net_pay:
+            remaining = round(max(net_pay - already_paid, 0.0), 2)
             raise serializers.ValidationError(
                 f"This payment would exceed what {staff.name} is owed for "
                 f"{month:%B %Y} ({remaining} remaining)."
             )
         return attrs
+
+
+class SalaryAdvanceSerializer(serializers.ModelSerializer):
+    staff_name = serializers.CharField(source='staff.name', read_only=True)
+
+    class Meta:
+        model = SalaryAdvance
+        fields = '__all__'
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('amount must be greater than zero.')
+        return value
 
 
 class ServiceAreaSerializer(serializers.ModelSerializer):

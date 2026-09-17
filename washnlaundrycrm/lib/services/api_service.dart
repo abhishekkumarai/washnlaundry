@@ -420,6 +420,11 @@ class ApiService {
     return _asList(data).map(SalaryPaymentModel.fromJson).toList();
   }
 
+  /// An advance against a month's wages — comes off net pay, distinct from a
+  /// [recordSalaryPayment] payout. See `SalaryAdvance` on the backend.
+  static Future<void> recordSalaryAdvance(Map<String, dynamic> payload) =>
+      _send('POST', '/salary-advances/', body: payload);
+
   // ── Reports ────────────────────────────────────────────────────────────────
 
   /// [from] and [to] are `YYYY-MM-DD`. Omitted, the server reports on the

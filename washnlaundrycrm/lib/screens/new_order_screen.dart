@@ -68,7 +68,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   static const _slotStartHour = 9; // 9 AM
   static const _slotEndHour = 22; // 10 PM — last slot is 9–10 PM
 
-  /// Shop Pickup is ready whenever it's actually done — the counter default
+  /// Walk-In is ready whenever it's actually done — the counter default
   /// is simply "now". Anything carried (Home Delivery / Pickup from Home)
   /// needs real lead time, so its default is the first still-selectable
   /// hourly slot today, or 9 AM tomorrow once today's slots have all passed.
@@ -2095,6 +2095,31 @@ class _OrderPlacedDialog extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              // A real route, not another `showDialog` stacked on this one —
+              // the real app's own "Print Tags" opens a Generate Tags modal
+              // on top of this same confirmation, then a Tag Preview modal on
+              // top of *that*; captured live and deliberately built as its
+              // own two-step page here instead. Closes this dialog first, the
+              // same way "Order Details" below already does.
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.go('/orders/${order.id}/tags');
+                },
+                icon: const Icon(Icons.qr_code_rounded, size: 16),
+                label: const Text('Print Tags',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  side: const BorderSide(color: Color(0xFFE2E8F0)),
                 ),
               ),
             ),

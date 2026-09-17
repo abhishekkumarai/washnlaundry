@@ -15,7 +15,7 @@ from rest_framework.test import APITestCase
 
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
-    Staff, Expense, Attendance, SalaryPayment, ServiceArea, TimeSlot,
+    Staff, Expense, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
     OrderStatus, PaymentStatus, DeliveryType, PricingUnit,
 )
 
@@ -1223,6 +1223,119 @@ class PayrollTests(APITestCase):
             f'/api/salary-payments/{payment.id}/', {'amount': 500.0}, format='json'
         )
         self.assertEqual(response.status_code, 200, response.data)
+
+    def test_attendance_breakdown_counts_each_state_separately(self):
+        self.mark(1, Attendance.PRESENT)
+        self.mark(2, Attendance.PRESENT)
+        self.mark(3, Attendance.HALF_DAY)
+        self.mark(4, Attendance.LEAVE)
+        self.mark(5, Attendance.ABSENT)
+        entry = self.entry()
+        self.assertEqual(entry['present_days'], 2)
+        self.assertEqual(entry['half_days'], 1)
+        self.assertEqual(entry['leave_days'], 1)
+
+    def test_an_advance_reduces_net_pay_and_pending(self):
+        self.mark(1, Attendance.PRESENT)  # total_salary == 600.0
+        SalaryAdvance.objects.create(staff=self.staff, month=self.month, amount=200.0)
+        entry = self.entry()
+        self.assertEqual(entry['total_salary'], 600.0)
+        self.assertEqual(entry['advances_amount'], 200.0)
+        self.assertEqual(entry['net_pay'], 400.0)
+        self.assertEqual(entry['pending_amount'], 400.0)
+        self.assertEqual(entry['status'], PaymentStatus.UNPAID)
+
+    def test_an_advance_bigger_than_the_wage_does_not_go_negative(self):
+        self.mark(1, Attendance.PRESENT)  # total_salary == 600.0
+        SalaryAdvance.objects.create(staff=self.staff, month=self.month, amount=1000.0)
+        entry = self.entry()
+        self.assertEqual(entry['net_pay'], 0.0)
+        self.assertEqual(entry['pending_amount'], 0.0)
+
+    def test_a_payment_cannot_exceed_net_pay_after_an_advance(self):
+        # 600 owed, 200 already taken as an advance — only 400 is left to pay,
+        # even though 600 alone would have passed the old total_salary cap.
+        self.mark(1, Attendance.PRESENT)
+        SalaryAdvance.objects.create(staff=self.staff, month=self.month, amount=200.0)
+        response = self.client.post(
+            '/api/salary-payments/',
+            {'staff': self.staff.id, 'month': '2026-07-01', 'amount': 401.0},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        response = self.client.post(
+            '/api/salary-payments/',
+            {'staff': self.staff.id, 'month': '2026-07-01', 'amount': 400.0},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_total_payroll_sums_net_pay_not_gross(self):
+        self.mark(1, Attendance.PRESENT)  # total_salary == 600.0
+        SalaryAdvance.objects.create(staff=self.staff, month=self.month, amount=100.0)
+        totals = self.payroll()['totals']
+        self.assertEqual(totals['total_payroll'], 500.0)
+
+    def test_an_inactive_staff_member_with_pending_wages_stays_on_the_payroll(self):
+        # Deactivating someone mid-month must not make their earned, unpaid
+        # wages disappear from the screen that's the only place to pay them.
+        self.mark(1, Attendance.PRESENT)
+        self.staff.status = 'INACTIVE'
+        self.staff.save()
+        entry = self.entry()
+        self.assertEqual(entry['staff_name'], 'Ramesh Kumar')
+        self.assertEqual(entry['pending_amount'], 600.0)
+
+    def test_a_truly_inactive_staff_member_with_no_activity_is_still_excluded(self):
+        Staff.objects.create(
+            name='Bhola Prasad', role='Retired', phone='2', status='INACTIVE'
+        )
+        names = [e['staff_name'] for e in self.payroll()['entries']]
+        self.assertEqual(names, ['Ramesh Kumar'])
+
+    def test_recording_a_salary_payment_creates_a_linked_expense(self):
+        self.mark(1, Attendance.PRESENT)
+        payment = SalaryPayment.objects.create(
+            staff=self.staff, month=self.month, amount=250.0, method='CASH',
+        )
+        self.assertIsNotNone(payment.expense)
+        self.assertEqual(payment.expense.category, 'Salary')
+        self.assertEqual(payment.expense.amount, 250.0)
+
+    def test_editing_a_salary_payment_updates_its_linked_expense_in_place(self):
+        payment = SalaryPayment.objects.create(
+            staff=self.staff, month=self.month, amount=250.0,
+        )
+        expense_id = payment.expense_id
+        payment.amount = 300.0
+        payment.save()
+        payment.refresh_from_db()
+        self.assertEqual(payment.expense_id, expense_id)
+        self.assertEqual(payment.expense.amount, 300.0)
+
+    def test_deleting_a_salary_payment_deletes_its_linked_expense(self):
+        payment = SalaryPayment.objects.create(
+            staff=self.staff, month=self.month, amount=250.0,
+        )
+        expense_id = payment.expense_id
+        payment.delete()
+        self.assertFalse(Expense.objects.filter(id=expense_id).exists())
+
+    def test_salary_advance_endpoint_filters_by_month(self):
+        SalaryAdvance.objects.create(staff=self.staff, month=self.month, amount=100.0)
+        SalaryAdvance.objects.create(staff=self.staff, month=date(2026, 8, 1), amount=200.0)
+        response = self.client.get('/api/salary-advances/', {'month': '2026-07'})
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['amount'], 100.0)
+        self.assertEqual(response.data[0]['staff_name'], 'Ramesh Kumar')
+
+    def test_a_non_positive_advance_is_rejected(self):
+        response = self.client.post(
+            '/api/salary-advances/',
+            {'staff': self.staff.id, 'month': '2026-07-01', 'amount': 0},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
 
 
 class ReportsApiTests(APITestCase):

@@ -459,6 +459,14 @@ class SalaryPayment(models.Model):
     paid_on = models.DateTimeField(default=timezone.now)
     method = models.CharField(max_length=50, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
     note = models.TextField(blank=True, default='')
+    # The real app's own text is "Paid salaries appear in Expenses
+    # automatically" — kept in sync here rather than a one-off copy, so
+    # editing or deleting a payment updates/removes its Expense too instead
+    # of leaving a stale row behind.
+    expense = models.OneToOneField(
+        Expense, null=True, blank=True, editable=False,
+        on_delete=models.SET_NULL, related_name='salary_payment',
+    )
 
     class Meta:
         ordering = ['-month', '-paid_on']
@@ -473,8 +481,60 @@ class SalaryPayment(models.Model):
             self.month = self.month_start(self.month)
         super().save(*args, **kwargs)
 
+        expense_fields = dict(
+            title=f'Salary — {self.staff.name} ({self.month:%b %Y})',
+            category=ExpenseCategory.SALARY,
+            amount=self.amount,
+            payment_method=self.method,
+            date=self.paid_on,
+            notes=self.note,
+        )
+        if self.expense_id:
+            Expense.objects.filter(pk=self.expense_id).update(**expense_fields)
+        else:
+            expense = Expense.objects.create(**expense_fields)
+            type(self).objects.filter(pk=self.pk).update(expense=expense)
+            self.expense = expense
+
+    def delete(self, *args, **kwargs):
+        expense = self.expense
+        super().delete(*args, **kwargs)
+        if expense:
+            expense.delete()
+
     def __str__(self):
         return f"{self.staff.name} {self.month:%b %Y} ₹{self.amount}"
+
+
+class SalaryAdvance(models.Model):
+    """An advance handed to a staff member against a month's wages.
+
+    Distinct from `SalaryPayment`: a payment records money paid out against
+    what's owed (reducing pending balance), while an advance reduces what's
+    owed in the first place — it comes off net pay before pending is even
+    computed. See `views.payroll_summary`.
+    """
+    staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='salary_advances')
+    month = models.DateField()
+    amount = models.FloatField()
+    paid_on = models.DateTimeField(default=timezone.now)
+    method = models.CharField(max_length=50, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
+    note = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-month', '-paid_on']
+
+    @staticmethod
+    def month_start(when):
+        return when.replace(day=1)
+
+    def save(self, *args, **kwargs):
+        if self.month:
+            self.month = self.month_start(self.month)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.staff.name} advance {self.month:%b %Y} ₹{self.amount}"
 
 
 class Attendance(models.Model):

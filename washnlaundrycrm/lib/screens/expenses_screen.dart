@@ -26,6 +26,29 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   String _category = 'All';
   String _searchQuery = '';
 
+  // Expenses used to only ever show the literal current month's "This month"
+  // figure with no way to look back — the list itself was every expense ever
+  // logged, all-time, with no month scoping at all.
+  DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
+
+  static const _monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  String get _monthLabel =>
+      '${_monthNames[_selectedMonth.month - 1]} ${_selectedMonth.year}';
+
+  void _stepMonth(int delta) {
+    setState(() {
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + delta);
+      // A category chip from the old month may not exist in the new one —
+      // left as-is, filtering by it would silently show an empty list with
+      // no chip visibly selected to explain why.
+      _category = 'All';
+    });
+  }
+
   static const _categoryColors = {
     'Supplies': Color(0xFF1A4FD6),
     'Rent': Color(0xFFDC2626),
@@ -49,10 +72,21 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final provider = context.watch<AppProvider>();
     final all = provider.expenses;
 
-    final categories = <String>{for (final e in all) e.category}.toList()
+    // An expense with no recorded date can't be excluded from any month —
+    // it stays visible everywhere rather than silently vanishing the moment
+    // a month filter exists at all.
+    final monthFiltered = all
+        .where((e) =>
+            e.date == null ||
+            (e.date!.year == _selectedMonth.year &&
+                e.date!.month == _selectedMonth.month))
+        .toList();
+
+    final categories = <String>{for (final e in monthFiltered) e.category}
+        .toList()
       ..sort();
     final query = _searchQuery.trim().toLowerCase();
-    final visible = all.where((e) {
+    final visible = monthFiltered.where((e) {
       final matchesCategory = _category == 'All' || e.category == _category;
       final matchesSearch = query.isEmpty ||
           e.title.toLowerCase().contains(query) ||
@@ -62,13 +96,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }).toList();
 
     final total = all.fold<double>(0, (sum, e) => sum + e.amount);
-    final now = DateTime.now();
-    final thisMonth = all
-        .where((e) =>
-            e.date != null &&
-            e.date!.year == now.year &&
-            e.date!.month == now.month)
-        .fold<double>(0, (sum, e) => sum + e.amount);
+    final monthTotal =
+        monthFiltered.fold<double>(0, (sum, e) => sum + e.amount);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -94,8 +123,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _titleRow(narrow, visible),
-                        const SizedBox(height: 20),
-                        _summaryRow(total, thisMonth, all.length),
+                        const SizedBox(height: 16),
+                        _monthNav(),
+                        const SizedBox(height: 16),
+                        _summaryRow(monthTotal, total, monthFiltered.length),
                         const SizedBox(height: 20),
                         if (categories.isNotEmpty) ...[
                           _filterChips(categories),
@@ -261,16 +292,53 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
   }
 
-  Widget _summaryRow(double total, double thisMonth, int count) {
+  /// Chevron month stepper — same pattern as Payroll's, so switching which
+  /// month's expenses are shown reads the same way across both screens.
+  Widget _monthNav() {
+    return Container(
+      key: const Key('expenseMonthNav'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded, size: 20),
+            tooltip: 'Previous month',
+            onPressed: () => _stepMonth(-1),
+          ),
+          Text(
+            _monthLabel,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right_rounded, size: 20),
+            tooltip: 'Next month',
+            onPressed: () => _stepMonth(1),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(double monthTotal, double allTimeTotal, int count) {
     final cards = [
       _summaryCard(
-          'This month',
-          '${Money.symbol}${thisMonth.toStringAsFixed(0)}',
+          _monthLabel,
+          '${Money.symbol}${monthTotal.toStringAsFixed(0)}',
           Icons.calendar_month_rounded,
           const Color(0xFFDC2626)),
-      _summaryCard('Total logged', '${Money.symbol}${total.toStringAsFixed(0)}',
+      _summaryCard('Total logged (all time)',
+          '${Money.symbol}${allTimeTotal.toStringAsFixed(0)}',
           Icons.account_balance_wallet_outlined, const Color(0xFF1A4FD6)),
-      _summaryCard('Entries', '$count', Icons.receipt_long_outlined,
+      _summaryCard('Entries this month', '$count', Icons.receipt_long_outlined,
           const Color(0xFF8B5CF6)),
     ];
 
@@ -368,8 +436,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 : _searchQuery.trim().isNotEmpty
                     ? 'No expenses match "${_searchQuery.trim()}".'
                     : _category == 'All'
-                        ? 'No expenses logged yet.'
-                        : 'No $_category expenses logged.',
+                        ? 'No expenses logged in $_monthLabel.'
+                        : 'No $_category expenses logged in $_monthLabel.',
             style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
           ),
         ),
