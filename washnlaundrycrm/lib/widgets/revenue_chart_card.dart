@@ -13,7 +13,9 @@ import 'panel_card.dart';
 /// `revenue_series` from `/api/dashboard/stats/`, which has always been in the
 /// payload.
 class RevenueChartCard extends StatelessWidget {
-  const RevenueChartCard({super.key});
+  final bool collapsible;
+
+  const RevenueChartCard({super.key, this.collapsible = false});
 
   @override
   Widget build(BuildContext context) {
@@ -31,64 +33,34 @@ class RevenueChartCard extends StatelessWidget {
     // The 350 floor keeps the axis readable on a quiet fortnight.
     final double maxY = peak > 300 ? (peak * 1.25) : 350.0;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return PanelCard(
+      title: 'Revenue',
+      subtitle: 'Last 14 days',
+      collapsible: collapsible,
+      trailing: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Revenue',
-                    style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A)),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Last 14 days',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                  ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // The total across the window — the subtitle says "last 14
-                  // days", so a single day's figure never belonged here.
-                  Text(
-                    formatRupees(total),
-                    style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A)),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    provider.revenueTodayChange == null
-                        ? '— vs prior'
-                        : '${formatPercent(provider.revenueTodayChange!.abs())} vs prior',
-                    style:
-                        const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                  ),
-                ],
-              ),
-            ],
+          // The total across the window — the subtitle says "last 14
+          // days", so a single day's figure never belonged here.
+          Text(
+            formatRupees(total),
+            style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A)),
           ),
-          const SizedBox(height: 24),
-          if (series.isEmpty)
-            const SizedBox(
+          const SizedBox(height: 4),
+          Text(
+            provider.revenueTodayChange == null
+                ? '— vs prior'
+                : '${formatPercent(provider.revenueTodayChange!.abs())} vs prior',
+            style:
+                const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+          ),
+        ],
+      ),
+      child: series.isEmpty
+          ? const SizedBox(
               height: 180,
               child: Center(
                 child: Text(
@@ -97,8 +69,7 @@ class RevenueChartCard extends StatelessWidget {
                 ),
               ),
             )
-          else
-            ClipRect(
+          : ClipRect(
               child: SizedBox(
                 height: 180,
                 child: BarChart(
@@ -187,8 +158,6 @@ class RevenueChartCard extends StatelessWidget {
                 ),
               ),
             ),
-        ],
-      ),
     );
   }
 

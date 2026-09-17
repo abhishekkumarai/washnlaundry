@@ -95,4 +95,63 @@ void main() {
       expect(e.toString(), 'ApiException: boom');
     });
   });
+
+  group('ApiService.describeError', () {
+    // A raw JSON dump used to reach the SnackBar unparsed — these pin the
+    // three DRF error shapes it now turns into an actual sentence, plus the
+    // non-JSON fallback.
+    test('a validate_<field> error surfaces as "field: message"', () {
+      // e.g. StaffSerializer.validate_start_date.
+      final msg = ApiService.describeError(
+        '{"start_date":["This staff member already has attendance recorded '
+        'before this date."]}',
+        '/staff/109/',
+      );
+      expect(msg,
+          'start_date: This staff member already has attendance recorded before this date.');
+    });
+
+    test('a custom @action {"detail": ...} response is used as-is', () {
+      // e.g. AttendanceViewSet.bulk's start-date rejection.
+      final msg = ApiService.describeError(
+        '{"detail":"Cannot mark attendance before start date for: Ramesh Kumar."}',
+        '/attendance/bulk/',
+      );
+      expect(msg, 'Cannot mark attendance before start date for: Ramesh Kumar.');
+    });
+
+    test('a bare-string serializer.validate() error drops the field label',
+        () {
+      // e.g. SalaryPaymentSerializer.validate raising a plain string, which
+      // DRF wraps as non_field_errors — there's no real field to prefix.
+      final msg = ApiService.describeError(
+        '{"non_field_errors":["This payment would exceed what Ramesh Kumar '
+        'is owed for July 2026 (200.0 remaining)."]}',
+        '/salary-payments/',
+      );
+      expect(msg,
+          'This payment would exceed what Ramesh Kumar is owed for July 2026 (200.0 remaining).');
+    });
+
+    test('multiple field errors are all included', () {
+      final msg = ApiService.describeError(
+        '{"name":["This field is required."],"phone":["This field is required."]}',
+        '/staff/',
+      );
+      expect(msg, contains('name: This field is required.'));
+      expect(msg, contains('phone: This field is required.'));
+    });
+
+    test('a non-JSON body (e.g. an HTML proxy error page) falls back to the raw dump',
+        () {
+      final msg =
+          ApiService.describeError('<html>502 Bad Gateway</html>', '/staff/');
+      expect(msg, 'Request to /staff/ failed: <html>502 Bad Gateway</html>');
+    });
+
+    test('an empty body says so instead of showing nothing', () {
+      final msg = ApiService.describeError('', '/staff/');
+      expect(msg, 'Request to /staff/ failed with no response body.');
+    });
+  });
 }

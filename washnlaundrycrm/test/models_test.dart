@@ -39,7 +39,6 @@ void main() {
         'name': 'Shirt',
         'price': 15.0,
         'unit': 'PC',
-        'turnaround_days': 2,
         'is_active': true,
       });
 
@@ -47,7 +46,6 @@ void main() {
       expect(item.categoryName, 'Ironing');
       expect(item.price, 15.0);
       expect(item.unitLabel, 'Per piece');
-      expect(item.turnaroundLabel, '2d');
     });
 
     test('parses a per-kg item', () {

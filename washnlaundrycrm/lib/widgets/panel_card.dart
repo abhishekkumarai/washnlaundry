@@ -3,27 +3,121 @@ import 'package:flutter/material.dart';
 import '../utils/money.dart';
 
 /// Shared chrome for the dashboard panels: white surface, hairline border,
-/// optional title/subtitle row with a trailing action.
-class PanelCard extends StatelessWidget {
+/// optional title/subtitle row with a trailing action, leading widget, and
+/// collapsible content support.
+class PanelCard extends StatefulWidget {
   final String title;
   final String? subtitle;
   final Widget? trailing;
+  final Widget? leading;
   final Widget child;
   final EdgeInsetsGeometry padding;
+  final bool collapsible;
+  final bool initiallyExpanded;
 
   const PanelCard({
     super.key,
     required this.title,
     this.subtitle,
     this.trailing,
+    this.leading,
     required this.child,
     this.padding = const EdgeInsets.all(20),
+    this.collapsible = false,
+    this.initiallyExpanded = true,
   });
 
   @override
+  State<PanelCard> createState() => _PanelCardState();
+}
+
+class _PanelCardState extends State<PanelCard> {
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.initiallyExpanded;
+  }
+
+  @override
+  void didUpdateWidget(covariant PanelCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.collapsible && !_expanded) {
+      _expanded = true;
+    }
+  }
+
+  void _toggle() {
+    if (widget.collapsible) {
+      setState(() {
+        _expanded = !_expanded;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final showContent = !widget.collapsible || _expanded;
+
+    Widget header = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.leading != null) ...[
+          widget.leading!,
+          const SizedBox(width: 12),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              if (widget.subtitle != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    widget.subtitle!,
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF94A3B8)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (widget.trailing != null) widget.trailing!,
+        if (widget.collapsible) ...[
+          const SizedBox(width: 8),
+          Icon(
+            _expanded
+                ? Icons.keyboard_arrow_up_rounded
+                : Icons.keyboard_arrow_down_rounded,
+            size: 20,
+            color: const Color(0xFF64748B),
+          ),
+        ],
+      ],
+    );
+
+    if (widget.collapsible) {
+      header = MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _toggle,
+          child: header,
+        ),
+      );
+    }
+
     return Container(
-      padding: padding,
+      padding: widget.padding,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -32,38 +126,11 @@ class PanelCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                    if (subtitle != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          subtitle!,
-                          style: const TextStyle(
-                              fontSize: 11, color: Color(0xFF94A3B8)),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              if (trailing != null) trailing!,
-            ],
-          ),
-          const SizedBox(height: 16),
-          child,
+          header,
+          if (showContent) ...[
+            const SizedBox(height: 16),
+            widget.child,
+          ],
         ],
       ),
     );

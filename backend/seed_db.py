@@ -163,13 +163,13 @@ def seed():
     total_items = 0
     for order_index, (cat_name, icon, items) in enumerate(CATALOGUE, start=1):
         category = GarmentCategory.objects.create(
-            name=cat_name, icon=icon, display_order=order_index, turnaround_days=1
+            name=cat_name, icon=icon, display_order=order_index
         )
         categories[cat_name] = category
         for item_index, (name, price, unit) in enumerate(items, start=1):
             GarmentItem.objects.create(
                 category=category, name=name, price=float(price), unit=unit,
-                turnaround_days=1, display_order=item_index,
+                display_order=item_index,
                 # Matched by name *here*, once, at seed time. The client used
                 # to do this lookup on every build, which meant renaming an
                 # item silently lost its photo.

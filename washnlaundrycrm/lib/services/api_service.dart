@@ -38,7 +38,13 @@ class ApiService {
   static String get baseUrl {
     const raw = String.fromEnvironment('API_BASE_URL', defaultValue: '');
     if (raw.isNotEmpty) return raw;
-    if (kDebugMode && kIsWeb) return 'http://127.0.0.1:8000/api';
+    if (kDebugMode) {
+      if (kIsWeb) return 'http://127.0.0.1:8000/api';
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        return 'http://10.0.2.2:8000/api';
+      }
+      return 'http://127.0.0.1:8000/api';
+    }
     return '/api';
   }
 
@@ -87,7 +93,7 @@ class ApiService {
         return json.decode(response.body);
       }
       throw ApiException(
-        'Request to $path failed: ${response.body}',
+        describeError(response.body, path),
         statusCode: response.statusCode,
       );
     } on ApiException {
@@ -95,6 +101,40 @@ class ApiService {
     } catch (e) {
       throw ApiException('Could not reach the server ($path): $e');
     }
+  }
+
+  /// DRF error bodies are JSON, not prose — a raw dump like
+  /// `{"start_date":["This staff member already has attendance recorded
+  /// before this date."]}` used to go straight into a SnackBar unparsed.
+  /// This pulls out the actual sentence(s) DRF is trying to say, covering
+  /// its three error shapes: `{"detail": "..."}` (custom @action responses,
+  /// object-level ValidationError), `{"non_field_errors": [...]}` (a bare
+  /// string raised from serializer.validate()), and `{"field": [...], ...}`
+  /// (validate_<field> / a model field's own validators). Anything that
+  /// isn't valid JSON (an nginx/proxy HTML error page, a raw 500 traceback)
+  /// falls back to the old dump rather than showing nothing.
+  ///
+  /// Public (not `_send`'s private detail) and pure — no HTTP client needed —
+  /// so the parsing itself is directly unit-testable, unlike `_send`.
+  static String describeError(String body, String path) {
+    if (body.isEmpty) return 'Request to $path failed with no response body.';
+    try {
+      final decoded = json.decode(body);
+      if (decoded is Map) {
+        if (decoded['detail'] is String) return decoded['detail'] as String;
+        final parts = <String>[];
+        decoded.forEach((key, value) {
+          final text = value is List ? value.join(' ') : value.toString();
+          parts.add(key == 'non_field_errors' ? text : '$key: $text');
+        });
+        if (parts.isNotEmpty) return parts.join(' ');
+      } else if (decoded is List && decoded.isNotEmpty) {
+        return decoded.join(' ');
+      }
+    } catch (_) {
+      // Not JSON — fall through to the raw body below.
+    }
+    return 'Request to $path failed: $body';
   }
 
   static List<Map<String, dynamic>> _asList(dynamic decoded) {
@@ -157,9 +197,15 @@ class ApiService {
   }
 
   /// The "Collect Payment" action on the order detail screen.
-  static Future<OrderModel> collectPayment(String id, double amount) async {
-    final data =
-        await _send('POST', '/orders/$id/payment/', body: {'amount': amount});
+  static Future<OrderModel> collectPayment(
+    String id,
+    double amount, {
+    String paymentMethod = PaymentMethod.cash,
+  }) async {
+    final data = await _send('POST', '/orders/$id/payment/', body: {
+      'amount': amount,
+      'payment_method': paymentMethod,
+    });
     return OrderModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
@@ -233,6 +279,60 @@ class ApiService {
 
   static Future<void> deleteCustomer(String id) =>
       _send('DELETE', '/customers/$id/');
+
+  /// Step 1 of bulk import: uploads the raw file and gets back its column
+  /// names, a few sample rows, and a best-effort field-mapping guess, for
+  /// the user to confirm/edit before anything is actually created.
+  static Future<Map<String, dynamic>> importCustomersPreview(
+      Uint8List bytes, String filename) async {
+    final request =
+        http.MultipartRequest('POST', _uri('/customers/import/preview/'))
+          ..files
+              .add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    return _sendMultipart(request);
+  }
+
+  /// Step 2: re-uploads the file alongside the confirmed
+  /// {targetField: sourceColumn} mapping and bulk-creates customers from it.
+  /// Returns the import summary (created/updated/skipped counts) — rows
+  /// missing a name/phone are always dropped; a row whose phone duplicates
+  /// another row or an existing customer is dropped too, *unless*
+  /// [overwriteDuplicates] is set, in which case that existing customer's
+  /// other fields are updated instead (its phone is never touched).
+  static Future<Map<String, dynamic>> importCustomersCommit(
+    Uint8List bytes,
+    String filename,
+    Map<String, String> mapping, {
+    bool overwriteDuplicates = false,
+  }) async {
+    final request =
+        http.MultipartRequest('POST', _uri('/customers/import/commit/'))
+          ..fields['mapping'] = json.encode(mapping)
+          ..fields['overwrite_duplicates'] = overwriteDuplicates.toString()
+          ..files
+              .add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    return _sendMultipart(request);
+  }
+
+  static Future<Map<String, dynamic>> _sendMultipart(
+      http.MultipartRequest request) async {
+    try {
+      final streamed = await request.send().timeout(_timeout);
+      final response = await http.Response.fromStream(streamed);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return (json.decode(response.body) as Map).cast<String, dynamic>();
+      }
+      throw ApiException(
+        describeError(response.body, request.url.path),
+        statusCode: response.statusCode,
+      );
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(
+          'Could not reach the server (${request.url.path}): $e');
+    }
+  }
 
   // ── Back office ────────────────────────────────────────────────────────────
 

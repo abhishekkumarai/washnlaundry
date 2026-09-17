@@ -14,8 +14,10 @@ import 'receipt_dialog.dart';
 /// TIME · ORDER · CUSTOMER · TYPE · PAYMENT · STATUS.
 class RecentActivityCard extends StatelessWidget {
   final int limit;
+  final bool collapsible;
 
-  const RecentActivityCard({super.key, this.limit = 8});
+  const RecentActivityCard(
+      {super.key, this.limit = 8, this.collapsible = false});
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +26,7 @@ class RecentActivityCard extends StatelessWidget {
 
     return PanelCard(
       title: 'Recent activity',
+      collapsible: collapsible,
       trailing: Row(
         children: [
           Container(

@@ -108,11 +108,9 @@ class _ServicesScreenState extends State<ServicesScreen> {
         'id': c.id,
         'title': c.name,
         'count': c.itemCount,
-        'range': c.priceRangeLabel,
         'icon': style['icon'],
         'color': style['color'],
         'bg': style['bg'],
-        'turnaroundDays': c.turnaroundDays,
         'isActive': c.isActive,
       };
     }).toList();
@@ -137,7 +135,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
               'price': g.price,
               'unit': g.unitLabel,
               'unitShort': g.unitShortLabel,
-              'turnaround': g.turnaroundLabel,
               'active': g.isActive,
               // The item's own category — Edit reads this instead of
               // assuming the sidebar's currently-selected tab, which only
@@ -209,23 +206,32 @@ class _ServicesScreenState extends State<ServicesScreen> {
             Container(
               width: 180,
               height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: TextField(
-                onChanged: (v) => setState(() => _searchQuery = v),
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13),
-                decoration: const InputDecoration(
-                  hintText: 'Search items...',
-                  hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                  prefixIcon: Icon(Icons.search_rounded,
+              child: Row(
+                children: [
+                  const Icon(Icons.search_rounded,
                       size: 18, color: Color(0xFF94A3B8)),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 9),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: const InputDecoration(
+                        hintText: 'Search items...',
+                        hintStyle:
+                            TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        border: InputBorder.none,
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
@@ -268,23 +274,32 @@ class _ServicesScreenState extends State<ServicesScreen> {
             const SizedBox(height: 10),
             Container(
               height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: TextField(
-                onChanged: (v) => setState(() => _searchQuery = v),
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13),
-                decoration: const InputDecoration(
-                  hintText: 'Search items...',
-                  hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                  prefixIcon: Icon(Icons.search_rounded,
+              child: Row(
+                children: [
+                  const Icon(Icons.search_rounded,
                       size: 18, color: Color(0xFF94A3B8)),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 9),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: const InputDecoration(
+                        hintText: 'Search items...',
+                        hintStyle:
+                            TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        border: InputBorder.none,
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -441,7 +456,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                       color: sel
                                           ? const Color(0xFF1A4FD6)
                                           : const Color(0xFF0F172A))),
-                              Text('${c['count']} items · ${c['range']}',
+                              Text('${c['count']} items',
                                   style: const TextStyle(
                                       fontSize: 11,
                                       color: Color(0xFF64748B))),
@@ -560,33 +575,13 @@ class _ServicesScreenState extends State<ServicesScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Items grid
-          LayoutBuilder(
-            builder: (context, gridConstraints) {
-              final crossAxisCount = gridConstraints.maxWidth < 380
-                  ? 1
-                  : gridConstraints.maxWidth < 620
-                      ? 2
-                      : gridConstraints.maxWidth < 900
-                          ? 3
-                          : 4;
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 0.78,
-                ),
-                itemCount: items.length + 1,
-                itemBuilder: (ctx, i) {
-                  if (i == items.length) return _buildAddNewItemCard();
-                  return _buildItemCard(items[i]);
-                },
-              );
-            },
-          ),
+          // Items list. Wide screens get the live app's own layout — a
+          // compact table (Photo/Service/Unit/Price/Active/Actions) — since
+          // that's what LIVE_AUDIT.md's /inventory capture shows. Phone/
+          // tablet widths keep the card grid: a 6-column table has no room
+          // to breathe below ~900px, same reasoning as every other screen's
+          // table-to-card fallback at contentWideBreakpoint.
+          narrow ? _buildItemsCardGrid(items) : _buildItemsTable(items),
         ],
       ),
     );
@@ -607,6 +602,188 @@ class _ServicesScreenState extends State<ServicesScreen> {
         categoryRail,
         Expanded(child: itemsGrid),
       ],
+    );
+  }
+
+  /// Card-grid form of the items list — phone/tablet widths, where a table's
+  /// fixed columns have no room.
+  Widget _buildItemsCardGrid(List<Map<String, dynamic>> items) {
+    return LayoutBuilder(
+      builder: (context, gridConstraints) {
+        final crossAxisCount = gridConstraints.maxWidth < 380
+            ? 1
+            : gridConstraints.maxWidth < 620
+                ? 2
+                : gridConstraints.maxWidth < 900
+                    ? 3
+                    : 4;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 0.78,
+          ),
+          itemCount: items.length + 1,
+          itemBuilder: (ctx, i) {
+            if (i == items.length) return _buildAddNewItemCard();
+            return _buildItemCard(items[i]);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _colHead(String text) => Text(
+        text,
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.6,
+          color: Color(0xFF64748B),
+        ),
+      );
+
+  /// Table form of the items list — Photo / Service / Unit / Price / Active /
+  /// Actions, matching the live app's own /inventory Items tab (LIVE_AUDIT.md).
+  Widget _buildItemsTable(List<Map<String, dynamic>> items) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 40),
+                const SizedBox(width: 12),
+                Expanded(flex: 3, child: _colHead('SERVICE')),
+                Expanded(flex: 2, child: _colHead('UNIT')),
+                Expanded(flex: 2, child: _colHead('PRICE')),
+                SizedBox(width: 60, child: _colHead('ACTIVE')),
+                const SizedBox(width: 76),
+              ],
+            ),
+          ),
+          if (items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32),
+              child: Center(
+                child: Text('No items in this category yet.',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+              ),
+            )
+          else
+            for (final item in items) _buildItemRow(item),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemRow(Map<String, dynamic> item) {
+    final active = item['active'] as bool;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: (item['img'] as String).isEmpty
+                  ? _itemImagePlaceholder()
+                  : Image.network(
+                      item['img'] as String,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _itemImagePlaceholder(),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 3,
+            child: Text(item['name'] as String,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A))),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(item['unit'] as String,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+          ),
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                Text(
+                    '${Money.symbol}${(item['price'] as double).toStringAsFixed(0)}',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A))),
+                Text(' / ${item['unitShort']}',
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF94A3B8))),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 60,
+            child: Switch(
+              value: active,
+              activeColor: const Color(0xFF1A4FD6),
+              onChanged: (v) => context
+                  .read<AppProvider>()
+                  .updateGarmentItem(item['id'] as String, {'is_active': v}),
+            ),
+          ),
+          SizedBox(
+            width: 76,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                GestureDetector(
+                  onTap: () => _showEditItemModal(context, item),
+                  child: const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Icon(Icons.edit_outlined,
+                        size: 16, color: Color(0xFF64748B)),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => _showDeleteItemConfirm(context, item),
+                  child: const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Icon(Icons.delete_outline_rounded,
+                        size: 16, color: Color(0xFFDC2626)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -718,22 +895,9 @@ class _ServicesScreenState extends State<ServicesScreen> {
       ],
     );
 
-    final priceAndActions = Row(
+    final actions = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            const Text('Price range',
-                style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-            Text(cat['range'] as String,
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
-          ],
-        ),
-        const SizedBox(width: 16),
         IconButton(
           icon: const Icon(Icons.edit_outlined,
               size: 18, color: Color(0xFF64748B)),
@@ -792,22 +956,22 @@ class _ServicesScreenState extends State<ServicesScreen> {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Below this the price-range/edit/menu cluster crowds the title
-          // column to near-zero — stack them on their own row instead.
+          // Below this the edit/menu cluster crowds the title column to
+          // near-zero — stack them on their own row instead.
           if (constraints.maxWidth < 500) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 iconAndTitle,
                 const SizedBox(height: 14),
-                priceAndActions,
+                actions,
               ],
             );
           }
           return Row(
             children: [
               Expanded(child: iconAndTitle),
-              priceAndActions,
+              actions,
             ],
           );
         },
@@ -999,13 +1163,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                           style: const TextStyle(
                               fontSize: 10, color: Color(0xFF64748B))),
                     ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.access_time_rounded,
-                        size: 11, color: Color(0xFF94A3B8)),
-                    const SizedBox(width: 2),
-                    Text(item['turnaround'] as String,
-                        style: const TextStyle(
-                            fontSize: 10, color: Color(0xFF94A3B8))),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -1773,8 +1930,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
   }
 
   /// The live modal — "Add New Service / Garment Item". Category, name and
-  /// price are required; unit and turnaround are selects, so nothing here has
-  /// to be guessed from free text.
+  /// price are required; unit is a select, so it doesn't have to be guessed
+  /// from free text.
   void _showAddItemModal(BuildContext context) {
     if (_categories.isEmpty) {
       _showError('Please select a service category first');
@@ -1785,7 +1942,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
     final priceCtrl = TextEditingController();
     String selectedCat = _categories[_selectedCategoryIndex]['title'] as String;
     String selectedUnit = PricingUnit.piece;
-    int turnaroundDays = 1;
 
     String? nameError;
     String? priceError;
@@ -1823,7 +1979,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
               'name': name,
               'price': price,
               'unit': selectedUnit,
-              'turnaround_days': turnaroundDays,
             });
             if (!ctx.mounted) return;
 
@@ -1951,18 +2106,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  _modalLabel('Turnaround Time'),
-                  _modalDropdown<int>(
-                    value: turnaroundDays,
-                    items: List.generate(7, (i) => i + 1)
-                        .map((d) =>
-                            DropdownMenuItem(value: d, child: Text('${d}d')))
-                        .toList(),
-                    onChanged: (v) {
-                      if (v != null) setModalState(() => turnaroundDays = v);
-                    },
-                  ),
                   if (submitError != null) ...[
                     const SizedBox(height: 14),
                     _modalErrorBanner(submitError!),
@@ -2004,7 +2147,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
   /// what GarmentCategory stores: name, icon and the active flag.
   void _showAddCategoryModal(BuildContext context) {
     final nameCtrl = TextEditingController();
-    final turnaroundCtrl = TextEditingController(text: '1');
     bool isActive = true;
     String? nameError;
     String? submitError;
@@ -2026,7 +2168,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
               'name': name,
               'display_order': _categories.length + 1,
               'is_active': isActive,
-              'turnaround_days': int.tryParse(turnaroundCtrl.text.trim()) ?? 1,
             });
             if (!ctx.mounted) return;
 
@@ -2106,18 +2247,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     value: isActive,
                     onChanged: (v) => setModalState(() => isActive = v),
                   ),
-                  const SizedBox(height: 6),
-                  _modalLabel('Turnaround Days'),
-                  TextField(
-                    controller: turnaroundCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
                   if (submitError != null) ...[
                     const SizedBox(height: 10),
                     _modalErrorBanner(submitError!),
@@ -2157,8 +2286,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   void _showEditCategoryModal(BuildContext context, Map<String, dynamic> cat) {
     final nameCtrl = TextEditingController(text: cat['title'] as String);
-    final turnaroundCtrl =
-        TextEditingController(text: '${cat['turnaroundDays'] ?? 1}');
     // Was hardcoded `true` regardless of the category's real state — saving
     // any edit to an already-inactive category (even just its name) would
     // silently reactivate it, since the switch always started on.
@@ -2182,7 +2309,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
             final ok = await provider.updateCategory('${cat['id']}', {
               'name': name,
               'is_active': isActive,
-              'turnaround_days': int.tryParse(turnaroundCtrl.text.trim()) ?? 1,
             });
             if (!ctx.mounted) return;
 
@@ -2258,18 +2384,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                             TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                     value: isActive,
                     onChanged: (v) => setModalState(() => isActive = v),
-                  ),
-                  const SizedBox(height: 6),
-                  _modalLabel('Turnaround Days'),
-                  TextField(
-                    controller: turnaroundCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
                   ),
                   if (submitError != null) ...[
                     const SizedBox(height: 10),
@@ -2405,9 +2519,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
       (u) => PricingUnit.label(u) == item['unit'],
       orElse: () => PricingUnit.piece,
     );
-    int turnaroundDays = int.tryParse(
-            (item['turnaround'] as String? ?? '').replaceAll('d', '').trim()) ??
-        1;
     bool isActive = (item['active'] as bool?) ?? true;
 
     String? nameError;
@@ -2446,7 +2557,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
               'name': name,
               'price': price,
               'unit': selectedUnit,
-              'turnaround_days': turnaroundDays,
               'is_active': isActive,
               'image_url': imgCtrl.text.trim(),
             });
@@ -2576,49 +2686,16 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _modalLabel('Turnaround Time'),
-                              _modalDropdown<int>(
-                                value: turnaroundDays,
-                                items: List.generate(7, (i) => i + 1)
-                                    .map((d) => DropdownMenuItem(
-                                        value: d, child: Text('${d}d')))
-                                    .toList(),
-                                onChanged: (v) {
-                                  if (v != null)
-                                    setModalState(() => turnaroundDays = v);
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _modalLabel('Status'),
-                              SwitchListTile(
-                                contentPadding: EdgeInsets.zero,
-                                dense: true,
-                                activeColor: const Color(0xFF1A4FD6),
-                                title: Text(isActive ? 'Active' : 'Inactive',
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600)),
-                                value: isActive,
-                                onChanged: (v) =>
-                                    setModalState(() => isActive = v),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    _modalLabel('Status'),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      activeColor: const Color(0xFF1A4FD6),
+                      title: Text(isActive ? 'Active' : 'Inactive',
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                      value: isActive,
+                      onChanged: (v) => setModalState(() => isActive = v),
                     ),
                     const SizedBox(height: 14),
                     _modalLabel('Image URL (optional)'),

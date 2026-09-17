@@ -6,7 +6,9 @@ import 'panel_card.dart';
 
 /// "Needs attention": the four things that should pull the owner into action.
 class NeedsAttentionCard extends StatelessWidget {
-  const NeedsAttentionCard({super.key});
+  final bool collapsible;
+
+  const NeedsAttentionCard({super.key, this.collapsible = false});
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +21,7 @@ class NeedsAttentionCard extends StatelessWidget {
 
     return PanelCard(
       title: 'Needs attention',
+      collapsible: collapsible,
       child: Column(
         children: [
           StatRow(
@@ -63,7 +66,9 @@ class NeedsAttentionCard extends StatelessWidget {
 
 /// "Order channels": where today's orders came in from.
 class OrderChannelsCard extends StatelessWidget {
-  const OrderChannelsCard({super.key});
+  final bool collapsible;
+
+  const OrderChannelsCard({super.key, this.collapsible = false});
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +89,7 @@ class OrderChannelsCard extends StatelessWidget {
 
     return PanelCard(
       title: 'Order channels',
+      collapsible: collapsible,
       trailing: const Text(
         'today',
         style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
@@ -135,7 +141,9 @@ class OrderChannelsCard extends StatelessWidget {
 
 /// "Staff attendance": today's present / absent / leave split.
 class StaffAttendanceCard extends StatelessWidget {
-  const StaffAttendanceCard({super.key});
+  final bool collapsible;
+
+  const StaffAttendanceCard({super.key, this.collapsible = false});
 
   @override
   Widget build(BuildContext context) {
@@ -147,6 +155,7 @@ class StaffAttendanceCard extends StatelessWidget {
 
     return PanelCard(
       title: 'Staff attendance',
+      collapsible: collapsible,
       child: Column(
         children: [
           Row(

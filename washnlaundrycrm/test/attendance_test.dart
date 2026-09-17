@@ -39,6 +39,79 @@ void main() {
     AttendanceModel(id: '11', staffId: '2', staffName: 'Geeta Devi', date: today, status: 'LEAVE'),
   ];
 
+  group('AttendanceScreen start date', () {
+    final futureStarter = StaffModel(
+      id: '4',
+      name: 'Not Yet Started',
+      role: 'Washer',
+      phone: '4',
+      startDate: today.add(const Duration(days: 5)),
+    );
+
+    testWidgets(
+        'a staff member who has not started yet shows a joins-date hint, not "not marked"',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: [futureStarter]);
+      await tester.pumpWidget(host(provider, const AttendanceScreen()));
+      await tester.pump();
+
+      expect(find.textContaining('joins'), findsOneWidget);
+      expect(find.textContaining('not marked'), findsNothing);
+    });
+
+    testWidgets('their status chips are disabled', (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: [futureStarter]);
+      await tester.pumpWidget(host(provider, const AttendanceScreen()));
+      await tester.pump();
+
+      final chip =
+          tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'PRESENT'));
+      expect(chip.onSelected, isNull);
+    });
+
+    testWidgets('tapping a disabled chip does not mark them', (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: [futureStarter]);
+      await tester.pumpWidget(host(provider, const AttendanceScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'PRESENT'), warnIfMissed: false);
+      await tester.pump();
+
+      expect(find.textContaining('joins'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Save Register skips them even if a stale mark is already on file',
+        (tester) async {
+      // Belt-and-braces: _save must filter them out of `marks` regardless of
+      // any already-saved row, since the backend would 400 the whole batch
+      // otherwise (though in practice this can't happen once a start date is
+      // set, since setting one is itself rejected while earlier attendance
+      // exists).
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: [futureStarter], attendance: [
+          AttendanceModel(
+              id: '99',
+              staffId: '4',
+              staffName: 'Not Yet Started',
+              date: today,
+              status: 'PRESENT'),
+        ]);
+      await tester.pumpWidget(host(provider, const AttendanceScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Save Register'));
+      await tester.pump();
+
+      expect(
+          find.text('Nothing to save — mark at least one staff member.'),
+          findsOneWidget);
+    });
+  });
+
   group('AttendanceScreen', () {
     testWidgets('the roster comes from the provider, not a literal', (tester) async {
       // The screen used to hardcode six staff, none of whom were the seeded
@@ -118,17 +191,27 @@ void main() {
     testWidgets('a failed save reports the error instead of claiming success',
         (tester) async {
       // The old Save Register showed a green "saved successfully" snackbar
-      // unconditionally, without making any network call at all.
+      // unconditionally, without making any network call at all. A failure
+      // now surfaces as a popup (showErrorDialog), not a SnackBar — a toast
+      // was easy to miss.
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: [roster.first]);
       await tester.pumpWidget(host(provider, const AttendanceScreen()));
+      await tester.pump();
+
+      // Mark someone first — an empty register short-circuits to "Nothing to
+      // save" before ever calling the network, which isn't the failure this
+      // test means to exercise.
+      await tester.tap(find.widgetWithText(ChoiceChip, 'PRESENT'));
       await tester.pump();
 
       await tester.tap(find.text('Save Register'));
       await tester.pump(); // start the save
       await tester.pump(const Duration(seconds: 1)); // let it fail
+      await tester.pumpAndSettle(); // let the error popup's route animate in
 
       expect(find.text('Attendance saved successfully'), findsNothing);
-      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.text('Could not save the register'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsOneWidget);
     });
 
     testWidgets('saving an untouched register marks nobody present',

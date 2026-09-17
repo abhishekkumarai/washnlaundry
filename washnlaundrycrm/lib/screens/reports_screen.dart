@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
+import '../widgets/app_date_picker.dart';
 import '../widgets/load_state.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -82,23 +83,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
   /// Takes no BuildContext parameter: a parameter would shadow `State.context`
   /// and the `mounted` check after the await guards the State.
   Future<void> _pickCustomDateRange() async {
-    final picked = await showDateRangePicker(
+    final picked = await AppDatePicker.pickDateRange(
       context: context,
       firstDate: DateTime(2025),
       lastDate: DateTime(2030),
-      initialDateRange: _customDateRange,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF1A4FD6),
-              onPrimary: Colors.white,
-              onSurface: Color(0xFF0F172A),
-            ),
-          ),
-          child: child!,
-        );
-      },
+      initialRange: _customDateRange,
     );
     if (!mounted || picked == null) return;
     setState(() {

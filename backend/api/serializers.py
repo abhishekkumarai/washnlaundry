@@ -1,3 +1,6 @@
+from datetime import timedelta
+
+from django.db.models import Sum
 from rest_framework import serializers
 
 from .models import (
@@ -111,6 +114,16 @@ class StaffSerializer(serializers.ModelSerializer):
         model = Staff
         fields = '__all__'
 
+    def validate_start_date(self, value):
+        # Only matters on an edit (self.instance exists) — a brand-new Staff
+        # row can't have attendance yet, so there's nothing to conflict with.
+        if value and self.instance and self.instance.attendance.filter(date__lt=value).exists():
+            raise serializers.ValidationError(
+                'This staff member already has attendance recorded before this date. '
+                'Fix or remove those records first.'
+            )
+        return value
+
 
 class AttendanceSerializer(serializers.ModelSerializer):
     staff_name = serializers.CharField(source='staff.name', read_only=True)
@@ -118,6 +131,16 @@ class AttendanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attendance
         fields = '__all__'
+
+    def validate(self, attrs):
+        staff = attrs.get('staff') or getattr(self.instance, 'staff', None)
+        date = attrs.get('date') or getattr(self.instance, 'date', None)
+        if staff and date and staff.start_date and date < staff.start_date:
+            raise serializers.ValidationError(
+                f"Cannot mark attendance for {staff.name} before their start date "
+                f"({staff.start_date})."
+            )
+        return attrs
 
 
 class SalaryPaymentSerializer(serializers.ModelSerializer):
@@ -131,6 +154,40 @@ class SalaryPaymentSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError('amount must be greater than zero.')
         return value
+
+    def validate(self, attrs):
+        # Mirrors payroll_summary's own total_salary/pending_amount formula
+        # (views.py) so this can't be bypassed by calling the API directly
+        # even though the Payroll screen's dialog already caps the amount
+        # against `pendingAmount` client-side.
+        staff = attrs.get('staff') or getattr(self.instance, 'staff', None)
+        month = attrs.get('month') or getattr(self.instance, 'month', None)
+        amount = attrs.get('amount', getattr(self.instance, 'amount', None))
+        if not (staff and month and amount is not None):
+            return attrs
+
+        month = SalaryPayment.month_start(month)
+        next_month = (month + timedelta(days=32)).replace(day=1)
+        days_in_month = (next_month - month).days
+        days_worked = sum(
+            a.day_value for a in
+            Attendance.objects.filter(staff=staff, date__gte=month, date__lt=next_month)
+        )
+        daily_rate = staff.monthly_wage / days_in_month
+        total_salary = round(days_worked * daily_rate, 2)
+
+        other_payments = SalaryPayment.objects.filter(staff=staff, month=month)
+        if self.instance:
+            other_payments = other_payments.exclude(pk=self.instance.pk)
+        already_paid = other_payments.aggregate(total=Sum('amount'))['total'] or 0.0
+
+        if round(already_paid + amount, 2) > total_salary:
+            remaining = round(max(total_salary - already_paid, 0.0), 2)
+            raise serializers.ValidationError(
+                f"This payment would exceed what {staff.name} is owed for "
+                f"{month:%B %Y} ({remaining} remaining)."
+            )
+        return attrs
 
 
 class ServiceAreaSerializer(serializers.ModelSerializer):

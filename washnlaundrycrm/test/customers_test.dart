@@ -476,4 +476,27 @@ void main() {
       expect(find.text('No customers to export.'), findsOneWidget);
     });
   });
+
+  group('CustomersScreen Import', () {
+    testWidgets('opens the Import Customers dialog with a file picker step',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Import Customers'), findsOneWidget);
+      expect(find.text('Choose File'), findsOneWidget);
+      // Only reached once a file has been picked and previewed.
+      expect(find.text('Match each field to a column from your file.'),
+          findsNothing);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Import Customers'), findsNothing);
+    });
+  });
 }

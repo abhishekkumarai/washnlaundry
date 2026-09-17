@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../models/garment_model.dart';
 import '../models/order_model.dart';
 import '../providers/app_provider.dart';
+import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
@@ -165,13 +167,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
           const SizedBox(width: 8),
           _headerButton('Edit', Icons.edit_outlined, const Color(0xFF475569),
-              _showEditOrder),
+              _canEditOrder(order) ? _showEditOrder : null),
           const SizedBox(width: 8),
           _headerButton('Print Receipt', Icons.print_outlined,
               const Color(0xFF475569), () => _toast('Sent to the printer.')),
           const SizedBox(width: 8),
           FilledButton.icon(
-            onPressed: order.isCancelled ? null : _showUpdateStatus,
+            onPressed: _canUpdateStatus(order) ? _showUpdateStatus : null,
             icon: const Icon(Icons.autorenew_rounded, size: 16),
             label: const Text('Update Status'),
             style: FilledButton.styleFrom(
@@ -221,7 +223,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(width: 4),
           IconButton(
             tooltip: 'Update Status',
-            onPressed: order.isCancelled ? null : _showUpdateStatus,
+            onPressed: _canUpdateStatus(order) ? _showUpdateStatus : null,
             icon: const Icon(Icons.autorenew_rounded, size: 18),
             style: IconButton.styleFrom(
               backgroundColor: const Color(0xFF1A4FD6),
@@ -245,6 +247,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
               PopupMenuItem(
                 value: _showEditOrder,
+                enabled: _canEditOrder(order),
                 child: const Text('Edit'),
               ),
               PopupMenuItem(
@@ -259,13 +262,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _headerButton(
-      String label, IconData icon, Color color, VoidCallback onTap) {
+      String label, IconData icon, Color color, VoidCallback? onTap) {
+    final effectiveColor = onTap == null ? const Color(0xFFCBD5E1) : color;
     return OutlinedButton.icon(
       onPressed: onTap,
-      icon: Icon(icon, size: 15, color: color),
+      icon: Icon(icon, size: 15, color: effectiveColor),
       label: Text(label,
           style: TextStyle(
-              fontSize: 12, fontWeight: FontWeight.bold, color: color)),
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: effectiveColor)),
       style: OutlinedButton.styleFrom(
         side: const BorderSide(color: Color(0xFFE2E8F0)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -823,7 +829,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             collected ? 'Expected Ready' : 'Expected Delivery',
             order.scheduledDate == null
                 ? 'Not scheduled'
-                : DateFormat('MMM d, yyyy').format(order.scheduledDate!),
+                : DateFormat('MMM d, yyyy').format(order.scheduledDate!) +
+                    (order.scheduledTime.isEmpty
+                        ? ''
+                        : ', ${TimeSlotModel.formatTime(order.scheduledTime)}'),
           ),
           if (!collected) ...[
             const SizedBox(height: 10),
@@ -857,10 +866,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Widget _paymentCard(OrderModel order) {
     final isPaid = order.paymentStatus == PaymentStatus.paid;
-    // Staff collect payment when the customer actually receives the order,
-    // not while it's still in the wash — the button stays visible so the
-    // balance is never hidden, but it can't be pressed early.
     final isDelivered = order.status == OrderStatus.delivered;
+    // Collect Payment is how an order now reaches Delivered, so it stays
+    // visible until there's genuinely nothing left to do: the order is
+    // already delivered and fully settled (or cancelled).
+    final hasAction = !order.isCancelled && !(isDelivered && order.dueAmount <= 0);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _panel,
@@ -903,15 +913,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(height: 8),
           _railRow('Balance Due',
               '${Money.symbol}${order.dueAmount.toStringAsFixed(0)}'),
-          if (order.dueAmount > 0) ...[
+          if (hasAction) ...[
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: isDelivered ? () => _collectPayment(order) : null,
+                onPressed: () => _showCollectPayment(order),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF10B981),
-                  disabledBackgroundColor: const Color(0xFFCBD5E1),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
@@ -920,13 +929,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
-            if (!isDelivered) ...[
-              const SizedBox(height: 6),
-              const Text(
-                'Available once the order is marked Delivered.',
-                style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-              ),
-            ],
           ],
         ],
       ),
@@ -940,18 +942,220 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _collectPayment(OrderModel order) async {
+  /// The "Collect Payment" dialog: amount, payment method, and whether the
+  /// customer is paying in full, part now, or later. Submitting it records
+  /// the payment (skipped entirely for Pay Later, where amount is 0) and,
+  /// if the order isn't already Delivered/Picked Up, also completes that
+  /// transition — Collect Payment is now the only way an order reaches
+  /// Delivered.
+  Future<void> _showCollectPayment(OrderModel order) async {
     final provider = context.read<AppProvider>();
-    final ok = await provider.collectPayment(order.id, order.dueAmount);
-    if (!mounted) return;
-    _toast(ok
-        ? 'Payment of ${Money.symbol}${order.dueAmount.toStringAsFixed(0)} collected.'
-        : provider.error ?? 'Could not record the payment.');
+    final willMarkDelivered = order.status != OrderStatus.delivered;
+    final amountController = TextEditingController(
+        text: order.dueAmount > 0 ? order.dueAmount.toStringAsFixed(0) : '');
+
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        var method = PaymentMethod.cash;
+        var payType = 'FULL';
+        String? error;
+        var saving = false;
+
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            void applyPayType(String type) {
+              payType = type;
+              if (type == 'FULL') {
+                amountController.text = order.dueAmount.toStringAsFixed(0);
+              } else if (type == 'PAY_LATER') {
+                amountController.text = '0';
+              }
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              title: const Text('Collect Payment',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A))),
+              content: SizedBox(
+                width: 420,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Payment Type',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF475569))),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ('FULL', 'Full'),
+                          ('PARTIAL', 'Partial'),
+                          ('PAY_LATER', 'Pay Later'),
+                        ].map((entry) {
+                          final (value, label) = entry;
+                          return ChoiceChip(
+                            label: Text(label),
+                            selected: payType == value,
+                            onSelected: (_) =>
+                                setDialogState(() => applyPayType(value)),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text('Amount',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF475569))),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: amountController,
+                        enabled: payType == 'PARTIAL',
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          prefixText: '${Money.symbol} ',
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text('Payment Method',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF475569))),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          PaymentMethod.cash,
+                          PaymentMethod.upi,
+                          PaymentMethod.card,
+                        ].map((value) {
+                          return ChoiceChip(
+                            label: Text(PaymentMethod.label(value)),
+                            selected: method == value,
+                            onSelected: payType == 'PAY_LATER'
+                                ? null
+                                : (_) => setDialogState(() => method = value),
+                          );
+                        }).toList(),
+                      ),
+                      if (error != null) ...[
+                        const SizedBox(height: 10),
+                        Text(error!,
+                            style: const TextStyle(
+                                fontSize: 12, color: Color(0xFFDC2626))),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: saving ? null : () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel',
+                      style: TextStyle(color: Color(0xFF64748B))),
+                ),
+                FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          double amount;
+                          if (payType == 'PAY_LATER') {
+                            amount = 0;
+                          } else {
+                            amount = double.tryParse(amountController.text) ?? -1;
+                            if (amount <= 0) {
+                              setDialogState(
+                                  () => error = 'Enter a valid amount.');
+                              return;
+                            }
+                            if (amount > order.dueAmount) {
+                              setDialogState(() =>
+                                  error = 'Amount can\'t exceed the balance due.');
+                              return;
+                            }
+                            if (payType == 'FULL' &&
+                                amount < order.dueAmount) {
+                              setDialogState(() => error =
+                                  'Full payment must cover the whole balance due.');
+                              return;
+                            }
+                          }
+                          setDialogState(() {
+                            saving = true;
+                            error = null;
+                          });
+                          final ok = await provider.collectPaymentAndMarkDelivered(
+                            order.id,
+                            amount: amount,
+                            paymentMethod: method,
+                            markDelivered: willMarkDelivered,
+                          );
+                          if (!ctx.mounted) return;
+                          if (ok) {
+                            Navigator.pop(ctx, true);
+                          } else {
+                            setDialogState(() {
+                              saving = false;
+                              error =
+                                  provider.error ?? 'Could not record the payment.';
+                            });
+                          }
+                        },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Text(saving ? 'Saving…' : 'Collect Payment',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (changed == true && mounted) {
+      _toast(willMarkDelivered
+          ? 'Payment recorded and order marked Delivered.'
+          : 'Payment recorded.');
+    }
   }
 
-  /// The live Update Status dialog: the four stages as a radio list with the
-  /// current one badged, Cancelled separated out as irreversible, and an
-  /// optional note that travels with the change.
+  /// Once an order is Delivered/Picked Up there's nothing left to move it to
+  /// — that transition now only happens via Collect Payment — and Cancelled
+  /// is already final, so Update Status is disabled for both.
+  bool _canUpdateStatus(OrderModel order) =>
+      !order.isCancelled && order.status != OrderStatus.delivered;
+
+  /// Once handed over, the order's own details (customer, fulfilment type,
+  /// expected date) shouldn't be edited after the fact either.
+  bool _canEditOrder(OrderModel order) => order.status != OrderStatus.delivered;
+
+  /// The live Update Status dialog: Placed → Processing → Ready as a radio
+  /// list with the current one badged, plus Cancelled separated out as
+  /// irreversible. Delivered/Picked Up is deliberately absent — that
+  /// transition now only happens via "Collect Payment" on the Payment card.
+  /// An optional note travels with the change.
   Future<void> _showUpdateStatus() async {
     final provider = context.read<AppProvider>();
     final order = _orderFrom(provider);
@@ -986,7 +1190,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF475569))),
                     const SizedBox(height: 8),
-                    for (var i = 0; i < order.stepStatuses.length; i++)
+                    for (var i = 0; i < order.stepStatuses.length - 1; i++)
                       _statusOption(
                         label: order.stepLabels[i],
                         value: order.stepStatuses[i],
@@ -1007,6 +1211,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       subtitle: 'This action cannot be undone',
                       onTap: () => setDialogState(
                           () => selected = OrderStatus.cancelled),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Marked delivered/picked up via "Collect Payment" on the Payment card, not here.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                     ),
                     const SizedBox(height: 14),
                     const Text('Notes (optional)',
@@ -1264,9 +1473,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             deliveryType == DeliveryType.homePickup
                         ? 'Expected Ready'
                         : 'Expected Delivery'),
-                    OutlinedButton.icon(
+                    AppDateButton(
+                      label: scheduled == null
+                          ? 'Not scheduled'
+                          : DateFormat('MMM d, yyyy').format(scheduled!),
                       onPressed: () async {
-                        final picked = await showDatePicker(
+                        final picked = await AppDatePicker.pickDate(
                           context: ctx,
                           initialDate: scheduled ?? DateTime.now(),
                           firstDate: DateTime.now()
@@ -1274,24 +1486,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           lastDate:
                               DateTime.now().add(const Duration(days: 365)),
                         );
-                        if (picked != null)
+                        if (picked != null) {
                           setDialogState(() => scheduled = picked);
+                        }
                       },
-                      icon: const Icon(Icons.calendar_today_rounded, size: 15),
-                      label: Text(
-                        scheduled == null
-                            ? 'Not scheduled'
-                            : DateFormat('MMM d, yyyy').format(scheduled!),
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        alignment: Alignment.centerLeft,
-                        minimumSize: const Size(double.infinity, 44),
-                        foregroundColor: const Color(0xFF334155),
-                        side: const BorderSide(color: Color(0xFFCBD5E1)),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
                     ),
                     if (error != null) ...[
                       const SizedBox(height: 10),

@@ -296,6 +296,7 @@ class _ScanScreenState extends State<ScanScreen> {
                                     controller: _orderIdController,
                                     onSubmitted: (_) =>
                                         _handleSearchOrder(provider),
+                                    textAlign: TextAlign.center,
                                     decoration: InputDecoration(
                                       hintText: 'Enter order number...',
                                       hintStyle: const TextStyle(

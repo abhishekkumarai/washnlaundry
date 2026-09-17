@@ -650,21 +650,30 @@ class _OrdersScreenState extends State<OrdersScreen> {
           Container(
             width: 240,
             height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: TextField(
-              onChanged: (val) => setState(() => _searchQuery = val),
-              textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                hintText: 'Search by order ID, phone, or name...',
-                hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                prefixIcon: Icon(Icons.search_rounded,
+            child: Row(
+              children: [
+                const Icon(Icons.search_rounded,
                     size: 18, color: Color(0xFF94A3B8)),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    onChanged: (val) => setState(() => _searchQuery = val),
+                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(
+                      hintText: 'Search by order ID, phone, or name...',
+                      hintStyle:
+                          TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 12),
@@ -719,17 +728,25 @@ class _OrdersScreenState extends State<OrdersScreen> {
               color: const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: TextField(
-              onChanged: (val) => setState(() => _searchQuery = val),
-              textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                hintText: 'Search by order ID, phone, or name...',
-                hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                prefixIcon: Icon(Icons.search_rounded,
+            child: Row(
+              children: [
+                const Icon(Icons.search_rounded,
                     size: 18, color: Color(0xFF94A3B8)),
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    onChanged: (val) => setState(() => _searchQuery = val),
+                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(
+                      hintText: 'Search by order ID, phone, or name...',
+                      hintStyle:
+                          TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 12),

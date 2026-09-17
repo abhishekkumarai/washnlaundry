@@ -171,6 +171,25 @@ void main() {
       expect(find.text('Enter an amount greater than zero.'), findsOneWidget);
     });
 
+    testWidgets('the record payment dialog rejects an amount over what is outstanding',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(payroll: summary);
+      await tester.pumpWidget(host(provider, const PayrollScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(TextButton, 'Record Payment').first);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.descendant(
+              of: find.byType(AlertDialog), matching: find.byType(TextField)).first,
+          '5601');
+      await tester.tap(find.widgetWithText(FilledButton, 'Record Payment'));
+      await tester.pump();
+
+      expect(find.text('Cannot exceed the ₹5600 outstanding.'), findsOneWidget);
+    });
+
     testWidgets('the dialog prefills with what is outstanding', (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(payroll: summary);
       await tester.pumpWidget(host(provider, const PayrollScreen()));

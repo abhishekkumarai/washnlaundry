@@ -11,6 +11,9 @@ client_secret_*.json
 # the repo anyway since it's local machine/deploy config, not shared code.
 .env
 
+# Local-machine port remaps / overrides — not shared config.
+docker-compose.override.yml
+
 # ── Python / Django ───────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
@@ -38,6 +41,10 @@ node_modules/
 app_index.js
 app_ui.js
 index_fetched.html
+
+# ── Claude Code (personal, machine-local) ─────────────────────────────────────
+.claude/settings.local.json
+.claude/.jira-sync-marker
 
 # ── Misc ──────────────────────────────────────────────────────────────────────
 .DS_Store

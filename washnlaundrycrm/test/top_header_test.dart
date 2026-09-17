@@ -57,6 +57,14 @@ void main() {
     expect(find.text('New Order'), findsNothing);
     expect(find.byIcon(Icons.add), findsNothing);
     expect(find.text('Expenses'), findsOneWidget);
-    expect(find.byIcon(Icons.help_outline_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.help_outline_rounded), findsNothing);
+  });
+
+  testWidgets('does not render a dead help icon in the header', (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(body: TopHeader(title: 'Dashboard')),
+    ));
+    expect(find.byIcon(Icons.help_outline_rounded), findsNothing);
+    expect(find.byTooltip('Help'), findsNothing);
   });
 }

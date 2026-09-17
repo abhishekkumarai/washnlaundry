@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
+import '../widgets/app_date_picker.dart';
+import '../widgets/error_dialog.dart';
 import '../widgets/load_state.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -42,6 +44,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   static String _statusLabel(String raw) => raw.replaceAll('_', ' ');
 
+  /// True when [_selectedDate] falls before a staff member's own start date
+  /// — the backend's `/attendance/bulk/` rejects marking them then, so the
+  /// register disables the row instead of letting the user hit that error.
+  bool _notYetStarted(StaffModel s) =>
+      s.startDate != null &&
+      DateUtils.dateOnly(_selectedDate).isBefore(DateUtils.dateOnly(s.startDate!));
+
   @override
   void initState() {
     super.initState();
@@ -56,23 +65,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   /// `State.context`, and the `mounted` check after the await guards the State,
   /// not some other context that happened to be passed in.
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    final picked = await AppDatePicker.pickDate(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2025),
       lastDate: DateTime(2030),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF1A4FD6),
-              onPrimary: Colors.white,
-              onSurface: Color(0xFF0F172A),
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
     if (!mounted || picked == null || picked == _selectedDate) return;
     setState(() {
@@ -95,6 +92,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     // marks is still free: the endpoint upserts.
     final marks = <String, String>{};
     for (final s in roster) {
+      if (_notYetStarted(s)) continue;
       final mark = _pending[s.id] ?? saved[s.id];
       if (mark != null) marks[s.id] = mark;
     }
@@ -117,16 +115,24 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       if (ok) _pending.clear();
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? 'Attendance saved successfully'
-              : provider.attendanceError ?? 'Could not save the register.',
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Attendance saved successfully'),
+          backgroundColor: Color(0xFF10B981),
         ),
-        backgroundColor: ok ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-      ),
-    );
+      );
+    } else {
+      // A popup, not a SnackBar — same reasoning as Staff's Add/Edit dialog:
+      // a toast is easy to miss, and the register's `_pending` marks (kept
+      // regardless of failure) are worth drawing attention back to rather
+      // than letting the user think nothing happened.
+      await showErrorDialog(
+        context,
+        title: 'Could not save the register',
+        message: provider.attendanceError ?? 'Unknown error.',
+      );
+    }
   }
 
   @override
@@ -419,7 +425,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         itemBuilder: (context, idx) {
           final s = roster[idx];
           final mark = _pending[s.id] ?? saved[s.id];
-          return _registerRow(s, mark);
+          return _registerRow(s, mark, notYetStarted: _notYetStarted(s));
         },
       ),
     );
@@ -431,7 +437,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   /// width back, squeezing `title`/`subtitle` down to a couple of pixels
   /// (the name rendered one letter per line). A plain Column sidesteps
   /// ListTile's layout algorithm entirely and works at any width.
-  Widget _registerRow(StaffModel s, String? mark) {
+  Widget _registerRow(StaffModel s, String? mark, {required bool notYetStarted}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Column(
@@ -459,7 +465,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF0F172A))),
                     Text(
-                      mark == null ? '${s.role} • not marked' : s.role,
+                      notYetStarted
+                          ? '${s.role} • joins ${DateFormat('d MMM yyyy').format(s.startDate!)}'
+                          : mark == null
+                              ? '${s.role} • not marked'
+                              : s.role,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 12, color: Color(0xFF64748B)),
@@ -487,9 +497,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 selected: isSel,
                 selectedColor: _statusColors[status],
                 backgroundColor: const Color(0xFFF1F5F9),
-                onSelected: (val) {
-                  if (val) setState(() => _pending[s.id] = status);
-                },
+                onSelected: notYetStarted
+                    ? null
+                    : (val) {
+                        if (val) setState(() => _pending[s.id] = status);
+                      },
               );
             }).toList(),
           ),

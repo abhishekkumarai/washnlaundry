@@ -163,10 +163,6 @@ class GarmentCategory(models.Model):
     icon = models.CharField(max_length=50, default='Shirt')
     display_order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
-    # The live app's Add/Edit Service modal offers Turnaround Days, not an
-    # icon picker — icon is chosen from a fixed set the client already maps
-    # by category name, so it was never a field the real form exposes.
-    turnaround_days = models.IntegerField(default=1)
 
     class Meta:
         verbose_name_plural = 'Garment categories'
@@ -200,7 +196,6 @@ class GarmentItem(models.Model):
     image_url = models.URLField(max_length=500, blank=True, default='')
     price = models.FloatField(default=0.0)
     unit = models.CharField(max_length=8, choices=PricingUnit.choices, default=PricingUnit.PIECE)
-    turnaround_days = models.IntegerField(default=1)
     is_active = models.BooleanField(default=True)
     display_order = models.IntegerField(default=0)
 
@@ -246,6 +241,11 @@ class Order(models.Model):
     notes = models.TextField(blank=True, null=True)
 
     scheduled_date = models.DateField(null=True, blank=True)
+    # Separate from scheduled_date rather than upgrading it to a DateTimeField
+    # — same split TimeSlot already uses for pickup/delivery slots, and it
+    # keeps every existing scheduled_date comparison (is_overdue, the
+    # Scheduled tab filter) working unchanged.
+    scheduled_time = models.TimeField(null=True, blank=True)
     assigned_agent = models.ForeignKey(
         'Staff', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_orders'
     )
@@ -425,6 +425,10 @@ class Staff(models.Model):
     # Whether this person has credentials for the Staff/Agent mobile app.
     # Plans cap how many of these a shop gets.
     has_app_login = models.BooleanField(default=False)
+    # Null for staff added before this field existed — treated as "no
+    # restriction" everywhere it's checked, so old records aren't retroactively
+    # blocked from having attendance on file.
+    start_date = models.DateField(null=True, blank=True)
 
     class Meta:
         verbose_name_plural = 'Staff'

@@ -1,57 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import 'panel_card.dart';
 
 class QuickScanCard extends StatelessWidget {
-  const QuickScanCard({Key? key}) : super(key: key);
+  final bool collapsible;
+
+  const QuickScanCard({super.key, this.collapsible = false});
 
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<AppProvider>(context);
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+    return PanelCard(
+      title: 'Quick Scan & Search',
+      subtitle: 'Find an order or customer',
+      collapsible: collapsible,
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEEF2FF),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Icon(Icons.search_rounded,
+            color: Color(0xFF1A4FD6), size: 20),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEEF2FF),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.search_rounded,
-                    color: Color(0xFF1A4FD6), size: 20),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Quick Scan & Search',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A)),
-                  ),
-                  Text(
-                    'Find an order or customer',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          LayoutBuilder(
+      child: LayoutBuilder(
             builder: (context, constraints) {
               final isDesktop = constraints.maxWidth > 600;
               return Flex(
@@ -75,6 +50,7 @@ class QuickScanCard extends StatelessWidget {
                           Expanded(
                             child: TextField(
                               onChanged: (val) => provider.setSearchQuery(val),
+                              textAlign: TextAlign.center,
                               decoration: const InputDecoration(
                                 hintText: 'Search orders, customers...',
                                 hintStyle: TextStyle(
@@ -135,8 +111,6 @@ class QuickScanCard extends StatelessWidget {
               );
             },
           ),
-        ],
-      ),
     );
   }
 }

@@ -228,7 +228,7 @@ void main() {
         (tester) async {
       await pumpWithCatalogue(tester);
 
-      await tester.tap(find.text('+ Add to List').first);
+      await tester.tap(find.text('+ Add to Cart').first);
       await tester.pumpAndSettle();
 
       expect(find.text('Checkout • ₹15'), findsOneWidget);
@@ -238,28 +238,60 @@ void main() {
       expect(button.onPressed, isNotNull);
     });
 
-    testWidgets('the express switch applies the 1.5x surcharge',
-        (tester) async {
-      await pumpWithCatalogue(tester);
-
-      await tester.tap(find.text('+ Add to List').first);
-      await tester.pumpAndSettle();
-      await tester.tap(find.byType(Switch).first);
-      await tester.pumpAndSettle();
-
-      // 15 -> 22.5, floored to 22 by the display.
-      expect(find.text('Checkout • ₹22'), findsOneWidget);
-    });
-
     testWidgets('decrementing to zero drops the line', (tester) async {
       await pumpWithCatalogue(tester);
 
-      await tester.tap(find.text('+ Add to List').first);
+      await tester.tap(find.text('+ Add to Cart').first);
       await tester.pumpAndSettle();
       expect(find.text('No items yet'), findsNothing);
 
       await tester.tap(find.byIcon(Icons.remove).first);
       await tester.pumpAndSettle();
+      expect(find.text('No items yet'), findsOneWidget);
+    });
+
+    testWidgets(
+        'an item already in the cart shows In Cart, not another Add button',
+        (tester) async {
+      // The item list's own +/- stepper was removed — increment/decrement
+      // now lives only in the cart panel (_cartLineRow), so the item list
+      // just reflects membership once added.
+      await pumpWithCatalogue(tester);
+
+      await tester.tap(find.text('+ Add to Cart').first);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('In Cart'), findsOneWidget);
+      // Two items in the catalogue: the one just added shows "In Cart", the
+      // other one still offers "+ Add to Cart".
+      expect(find.text('+ Add to Cart'), findsWidgets);
+    });
+
+    testWidgets('the cart panel + button increments quantity and the total',
+        (tester) async {
+      await pumpWithCatalogue(tester);
+      await tester.tap(find.text('+ Add to Cart').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.add).first);
+      await tester.pumpAndSettle();
+
+      // Both the cart line's own qty and the "Current order" header badge
+      // read 2 — they're driven by the same _cartQuantities map.
+      expect(find.text('2'), findsNWidgets(2));
+      expect(find.text('Checkout • ₹30'), findsOneWidget);
+    });
+
+    testWidgets('the cart panel delete button removes the line outright',
+        (tester) async {
+      await pumpWithCatalogue(tester);
+      await tester.tap(find.text('+ Add to Cart').first);
+      await tester.pumpAndSettle();
+      expect(find.text('No items yet'), findsNothing);
+
+      await tester.tap(find.byTooltip('Remove from order'));
+      await tester.pumpAndSettle();
+
       expect(find.text('No items yet'), findsOneWidget);
     });
   });
@@ -270,7 +302,7 @@ void main() {
         ..seedForTest(garments: _catalogue);
       await tester.pumpWidget(host(provider, const NewOrderScreen()));
       await tester.pump();
-      await tester.tap(find.text('+ Add to List').first);
+      await tester.tap(find.text('+ Add to Cart').first);
       await tester.pumpAndSettle();
       return provider;
     }
@@ -278,8 +310,8 @@ void main() {
     testWidgets('Checkout opens the review step, Back to items returns',
         (tester) async {
       // The real app doesn't submit straight from the cart — Checkout opens
-      // a second review step (Fulfilment / Ready by / Payment / Notes)
-      // before there's an actual Place order button.
+      // a second review step (Fulfilment / Ready by / Notes) before there's
+      // an actual Place order button.
       await pumpWithItemInCart(tester);
 
       expect(find.text('FULFILMENT'), findsNothing);
@@ -337,6 +369,110 @@ void main() {
 
       expect(find.byType(TextField), findsNWidgets(2));
       expect(find.text('₹45'), findsNothing);
+    });
+
+    testWidgets('there is no Collect payment now control anymore',
+        (tester) async {
+      await pumpWithItemInCart(tester);
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('PAYMENT'), findsNothing);
+      expect(find.text('Collect payment now'), findsNothing);
+      expect(find.byType(Switch), findsNothing);
+    });
+
+    testWidgets('Shop Pickup shows a Ready at label, no slot chips',
+        (tester) async {
+      // Shop Pickup is the default fulfilment type, so this is what Checkout
+      // review shows without tapping anything.
+      await pumpWithItemInCart(tester);
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Ready at'), findsOneWidget);
+      expect(find.byType(ChoiceChip), findsNothing);
+    });
+
+    testWidgets(
+        'a carried fulfilment type offers 13 hourly slot chips, 9 AM to 10 PM',
+        (tester) async {
+      await pumpWithItemInCart(tester);
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Home Delivery'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Ready at'), findsNothing);
+      final chips = tester.widgetList<ChoiceChip>(find.byType(ChoiceChip)).toList();
+      expect(chips.length, 13);
+
+      // Mirrors _readyByDefaultFor: the first slot whose hour hasn't already
+      // passed today is selected by default (or 9 AM, if it's before 9 AM).
+      final now = DateTime.now();
+      final selectedIndex = chips.indexWhere((c) => c.selected);
+      expect(selectedIndex, isNot(-1));
+      if (now.hour >= 9 && now.hour <= 21) {
+        expect(selectedIndex, now.hour - 9);
+      } else {
+        // Either before opening hours (defaults to 9 AM) or after the last
+        // slot (rolls to 9 AM tomorrow, where nothing is disabled).
+        expect(selectedIndex, 0);
+      }
+      // Every chip for an hour already past today is disabled; the rest
+      // aren't.
+      for (var i = 0; i < chips.length; i++) {
+        final slotHour = 9 + i;
+        final shouldBeDisabled =
+            now.hour >= 9 && now.hour <= 21 && slotHour < now.hour;
+        expect(chips[i].onSelected == null, shouldBeDisabled,
+            reason: 'slot $slotHour AM/PM disabled state');
+      }
+    });
+
+    testWidgets('tapping a later enabled slot chip selects it instead',
+        (tester) async {
+      await pumpWithItemInCart(tester);
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Home Delivery'));
+      await tester.pumpAndSettle();
+
+      final before =
+          tester.widgetList<ChoiceChip>(find.byType(ChoiceChip)).toList();
+      final enabledIndices = [
+        for (var i = 0; i < before.length; i++)
+          if (before[i].onSelected != null) i
+      ];
+      final target = enabledIndices.last;
+      final previouslySelected = before.indexWhere((c) => c.selected);
+
+      await tester.tap(find.byType(ChoiceChip).at(target));
+      await tester.pumpAndSettle();
+
+      final after =
+          tester.widgetList<ChoiceChip>(find.byType(ChoiceChip)).toList();
+      expect(after[target].selected, isTrue);
+      if (previouslySelected != target) {
+        expect(after[previouslySelected].selected, isFalse);
+      }
+    });
+
+    testWidgets('switching back to Shop Pickup drops the slot chips again',
+        (tester) async {
+      await pumpWithItemInCart(tester);
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Home Delivery'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChoiceChip), findsNWidgets(13));
+
+      await tester.tap(find.text('Shop Pickup'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.textContaining('Ready at'), findsOneWidget);
     });
 
     testWidgets('a discount reduces the total', (tester) async {
@@ -584,7 +720,7 @@ void main() {
     });
   });
 
-  group('Responsive layout (cart panel + item grid)', () {
+  group('Responsive layout (cart panel + item grid/table)', () {
     Future<void> pumpAt(WidgetTester tester, double width) async {
       tester.view
         ..physicalSize = Size(width, 1400)
@@ -595,15 +731,35 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('cart sits beside the grid at wide width', (tester) async {
+    testWidgets('wide width renders the items table, not the card grid',
+        (tester) async {
+      // Wide screens mirror the Services screen's Items tab: a table
+      // (Photo/Item/Unit/Price/Add to Cart) instead of the card grid,
+      // which stays for narrow/phone widths only.
       await pumpAt(tester, 1400);
 
-      final gridBottom = tester.getBottomLeft(find.byType(GridView)).dy;
+      expect(find.byKey(const Key('itemsTable')), findsOneWidget);
+      expect(find.byType(GridView), findsNothing);
+    });
+
+    testWidgets('cart sits beside the table at wide width', (tester) async {
+      await pumpAt(tester, 1400);
+
+      final tableBottom =
+          tester.getBottomLeft(find.byKey(const Key('itemsTable'))).dy;
       final cartTop = tester.getTopLeft(find.text('Current order')).dy;
 
       // Side-by-side: the cart header starts near the top, well before the
-      // grid (which fills the full column height) ends.
-      expect(cartTop, lessThan(gridBottom));
+      // table (which fills the full column height) ends.
+      expect(cartTop, lessThan(tableBottom));
+    });
+
+    testWidgets('narrow width renders the card grid, not the table',
+        (tester) async {
+      await pumpAt(tester, 390);
+
+      expect(find.byType(GridView), findsOneWidget);
+      expect(find.byKey(const Key('itemsTable')), findsNothing);
     });
 
     testWidgets('cart stacks below the grid at phone width', (tester) async {
@@ -622,15 +778,52 @@ void main() {
       return delegate.crossAxisCount;
     }
 
-    testWidgets('the grid uses fewer columns at phone width than at desktop width',
+    testWidgets(
+        'the card grid uses fewer columns at phone width than at tablet width',
         (tester) async {
-      await pumpAt(tester, 1400);
-      final wideColumns = columnsAt(tester);
+      // Both widths stay below SidebarNavigation.contentWideBreakpoint (760)
+      // so the card grid — not the table — renders at either; only the
+      // grid's own internal breakpoint (_gridColumnsFor) varies here.
+      await pumpAt(tester, 700);
+      final tabletColumns = columnsAt(tester);
 
       await pumpAt(tester, 390);
-      final narrowColumns = columnsAt(tester);
+      final phoneColumns = columnsAt(tester);
 
-      expect(narrowColumns, lessThan(wideColumns));
+      expect(phoneColumns, lessThan(tabletColumns));
+    });
+  });
+
+  group('NewOrderScreen header', () {
+    testWidgets(
+        'the header has just the title — no back arrow, no dead help icon',
+        (tester) async {
+      // The header used to carry a back-arrow IconButton next to the title
+      // (redundant with the always-visible sidebar's own Dashboard link) —
+      // removed at the user's request.
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(garments: _catalogue);
+      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pump();
+
+      final headerRow =
+          tester.widget<Row>(find.byKey(const Key('newOrderHeader')));
+
+      expect(headerRow.children.length, 1);
+      expect(
+        find.descendant(
+          of: find.byWidget(headerRow),
+          matching: find.byIcon(Icons.arrow_back_rounded),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byWidget(headerRow),
+          matching: find.byIcon(Icons.help_outline_rounded),
+        ),
+        findsNothing,
+      );
     });
   });
 }

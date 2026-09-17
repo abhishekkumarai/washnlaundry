@@ -8,7 +8,9 @@ import 'panel_card.dart';
 /// "Store Health — Operational performance · last 30 days": a 0–100 score with
 /// the four metrics behind it.
 class StoreHealthCard extends StatelessWidget {
-  const StoreHealthCard({super.key});
+  final bool collapsible;
+
+  const StoreHealthCard({super.key, this.collapsible = false});
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +31,7 @@ class StoreHealthCard extends StatelessWidget {
     return PanelCard(
       title: 'Store Health',
       subtitle: 'Operational performance · last 30 days',
+      collapsible: collapsible,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

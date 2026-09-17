@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 
 from django.db.models import Sum, Count, Q
@@ -5,8 +6,10 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import viewsets
 from rest_framework.decorators import api_view, action
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
+from . import customer_import
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
     Expense, Staff, Attendance, SalaryPayment, ServiceArea, TimeSlot,
@@ -39,6 +42,118 @@ class CustomerViewSet(viewsets.ModelViewSet):
             )
         return qs
 
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser],
+            url_path='import/preview')
+    def import_preview(self, request):
+        """POST /api/customers/import/preview/ {file} — column names, a
+        handful of sample rows, and a best-effort field-mapping guess, for
+        the frontend's mapping-confirmation step.
+        """
+        upload = request.FILES.get('file')
+        if not upload:
+            return Response({'detail': 'file is required.'}, status=400)
+        try:
+            headers, rows = customer_import.parse_rows(upload)
+        except customer_import.ImportFileError as exc:
+            return Response({'detail': str(exc)}, status=400)
+        if not headers:
+            return Response({'detail': 'The file has no header row.'}, status=400)
+
+        return Response({
+            'columns': headers,
+            'sample_rows': rows[:5],
+            'row_count': len(rows),
+            'suggested_mapping': customer_import.guess_mapping(headers),
+        })
+
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser],
+            url_path='import/commit')
+    def import_commit(self, request):
+        """POST /api/customers/import/commit/ {file, mapping} — bulk-creates
+        customers from the file using a confirmed column mapping.
+
+        `mapping` is a JSON object {"name": "<source column>", ...}, from
+        the preview step's suggestion (edited or not). Rows missing a name
+        or phone are always dropped. A row whose phone is already in use —
+        by another row in this same file, or by an existing customer — is
+        also dropped *unless* `overwrite_duplicates` ("true"/"false" form
+        field, default false) is set, in which case that customer's other
+        fields are updated in place instead (never the phone itself, which
+        is what matched it) — a blank cell in the file leaves the existing
+        value alone rather than wiping it. Either way the response
+        summarises what happened, never fails the whole import over it.
+        """
+        upload = request.FILES.get('file')
+        if not upload:
+            return Response({'detail': 'file is required.'}, status=400)
+
+        try:
+            mapping = json.loads(request.data.get('mapping') or '{}')
+        except (TypeError, ValueError):
+            return Response({'detail': 'mapping must be valid JSON.'}, status=400)
+        if not isinstance(mapping, dict) or not mapping.get('name') or not mapping.get('phone'):
+            return Response(
+                {'detail': 'Map both a name column and a phone column before importing.'},
+                status=400,
+            )
+        overwrite_duplicates = (request.data.get('overwrite_duplicates') or '').lower() == 'true'
+
+        try:
+            headers, rows = customer_import.parse_rows(upload)
+        except customer_import.ImportFileError as exc:
+            return Response({'detail': str(exc)}, status=400)
+
+        records = customer_import.rows_to_records(headers, rows, mapping)
+
+        existing_by_phone = {c.phone: c for c in Customer.objects.all()}
+        to_create = {}  # phone -> unsaved Customer
+        to_update = {}  # phone -> existing Customer, fields already applied in memory
+        skipped_missing = 0
+        skipped_duplicate = 0
+
+        for record in records:
+            name = (record.get('name') or '').strip()
+            phone = customer_import.normalize_phone(record.get('phone'))
+            if not name or not phone:
+                skipped_missing += 1
+                continue
+
+            fields = {
+                'name': name,
+                'email': (record.get('email') or '').strip() or None,
+                'address': (record.get('address') or '').strip() or None,
+                'area': (record.get('area') or '').strip(),
+                'notes': (record.get('notes') or '').strip() or None,
+            }
+
+            target = to_create.get(phone) or to_update.get(phone) or existing_by_phone.get(phone)
+            if target is not None:
+                if not overwrite_duplicates:
+                    skipped_duplicate += 1
+                    continue
+                for field, value in fields.items():
+                    if value not in (None, ''):
+                        setattr(target, field, value)
+                if phone in existing_by_phone and phone not in to_update:
+                    to_update[phone] = target
+                continue
+
+            to_create[phone] = Customer(phone=phone, **fields)
+
+        Customer.objects.bulk_create(to_create.values())
+        if to_update:
+            Customer.objects.bulk_update(
+                to_update.values(), ['name', 'email', 'address', 'area', 'notes'],
+            )
+
+        return Response({
+            'total_rows': len(records),
+            'created': len(to_create),
+            'updated': len(to_update),
+            'skipped_missing': skipped_missing,
+            'skipped_duplicate': skipped_duplicate,
+        })
+
 
 class GarmentCategoryViewSet(viewsets.ModelViewSet):
     queryset = GarmentCategory.objects.all().order_by('display_order')
@@ -50,7 +165,12 @@ class GarmentItemViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = GarmentItem.objects.select_related('category').all()
-        if self.request.query_params.get('include_inactive') != 'true':
+        # is_active is a *list* default-hide, not an access restriction —
+        # applying it unconditionally also gated retrieve/update/destroy,
+        # so PATCHing is_active to False made the item unreachable by its
+        # own id afterward: no way to GET it, edit it, or turn it back on
+        # again through the API.
+        if self.action == 'list' and self.request.query_params.get('include_inactive') != 'true':
             qs = qs.filter(is_active=True)
         category = self.request.query_params.get('category')
         if category:
@@ -141,7 +261,9 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def payment(self, request, pk=None):
-        """POST /api/orders/<id>/payment/ {"amount": 250} — 'Collect Payment'."""
+        """POST /api/orders/<id>/payment/ {"amount": 250, "payment_method": "UPI"}
+        — 'Collect Payment'.
+        """
         order = self.get_object()
         try:
             amount = float(request.data.get('amount', 0))
@@ -150,8 +272,17 @@ class OrderViewSet(viewsets.ModelViewSet):
         if amount <= 0:
             return Response({'detail': 'amount must be greater than zero.'}, status=400)
 
+        method = (request.data.get('payment_method') or '').upper()
+        if method and method not in PaymentMethod.values:
+            return Response(
+                {'detail': f'Invalid payment_method. Expected one of {PaymentMethod.values}.'},
+                status=400,
+            )
+
         order.paid_amount = min(order.paid_amount + amount, order.total_amount)
         order.due_amount = max(order.total_amount - order.paid_amount, 0.0)
+        if method:
+            order.payment_method = method
         if order.due_amount <= 0:
             order.payment_status = PaymentStatus.PAID
         elif order.paid_amount > 0:
@@ -161,7 +292,10 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.save()
         order.audit_log.create(
             title='Payment Collected',
-            detail=f'₹{amount:.0f} collected — now {order.get_payment_status_display()}',
+            detail=(
+                f'₹{amount:.0f} via {order.get_payment_method_display()} — '
+                f'now {order.get_payment_status_display()}'
+            ),
         )
 
         if order.customer:
@@ -229,10 +363,24 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 return Response({'detail': 'Each entry needs a staff id.'}, status=400)
             cleaned.append((staff_id, status_value))
 
-        known = set(Staff.objects.filter(id__in=[s for s, _ in cleaned]).values_list('id', flat=True))
-        missing = sorted({s for s, _ in cleaned} - known)
+        staff_by_id = {
+            s.id: s for s in Staff.objects.filter(id__in=[s for s, _ in cleaned])
+        }
+        missing = sorted({s for s, _ in cleaned} - set(staff_by_id))
         if missing:
             return Response({'detail': f'Unknown staff: {missing}.'}, status=400)
+
+        not_yet_started = sorted({
+            staff_by_id[staff_id].name
+            for staff_id, _ in cleaned
+            if staff_by_id[staff_id].start_date and date < staff_by_id[staff_id].start_date
+        })
+        if not_yet_started:
+            return Response(
+                {'detail': f"Cannot mark attendance before start date for: "
+                           f"{', '.join(not_yet_started)}."},
+                status=400,
+            )
 
         # Validate everything before writing anything — a half-saved register is
         # worse than a rejected one, because nothing on screen says which half.

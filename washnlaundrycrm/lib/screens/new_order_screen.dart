@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
-import '../utils/navigation.dart';
+import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/receipt_dialog.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -30,14 +30,13 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   /// Keyed by [GarmentItemModel.id].
   final Map<String, int> _cartQuantities = {};
-  final Map<String, bool> _expressToggles = {};
 
   // No method picker in the real app's Checkout review either — just
   // whether payment was collected. Kept fixed at the backend's own default.
   final String _paymentMethod = 'CASH';
-  // The real app's Checkout review defaults "Collect payment now" to off —
-  // most counter orders are billed on pickup/delivery, not up front.
-  bool _markPaid = false;
+  // "Collect payment now" was removed from Checkout review at the user's
+  // request — every order placed from here now starts unpaid, same as this
+  // already-false default did for the common case.
   bool _submitting = false;
 
   /// Store Pickup by default — checkout used to hardcode this, so there was
@@ -46,8 +45,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   String _deliveryType = DeliveryType.storePickup;
 
   /// Whether the cart has handed off to the Checkout review step (Fulfilment,
-  /// Ready by, Payment, Notes) — a second screen the real app shows before
-  /// actually placing the order, still under `/new-order`.
+  /// Ready by, Notes) — a second screen the real app shows before actually
+  /// placing the order, still under `/new-order`.
   bool _showCheckoutReview = false;
   DateTime? _readyBy;
   double _discountAmount = 0;
@@ -65,6 +64,38 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   bool get _isCarriedDelivery =>
       _deliveryType == DeliveryType.homeDelivery ||
       _deliveryType == DeliveryType.online;
+
+  static const _slotStartHour = 9; // 9 AM
+  static const _slotEndHour = 22; // 10 PM — last slot is 9–10 PM
+
+  /// Shop Pickup is ready whenever it's actually done — the counter default
+  /// is simply "now". Anything carried (Home Delivery / Pickup from Home)
+  /// needs real lead time, so its default is the first still-selectable
+  /// hourly slot today, or 9 AM tomorrow once today's slots have all passed.
+  DateTime _readyByDefaultFor(String deliveryType) {
+    final now = DateTime.now();
+    if (deliveryType == DeliveryType.storePickup) return now;
+    final today = _readySlotStarts(now).where((s) => !_isSlotDisabled(s));
+    if (today.isNotEmpty) return today.first;
+    return DateTime(now.year, now.month, now.day + 1, _slotStartHour);
+  }
+
+  /// The hourly slot start times a carried fulfilment type can pick between,
+  /// 9 AM through 9 PM (each a 1-hour window ending by 10 PM), for whatever
+  /// date [forDate] falls on — not off any shop-configured Pickup/Delivery
+  /// slot list, so it still works for a shop that hasn't set any up.
+  List<DateTime> _readySlotStarts(DateTime forDate) => [
+        for (var h = _slotStartHour; h < _slotEndHour; h++)
+          DateTime(forDate.year, forDate.month, forDate.day, h),
+      ];
+
+  /// A slot is only disabled relative to "right now" — on any day other than
+  /// today every slot stays selectable, since lead time isn't an issue for a
+  /// future date.
+  bool _isSlotDisabled(DateTime slot) {
+    final now = DateTime.now();
+    return DateUtils.isSameDay(slot, now) && slot.hour < now.hour;
+  }
 
   @override
   void initState() {
@@ -89,21 +120,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   String get _customerName => _customer?.name ?? _walkInName;
   String get _customerPhone => _customer?.phone ?? _walkInPhone;
 
-  /// The express surcharge is shop policy, not app policy — it used to be a
-  /// `const double _expressMultiplier = 1.5` at the top of this file, so no
-  /// shop could charge anything else. The EXPRESS switch on a product card
-  /// still only affects that card's lines.
-  double get _expressMultiplier =>
-      context.read<AppProvider>().expressMultiplier;
-
-  double _priceFor(GarmentItemModel g) =>
-      _expressToggles[g.id] == true ? g.price * _expressMultiplier : g.price;
-
   double _subtotalFor(List<GarmentItemModel> garments) {
     double sum = 0.0;
     for (final g in garments) {
       final qty = _cartQuantities[g.id] ?? 0;
-      if (qty > 0) sum += _priceFor(g) * qty;
+      if (qty > 0) sum += g.price * qty;
     }
     return sum;
   }
@@ -115,14 +136,13 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     for (final g in garments) {
       final qty = _cartQuantities[g.id] ?? 0;
       if (qty == 0) continue;
-      final price = _priceFor(g);
       items.add(OrderItemModel(
         itemTitle: g.name,
         serviceType: g.categoryName,
         quantity: qty,
         unit: g.unit,
-        unitPrice: price,
-        totalPrice: price * qty,
+        unitPrice: g.price,
+        totalPrice: g.price * qty,
       ));
     }
     return items;
@@ -192,26 +212,15 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               color: Colors.white,
               border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
             ),
-            child: Row(
+            child: const Row(
+              key: Key('newOrderHeader'),
               children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded,
-                      color: Color(0xFF475569)),
-                  onPressed: () => context.goSection(0),
-                ),
-                const SizedBox(width: 8),
-                const Text(
+                Text(
                   'New Order',
                   style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF0F172A)),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.help_outline_rounded,
-                      color: Color(0xFF64748B)),
-                  onPressed: () {},
                 ),
               ],
             ),
@@ -229,22 +238,32 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 children: [
                   // Search Bar
                   Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: TextField(
-                      onChanged: (val) => setState(() => _searchQuery = val),
-                      textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        hintText: 'Search items or scan a tag...',
-                        hintStyle:
-                            TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                        prefixIcon: Icon(Icons.search_rounded,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.search_rounded,
                             color: Color(0xFF94A3B8), size: 20),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 14),
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            onChanged: (val) =>
+                                setState(() => _searchQuery = val),
+                            textAlign: TextAlign.center,
+                            decoration: const InputDecoration(
+                              hintText: 'Search items or scan a tag...',
+                              hintStyle: TextStyle(
+                                  fontSize: 13, color: Color(0xFF94A3B8)),
+                              border: InputBorder.none,
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -288,10 +307,13 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               ),
             ),
 
-            // Items Grid
+            // Items Grid / Table
             narrow
-                ? _buildItemGrid(provider, filteredItems, shrinkWrap: true)
-                : Expanded(child: _buildItemGrid(provider, filteredItems)),
+                ? _buildItemGrid(provider, filteredItems,
+                    narrow: true, shrinkWrap: true)
+                : Expanded(
+                    child: _buildItemGrid(provider, filteredItems,
+                        narrow: false)),
           ],
         ],
       );
@@ -393,8 +415,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                       onPressed: (subtotal == 0 || _submitting)
                           ? null
                           : () => setState(() {
-                                _readyBy ??=
-                                    DateTime.now().add(const Duration(days: 1));
+                                _readyBy ??= _readyByDefaultFor(_deliveryType);
                                 _showCheckoutReview = true;
                               }),
                       style: ElevatedButton.styleFrom(
@@ -518,27 +539,95 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         ),
       );
     }
-    return ListView(
+    // Iterates garments (not _cartItems) so each row has the garment's own id
+    // to mutate _cartQuantities directly — the +/- stepper and delete button
+    // live here now, not on the item card/table (see _addToCartControl).
+    final inCart = garments.where((g) => (_cartQuantities[g.id] ?? 0) > 0).toList();
+    return ListView.separated(
       shrinkWrap: shrinkWrap,
       physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      children: _cartItems(garments).map((item) {
-        return ListTile(
-          title: Text(item.itemTitle,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
-          subtitle: Text(
-              '${item.quantity}x @ ${Money.symbol}${item.unitPrice.toInt()}',
-              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-          trailing: Text('${Money.symbol}${item.totalPrice.toInt()}',
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
-        );
-      }).toList(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      itemCount: inCart.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (context, idx) => _cartLineRow(inCart[idx]),
+    );
+  }
+
+  Widget _cartLineRow(GarmentItemModel g) {
+    final qty = _cartQuantities[g.id] ?? 0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(g.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A))),
+                Text('${Money.symbol}${g.price.toInt()} each',
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF64748B))),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF2FF),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.remove,
+                      size: 14, color: Color(0xFF1A4FD6)),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  onPressed: () => setState(() {
+                    if (qty > 1) {
+                      _cartQuantities[g.id] = qty - 1;
+                    } else {
+                      _cartQuantities.remove(g.id);
+                    }
+                  }),
+                ),
+                SizedBox(
+                  width: 20,
+                  child: Text('$qty',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A4FD6))),
+                ),
+                IconButton(
+                  icon:
+                      const Icon(Icons.add, size: 14, color: Color(0xFF1A4FD6)),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  onPressed: () =>
+                      setState(() => _cartQuantities[g.id] = qty + 1),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded,
+                size: 18, color: Color(0xFFDC2626)),
+            tooltip: 'Remove from order',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            onPressed: () => setState(() => _cartQuantities.remove(g.id)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -636,6 +725,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             type == DeliveryType.homeDelivery || type == DeliveryType.online;
         _deliveryCharge = carried ? _deliveryFee : 0;
         _deliveryChargeController.text = _deliveryCharge.toStringAsFixed(0);
+        // Switching fulfilment type changes what "ready" even means (now, vs
+        // needing lead time) — re-default Ready by rather than leaving
+        // whatever the previous type had selected.
+        _readyBy = _readyByDefaultFor(type);
       }),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -667,7 +760,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   }
 
   /// The Checkout review — the real app's second step before an order is
-  /// actually placed: Fulfilment, Ready by, Payment collected, and Notes.
+  /// actually placed: Fulfilment, Ready by, and Notes.
   /// `_readyBy` is guaranteed non-null by the time this builds (the Checkout
   /// button sets a default before flipping `_showCheckoutReview`).
   Widget _buildCheckoutReview() {
@@ -700,15 +793,13 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           _panelBox(
             title: 'FULFILMENT',
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  // Matches the real app's Fulfilment card order — not the
-                  // enum's own declaration order, which puts Home Pickup
-                  // before Home Delivery.
                   children: const [
                     DeliveryType.storePickup,
-                    DeliveryType.homeDelivery,
                     DeliveryType.homePickup,
+                    DeliveryType.homeDelivery,
                   ]
                       .map((type) => Expanded(
                             child: Padding(
@@ -729,55 +820,105 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                         style:
                             TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                     const Spacer(),
-                    Text(
-                      DateFormat('EEE, d MMM, yyyy').format(_readyBy!),
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A)),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline,
-                          size: 20, color: Color(0xFF64748B)),
-                      onPressed: () => setState(() => _readyBy =
-                          _readyBy!.subtract(const Duration(days: 1))),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add_circle_outline,
-                          size: 20, color: Color(0xFF64748B)),
-                      onPressed: () => setState(() =>
-                          _readyBy = _readyBy!.add(const Duration(days: 1))),
+                    Flexible(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(6),
+                        onTap: () async {
+                          final today = DateUtils.dateOnly(DateTime.now());
+                          final picked = await AppDatePicker.pickDate(
+                            context: context,
+                            initialDate: _readyBy!,
+                            firstDate: today,
+                            lastDate: today.add(const Duration(days: 60)),
+                          );
+                          if (picked != null) {
+                            setState(() => _readyBy = DateTime(
+                                picked.year,
+                                picked.month,
+                                picked.day,
+                                _readyBy!.hour,
+                                _readyBy!.minute));
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 4),
+                          child: Text(
+                            DateFormat('EEE, d MMM, yyyy').format(_readyBy!),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                                decoration: TextDecoration.underline,
+                                decorationColor: Color(0xFFCBD5E1)),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          _panelBox(
-            title: 'PAYMENT',
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 10),
+                if (_deliveryType == DeliveryType.storePickup)
+                  Row(
                     children: [
-                      Text('Collect payment now',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A))),
-                      Text('Mark this order as paid',
-                          style: TextStyle(
-                              fontSize: 11, color: Color(0xFF94A3B8))),
+                      const SizedBox(width: 24),
+                      const Icon(Icons.access_time_rounded,
+                          size: 14, color: Color(0xFF94A3B8)),
+                      const SizedBox(width: 6),
+                      Text('Ready at ${DateFormat('h a').format(_readyBy!)}',
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF64748B))),
                     ],
+                  )
+                else
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _readySlotStarts(_readyBy!).map((slot) {
+                      final isSel = _readyBy!.hour == slot.hour;
+                      final disabled = _isSlotDisabled(slot);
+                      final end = slot.add(const Duration(hours: 1));
+                      final startMeridiem = DateFormat('a').format(slot);
+                      final endMeridiem = DateFormat('a').format(end);
+                      // Drop the repeated "AM"/"PM" when both ends of the
+                      // slot share one, so each chip is short enough for
+                      // several to fit per row even on a phone-width screen.
+                      final label = startMeridiem == endMeridiem
+                          ? '${DateFormat('h').format(slot)}–'
+                              '${DateFormat('h').format(end)} $startMeridiem'
+                          : '${DateFormat('h a').format(slot)}–'
+                              '${DateFormat('h a').format(end)}';
+                      return ChoiceChip(
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        labelPadding:
+                            const EdgeInsets.symmetric(horizontal: 4),
+                        label: Text(label,
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: disabled
+                                    ? const Color(0xFFCBD5E1)
+                                    : (isSel
+                                        ? Colors.white
+                                        : const Color(0xFF334155)))),
+                        selected: isSel,
+                        selectedColor: const Color(0xFF1A4FD6),
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        onSelected: disabled
+                            ? null
+                            : (_) => setState(() => _readyBy = DateTime(
+                                _readyBy!.year,
+                                _readyBy!.month,
+                                _readyBy!.day,
+                                slot.hour,
+                                slot.minute)),
+                      );
+                    }).toList(),
                   ),
-                ),
-                Switch(
-                  value: _markPaid,
-                  activeColor: const Color(0xFF1A4FD6),
-                  onChanged: (val) => setState(() => _markPaid = val),
-                ),
               ],
             ),
           ),
@@ -993,7 +1134,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   }
 
   Widget _buildItemGrid(AppProvider provider, List<GarmentItemModel> items,
-      {bool shrinkWrap = false}) {
+      {required bool narrow, bool shrinkWrap = false}) {
     if (provider.isLoading && provider.garments.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -1020,6 +1161,13 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       );
     }
 
+    // Wide screens get the same table treatment as the Services screen's
+    // Items tab — Photo/Item/Unit/Price/Add to Cart — since a 4-wide
+    // card grid wastes most of the row scanning prices. Narrow/phone widths
+    // keep the card grid: the table's fixed columns have no room below
+    // SidebarNavigation.contentWideBreakpoint, same reasoning as Services.
+    if (!narrow) return _buildItemsTable(items);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = _gridColumnsFor(constraints.maxWidth);
@@ -1041,6 +1189,123 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           itemBuilder: (context, idx) => _itemCard(items[idx]),
         );
       },
+    );
+  }
+
+  Widget _tableColHead(String text) => Text(
+        text,
+        style: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.6,
+          color: Color(0xFF64748B),
+        ),
+      );
+
+  Widget _buildItemsTable(List<GarmentItemModel> items) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Container(
+        key: const Key('itemsTable'),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 40),
+                  const SizedBox(width: 12),
+                  Expanded(flex: 3, child: _tableColHead('ITEM')),
+                  Expanded(flex: 2, child: _tableColHead('UNIT')),
+                  Expanded(flex: 2, child: _tableColHead('PRICE')),
+                  const SizedBox(width: 150, child: Text('')),
+                ],
+              ),
+            ),
+            for (final item in items) _buildItemTableRow(item),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemTableRow(GarmentItemModel item) {
+    final qty = _cartQuantities[item.id] ?? 0;
+    final art = _artFor(item.name);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+        color: qty > 0 ? const Color(0xFFF8FAFF) : null,
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: item.imageUrl.isEmpty
+                  ? Container(
+                      color: const Color(0xFFF8FAFC),
+                      child: Icon(art.icon, size: 20, color: art.color),
+                    )
+                  : Image.network(
+                      item.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: const Color(0xFFF8FAFC),
+                        child: Icon(art.icon, size: 20, color: art.color),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 3,
+            child: Text(item.name,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A))),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(item.unitLabel,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text('${Money.symbol}${item.price.toInt()}',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A4FD6))),
+          ),
+          SizedBox(
+            width: 150,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: _addToCartControl(item, width: 140),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1093,7 +1358,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   Widget _itemCard(GarmentItemModel item) {
     final qty = _cartQuantities[item.id] ?? 0;
-    final isExpress = _expressToggles[item.id] ?? false;
     final art = _artFor(item.name);
 
     return Container(
@@ -1136,17 +1400,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     )
                   else
                     Center(child: Icon(art.icon, size: 48, color: art.color)),
-                  Positioned(
-                    top: 6,
-                    right: 8,
-                    child: Text(
-                      item.turnaroundLabel,
-                      style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF94A3B8)),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -1164,7 +1417,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           Row(
             children: [
               Flexible(
-                child: Text('${Money.symbol}${_priceFor(item).toInt()}',
+                child: Text('${Money.symbol}${item.price.toInt()}',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontSize: 15,
@@ -1182,110 +1435,64 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           ),
           const SizedBox(height: 10),
 
-          // Express Toggle Row
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.bolt_rounded,
-                          size: 14, color: Color(0xFFF59E0B)),
-                      SizedBox(width: 4),
-                      Flexible(
-                        child: Text('EXPRESS',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF64748B))),
-                      ),
-                    ],
-                  ),
-                ),
-                Transform.scale(
-                  scale: 0.7,
-                  child: Switch(
-                    value: isExpress,
-                    activeColor: const Color(0xFF1A4FD6),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    onChanged: (val) =>
-                        setState(() => _expressToggles[item.id] = val),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-
           // Add to List / Counter Button
-          qty == 0
-              ? SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () =>
-                        setState(() => _cartQuantities[item.id] = 1),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                    child: const Text('+ Add to List',
-                        style: TextStyle(
+          _addToCartControl(item),
+        ],
+      ),
+    );
+  }
+
+  /// The "+ Add to Cart" button, shared by the item card (full width) and the
+  /// wide-width items table's Add to Cart column (fixed width) — same widget
+  /// either place, so behaviour can't drift between the two layouts.
+  ///
+  /// Once an item is in the cart this becomes a static "In Cart" indicator —
+  /// quantity +/- and removal live only in the cart panel now (see
+  /// _cartLineRow), not here, so there's exactly one place to change either.
+  Widget _addToCartControl(GarmentItemModel item, {double? width}) {
+    final qty = _cartQuantities[item.id] ?? 0;
+    return SizedBox(
+      width: width ?? double.infinity,
+      child: qty == 0
+          ? OutlinedButton(
+              onPressed: () => setState(() => _cartQuantities[item.id] = 1),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                shape:
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              child: const Text('+ Add to Cart',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A4FD6))),
+            )
+          : Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF2FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.check_circle_rounded,
+                      size: 15, color: Color(0xFF1A4FD6)),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text('In Cart · $qty',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF1A4FD6))),
                   ),
-                )
-              : Container(
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove,
-                            size: 16, color: Color(0xFF1A4FD6)),
-                        padding: EdgeInsets.zero,
-                        constraints:
-                            const BoxConstraints(minWidth: 32, minHeight: 32),
-                        onPressed: () => setState(() {
-                          if (qty > 1) {
-                            _cartQuantities[item.id] = qty - 1;
-                          } else {
-                            _cartQuantities.remove(item.id);
-                          }
-                        }),
-                      ),
-                      Text('$qty',
-                          style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A4FD6))),
-                      IconButton(
-                        icon: const Icon(Icons.add,
-                            size: 16, color: Color(0xFF1A4FD6)),
-                        padding: EdgeInsets.zero,
-                        constraints:
-                            const BoxConstraints(minWidth: 32, minHeight: 32),
-                        onPressed: () =>
-                            setState(() => _cartQuantities[item.id] = qty + 1),
-                      ),
-                    ],
-                  ),
-                ),
-        ],
-      ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -1309,14 +1516,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     final items = _cartItems(garments);
     if (items.isEmpty) return;
 
-    final anyExpress =
-        _cartQuantities.keys.any((id) => _expressToggles[id] == true);
     // Matches the backend's own formula (serializers.py: subtotal + delivery
     // - discount) so the payload and what the server computes agree.
     final total = (subtotal + _deliveryCharge - _discountAmount)
         .clamp(0, double.infinity)
         .toDouble();
-    final paid = _markPaid ? total : 0.0;
+    // "Collect payment now" was removed from Checkout review — every order
+    // placed from here starts unpaid; payment is collected later.
+    const paid = 0.0;
     final notes = _notesController.text.trim();
 
     final payload = <String, dynamic>{
@@ -1326,7 +1533,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       'customer_name': _customerName,
       'customer_phone': _customerPhone,
       'status': OrderStatus.placed,
-      'payment_status': _markPaid ? PaymentStatus.paid : PaymentStatus.unpaid,
+      'payment_status': PaymentStatus.unpaid,
       'payment_method': _paymentMethod,
       'delivery_type': _deliveryType,
       'delivery_charge': _deliveryCharge,
@@ -1336,10 +1543,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       'total_amount': total,
       'paid_amount': paid,
       'due_amount': total - paid,
-      'express': anyExpress,
       if (notes.isNotEmpty) 'notes': notes,
-      if (_readyBy != null)
+      if (_readyBy != null) ...{
         'scheduled_date': DateFormat('yyyy-MM-dd').format(_readyBy!),
+        'scheduled_time': DateFormat('HH:mm:ss').format(_readyBy!),
+      },
       'items': items.map((i) => i.toJson()).toList(),
     };
 
@@ -1372,14 +1580,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     final shop = provider.shop;
     setState(() {
       _cartQuantities.clear();
-      _expressToggles.clear();
       _customer = null;
       _showCheckoutReview = false;
       _readyBy = null;
       _discountAmount = 0;
       _deliveryType = DeliveryType.storePickup;
       _deliveryCharge = 0;
-      _markPaid = false;
       _notesController.clear();
       _discountController.text = '0';
       _deliveryChargeController.text = _deliveryFee.toStringAsFixed(0);
@@ -1670,19 +1876,33 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
             ] else ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: TextField(
-                  autofocus: true,
-                  onChanged: (v) => setState(() => _query = v),
-                  textAlign: TextAlign.center,
-                  decoration: InputDecoration(
-                    hintText: 'Search by name or phone',
-                    hintStyle:
-                        const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                    prefixIcon: const Icon(Icons.search_rounded,
-                        size: 20, color: Color(0xFF94A3B8)),
-                    isDense: true,
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search_rounded,
+                          size: 20, color: Color(0xFF94A3B8)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          autofocus: true,
+                          onChanged: (v) => setState(() => _query = v),
+                          textAlign: TextAlign.center,
+                          decoration: const InputDecoration(
+                            hintText: 'Search by name or phone',
+                            hintStyle: TextStyle(
+                                fontSize: 13, color: Color(0xFF94A3B8)),
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1831,8 +2051,13 @@ class _OrderPlacedDialog extends StatelessWidget {
                   isPaid ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
             ),
             if (order.scheduledDate != null)
-              _summaryRow('Ready by',
-                  DateFormat('MMM d, yyyy').format(order.scheduledDate!)),
+              _summaryRow(
+                'Ready by',
+                DateFormat('MMM d, yyyy').format(order.scheduledDate!) +
+                    (order.scheduledTime.isEmpty
+                        ? ''
+                        : ', ${TimeSlotModel.formatTime(order.scheduledTime)}'),
+              ),
             const SizedBox(height: 8),
             const Divider(height: 1),
             const SizedBox(height: 12),

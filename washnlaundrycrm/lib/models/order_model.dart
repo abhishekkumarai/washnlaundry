@@ -45,6 +45,16 @@ class PaymentStatus {
   static String label(String status) => labels[status] ?? status;
 }
 
+class PaymentMethod {
+  static const cash = 'CASH';
+  static const upi = 'UPI';
+  static const card = 'CARD';
+
+  static const labels = {cash: 'Cash', upi: 'UPI', card: 'Card'};
+
+  static String label(String method) => labels[method] ?? method;
+}
+
 class DeliveryType {
   static const storePickup = 'STORE_PICKUP';
   static const homePickup = 'HOME_PICKUP';
@@ -165,6 +175,10 @@ class OrderModel {
   final bool isOverdue;
   final String? notes;
   final DateTime? scheduledDate;
+
+  /// Raw "HH:MM:SS" (Django `TimeField`), or '' when unset. Use
+  /// [TimeSlotModel.formatTime] to render it, same as pickup/delivery slots.
+  final String scheduledTime;
   final String? assignedAgentName;
 
   /// Who or what raised the order — a person for a counter sale, a channel
@@ -197,6 +211,7 @@ class OrderModel {
     this.isOverdue = false,
     this.notes,
     this.scheduledDate,
+    this.scheduledTime = '',
     this.assignedAgentName,
     this.createdBy = '',
     required this.createdAt,
@@ -313,6 +328,7 @@ class OrderModel {
       isOverdue: json['is_overdue'] ?? false,
       notes: json['notes'],
       scheduledDate: DateTime.tryParse(json['scheduled_date'] ?? ''),
+      scheduledTime: json['scheduled_time'] ?? '',
       assignedAgentName: json['assigned_agent_name'],
       createdBy: json['created_by'] ?? '',
       createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),

@@ -36,6 +36,7 @@ void main() {
     expect(find.text('New Order'), findsOneWidget);
     expect(find.text('Orders'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Help'), findsOneWidget);
   });
 
   testWidgets('tapping a nav item changes the selected index', (tester) async {
@@ -199,6 +200,43 @@ void main() {
     await tester.tap(find.text('Apps'));
     await tester.pump();
 
+    expect(provider.currentNavIndex, 0);
+  });
+
+  testWidgets(
+      'Help is listed, enabled without Soon chip, and tapping it opens a dialog without changing nav index',
+      (tester) async {
+    final provider = AppProvider(autoLoad: false);
+    await tester.pumpWidget(wrap(provider, const SidebarNavigation()));
+
+    expect(find.text('Help'), findsOneWidget);
+
+    // Help should not have a "Soon" chip
+    final helpTile = find.ancestor(
+      of: find.text('Help'),
+      matching: find.byType(InkWell),
+    );
+    expect(find.descendant(of: helpTile, matching: find.text('Soon')),
+        findsNothing);
+
+    expect(provider.currentNavIndex, 0);
+
+    await tester.tap(find.text('Help'));
+    await tester.pumpAndSettle();
+
+    // Dialog is displayed
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('Help & Support'), findsOneWidget);
+    expect(find.text('support@laundrybill.com'), findsOneWidget);
+
+    // selected nav index does not change
+    expect(provider.currentNavIndex, 0);
+
+    // Closing the dialog
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
     expect(provider.currentNavIndex, 0);
   });
 }

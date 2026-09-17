@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import 'panel_card.dart';
 
 class OrderPipelineCard extends StatelessWidget {
-  const OrderPipelineCard({Key? key}) : super(key: key);
+  final bool collapsible;
+
+  const OrderPipelineCard({super.key, this.collapsible = false});
 
   @override
   Widget build(BuildContext context) {
@@ -37,50 +40,19 @@ class OrderPipelineCard extends StatelessWidget {
     final inPipeline =
         stages.fold<int>(0, (sum, s) => sum + (s['count'] as int));
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+    return PanelCard(
+      title: 'Order pipeline',
+      subtitle: 'Live across stages',
+      collapsible: collapsible,
+      trailing: Text(
+        '$inPipeline',
+        style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Order pipeline',
-                    style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A)),
-                  ),
-                  Text(
-                    'Live across stages',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                  ),
-                ],
-              ),
-              Text(
-                '$inPipeline',
-                style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Stages List
-          Column(
-            children: stages.map((st) {
+        children: stages.map((st) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 14.0),
                 child: Row(
@@ -124,8 +96,6 @@ class OrderPipelineCard extends StatelessWidget {
               );
             }).toList(),
           ),
-        ],
-      ),
     );
   }
 }

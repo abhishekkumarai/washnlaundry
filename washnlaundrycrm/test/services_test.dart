@@ -29,7 +29,6 @@ final _catalogue = [
     'name': 'Shirt',
     'price': 15.0,
     'unit': 'PC',
-    'turnaround_days': 1,
     'is_active': true,
   }),
   GarmentItemModel.fromJson({
@@ -39,7 +38,6 @@ final _catalogue = [
     'name': 'Regular Cloths',
     'price': 85.0,
     'unit': 'KG',
-    'turnaround_days': 2,
     'is_active': true,
   }),
   GarmentItemModel.fromJson({
@@ -49,7 +47,6 @@ final _catalogue = [
     'name': 'Retired Item',
     'price': 250.0,
     'unit': 'SET',
-    'turnaround_days': 1,
     'is_active': false,
   }),
   GarmentItemModel.fromJson({
@@ -59,7 +56,6 @@ final _catalogue = [
     'name': 'Sofa Cover',
     'price': 300.0,
     'unit': 'SET',
-    'turnaround_days': 1,
     'is_active': true,
   }),
 ];
@@ -224,9 +220,8 @@ void main() {
       await openModal(tester);
 
       expect(find.text('Add New Service / Garment Item'), findsOneWidget);
-      // Category preselected, unit and turnaround defaulted — not blank.
+      // Category preselected, unit defaulted — not blank.
       expect(find.text('Per piece'), findsWidgets);
-      expect(find.text('1d'), findsWidgets);
       expect(find.widgetWithText(ElevatedButton, 'Save Item'), findsOneWidget);
     });
 
@@ -283,18 +278,19 @@ void main() {
       expect(find.text('Please enter a service name.'), findsOneWidget);
     });
 
-    testWidgets('offers Turnaround Days, not the icon picker the live app lacks',
+    testWidgets('offers no icon picker and no Turnaround Days field',
         (tester) async {
-      // The live app's Add Service modal is Name / Active / Turnaround Days —
-      // no icon picker. Ours used to offer one instead of Turnaround Days.
+      // No icon picker — icon is chosen from a fixed set keyed by category
+      // name. Turnaround Days was removed from the model entirely at the
+      // user's request, so it must not appear here either.
       await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
       await tester.pump();
 
       await tester.tap(find.text('New service category'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Turnaround Days'), findsOneWidget);
       expect(find.text('Service Icon'), findsNothing);
+      expect(find.text('Turnaround Days'), findsNothing);
     });
   });
 

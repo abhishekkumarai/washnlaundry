@@ -54,7 +54,6 @@ class GarmentItemModel {
   final String name;
   final double price;
   final String unit;
-  final int turnaroundDays;
   final bool isActive;
 
   /// Product photo, or '' to fall back to the icon treatment. The client used
@@ -69,14 +68,12 @@ class GarmentItemModel {
     required this.name,
     required this.price,
     this.unit = PricingUnit.piece,
-    this.turnaroundDays = 1,
     this.isActive = true,
     this.imageUrl = '',
   });
 
   String get unitLabel => PricingUnit.label(unit);
   String get unitShortLabel => PricingUnit.shortLabel(unit);
-  String get turnaroundLabel => '${turnaroundDays}d';
 
   factory GarmentItemModel.fromJson(Map<String, dynamic> json) {
     return GarmentItemModel(
@@ -86,7 +83,6 @@ class GarmentItemModel {
       name: json['name'] ?? '',
       price: (json['price'] ?? 0).toDouble(),
       unit: json['unit'] ?? PricingUnit.piece,
-      turnaroundDays: json['turnaround_days'] ?? 1,
       isActive: json['is_active'] ?? true,
       imageUrl: json['image_url'] ?? '',
     );
@@ -99,7 +95,6 @@ class GarmentCategoryModel {
   final String icon;
   final int displayOrder;
   final bool isActive;
-  final int turnaroundDays;
   final int itemCount;
   final double minPrice;
   final double maxPrice;
@@ -111,7 +106,6 @@ class GarmentCategoryModel {
     this.icon = 'Shirt',
     this.displayOrder = 0,
     this.isActive = true,
-    this.turnaroundDays = 1,
     this.itemCount = 0,
     this.minPrice = 0,
     this.maxPrice = 0,
@@ -132,7 +126,6 @@ class GarmentCategoryModel {
       icon: json['icon'] ?? 'Shirt',
       displayOrder: json['display_order'] ?? 0,
       isActive: json['is_active'] ?? true,
-      turnaroundDays: json['turnaround_days'] ?? 1,
       itemCount: json['item_count'] ?? rawItems.length,
       minPrice: (range['min'] ?? 0).toDouble(),
       maxPrice: (range['max'] ?? 0).toDouble(),
@@ -204,6 +197,10 @@ class StaffModel {
   final String status;
   final bool hasAppLogin;
 
+  /// Null for staff added before this field existed, or never set — read as
+  /// "no restriction" everywhere it gates something (e.g. Attendance).
+  final DateTime? startDate;
+
   const StaffModel({
     required this.id,
     required this.name,
@@ -212,6 +209,7 @@ class StaffModel {
     this.monthlyWage = 0,
     this.status = 'ACTIVE',
     this.hasAppLogin = false,
+    this.startDate,
   });
 
   bool get isActive => status == 'ACTIVE';
@@ -224,6 +222,7 @@ class StaffModel {
         monthlyWage: (json['monthly_wage'] ?? 0).toDouble(),
         status: json['status'] ?? 'ACTIVE',
         hasAppLogin: json['has_app_login'] ?? false,
+        startDate: DateTime.tryParse(json['start_date'] ?? ''),
       );
 
   Map<String, dynamic> toJson() => {
@@ -233,6 +232,11 @@ class StaffModel {
         'monthly_wage': monthlyWage,
         'status': status,
         'has_app_login': hasAppLogin,
+        'start_date': startDate == null
+            ? null
+            : '${startDate!.year.toString().padLeft(4, '0')}-'
+                '${startDate!.month.toString().padLeft(2, '0')}-'
+                '${startDate!.day.toString().padLeft(2, '0')}',
       };
 }
 

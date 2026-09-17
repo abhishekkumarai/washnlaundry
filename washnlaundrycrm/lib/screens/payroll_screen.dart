@@ -212,18 +212,9 @@ class _PayrollScreenState extends State<PayrollScreen> {
   static String _money(double? value) => (value ?? 0).round().toString();
 
   Widget _titleRow(bool narrow) {
-    const title = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Payroll',
-            style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
-        Text('Calculate staff wages, attendance payout, and salary records',
-            style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-      ],
-    );
+    const title = Text(
+        'Calculate staff wages, attendance payout, and salary records',
+        style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)));
     final monthNav = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -279,23 +270,31 @@ class _PayrollScreenState extends State<PayrollScreen> {
   Widget _searchField() {
     return Container(
       height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: TextField(
-        onChanged: (v) => setState(() => _searchQuery = v),
-        style: const TextStyle(fontSize: 13),
-        textAlign: TextAlign.center,
-        decoration: const InputDecoration(
-          hintText: 'Search staff...',
-          hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-          prefixIcon:
-              Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(vertical: 9),
-        ),
+      child: Row(
+        children: [
+          const Icon(Icons.search_rounded,
+              size: 18, color: Color(0xFF94A3B8)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              onChanged: (v) => setState(() => _searchQuery = v),
+              style: const TextStyle(fontSize: 13),
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(
+                hintText: 'Search staff...',
+                hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -879,6 +878,14 @@ class _PayrollScreenState extends State<PayrollScreen> {
                 if (amount == null || amount <= 0) {
                   setDialogState(
                       () => error = 'Enter an amount greater than zero.');
+                  return;
+                }
+                // Can't pay out more than is actually owed for the month —
+                // pendingAmount is total_salary minus what's already been
+                // paid, so anything above it would be an overpayment.
+                if (amount > entry.pendingAmount) {
+                  setDialogState(() => error =
+                      'Cannot exceed the ${Money.symbol}${_money(entry.pendingAmount)} outstanding.');
                   return;
                 }
                 final ok =

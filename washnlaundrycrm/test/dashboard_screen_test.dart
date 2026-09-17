@@ -182,5 +182,92 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('narrow width: panels default expanded and collapse on tap',
+        (tester) async {
+      final view = TestWidgetsFlutterBinding.ensureInitialized()
+          .platformDispatcher
+          .implicitView!;
+      view.physicalSize = const Size(700, 3200);
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(orders: [order('WASH-00001')], stats: fullStats);
+      await tester.pumpWidget(host(provider, size: const Size(700, 3200)));
+      await tester.pump();
+
+      // Below DashboardScreen's own 990px breakpoint, panels render
+      // collapsible and start expanded — same content visible as wide width.
+      // The viewport is made tall enough that every panel, including the
+      // single-column-stacked Store Health card, is on-screen without
+      // needing a scroll first.
+      expect(find.text('9 active orders on schedule'), findsOneWidget);
+      expect(find.byIcon(Icons.keyboard_arrow_up_rounded), findsWidgets);
+
+      await tester.tap(find.text('Store Health'));
+      await tester.pump();
+      expect(find.text('9 active orders on schedule'), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Store Health'));
+      await tester.pump();
+      expect(find.text('9 active orders on schedule'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'wide width: panels are not collapsible — tapping the title does nothing',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(orders: [order('WASH-00001')], stats: fullStats);
+      await tester.pumpWidget(host(provider));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.keyboard_arrow_up_rounded), findsNothing);
+
+      await tester.tap(find.text('Store Health'));
+      await tester.pump();
+      expect(find.text('9 active orders on schedule'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        'narrow width: scroll-to-top appears after scrolling and returns to the top',
+        (tester) async {
+      final view = TestWidgetsFlutterBinding.ensureInitialized()
+          .platformDispatcher
+          .implicitView!;
+      view.physicalSize = const Size(700, 1600);
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(orders: [order('WASH-00001')], stats: fullStats);
+      await tester.pumpWidget(host(provider, size: const Size(700, 1600)));
+      await tester.pump();
+
+      final fab = find.byKey(const Key('dashboard_scroll_to_top'));
+      expect(fab, findsNothing);
+
+      await tester.drag(
+          find.byKey(const Key('dashboard_scroll_view')), const Offset(0, -600));
+      await tester.pump();
+      expect(fab, findsOneWidget);
+
+      await tester.tap(fab);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('dashboard_scroll_to_top')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('wide width: scroll-to-top never appears even after scrolling',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(orders: [order('WASH-00001')], stats: fullStats);
+      await tester.pumpWidget(host(provider));
+      await tester.pump();
+
+      await tester.drag(
+          find.byKey(const Key('dashboard_scroll_view')), const Offset(0, -600));
+      await tester.pump();
+
+      expect(find.byKey(const Key('dashboard_scroll_to_top')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
   });
 }

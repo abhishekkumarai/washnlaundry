@@ -531,6 +531,36 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  /// The order-detail "Collect Payment" dialog's submit action. Records the
+  /// payment (skipped when [amount] is 0, e.g. "Pay Later") and, when
+  /// [markDelivered] is true, also completes the delivery/pickup — this is
+  /// how an order now reaches Delivered, replacing the old manual status
+  /// option.
+  Future<bool> collectPaymentAndMarkDelivered(
+    String orderId, {
+    required double amount,
+    required String paymentMethod,
+    required bool markDelivered,
+  }) async {
+    try {
+      if (amount > 0) {
+        final updated = await ApiService.collectPayment(orderId, amount,
+            paymentMethod: paymentMethod);
+        _replaceOrder(updated);
+      }
+      if (markDelivered) {
+        final updated =
+            await ApiService.updateOrderStatus(orderId, OrderStatus.delivered);
+        _replaceOrder(updated);
+      }
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> addCustomer(Map<String, dynamic> payload) async {
     try {
       final customer = await ApiService.createCustomer(payload);

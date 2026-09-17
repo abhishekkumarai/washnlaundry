@@ -229,6 +229,58 @@ void main() {
     });
   });
 
+  group('Update Status availability', () {
+    testWidgets('is disabled once the order is Delivered', (tester) async {
+      // Nothing left to move it to — that transition now only happens via
+      // Collect Payment — so re-opening the dialog here would be a dead end.
+      await pump(tester, order(status: OrderStatus.delivered));
+
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Update Status'),
+      );
+      expect(button.onPressed, isNull);
+    });
+
+    testWidgets('is disabled once the order is Cancelled', (tester) async {
+      await pump(tester, order(status: OrderStatus.cancelled));
+
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Update Status'),
+      );
+      expect(button.onPressed, isNull);
+    });
+
+    testWidgets('stays enabled for every other status', (tester) async {
+      await pump(tester, order(status: OrderStatus.ready));
+
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Update Status'),
+      );
+      expect(button.onPressed, isNotNull);
+    });
+  });
+
+  group('Edit availability', () {
+    testWidgets('is disabled once the order is Delivered', (tester) async {
+      // The order's own details shouldn't change after handoff either.
+      await pump(tester, order(status: OrderStatus.delivered));
+
+      final button = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, 'Edit'),
+      );
+      expect(button.onPressed, isNull);
+    });
+
+    testWidgets('stays enabled for every other status', (tester) async {
+      await pump(tester, order(status: OrderStatus.ready));
+
+      final button = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, 'Edit'),
+      );
+      expect(button.onPressed, isNotNull);
+    });
+  });
+
   group('Update Status dialog', () {
     Future<void> openDialog(WidgetTester tester, OrderModel o) async {
       await pump(tester, o);
@@ -301,6 +353,27 @@ void main() {
 
       expect(find.text('That is already the current status.'), findsOneWidget);
     });
+
+    testWidgets(
+        'does not offer Delivered/Picked Up — that now only happens via Collect Payment',
+        (tester) async {
+      await openDialog(tester, order(deliveryType: DeliveryType.homeDelivery));
+
+      expect(
+        find.descendant(
+            of: find.byType(AlertDialog), matching: find.text('Delivered')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+            of: find.byType(AlertDialog), matching: find.text('Picked Up')),
+        findsNothing,
+      );
+      expect(
+        find.textContaining('Collect Payment" on the Payment card'),
+        findsOneWidget,
+      );
+    });
   });
 
   group('Edit dialog', () {
@@ -329,43 +402,122 @@ void main() {
   });
 
   group('payment', () {
-    testWidgets('Collect Payment is offered only while money is owed',
+    testWidgets('Collect Payment is offered whenever there is money owed',
         (tester) async {
-      await pump(tester, order(due: 150));
-      expect(find.text('Collect Payment'), findsOneWidget);
-    });
-
-    testWidgets('a settled order offers nothing to collect', (tester) async {
-      await pump(tester, order(paid: 150, due: 0));
-
-      expect(find.text('Collect Payment'), findsNothing);
-      expect(find.text('Balance Due'), findsOneWidget);
-    });
-
-    testWidgets('Collect Payment stays disabled until the order is delivered',
-        (tester) async {
-      // Money owed alone used to be enough to press it — staff could collect
-      // payment on an order that hadn't even left the shop yet.
+      // No gate on delivery status anymore — Collect Payment is now how an
+      // order *reaches* Delivered, so it must be pressable long before then.
       await pump(tester, order(due: 150, status: OrderStatus.processing));
 
       final button = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, 'Collect Payment'),
       );
-      expect(button.onPressed, isNull);
-      expect(find.text('Available once the order is marked Delivered.'),
-          findsOneWidget);
+      expect(button.onPressed, isNotNull);
     });
 
-    testWidgets('Collect Payment is pressable once the order is delivered',
+    testWidgets(
+        'a not-yet-delivered order with nothing owed still offers Collect Payment',
         (tester) async {
-      await pump(tester, order(due: 150, status: OrderStatus.delivered));
+      // Even fully paid up front, the order still needs to be handed over —
+      // Collect Payment is also how that final Delivered transition happens.
+      await pump(tester, order(paid: 150, due: 0, status: OrderStatus.ready));
 
-      final button = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Collect Payment'),
+      expect(find.text('Collect Payment'), findsOneWidget);
+    });
+
+    testWidgets('a delivered, fully settled order offers nothing to collect',
+        (tester) async {
+      await pump(tester,
+          order(paid: 150, due: 0, status: OrderStatus.delivered));
+
+      expect(find.text('Collect Payment'), findsNothing);
+      expect(find.text('Balance Due'), findsOneWidget);
+    });
+
+    Future<void> openCollectPayment(WidgetTester tester, OrderModel o) async {
+      await pump(tester, o);
+      await tester.tap(find.widgetWithText(FilledButton, 'Collect Payment'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'the dialog offers Full/Partial/Pay Later and Cash/UPI/Card, defaulting to Full',
+        (tester) async {
+      await openCollectPayment(
+          tester, order(due: 150, status: OrderStatus.ready));
+
+      for (final label in ['Full', 'Partial', 'Pay Later', 'Cash', 'UPI', 'Card']) {
+        expect(
+          find.descendant(
+              of: find.byType(AlertDialog), matching: find.text(label)),
+          findsOneWidget,
+        );
+      }
+
+      final amountField = tester.widget<TextField>(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ));
+      expect(amountField.enabled, isFalse);
+      expect(amountField.controller!.text, '150');
+    });
+
+    testWidgets('selecting Partial enables the amount field for editing',
+        (tester) async {
+      await openCollectPayment(
+          tester, order(due: 150, status: OrderStatus.ready));
+
+      await tester.tap(find.text('Partial'));
+      await tester.pump();
+
+      final amountField = tester.widget<TextField>(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ));
+      expect(amountField.enabled, isTrue);
+    });
+
+    testWidgets('selecting Pay Later zeroes the amount and locks the method',
+        (tester) async {
+      await openCollectPayment(
+          tester, order(due: 150, status: OrderStatus.ready));
+
+      await tester.tap(find.text('Pay Later'));
+      await tester.pump();
+
+      final amountField = tester.widget<TextField>(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ));
+      expect(amountField.enabled, isFalse);
+      expect(amountField.controller!.text, '0');
+
+      final cashChip = tester.widget<ChoiceChip>(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(ChoiceChip, 'Cash'),
+      ));
+      expect(cashChip.onSelected, isNull);
+    });
+
+    testWidgets(
+        'a Partial amount over the balance due is rejected before any save',
+        (tester) async {
+      await openCollectPayment(
+          tester, order(due: 150, status: OrderStatus.ready));
+
+      await tester.tap(find.text('Partial'));
+      await tester.pump();
+      await tester.enterText(
+        find.descendant(
+            of: find.byType(AlertDialog), matching: find.byType(TextField)),
+        '999',
       );
-      expect(button.onPressed, isNotNull);
-      expect(find.text('Available once the order is marked Delivered.'),
-          findsNothing);
+      await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Collect Payment'),
+      ));
+      await tester.pump();
+
+      expect(find.text('Amount can\'t exceed the balance due.'), findsOneWidget);
     });
   });
 

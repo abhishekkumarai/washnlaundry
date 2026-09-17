@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/error_dialog.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../utils/money.dart';
 
@@ -34,6 +37,7 @@ class _StaffScreenState extends State<StaffScreen> {
               'wage': s.monthlyWage,
               'status': s.status,
               'hasAppLogin': s.hasAppLogin,
+              'startDate': s.startDate,
             })
         .toList();
   }
@@ -120,6 +124,11 @@ class _StaffScreenState extends State<StaffScreen> {
       text: ((existing?['wage'] as num?) ?? defaultWage).toStringAsFixed(0),
     );
     bool isActive = (existing?['status'] as String?) != 'INACTIVE';
+    // New hires default to joining today — almost always right, and still
+    // editable before saving. An edit leaves an already-unset date alone
+    // rather than backfilling one that was never actually recorded.
+    DateTime? startDate =
+        existing?['startDate'] as DateTime? ?? (isEdit ? null : DateTime.now());
 
     showDialog(
       context: context,
@@ -244,6 +253,59 @@ class _StaffScreenState extends State<StaffScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
+                  const Text('Start Date',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF475569))),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final picked = await AppDatePicker.pickDate(
+                            context: context,
+                            initialDate: startDate ?? DateTime.now(),
+                            firstDate: DateTime(2015),
+                            lastDate: DateTime(2035),
+                          );
+                          if (picked != null) {
+                            setModalState(() => startDate = picked);
+                          }
+                        },
+                        icon: const Icon(Icons.calendar_month_rounded,
+                            size: 16, color: Color(0xFF1A4FD6)),
+                        label: Text(
+                          startDate == null
+                              ? 'Not set'
+                              : DateFormat('d MMM yyyy').format(startDate!),
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1A4FD6)),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF1A4FD6)),
+                          backgroundColor: const Color(0xFFEEF2FF),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      if (startDate != null) ...[
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded,
+                              size: 18, color: Color(0xFF94A3B8)),
+                          tooltip: 'Clear start date',
+                          onPressed: () =>
+                              setModalState(() => startDate = null),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 14),
                   if (isEdit)
                     Row(
                       children: [
@@ -287,6 +349,10 @@ class _StaffScreenState extends State<StaffScreen> {
                     : roleCtrl.text.trim(),
                 'phone': phoneCtrl.text.trim(),
                 'monthly_wage': double.tryParse(wageCtrl.text) ?? defaultWage,
+                // Sent explicitly (even as null) so clearing an already-set
+                // date actually persists, not just skips the field.
+                'start_date':
+                    startDate == null ? null : AppProvider.dateKey(startDate!),
                 if (isEdit) 'status': isActive ? 'ACTIVE' : 'INACTIVE',
               };
               final ok = isEdit
@@ -298,18 +364,28 @@ class _StaffScreenState extends State<StaffScreen> {
                       'has_app_login': false,
                     });
               if (!ctx.mounted) return;
-              Navigator.pop(ctx);
-              messenger.showSnackBar(
-                SnackBar(
-                  content: Text(ok
-                      ? (isEdit
-                          ? 'Updated "$name"'
-                          : 'Added staff member "$name"')
-                      : 'Could not save "$name": ${provider.error ?? 'unknown error'}'),
-                  backgroundColor:
-                      ok ? const Color(0xFF10B981) : const Color(0xFFDC2626),
-                ),
-              );
+              if (ok) {
+                Navigator.pop(ctx);
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(isEdit
+                        ? 'Updated "$name"'
+                        : 'Added staff member "$name"'),
+                    backgroundColor: const Color(0xFF10B981),
+                  ),
+                );
+              } else {
+                // The dialog used to close unconditionally here, discarding
+                // whatever the user had typed, with only a SnackBar (easy to
+                // miss, and gone once the dialog's gone) explaining why. A
+                // popup instead — and the dialog stays open behind it — so
+                // the failure is impossible to miss and nothing is lost.
+                await showErrorDialog(
+                  ctx,
+                  title: 'Could not save "$name"',
+                  message: provider.error ?? 'Unknown error.',
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1A4FD6),
@@ -503,23 +579,31 @@ class _StaffScreenState extends State<StaffScreen> {
   Widget _searchField() {
     return Container(
       height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: TextField(
-        onChanged: (v) => setState(() => _searchQuery = v),
-        style: const TextStyle(fontSize: 13),
-        textAlign: TextAlign.center,
-        decoration: const InputDecoration(
-          hintText: 'Search staff...',
-          hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-          prefixIcon:
-              Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(vertical: 9),
-        ),
+      child: Row(
+        children: [
+          const Icon(Icons.search_rounded,
+              size: 18, color: Color(0xFF94A3B8)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              onChanged: (v) => setState(() => _searchQuery = v),
+              style: const TextStyle(fontSize: 13),
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(
+                hintText: 'Search staff...',
+                hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

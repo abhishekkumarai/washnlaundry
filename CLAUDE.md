@@ -308,3 +308,66 @@ it, and `flutter run -d chrome` is the fast loop.
 - Seeded shop is `washing`, owner `AK` — matches the live account the screenshots come from.
 - Money is `FloatField` / Dart `double` end to end. Fine for a demo, wrong for money; if this ever takes real payments, move to integer paise.
 - Flutter widgets are large single files with inline literals and no test coverage beyond the default `widget_test.dart`. Match the surrounding style when editing rather than introducing a new architecture mid-file.
+
+---
+
+## Jira tracking
+
+Work on this project is tracked in Jira project **KAN** ("washnlaundry", site
+`emailabhishek2.atlassian.net`) via the `atlassian` MCP server (added
+2026-08-29; `claude mcp add --transport sse atlassian
+https://mcp.atlassian.com/v1/sse` — re-authenticate with
+`mcp__atlassian__authenticate` if its tools ever stop showing up after a
+restart). Four standing epics hold the outstanding-work backlog:
+
+| Epic | Covers |
+|---|---|
+| KAN-4 | Android / multi-form-factor |
+| KAN-5 | Routing / dead screens |
+| KAN-6 | Real-app parity gaps (vs. app.laundrybill.com) |
+| KAN-7 | Smaller known gaps |
+
+**Whenever you complete a unit of real work in this repo** — a bug fix, a
+feature, a refactor with user-visible effect, not a read-only investigation
+or a question answered — do the following before considering the task
+finished:
+
+1. Check whether an existing KAN issue already describes it (search
+   `getVisibleJiraProjects`/`searchJiraIssuesUsingJql`, or recall from this
+   session) — if so, comment/transition that issue instead of creating a
+   duplicate.
+2. Otherwise create a Jira **Subtask** under the epic (or under a Task
+   already sitting under the right epic, if one exists) via
+   `createJiraIssue`, using `parent` to link it. Pick the epic by subject
+   matter (Android work → KAN-4, etc.); if the work doesn't fit any of the
+   four, say so and ask rather than forcing a bad fit.
+3. Give the subtask a summary that names the actual change (not "fix bug")
+   and a description with enough context (file/screen touched, why) that
+   someone reading only Jira understands what happened, mirroring the level
+   of detail this file and `wip.md` already keep.
+4. If the change closes out something the subtask/epic describes, transition
+   it to **In Review** (`transitionJiraIssue`) — never straight to Done, even
+   when verification looks solid. Then explicitly ask the user to confirm
+   before moving it to Done; don't auto-close on your own say-so.
+
+This is a standing instruction, not a mechanical hook — deciding *which*
+epic and *what* the subtask should say needs judgment a shell hook doesn't
+have. Follow it without being asked again each session.
+
+**Mechanical backstop:** `.claude/settings.local.json` (gitignored, personal)
+has a `Stop` hook that hashes `git status --porcelain` + `git diff HEAD` and
+compares it against `.claude/.jira-sync-marker` (also gitignored). If they
+differ — meaning the working tree changed since the marker was last written —
+it prints a `systemMessage` reminder; it does not block. After handling Jira
+per the steps above (or after a change that genuinely doesn't warrant a KAN
+issue — e.g. editing this file), refresh the marker so the reminder goes
+quiet again:
+
+```bash
+printf '%s' "$(git status --porcelain)$(git diff HEAD)" | sha256sum | cut -d' ' -f1 > .claude/.jira-sync-marker
+```
+
+The hook only tracks tracked-file diffs plus the untracked-file list — a
+brand-new file's content changing across turns without being added/removed
+won't retrigger it. It's a nudge, not a guarantee; the instruction above is
+what actually does the linking.

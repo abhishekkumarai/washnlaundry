@@ -5,8 +5,10 @@ vocabulary, order numbering, the timeline stamps, delivery charges, derived
 filters, and the catalogue shape.
 """
 
+import io
 from datetime import date, time, timedelta
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APITestCase
@@ -209,6 +211,207 @@ class CustomerTests(TestCase):
         self.assertEqual(c.avg_order_value, 0.0)
 
 
+class CustomerImportTests(APITestCase):
+    def _csv_file(self, text, name='customers.csv'):
+        return SimpleUploadedFile(name, text.encode('utf-8'), content_type='text/csv')
+
+    def test_preview_guesses_mapping_from_csv_headers(self):
+        upload = self._csv_file(
+            'Customer Name,Mobile Number,Email\nAsha Rao,9876500001,asha@example.com\n'
+        )
+        response = self.client.post('/api/customers/import/preview/', {'file': upload})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['columns'], ['Customer Name', 'Mobile Number', 'Email'])
+        self.assertEqual(response.data['row_count'], 1)
+        self.assertEqual(response.data['suggested_mapping'], {
+            'name': 'Customer Name',
+            'phone': 'Mobile Number',
+            'email': 'Email',
+        })
+
+    def test_preview_without_a_file_is_rejected(self):
+        response = self.client.post('/api/customers/import/preview/', {})
+        self.assertEqual(response.status_code, 400)
+
+    def test_commit_requires_name_and_phone_mapping(self):
+        upload = self._csv_file('Email\nasha@example.com\n')
+        response = self.client.post('/api/customers/import/commit/', {
+            'file': upload,
+            'mapping': '{"email": "Email"}',
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Customer.objects.count(), 0)
+
+    def test_commit_creates_valid_rows_and_drops_missing_and_duplicate_rows(self):
+        Customer.objects.create(name='Existing', phone='9000000000')
+        upload = self._csv_file(
+            'Name,Phone,Area\n'
+            'Asha Rao,9876500001,Koramangala\n'      # valid
+            ',9876500002,Indiranagar\n'               # missing name -> dropped
+            'No Phone,,HSR\n'                         # missing phone -> dropped
+            'Dupe In File,9876500003,Whitefield\n'    # valid
+            'Dupe In File Again,9876500003,Whitefield\n'  # duplicate of the row above -> dropped
+            'Already A Customer,9000000000,Koramangala\n'  # duplicate of existing DB row -> dropped
+        )
+        response = self.client.post('/api/customers/import/commit/', {
+            'file': upload,
+            'mapping': '{"name": "Name", "phone": "Phone", "area": "Area"}',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {
+            'total_rows': 6,
+            'created': 2,
+            'updated': 0,
+            'skipped_missing': 2,
+            'skipped_duplicate': 2,
+        })
+        self.assertEqual(Customer.objects.count(), 3)  # 1 pre-existing + 2 imported
+        asha = Customer.objects.get(phone='9876500001')
+        self.assertEqual(asha.name, 'Asha Rao')
+        self.assertEqual(asha.area, 'Koramangala')
+        # The pre-existing duplicate was skipped, not touched.
+        self.assertEqual(Customer.objects.get(phone='9000000000').name, 'Existing')
+
+    def test_commit_with_overwrite_updates_the_existing_customer_instead_of_skipping(self):
+        existing = Customer.objects.create(
+            name='Old Name', phone='9000000000', area='Old Area', email='old@example.com',
+        )
+        upload = self._csv_file(
+            'Name,Phone,Area,Email\n'
+            'New Name,9000000000,New Area,\n'  # blank email -> leaves the existing one alone
+        )
+        response = self.client.post('/api/customers/import/commit/', {
+            'file': upload,
+            'mapping': '{"name": "Name", "phone": "Phone", "area": "Area", "email": "Email"}',
+            'overwrite_duplicates': 'true',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {
+            'total_rows': 1,
+            'created': 0,
+            'updated': 1,
+            'skipped_missing': 0,
+            'skipped_duplicate': 0,
+        })
+        existing.refresh_from_db()
+        self.assertEqual(existing.name, 'New Name')
+        self.assertEqual(existing.area, 'New Area')
+        self.assertEqual(existing.phone, '9000000000')  # never touched
+        self.assertEqual(existing.email, 'old@example.com')  # blank cell didn't wipe it
+
+    def test_commit_with_overwrite_merges_repeated_in_file_duplicates(self):
+        upload = self._csv_file(
+            'Name,Phone,Area\n'
+            'First Pass,9876500099,Koramangala\n'
+            'Final Pass,9876500099,Indiranagar\n'
+        )
+        response = self.client.post('/api/customers/import/commit/', {
+            'file': upload,
+            'mapping': '{"name": "Name", "phone": "Phone", "area": "Area"}',
+            'overwrite_duplicates': 'true',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], 1)
+        self.assertEqual(response.data['updated'], 0)
+        customer = Customer.objects.get(phone='9876500099')
+        self.assertEqual(customer.name, 'Final Pass')
+        self.assertEqual(customer.area, 'Indiranagar')
+
+    def test_commit_supports_xlsx(self):
+        openpyxl = __import__('openpyxl')
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.append(['Name', 'Phone'])
+        sheet.append(['Bala Krishnan', '9876500009'])
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        upload = SimpleUploadedFile(
+            'customers.xlsx', buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+
+        response = self.client.post('/api/customers/import/commit/', {
+            'file': upload,
+            'mapping': '{"name": "Name", "phone": "Phone"}',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], 1)
+        self.assertTrue(Customer.objects.filter(phone='9876500009', name='Bala Krishnan').exists())
+
+    def test_commit_strips_a_decimal_tail_a_numeric_phone_column_leaves_behind(self):
+        # A phone column stored/exported as a *numeric* cell round-trips as
+        # e.g. "9876500009.0" — corrupting the number and making it useless
+        # as a tappable phone link in the UI. The imported customer's phone
+        # must be the plain digits, not that literal string.
+        upload = self._csv_file('Name,Phone\nAsha Rao,9876500001.0\n')
+        response = self.client.post('/api/customers/import/commit/', {
+            'file': upload,
+            'mapping': '{"name": "Name", "phone": "Phone"}',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], 1)
+        asha = Customer.objects.get(name='Asha Rao')
+        self.assertEqual(asha.phone, '9876500001')
+
+    def test_commit_supports_xlsx_with_a_float_valued_phone_cell(self):
+        openpyxl = __import__('openpyxl')
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.append(['Name', 'Phone'])
+        sheet.cell(row=2, column=1, value='Chitra Nair')
+        sheet.cell(row=2, column=2, value=9876500010.0)
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        upload = SimpleUploadedFile(
+            'customers.xlsx', buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+
+        response = self.client.post('/api/customers/import/commit/', {
+            'file': upload,
+            'mapping': '{"name": "Name", "phone": "Phone"}',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], 1)
+        self.assertTrue(
+            Customer.objects.filter(phone='9876500010', name='Chitra Nair').exists()
+        )
+
+
+class CustomerImportHelperTests(TestCase):
+    """Direct unit tests of the pure parsing helpers, independent of the
+    view/HTTP layer above."""
+
+    def test_normalize_phone_strips_trailing_zero_decimal(self):
+        from .customer_import import normalize_phone
+        self.assertEqual(normalize_phone('9876500001.0'), '9876500001')
+        self.assertEqual(normalize_phone('9876500001.00'), '9876500001')
+
+    def test_normalize_phone_leaves_a_plain_number_alone(self):
+        from .customer_import import normalize_phone
+        self.assertEqual(normalize_phone('9876500001'), '9876500001')
+
+    def test_normalize_phone_leaves_a_real_fraction_alone(self):
+        # Not a real phone number either way — this function's job is only
+        # to undo the numeric-cell round-trip, not to validate phone shape.
+        from .customer_import import normalize_phone
+        self.assertEqual(normalize_phone('987.65'), '987.65')
+
+    def test_cell_to_str_strips_a_whole_number_float(self):
+        from .customer_import import _cell_to_str
+        self.assertEqual(_cell_to_str(9876500001.0), '9876500001')
+        self.assertEqual(_cell_to_str(9876500001), '9876500001')
+        self.assertEqual(_cell_to_str('Asha Rao'), 'Asha Rao')
+        self.assertEqual(_cell_to_str(None), '')
+
+
 class OrderApiTests(APITestCase):
     def setUp(self):
         Shop.objects.create(name='washing', order_prefix='WA3P')
@@ -384,7 +587,25 @@ class CatalogueApiTests(APITestCase):
         item = self.client.get('/api/items/').data[0]
         self.assertEqual(item['category_name'], 'Ironing')
         self.assertEqual(item['unit_label'], 'per pc')
-        self.assertEqual(item['turnaround_days'], 1)
+
+    def test_deactivating_an_item_does_not_strand_it(self):
+        # The is_active default-hide used to apply to retrieve/update/destroy
+        # too (not just list), via a shared get_queryset(). PATCHing an item
+        # to is_active=False took it out of that same queryset, so the next
+        # request for it by id — a GET, another PATCH, even a DELETE — 404'd.
+        # Reactivating a deactivated item through the API was impossible.
+        shirt = GarmentItem.objects.get(name='Shirt')
+
+        response = self.client.patch(f'/api/items/{shirt.id}/', {'is_active': False})
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(f'/api/items/{shirt.id}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data['is_active'])
+
+        response = self.client.patch(f'/api/items/{shirt.id}/', {'is_active': True})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['is_active'])
 
 
 class SchedulingApiTests(APITestCase):
@@ -577,6 +798,55 @@ class StaffApiTests(APITestCase):
         self.assertFalse(response.data['has_app_login'])
         self.assertEqual(response.data['status'], 'ACTIVE')
 
+    def test_start_date_round_trips(self):
+        response = self.client.post('/api/staff/', {
+            'name': 'Joins Later',
+            'role': 'Washer',
+            'phone': '9000000011',
+            'start_date': '2026-09-01',
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['start_date'], '2026-09-01')
+
+    def test_start_date_is_optional(self):
+        # Staff created before this field existed have none — must not become
+        # required on every future edit just because it exists now.
+        response = self.client.post('/api/staff/', {
+            'name': 'No Start Date',
+            'role': 'Washer',
+            'phone': '9000000012',
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertIsNone(response.data['start_date'])
+
+    def test_moving_start_date_past_existing_attendance_is_rejected(self):
+        staff = Staff.objects.create(
+            name='Already Worked', role='Washer', phone='9000000013',
+            start_date=date(2026, 8, 1),
+        )
+        Attendance.objects.create(staff=staff, date=date(2026, 8, 5))
+
+        response = self.client.patch(
+            f'/api/staff/{staff.id}/', {'start_date': '2026-08-10'}, format='json'
+        )
+        self.assertEqual(response.status_code, 400)
+        staff.refresh_from_db()
+        self.assertEqual(staff.start_date, date(2026, 8, 1))
+
+    def test_moving_start_date_earlier_is_always_fine(self):
+        # Only attendance *before* the new date is a conflict — pulling the
+        # date earlier can never orphan an existing record.
+        staff = Staff.objects.create(
+            name='Backdated', role='Washer', phone='9000000014',
+            start_date=date(2026, 8, 10),
+        )
+        Attendance.objects.create(staff=staff, date=date(2026, 8, 12))
+
+        response = self.client.patch(
+            f'/api/staff/{staff.id}/', {'start_date': '2026-08-01'}, format='json'
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
 
 class AttendanceTests(TestCase):
     def test_one_record_per_staff_per_day(self):
@@ -687,6 +957,41 @@ class AttendanceBulkTests(APITestCase):
         response = self.client.get('/api/attendance/', {'date': self.day})
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['status'], 'PRESENT')
+
+    def test_marking_before_start_date_is_rejected(self):
+        self.a.start_date = date(2026, 8, 15)
+        self.a.save()
+        response = self.post({'date': self.day, 'entries': [{'staff': self.a.id, 'status': 'PRESENT'}]})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Ramesh Kumar', response.data['detail'])
+        self.assertEqual(Attendance.objects.count(), 0)
+
+    def test_marking_on_the_start_date_itself_is_allowed(self):
+        self.a.start_date = date(2026, 8, 11)  # == self.day
+        self.a.save()
+        response = self.post({'date': self.day, 'entries': [{'staff': self.a.id, 'status': 'PRESENT'}]})
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_a_start_date_violation_blocks_the_whole_batch(self):
+        # Same "reject everything, write nothing" rule as an invalid status —
+        # b's entry is fine on its own but a's isn't allowed yet.
+        self.a.start_date = date(2026, 9, 1)
+        self.a.save()
+        response = self.post({
+            'date': self.day,
+            'entries': [
+                {'staff': self.a.id, 'status': 'PRESENT'},
+                {'staff': self.b.id, 'status': 'PRESENT'},
+            ],
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Attendance.objects.count(), 0)
+
+    def test_no_start_date_on_file_never_blocks_marking(self):
+        # self.a/self.b are created with no start_date in setUp — None must
+        # read as "no restriction", not as "before everything".
+        response = self.post({'date': self.day, 'entries': [{'staff': self.a.id, 'status': 'PRESENT'}]})
+        self.assertEqual(response.status_code, 200, response.data)
 
 
 class PayrollTests(APITestCase):
@@ -869,6 +1174,55 @@ class PayrollTests(APITestCase):
             format='json',
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_a_payment_exceeding_what_is_owed_is_rejected(self):
+        self.mark(1, Attendance.PRESENT)  # total_salary == 600.0
+        response = self.client.post(
+            '/api/salary-payments/',
+            {'staff': self.staff.id, 'month': '2026-07-01', 'amount': 600.01},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(SalaryPayment.objects.count(), 0)
+
+    def test_a_payment_exactly_matching_what_is_owed_is_allowed(self):
+        self.mark(1, Attendance.PRESENT)  # total_salary == 600.0
+        response = self.client.post(
+            '/api/salary-payments/',
+            {'staff': self.staff.id, 'month': '2026-07-01', 'amount': 600.0},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_the_cap_accounts_for_payments_already_made(self):
+        # 600 owed, 400 already paid — a second payment can only cover the
+        # remaining 200, even though 250 alone would have been fine on its own.
+        self.mark(1, Attendance.PRESENT)
+        SalaryPayment.objects.create(staff=self.staff, month=self.month, amount=400.0)
+        response = self.client.post(
+            '/api/salary-payments/',
+            {'staff': self.staff.id, 'month': '2026-07-01', 'amount': 250.0},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        response = self.client.post(
+            '/api/salary-payments/',
+            {'staff': self.staff.id, 'month': '2026-07-01', 'amount': 200.0},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_editing_a_payment_excludes_its_own_prior_amount_from_the_cap(self):
+        # Raising an existing payment from 300 to 500 (still <= 600 owed)
+        # must not double-count the 300 it's replacing.
+        self.mark(1, Attendance.PRESENT)
+        payment = SalaryPayment.objects.create(
+            staff=self.staff, month=self.month, amount=300.0
+        )
+        response = self.client.patch(
+            f'/api/salary-payments/{payment.id}/', {'amount': 500.0}, format='json'
+        )
+        self.assertEqual(response.status_code, 200, response.data)
 
 
 class ReportsApiTests(APITestCase):
@@ -1132,6 +1486,25 @@ class PosCheckoutContractTests(APITestCase):
     def test_express_flag_survives(self):
         response = self._checkout(express=True)
         self.assertTrue(response.data['express'])
+
+    def test_scheduled_date_and_time_survive(self):
+        # New Order's Checkout review sends both — scheduled_time is separate
+        # from scheduled_date (not a DateTimeField) so it doesn't disturb any
+        # existing scheduled_date-only comparison (is_overdue, the Scheduled
+        # tab filter).
+        response = self._checkout(
+            scheduled_date='2026-08-15', scheduled_time='15:00:00'
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['scheduled_date'], '2026-08-15')
+        self.assertEqual(response.data['scheduled_time'], '15:00:00')
+
+    def test_scheduled_time_is_optional(self):
+        # Store Pickup's checkout still only sends scheduled_date in some
+        # flows — scheduled_time must not be required.
+        response = self._checkout(scheduled_date='2026-08-15')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertIsNone(response.data['scheduled_time'])
 
     def test_created_order_appears_in_the_list(self):
         self._checkout()

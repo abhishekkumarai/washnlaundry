@@ -8,7 +8,9 @@ import 'panel_card.dart';
 /// "Revenue Analytics — This month overview": collection progress bar plus the
 /// sales / collected / uncollected / expenses / net profit breakdown.
 class RevenueAnalyticsCard extends StatelessWidget {
-  const RevenueAnalyticsCard({super.key});
+  final bool collapsible;
+
+  const RevenueAnalyticsCard({super.key, this.collapsible = false});
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +26,7 @@ class RevenueAnalyticsCard extends StatelessWidget {
     return PanelCard(
       title: 'Revenue Analytics',
       subtitle: 'This month overview',
+      collapsible: collapsible,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

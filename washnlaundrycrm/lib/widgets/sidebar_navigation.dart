@@ -137,6 +137,12 @@ class SidebarNavigation extends StatefulWidget {
       'index': 13,
       'disabled': true
     },
+    {
+      'label': 'Help',
+      'icon': Icons.help_outline_rounded,
+      'index': 14,
+      'disabled': false
+    },
   ];
 
   @override
@@ -250,7 +256,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: RichText(
-                text: TextSpan(
+                text: const TextSpan(
                   children: [
                     TextSpan(
                       text: 'WashN',
@@ -421,8 +427,13 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
           onTap: disabled
               ? null
               : () {
-                  context.goSection(navIndex);
-                  if (widget.inDrawer) Navigator.of(context).maybePop();
+                  if (navIndex == 14) {
+                    if (widget.inDrawer) Navigator.of(context).maybePop();
+                    _showHelpDialog(context);
+                  } else {
+                    context.goSection(navIndex);
+                    if (widget.inDrawer) Navigator.of(context).maybePop();
+                  }
                 },
           child: Padding(
             padding: EdgeInsets.symmetric(
@@ -527,6 +538,127 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                 ),
               ],
             ),
+    );
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.help_outline_rounded,
+                    color: _brandBlue, size: 22),
+                SizedBox(width: 10),
+                Text(
+                  'Help & Support',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _ink,
+                  ),
+                ),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.close_rounded,
+                  size: 20, color: Color(0xFF94A3B8)),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Need help managing your laundry CRM or POS?',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _ink,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Get in touch with support or find answers to common questions about orders, customers, payroll, and billing.',
+              style: TextStyle(
+                fontSize: 13,
+                color: _muted,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _helpContactRow(
+              icon: Icons.email_outlined,
+              label: 'Email Support',
+              value: 'support@laundrybill.com',
+            ),
+            const SizedBox(height: 10),
+            _helpContactRow(
+              icon: Icons.phone_outlined,
+              label: 'Phone Support',
+              value: '+91 80 4567 8900',
+            ),
+            const SizedBox(height: 10),
+            _helpContactRow(
+              icon: Icons.schedule_outlined,
+              label: 'Hours',
+              value: 'Mon – Sat, 9:00 AM – 8:00 PM',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text(
+              'Close',
+              style: TextStyle(
+                color: _brandBlue,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _helpContactRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: _muted),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: _ink,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              color: _muted,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

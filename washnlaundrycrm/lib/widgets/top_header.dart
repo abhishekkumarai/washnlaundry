@@ -55,23 +55,8 @@ class TopHeader extends StatelessWidget {
                 ),
               ),
             ),
-            Row(
-              children: [
-                // A "Pro · Active" plan badge used to sit here. There are no
-                // plan tiers — `Shop.plan` was dropped in migration 0008 — so
-                // it measured nothing. Removed rather than wired.
-                if (onActionPressed != null) ...[
-                  narrow ? _iconOnlyActionButton() : _labeledActionButton(),
-                  const SizedBox(width: 12),
-                ],
-                IconButton(
-                  onPressed: () {},
-                  icon: const Icon(Icons.help_outline_rounded,
-                      color: Color(0xFF64748B), size: 20),
-                  tooltip: 'Help',
-                ),
-              ],
-            ),
+            if (onActionPressed != null)
+              narrow ? _iconOnlyActionButton() : _labeledActionButton(),
           ],
         );
       }),

@@ -5,6 +5,7 @@ import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
 import '../utils/csv.dart';
 import '../utils/csv_download.dart';
+import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/top_header.dart';
@@ -115,19 +116,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Widget _titleRow(bool narrow, List<ExpenseModel> visible) {
     const titleBlock = Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Expenses Log',
-              style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
-          SizedBox(height: 2),
-          Text('Log shop operational expenses, rent, detergents, & repairs',
-              style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-        ],
-      ),
+      child: Text('Log shop operational expenses, rent, detergents, & repairs',
+          style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
     );
 
     if (narrow) {
@@ -189,22 +179,32 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   Widget _searchField() {
     return SizedBox(
       height: 38,
-      child: TextField(
-        onChanged: (v) => setState(() => _searchQuery = v),
-        style: const TextStyle(fontSize: 13),
-        textAlign: TextAlign.center,
-        decoration: InputDecoration(
-          hintText: 'Search by title, category, or method...',
-          hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-          prefixIcon: const Icon(Icons.search_rounded,
-              size: 18, color: Color(0xFF94A3B8)),
-          filled: true,
-          fillColor: const Color(0xFFF1F5F9),
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide.none,
-          ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.search_rounded,
+                size: 18, color: Color(0xFF94A3B8)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                onChanged: (v) => setState(() => _searchQuery = v),
+                style: const TextStyle(fontSize: 13),
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  hintText: 'Search by title, category, or method...',
+                  hintStyle:
+                      TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  border: InputBorder.none,
+                  isDense: true,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -599,9 +599,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     ),
                     const SizedBox(height: 14),
                     _label('Date'),
-                    OutlinedButton.icon(
+                    AppDateButton(
+                      label: DateFormat('MMM d, yyyy').format(date),
                       onPressed: () async {
-                        final picked = await showDatePicker(
+                        final picked = await AppDatePicker.pickDate(
                           context: ctx,
                           initialDate: date,
                           firstDate: DateTime(2020),
@@ -609,17 +610,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         );
                         if (picked != null) setDialogState(() => date = picked);
                       },
-                      icon: const Icon(Icons.calendar_today_rounded, size: 15),
-                      label: Text(DateFormat('MMM d, yyyy').format(date),
-                          style: const TextStyle(fontSize: 13)),
-                      style: OutlinedButton.styleFrom(
-                        alignment: Alignment.centerLeft,
-                        minimumSize: const Size(double.infinity, 44),
-                        foregroundColor: const Color(0xFF334155),
-                        side: const BorderSide(color: Color(0xFFCBD5E1)),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
                     ),
                     if (error != null) ...[
                       const SizedBox(height: 10),
