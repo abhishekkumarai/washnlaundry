@@ -277,7 +277,7 @@ void main() {
       await tester.pumpWidget(host(provider, const ScanScreen()));
       await tester.pump();
 
-      expect(find.text('Scan QR Code'), findsOneWidget);
+      expect(find.text('Scan & Tags'), findsOneWidget);
     });
   });
 }

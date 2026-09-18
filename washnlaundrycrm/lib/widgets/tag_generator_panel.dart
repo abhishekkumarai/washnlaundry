@@ -4,26 +4,28 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../models/order_model.dart';
 import '../providers/app_provider.dart';
-import '../widgets/app_shell.dart';
 
-/// `/orders/:id/tags` — the real app's "Print Tags" flow (Order Placed →
-/// Generate Tags modal → Tag Preview modal, each stacked on the last) built
-/// as its own two-step *route* instead. Captured live on 2026-09-17 by
-/// placing a real 2-item order and stepping through it — see the Jira issue
-/// this screen closes out for the walkthrough. Cancel/Back pop to the order
-/// detail page rather than closing a dialog, since there is no dialog here.
+/// The "Generate Tags" content for a single, already-chosen order — the
+/// real app's Order Placed → Generate Tags modal → Tag Preview modal, each
+/// stacked on the last, rebuilt as a two-step *panel* instead. Lives inside
+/// the Scan screen's "Generate Tags" tab (an order picker sits above this
+/// once an order is chosen) rather than as its own route, so there is only
+/// one sidebar destination for "scan a tag or generate one" — see
+/// `ScanScreen`.
 ///
-/// [onBack] is injected rather than calling `context.go` directly — same
-/// shape as [OrderDetailScreen]'s `onBack`, so a widget test can pump this
-/// screen standalone without a real `GoRouter` in the tree.
-class TagGenerationScreen extends StatefulWidget {
+/// [onChangeOrder] returns to that picker; it does not leave the tab.
+class TagGeneratorPanel extends StatefulWidget {
   final OrderModel order;
-  final VoidCallback onBack;
+  final VoidCallback onChangeOrder;
 
-  const TagGenerationScreen({super.key, required this.order, required this.onBack});
+  const TagGeneratorPanel({
+    super.key,
+    required this.order,
+    required this.onChangeOrder,
+  });
 
   @override
-  State<TagGenerationScreen> createState() => _TagGenerationScreenState();
+  State<TagGeneratorPanel> createState() => _TagGeneratorPanelState();
 }
 
 class _TagFormat {
@@ -47,7 +49,7 @@ class _TagEntry {
   const _TagEntry({required this.label, required this.index, required this.total});
 }
 
-class _TagGenerationScreenState extends State<TagGenerationScreen> {
+class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
   static const _stepConfigure = 0;
   static const _stepPreview = 1;
 
@@ -92,59 +94,63 @@ class _TagGenerationScreenState extends State<TagGenerationScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant TagGeneratorPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A different order picked from the list resets to the first step —
+    // otherwise picking a new order while sitting on the preview step would
+    // silently keep showing the previous order's generated tags.
+    if (oldWidget.order.id != widget.order.id) {
+      _step = _stepConfigure;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      drawer: const AppDrawer(),
-      body: AppShell(
-        body: Column(
-          children: [
-            _header(),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 640),
-                    child: _step == _stepConfigure ? _configureStep() : _previewStep(),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _header(),
+        const SizedBox(height: 16),
+        _step == _stepConfigure ? _configureStep() : _previewStep(),
+      ],
     );
   }
 
   Widget _header() {
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: _step == _stepPreview
-                ? () => setState(() => _step = _stepConfigure)
-                : widget.onBack,
-            icon: const Icon(Icons.arrow_back_rounded),
+    return Row(
+      children: [
+        Expanded(
+          child: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('#${_order.orderNumber} · ${_order.customerName}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A))),
+              ),
+              TextButton(
+                onPressed: widget.onChangeOrder,
+                child: const Text('Change order'),
+              ),
+            ],
           ),
-          const Text('Generate Tags',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
-          const Spacer(),
-          _stepPill('1', 'Configure', _step == _stepConfigure),
-          const Icon(Icons.chevron_right_rounded,
-              size: 16, color: Color(0xFFCBD5E1)),
-          _stepPill('2', 'Preview', _step == _stepPreview),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        _stepPill('1', 'Configure', _step == _stepConfigure),
+        const Icon(Icons.chevron_right_rounded,
+            size: 16, color: Color(0xFFCBD5E1)),
+        _stepPill('2', 'Preview', _step == _stepPreview),
+      ],
     );
   }
 
@@ -166,7 +172,6 @@ class _TagGenerationScreenState extends State<TagGenerationScreen> {
         Text(label,
             style: TextStyle(
                 fontSize: 12, fontWeight: FontWeight.bold, color: colour)),
-        const SizedBox(width: 12),
       ],
     );
   }
@@ -176,7 +181,6 @@ class _TagGenerationScreenState extends State<TagGenerationScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 8),
         _sectionLabel('Format'),
         Row(
           children: [
@@ -271,53 +275,19 @@ class _TagGenerationScreenState extends State<TagGenerationScreen> {
           'print at exact size from your label printer app.',
           style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
         ),
-        const SizedBox(height: 14),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: [
-              _infoRow('Order', '#${_order.orderNumber}'),
-              _infoRow('Customer', _order.customerName),
-              _infoRow('Items',
-                  '${_order.items.fold<int>(0, (s, it) => s + it.quantity)}'),
-            ],
-          ),
-        ),
         const SizedBox(height: 20),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: widget.onBack,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-                child: const Text('Cancel'),
-              ),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: () => setState(() => _step = _stepPreview),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton(
-                onPressed: () => setState(() => _step = _stepPreview),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('Generate Preview'),
-              ),
-            ),
-          ],
+            child: const Text('Generate Preview'),
+          ),
         ),
-        const SizedBox(height: 24),
       ],
     );
   }
@@ -331,7 +301,6 @@ class _TagGenerationScreenState extends State<TagGenerationScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 8),
         if (_format == _TagFormat.barcode)
           Container(
             width: double.infinity,
@@ -404,7 +373,6 @@ class _TagGenerationScreenState extends State<TagGenerationScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 24),
       ],
     );
   }
@@ -459,26 +427,6 @@ class _TagGenerationScreenState extends State<TagGenerationScreen> {
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF475569))),
-      );
-
-  Widget _infoRow(String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-            Flexible(
-              child: Text(value,
-                  textAlign: TextAlign.right,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A))),
-            ),
-          ],
-        ),
       );
 
   Widget _optionCard({

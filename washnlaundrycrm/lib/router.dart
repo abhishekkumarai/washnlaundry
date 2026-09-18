@@ -18,7 +18,6 @@ import 'screens/reports_screen.dart';
 import 'screens/scan_screen.dart';
 import 'screens/services_screen.dart';
 import 'screens/staff_screen.dart';
-import 'screens/tag_generation_screen.dart';
 import 'widgets/app_shell.dart';
 
 /// Updates `AppProvider.currentNavIndex` to match the matched route.
@@ -126,53 +125,6 @@ List<RouteBase> appRoutes() => [
         },
       ),
       GoRoute(
-        path: '/orders/:id/tags',
-        builder: (c, s) {
-          // Same watch-and-resolve shape as `/orders/:id` above — a deep
-          // link (or a fresh "Order Placed" navigation) can land before
-          // `AppProvider.orders` has the just-created order in it yet.
-          final provider = c.watch<AppProvider>();
-          _deferSetNavIndex(c, 2);
-          final id = s.pathParameters['id']!;
-          OrderModel? match;
-          for (final o in provider.orders) {
-            if (o.id == id) {
-              match = o;
-              break;
-            }
-          }
-          if (match != null) {
-            final resolved = match;
-            return TagGenerationScreen(
-              order: resolved,
-              onBack: () => c.go('/orders/${resolved.id}'),
-            );
-          }
-          if (provider.isLoading) {
-            return _ordersFrame(
-              const Center(child: CircularProgressIndicator()),
-            );
-          }
-          return _ordersFrame(
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Order not found',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: () => c.go('/orders'),
-                    child: const Text('Back to Orders'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-      GoRoute(
         path: '/customers',
         builder: (c, s) => _section(c, 3, const CustomersScreen()),
       ),
@@ -202,7 +154,13 @@ List<RouteBase> appRoutes() => [
       ),
       GoRoute(
         path: '/scan',
-        builder: (c, s) => _section(c, 11, const ScanScreen()),
+        // `?order=<id>` preselects that order straight into the Generate
+        // Tags tab — how New Order's "Print Tags" reaches this screen.
+        builder: (c, s) => _section(
+          c,
+          11,
+          ScanScreen(initialOrderId: s.uri.queryParameters['order']),
+        ),
       ),
     ];
 

@@ -3,11 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:washnlaundrycrm/models/order_model.dart';
 import 'package:washnlaundrycrm/providers/app_provider.dart';
-import 'package:washnlaundrycrm/screens/tag_generation_screen.dart';
+import 'package:washnlaundrycrm/widgets/tag_generator_panel.dart';
 
 Widget host(AppProvider provider, Widget child) => ChangeNotifierProvider.value(
       value: provider,
-      child: MaterialApp(home: child),
+      child: MaterialApp(home: Scaffold(body: SingleChildScrollView(child: child))),
     );
 
 /// Two garments under the same service (mirrors the live capture: a Shirt
@@ -51,6 +51,30 @@ final _order = OrderModel(
   ],
 );
 
+final _otherOrder = OrderModel(
+  id: 'o2',
+  orderNumber: 'WA3P-00012',
+  customerName: 'Geeta',
+  customerPhone: '+919000000000',
+  status: OrderStatus.placed,
+  paymentStatus: PaymentStatus.unpaid,
+  paymentMethod: 'CASH',
+  totalAmount: 20,
+  paidAmount: 0,
+  dueAmount: 20,
+  express: false,
+  createdAt: DateTime(2026, 9, 17),
+  items: const [
+    OrderItemModel(
+      itemTitle: 'Pant',
+      serviceType: 'Iron Only',
+      quantity: 1,
+      unitPrice: 20,
+      totalPrice: 20,
+    ),
+  ],
+);
+
 void main() {
   setUp(() {
     final view =
@@ -66,16 +90,26 @@ void main() {
     view.resetDevicePixelRatio();
   });
 
-  Widget pumpScreen({VoidCallback? onBack}) => host(
-        AppProvider(autoLoad: false)
-          ..seedForTest(shop: const {'name': 'Washing'}),
-        TagGenerationScreen(order: _order, onBack: onBack ?? () {}),
+  Widget pumpPanel({OrderModel? order, VoidCallback? onChangeOrder}) => host(
+        AppProvider(autoLoad: false)..seedForTest(shop: const {'name': 'Washing'}),
+        TagGeneratorPanel(
+          order: order ?? _order,
+          onChangeOrder: onChangeOrder ?? () {},
+        ),
       );
 
-  group('TagGenerationScreen configure step', () {
+  group('TagGeneratorPanel configure step', () {
+    testWidgets('shows which order it is generating tags for', (tester) async {
+      await tester.pumpWidget(pumpPanel());
+      await tester.pump();
+
+      expect(find.textContaining('#WA3P-00011'), findsOneWidget);
+      expect(find.textContaining('Me'), findsWidgets);
+    });
+
     testWidgets('lists services grouped by type, not one row per item',
         (tester) async {
-      await tester.pumpWidget(pumpScreen());
+      await tester.pumpWidget(pumpPanel());
       await tester.pump();
 
       expect(find.text('Iron Only'), findsOneWidget);
@@ -86,44 +120,35 @@ void main() {
 
     testWidgets('Service Tags defaults to one tag per distinct service',
         (tester) async {
-      await tester.pumpWidget(pumpScreen());
+      await tester.pumpWidget(pumpPanel());
       await tester.pump();
 
       expect(find.textContaining('2 tags · one per service'), findsOneWidget);
     });
 
     testWidgets('Item Tags counts every physical garment', (tester) async {
-      await tester.pumpWidget(pumpScreen());
+      await tester.pumpWidget(pumpPanel());
       await tester.pump();
 
       expect(find.textContaining('3 tags (one per garment)'), findsOneWidget);
     });
 
-    testWidgets('shows the order, customer and item count', (tester) async {
-      await tester.pumpWidget(pumpScreen());
+    testWidgets('Change order calls onChangeOrder', (tester) async {
+      var changed = false;
+      await tester.pumpWidget(pumpPanel(onChangeOrder: () => changed = true));
       await tester.pump();
 
-      expect(find.text('#WA3P-00011'), findsOneWidget);
-      expect(find.text('Me'), findsWidgets);
-    });
-
-    testWidgets('Cancel calls onBack instead of pushing a dialog',
-        (tester) async {
-      var backCalled = false;
-      await tester.pumpWidget(pumpScreen(onBack: () => backCalled = true));
+      await tester.tap(find.widgetWithText(TextButton, 'Change order'));
       await tester.pump();
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Cancel'));
-      await tester.pump();
-
-      expect(backCalled, isTrue);
+      expect(changed, isTrue);
     });
   });
 
-  group('TagGenerationScreen preview step', () {
+  group('TagGeneratorPanel preview step', () {
     testWidgets('Generate Preview advances to a real step, not a dialog',
         (tester) async {
-      await tester.pumpWidget(pumpScreen());
+      await tester.pumpWidget(pumpPanel());
       await tester.pump();
 
       expect(find.byType(Dialog), findsNothing);
@@ -136,7 +161,7 @@ void main() {
 
     testWidgets('Service Tags mode renders one tag per distinct service',
         (tester) async {
-      await tester.pumpWidget(pumpScreen());
+      await tester.pumpWidget(pumpPanel());
       await tester.pump();
 
       await tester.tap(find.widgetWithText(FilledButton, 'Generate Preview'));
@@ -150,7 +175,7 @@ void main() {
     });
 
     testWidgets('Item Tags mode renders one tag per garment', (tester) async {
-      await tester.pumpWidget(pumpScreen());
+      await tester.pumpWidget(pumpPanel());
       await tester.pump();
 
       await tester.tap(find.text('Item Tags'));
@@ -167,7 +192,7 @@ void main() {
 
     testWidgets('Barcode falls back to QR with an explanatory note',
         (tester) async {
-      await tester.pumpWidget(pumpScreen());
+      await tester.pumpWidget(pumpPanel());
       await tester.pump();
 
       await tester.tap(find.text('Barcode'));
@@ -180,10 +205,8 @@ void main() {
           findsOneWidget);
     });
 
-    testWidgets('Back returns to the configure step, not out of the screen',
-        (tester) async {
-      var backCalled = false;
-      await tester.pumpWidget(pumpScreen(onBack: () => backCalled = true));
+    testWidgets('Back returns to the configure step', (tester) async {
+      await tester.pumpWidget(pumpPanel());
       await tester.pump();
 
       await tester.tap(find.widgetWithText(FilledButton, 'Generate Preview'));
@@ -191,12 +214,11 @@ void main() {
       await tester.tap(find.widgetWithText(OutlinedButton, 'Back'));
       await tester.pump();
 
-      expect(backCalled, isFalse);
       expect(find.text('Generate Preview'), findsOneWidget);
     });
 
     testWidgets('Download PDF is a labelled demo stub', (tester) async {
-      await tester.pumpWidget(pumpScreen());
+      await tester.pumpWidget(pumpPanel());
       await tester.pump();
 
       await tester.tap(find.widgetWithText(FilledButton, 'Generate Preview'));
@@ -209,7 +231,7 @@ void main() {
     });
 
     testWidgets('Print is a labelled demo stub', (tester) async {
-      await tester.pumpWidget(pumpScreen());
+      await tester.pumpWidget(pumpPanel());
       await tester.pump();
 
       await tester.tap(find.widgetWithText(FilledButton, 'Generate Preview'));
@@ -219,5 +241,33 @@ void main() {
       await tester.pump();
       expect(find.text('Sent to the printer.'), findsOneWidget);
     });
+  });
+
+  testWidgets(
+      'a widget update to a different order (same State) resets back to '
+      'configure', (tester) async {
+    // Defensive: ScanScreen actually forces a fresh State per order via
+    // `ValueKey(order.id)`, so this path doesn't fire there today — but
+    // `didUpdateWidget` still guards any caller that updates `order` in
+    // place, so it must not go on showing the old order's generated tags.
+    final provider = AppProvider(autoLoad: false)
+      ..seedForTest(shop: const {'name': 'Washing'});
+    await tester.pumpWidget(host(
+      provider,
+      TagGeneratorPanel(order: _order, onChangeOrder: () {}),
+    ));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Generate Preview'));
+    await tester.pump();
+    expect(find.text('Back'), findsOneWidget);
+
+    await tester.pumpWidget(host(
+      provider,
+      TagGeneratorPanel(order: _otherOrder, onChangeOrder: () {}),
+    ));
+    await tester.pump();
+
+    expect(find.text('Generate Preview'), findsOneWidget);
+    expect(find.textContaining('#WA3P-00012'), findsOneWidget);
   });
 }

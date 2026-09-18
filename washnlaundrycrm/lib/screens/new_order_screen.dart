@@ -2104,13 +2104,14 @@ class _OrderPlacedDialog extends StatelessWidget {
               // A real route, not another `showDialog` stacked on this one —
               // the real app's own "Print Tags" opens a Generate Tags modal
               // on top of this same confirmation, then a Tag Preview modal on
-              // top of *that*; captured live and deliberately built as its
-              // own two-step page here instead. Closes this dialog first, the
+              // top of *that*; captured live and deliberately built as a
+              // Scan screen tab instead (one sidebar destination for both
+              // scanning and generating tags). Closes this dialog first, the
               // same way "Order Details" below already does.
               child: OutlinedButton.icon(
                 onPressed: () {
                   Navigator.pop(context);
-                  context.go('/orders/${order.id}/tags');
+                  context.go('/scan?order=${order.id}');
                 },
                 icon: const Icon(Icons.qr_code_rounded, size: 16),
                 label: const Text('Print Tags',

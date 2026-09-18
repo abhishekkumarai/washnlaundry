@@ -9,7 +9,9 @@ import '../models/order_model.dart';
 import '../utils/csv.dart';
 import '../utils/csv_download.dart';
 import '../utils/navigation.dart';
+import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/order_calendar_heatmap.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
 import '../utils/money.dart';
@@ -24,6 +26,13 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   String _selectedTab = 'All';
   OrderDateRange _timeFilter = OrderDateRange.allTime;
+
+  /// Set when the user picks "Custom range..." from the date menu. Takes
+  /// over from [_timeFilter] (which is forced back to [OrderDateRange.allTime]
+  /// whenever this is non-null) rather than living inside the enum, since a
+  /// custom range carries data the enum's fixed presets don't.
+  DateTimeRange? _customRange;
+
   String _searchQuery = '';
 
   /// Extra dimensions the status chips and date dropdown don't cover — the
@@ -91,6 +100,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       _selectedTab != 'All' ||
       _searchQuery.isNotEmpty ||
       _timeFilter != OrderDateRange.allTime ||
+      _customRange != null ||
       _extraFilterCount > 0;
 
   String get _selectedKey {
@@ -98,6 +108,76 @@ class _OrdersScreenState extends State<OrdersScreen> {
       if (tab['label'] == _selectedTab) return tab['key']!;
     }
     return 'ALL';
+  }
+
+  /// What the date button shows, and what the empty-state message names.
+  String get _dateFilterLabel {
+    if (_customRange != null) {
+      final fmt = DateFormat('MMM d');
+      final start = fmt.format(_customRange!.start);
+      final end = fmt.format(_customRange!.end);
+      return start == end ? start : '$start – $end';
+    }
+    return _timeFilter.label;
+  }
+
+  bool _withinCustomRange(DateTime when) {
+    final range = _customRange;
+    if (range == null) return true;
+    final day = DateTime(when.year, when.month, when.day);
+    final start = DateTime(range.start.year, range.start.month, range.start.day);
+    final end = DateTime(range.end.year, range.end.month, range.end.day);
+    return !day.isBefore(start) && !day.isAfter(end);
+  }
+
+  Future<void> _openDateMenu(BuildContext buttonContext) async {
+    final button = buttonContext.findRenderObject() as RenderBox;
+    final overlay =
+        Overlay.of(buttonContext).context.findRenderObject() as RenderBox;
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(Offset.zero, ancestor: overlay),
+        button.localToGlobal(button.size.bottomRight(Offset.zero),
+            ancestor: overlay),
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    final selection = await showMenu<String>(
+      context: buttonContext,
+      position: position,
+      items: [
+        ...OrderDateRange.values.map((r) => PopupMenuItem(
+              value: r.name,
+              child: Text(r.label),
+            )),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: 'custom',
+          child: Text('Custom range...'),
+        ),
+      ],
+    );
+    if (selection == null || !mounted) return;
+
+    if (selection == 'custom') {
+      final picked = await AppDatePicker.pickDateRange(
+        context: context,
+        initialRange: _customRange,
+      );
+      if (picked != null) {
+        setState(() {
+          _customRange = picked;
+          _timeFilter = OrderDateRange.allTime;
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _timeFilter = OrderDateRange.values.firstWhere((r) => r.name == selection);
+      _customRange = null;
+    });
   }
 
   @override
@@ -111,6 +191,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           search: _searchQuery,
         )
         .where((o) =>
+            _withinCustomRange(o.createdAt) &&
             (!_overdueOnly || o.isOverdue) &&
             (!_unpaidDuesOnly || o.paymentStatus == PaymentStatus.unpaid) &&
             (_orderSource == 'all' ||
@@ -287,7 +368,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 Text(
                                   _hasActiveFilter
                                       ? 'No orders match "$_selectedTab"'
-                                          '${_timeFilter == OrderDateRange.allTime ? '' : ' in ${_timeFilter.label}'}.'
+                                          '${_timeFilter == OrderDateRange.allTime && _customRange == null ? '' : ' in $_dateFilterLabel'}.'
                                       : 'Create a new order to get started.',
                                   style: const TextStyle(
                                       fontSize: 11, color: Color(0xFF94A3B8)),
@@ -644,11 +725,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
           const Spacer(),
           _dateDropdown(),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
+          _calendarHeatmapButton(provider),
+          const SizedBox(width: 8),
 
           // Search Input Box
           Container(
-            width: 240,
+            width: 200,
             height: 38,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
@@ -676,7 +759,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           _filtersButton(),
           const SizedBox(width: 8),
           _exportButton(filteredOrders),
@@ -757,6 +840,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
               children: [
                 _dateDropdown(),
                 const SizedBox(width: 8),
+                _calendarHeatmapButton(provider),
+                const SizedBox(width: 8),
                 _filtersButton(),
                 const SizedBox(width: 8),
                 _exportButton(filteredOrders),
@@ -769,28 +854,81 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Widget _dateDropdown() {
+    return Builder(
+      builder: (buttonContext) => InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => _openDateMenu(buttonContext),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          height: 38,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.calendar_today_rounded,
+                  size: 14, color: Color(0xFF334155)),
+              const SizedBox(width: 8),
+              Text(
+                _dateFilterLabel,
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF334155)),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.arrow_drop_down,
+                  size: 18, color: Color(0xFF334155)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Every order's day → how many landed on it, across the whole shop
+  /// (not the current status/date filters) so the heatmap always reads as
+  /// absolute daily volume rather than shifting under whatever's selected.
+  Map<DateTime, int> _orderCountsByDay(AppProvider provider) {
+    final counts = <DateTime, int>{};
+    for (final o in provider.orders) {
+      final day = DateTime(o.createdAt.year, o.createdAt.month, o.createdAt.day);
+      counts[day] = (counts[day] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  Future<void> _openCalendarHeatmap(AppProvider provider) async {
+    final picked = await OrderCalendarHeatmap.pickDay(
+      context: context,
+      countsByDay: _orderCountsByDay(provider),
+      initialFocusedDay: _customRange?.start,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _customRange = DateTimeRange(start: picked, end: picked);
+      _timeFilter = OrderDateRange.allTime;
+    });
+  }
+
+  Widget _calendarHeatmapButton(AppProvider provider) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
       height: 38,
+      width: 38,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<OrderDateRange>(
-          value: _timeFilter,
-          style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF334155)),
-          items: OrderDateRange.values
-              .map((r) => DropdownMenuItem(value: r, child: Text(r.label)))
-              .toList(),
-          onChanged: (val) {
-            if (val != null) setState(() => _timeFilter = val);
-          },
-        ),
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        icon: const Icon(Icons.calendar_view_month_rounded,
+            size: 18, color: Color(0xFF334155)),
+        tooltip: 'Orders calendar',
+        onPressed: () => _openCalendarHeatmap(provider),
       ),
     );
   }

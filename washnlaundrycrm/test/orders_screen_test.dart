@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:washnlaundrycrm/models/garment_model.dart';
 import 'package:washnlaundrycrm/models/order_model.dart';
@@ -319,6 +320,89 @@ void main() {
       await tester.pump();
 
       expect(find.text('No orders to export.'), findsOneWidget);
+    });
+  });
+
+  group('OrdersScreen date filter', () {
+    testWidgets('defaults to All time and opens a menu of presets plus Custom range',
+        (tester) async {
+      await pumpOrders(tester);
+
+      expect(find.text('All time'), findsOneWidget);
+
+      await tester.tap(find.text('All time'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Today'), findsOneWidget);
+      expect(find.text('This Week'), findsOneWidget);
+      expect(find.text('This Month'), findsOneWidget);
+      expect(find.text('Last Month'), findsOneWidget);
+      expect(find.text('Custom range...'), findsOneWidget);
+    });
+
+    testWidgets('picking a preset updates the button label', (tester) async {
+      await pumpOrders(tester);
+
+      await tester.tap(find.text('All time'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('This Week').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('This Week'), findsOneWidget);
+      expect(find.text('All time'), findsNothing);
+    });
+
+    testWidgets('Custom range... opens a calendar and applies the picked range',
+        (tester) async {
+      await pumpOrders(tester);
+
+      await tester.tap(find.text('All time'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Custom range...'));
+      await tester.pumpAndSettle();
+
+      // The picker defaults both ends to today; confirming without changing
+      // the selection should label the button with today's single date.
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      final today = DateFormat('MMM d').format(DateTime.now());
+      expect(find.text(today), findsOneWidget);
+      expect(find.text('All time'), findsNothing);
+    });
+  });
+
+  group('OrdersScreen calendar heatmap', () {
+    testWidgets('opens a month calendar and picking a day applies it as the filter',
+        (tester) async {
+      await pumpOrders(tester);
+
+      await tester.tap(find.byIcon(Icons.calendar_view_month_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Orders calendar'), findsOneWidget);
+
+      final today = DateTime.now();
+      await tester.tap(find.text('${today.day}').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Orders calendar'), findsNothing);
+      final label = DateFormat('MMM d').format(today);
+      expect(find.text(label), findsOneWidget);
+    });
+
+    testWidgets('closing with the × leaves the date filter untouched',
+        (tester) async {
+      await pumpOrders(tester);
+
+      await tester.tap(find.byIcon(Icons.calendar_view_month_rounded));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Orders calendar'), findsNothing);
+      expect(find.text('All time'), findsOneWidget);
     });
   });
 }
