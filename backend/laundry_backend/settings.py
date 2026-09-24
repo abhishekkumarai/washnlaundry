@@ -62,6 +62,20 @@ DATABASES = {
     }
 }
 
+# Production (Render) points this at the Neon Postgres `washnlaundry-db`; unset
+# keeps local dev and Docker on SQLite. Deliberately NOT the generic
+# DATABASE_URL: this machine has a machine-wide DATABASE_URL belonging to
+# another project, which would silently hijack a local `runserver`.
+if os.environ.get('DJANGO_DATABASE_URL'):
+    import dj_database_url
+
+    DATABASES['default'] = dj_database_url.parse(
+        os.environ['DJANGO_DATABASE_URL'],
+        conn_max_age=600,
+        conn_health_checks=True,
+        ssl_require=True,
+    )
+
 AUTH_PASSWORD_VALIDATORS = []
 
 LANGUAGE_CODE = 'en-us'
