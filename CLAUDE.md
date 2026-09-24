@@ -87,9 +87,19 @@ Start: `python manage.py migrate --noinput && gunicorn laundry_backend.wsgi:appl
 --bind 0.0.0.0:$PORT` — so new migrations apply on deploy with no manual step. Settings
 are env-driven (`SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `CORS_*`; commit `6e71cdb`).
 Inspect with the `render` CLI (`render services list -o json`, `render deploys list`).
-- **No persistent disk, and `db.sqlite3` is gitignored:** every deploy or restart
-  starts from an *empty* database and nothing seeds it. Production shows no data
-  unless something runs `seed_db.py` there (or the DB moves to a hosted Postgres).
+- **Production database is Neon Postgres** (`washnlaundry-db`, region `pdx1` next to
+  Render's Oregon; provisioned 2026-09-24 via the Vercel Marketplace in team
+  "abhishekzgithub's projects", connected to the `washnlaundry-crm` project). Render's
+  env var **`DJANGO_DATABASE_URL`** holds its pooled URL; `settings.py` uses it via
+  `dj-database-url` when set, and falls back to SQLite when unset (local dev, Docker,
+  tests). It is deliberately *not* `DATABASE_URL` — see the machine-wide
+  `DATABASE_URL` gotcha in `~/CLAUDE.md`, which would otherwise hijack local runs.
+  Before this, Render had no persistent disk, so SQLite reset to empty on every
+  deploy/restart. Data now survives restarts (verified).
+- **Re-seeding production** is a manual, destructive choice (`seed_db.py` wipes every
+  table): pull the URL with `vercel env pull` from a dir linked to `washnlaundry-crm`,
+  then run `DJANGO_DATABASE_URL=<DATABASE_URL_UNPOOLED> python seed_db.py` from
+  `backend/`. Never set it in a shell you'll keep using — every command there hits prod.
 - Free tier sleeps when idle; the first request after a nap can take well over 15 s.
   That reads like a hung backend — it isn't. Retry with a long timeout.
 - `laundrypro-api` / `laundrypro-db` in the same Render account are an unrelated
