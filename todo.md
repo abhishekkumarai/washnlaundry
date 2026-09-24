@@ -183,3 +183,28 @@
 
 As of the Payroll/Expenses/Reports follow-up round above: full `flutter
 test` is 438 tests, all passing.
+
+## Session of 2026-09-23 — Staff & Payroll Fixes (KAN-42, KAN-43)
+
+### Browser MCP Investigation Findings:
+- [x] Staff screen (/staff):
+  - Inactive staff member (Ramesh Kumar) is hidden under "All Staff" tab because `_selectedTab == 0` filters `s['status'] == 'ACTIVE'`, causing a count mismatch: header displays "7 members" while the table only lists 6.
+  - Sub-tab row has large unused space on the right while Search and "+ Add Staff" sit above in a separate header bar.
+  - Add/Edit Staff dialog has a plain checkbox for Active status (only shown in Edit mode), instead of a clean toggle button radio (Active/Inactive) across both modes.
+- [x] Payroll screen (/payroll):
+  - Staff member with 0 attendance (e.g. Tarun) has `total_salary = 0`, `net_pay = 0`, and `pending_amount = 0`. Record Payment button is disabled, and manual payment fails with 400 (`"This payment would exceed what tarun is owed for September 2026 (0.0 remaining)."`).
+  - Floating-point remainder (e.g. Lakshman Rao: `pending = 0.33`) keeps status as `PARTIAL` with a clickable Record Payment button, while UI displays `Paid ₹8583`, `Due ₹0`.
+  - In `payroll_summary`, if an employee has recorded payments but `net_pay <= 0`, status erroneously defaults to `UNPAID`.
+
+### Todo / Execution Tasks:
+- [x] Staff: "All Staff" tab shows all staff (active and inactive); "Active" / "Inactive" filter.
+- [x] Staff: Status column is an on/off switch per row (user follow-up; replaced the two-chip radio). Add/Edit dialog radio kept, new staff default to Inactive.
+- [x] Staff: Search input and "+ Add Staff" inline with the sub-tabs, top right.
+- [x] ~~Payroll: default to monthly_wage when attendance isn't logged~~ — **rejected**: pay owed stays attendance-only. Instead, ₹0-earned rows can still record a payment (no ₹0 cap).
+- [x] Payroll: `< ₹1.0` balance marks row as `PAID`.
+- [x] Payroll: recorded payments always show `PAID` or `PARTIAL`, never `UNPAID`.
+- [x] Tests: backend `tests.py`, frontend `staff_test.dart`, `payroll_test.dart`, `credits_test.dart`, `expenses_test.dart`.
+- [x] Browser verification in Chrome (claude-in-chrome) on the Docker build — Staff, Payroll, Expenses, Credits.
+- [x] Credits: fixed nav index clash with Help (14 → 15) and sidebar icon clash with Reports.
+- [x] Credit categories (KAN-46): laundromat defaults, managed from Settings → Credit categories; Settings routed and enabled.
+- [ ] Jira KAN-42..46 are In Review — awaiting user confirmation to move to Done.

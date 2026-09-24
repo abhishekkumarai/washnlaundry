@@ -64,3 +64,9 @@ Whenever performing browser automation, session verification, or screenshot capt
 - `staff.png` & `staff_scrolled.png`
 - `settings.png` & `settings_scrolled.png`
 - `full_audit_verified.png`
+
+## JIRA
+- Always allow jira MCP.
+
+## CHROME-DEVTOOLS-MCP
+- Always allow it.

@@ -73,11 +73,56 @@ cd washnlaundrycrm && flutter run -d chrome
 
 ---
 
+## Deployment (production)
+
+Split host: **backend on Render, frontend on Vercel.** GitHub repo is
+`abhishekkumarai/washnlaundrycrm` (renamed from `laundrybill_crm` on 2026-09-24; Render
+and both Vercel projects were re-pointed and GitHub redirects the old URL).
+
+**Backend — Render, automatic.** Service `laundrybill-backend`
+(`srv-da4j29bl550s738309ng`, free plan, root dir `backend/`) at
+`https://laundrybill-backend.onrender.com`, auto-deploys on every push to `main`.
+Build: `pip install -r requirements.txt && python manage.py collectstatic --noinput`.
+Start: `python manage.py migrate --noinput && gunicorn laundry_backend.wsgi:application
+--bind 0.0.0.0:$PORT` — so new migrations apply on deploy with no manual step. Settings
+are env-driven (`SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `CORS_*`; commit `6e71cdb`).
+Inspect with the `render` CLI (`render services list -o json`, `render deploys list`).
+- **No persistent disk, and `db.sqlite3` is gitignored:** every deploy or restart
+  starts from an *empty* database and nothing seeds it. Production shows no data
+  unless something runs `seed_db.py` there (or the DB moves to a hosted Postgres).
+- Free tier sleeps when idle; the first request after a nap can take well over 15 s.
+  That reads like a hung backend — it isn't. Retry with a long timeout.
+- `laundrypro-api` / `laundrypro-db` in the same Render account are an unrelated
+  project, not this one.
+
+**Frontend — Vercel, manual.** Vercel has no Flutter SDK, so a Git-triggered build
+produces an empty deployment that 404s — the real site only ever comes from uploading a
+locally built bundle, with the Render API URL baked in:
+
+```bash
+cd washnlaundrycrm
+flutter build web --release --dart-define=API_BASE_URL=https://laundrybill-backend.onrender.com/api
+vercel deploy build/web --prod --scope abhishekzgithubs-projects   # project: washnlaundry-crm
+```
+
+Target project is **`washnlaundry-crm`** in team "abhishekzgithub's projects"
+(`team_3q6DiOqHmHEU2kSpyXvL3xzg`); there is also an unused, empty `washnlaundrycrm`
+project there. SPA routing comes from `washnlaundrycrm/vercel.json`'s catch-all rewrite
+(no `cleanUrls` — it broke deep links). The local `.vercel/project.json` files point at a
+different team the CLI can't reach; don't trust them, link explicitly.
+**www.washnlaundry.com is not this app** — it is a separate Next.js site in another
+Vercel team; pointing it here needs that team's access or a TXT re-verification at the
+Namecheap DNS.
+
+---
+
 ## Backend
 
 Django 5 / DRF / SQLite, app label `api`. Everything is a plain `ModelViewSet` on a `DefaultRouter` — no auth, no permissions, no pagination, no filtering.
 
-Models (`backend/api/models.py`): `Shop`, `Customer`, `GarmentCategory`, `GarmentItem`, `Order`, `OrderItem`, `Expense`, `Staff`, `Attendance`, `SalaryPayment`.
+Models (`backend/api/models.py`): `Shop`, `Customer`, `GarmentCategory`, `GarmentItem`, `Order`, `OrderItem`, `Expense`, `Credit`, `CreditCategory`, `Staff`, `Attendance`, `SalaryPayment`.
+
+`Credit` is money coming *into* the shop outside an order (advances, delivery fees, owner top-ups) — the mirror of `Expense`. Unlike `ExpenseCategory` (fixed `TextChoices`), its categories are a **shop-managed table**, `CreditCategory`, edited from Settings → Credit categories and seeded by migration `0018` with `DEFAULT_CREDIT_CATEGORIES`. `Credit.category` is a `PROTECT` FK, so a category in use can only be turned off (`is_active=False`: hidden from new credits, kept on old ones), never deleted. The API still reads and writes the category **by name** (`SlugRelatedField`), so a rename shows on every existing credit.
 
 `SalaryPayment` is a payout against one staff member's wages for one month. Wages *earned* are never stored — they are derived from `Attendance` times `Staff.daily_wage`, with `Attendance.DAY_VALUE` deciding what each state is worth (`HALF_DAY` is 0.5; `LEAVE` is unpaid). It is deliberately **not** unique on `(staff, month)`: a month can be paid in instalments, which is what makes `PARTIAL` a real state.
 
@@ -86,6 +131,8 @@ Models (`backend/api/models.py`): `Shop`, `Customer`, `GarmentCategory`, `Garmen
 | `/api/shops/` `/api/customers/` `/api/categories/` `/api/items/` `/api/orders/` `/api/expenses/` `/api/staff/` `/api/attendance/` | full CRUD |
 | `/api/dashboard/stats/` | aggregates: order counts by status, revenue, dues, expenses, net profit |
 | `/api/attendance/bulk/` | POST a whole day's register; **upserts**, because `Attendance` is unique on (staff, date) and Save Register must be pressable twice |
+| `/api/credits/` | full CRUD; `category` is the category's name |
+| `/api/credit-categories/` | full CRUD, each row with a read-only `credit_count`; DELETE of a category in use returns 400 ("turn it off instead") |
 | `/api/salary-payments/` | full CRUD, filterable by `?month=YYYY-MM` and `?staff=` |
 | `/api/payroll/?month=YYYY-MM` | the Payroll screen in one call: days worked and wages derived from the register, paid/pending from `SalaryPayment`, plus the four KPI totals |
 
@@ -104,8 +151,8 @@ Flutter Web, Material 3, `provider` for state, `fl_chart` for charts, `google_fo
 - URLs, deep links, and browser back/forward all work — confirmed by signing into the real app.laundrybill.com and comparing behaviour directly (see `wip.md`'s "go_router migration" section for what was checked).
 - `/orders/:id` is a real per-record route (`router.dart`), matching the real app's Firestore-doc-ID URLs. It `watch`es `AppProvider` rather than `read`ing it, so a deep link hit before `loadDataFromBackend()` resolves shows a spinner that turns into the real order once the data arrives, rather than a false "not found". `OrdersScreen` no longer swaps its own body for `OrderDetailScreen` — `orders_screen.dart:39`'s old pattern is gone.
 - Section navigation goes through `context.goSection(n)` (`lib/utils/navigation.dart`), a thin wrapper that looks `n` up in `AppProvider.routePaths` and calls `context.go(path)` — every former `setNavIndex(n)` call site was a same-shape one-line swap to this.
-- `SettingsScreen` (408 lines) still exists but **is not wired into the router at all** — still dead code today, unchanged by this migration.
-- Sidebar indices are still load-bearing magic numbers, now doubling as the vocabulary `AppProvider.routePaths` maps to URL paths. Index 10 (`Apps`), 12 (`Subscription`), 13 (`Settings`) are still flagged `disabled: true` and render a "Soon" chip; re-enabling one still means flipping `disabled` back to `false` in `sidebar_navigation.dart`, but now also means adding a route for it in `router.dart` rather than a `case` in `main.dart`.
+- `/settings` (index 13) is routed and enabled as of 2026-09-24. Of its vertical tab list only **Business profile** and **Credit categories** (`lib/widgets/credit_categories_panel.dart`) are built; the other tabs show "Not available yet". `?tab=<slug>` opens a specific tab — Credits' Add dialog links to `/settings?tab=credit-categories`. Below `contentWideBreakpoint` the 240px tab column becomes a chip row.
+- Sidebar indices are still load-bearing magic numbers, now doubling as the vocabulary `AppProvider.routePaths` maps to URL paths — and must be unique: Credits was once given 14, Help's index, which lit both up. Credits is 15. Index 10 (`Apps`) and 12 (`Subscription`) are still flagged `disabled: true` and render a "Soon" chip; re-enabling one still means flipping `disabled` back to `false` in `sidebar_navigation.dart`, but now also means adding a route for it in `router.dart` rather than a `case` in `main.dart`.
 
 Adding a screen now means: write it, add a `navItems` entry with a new index, add its path to `AppProvider.routePaths`, add a `GoRoute` in `router.dart`.
 
