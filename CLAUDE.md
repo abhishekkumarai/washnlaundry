@@ -105,15 +105,19 @@ Inspect with the `render` CLI (`render services list -o json`, `render deploys l
 - `laundrypro-api` / `laundrypro-db` in the same Render account are an unrelated
   project, not this one.
 
-**Frontend — Vercel, manual.** Vercel has no Flutter SDK, so a Git-triggered build
-produces an empty deployment that 404s — the real site only ever comes from uploading a
+**Frontend — Vercel.** Vercel has no Flutter SDK, so a Git-triggered build
+produces an empty deployment that 404s — the real site comes from uploading a
 locally built bundle, with the Render API URL baked in:
 
 ```bash
 cd washnlaundrycrm
 flutter build web --release --dart-define=API_BASE_URL=https://laundrybill-backend.onrender.com/api
-vercel deploy build/web --prod --scope abhishekzgithubs-projects   # project: washnlaundry-crm
+node ../scripts/deploy_vercel.js   # deploys build/web to washnlaundry-crm
 ```
+
+A **Git pre-push hook** (`.git/hooks/pre-push`) is installed: before any `git push` to `main`,
+it automatically runs the test suite, builds the Flutter Web release bundle, and deploys the
+updated bundle to Vercel production. If any step fails, the push to `main` is safely aborted.
 
 Target project is **`washnlaundry-crm`** in team "abhishekzgithub's projects"
 (`team_3q6DiOqHmHEU2kSpyXvL3xzg`); there is also an unused, empty `washnlaundrycrm`

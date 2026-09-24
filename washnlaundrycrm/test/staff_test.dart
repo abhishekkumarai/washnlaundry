@@ -209,4 +209,67 @@ void main() {
       expect(find.text('2. Inactive'), findsNothing);
     });
   });
+
+  group('StaffScreen table sorting', () {
+    // Wages chosen so string order ('9000' > '18000') and numeric order
+    // disagree — a text sort on wage would fail here.
+    const sortRoster = [
+      StaffModel(id: '1', name: 'Mohan', role: 'Washer', phone: '3',
+          monthlyWage: 18000),
+      StaffModel(id: '2', name: 'anita', role: 'Ironer', phone: '1',
+          monthlyWage: 9000, status: 'INACTIVE'),
+      StaffModel(id: '3', name: 'Geeta', role: 'Driver', phone: '2',
+          monthlyWage: 12000),
+    ];
+
+    List<String> rowOrder(WidgetTester tester) {
+      final names = ['Mohan', 'anita', 'Geeta'];
+      final ys = {
+        for (final n in names) n: tester.getTopLeft(find.text(n)).dy,
+      };
+      return names..sort((a, b) => ys[a]!.compareTo(ys[b]!));
+    }
+
+    Future<void> pump(WidgetTester tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: sortRoster);
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+    }
+
+    testWidgets('keeps the backend order until a header is tapped',
+        (tester) async {
+      await pump(tester);
+      expect(rowOrder(tester), ['Mohan', 'anita', 'Geeta']);
+    });
+
+    testWidgets('name sorts case-insensitively; a second tap reverses',
+        (tester) async {
+      await pump(tester);
+      await tester.tap(find.byKey(const ValueKey('staff-sort-name')));
+      await tester.pump();
+      expect(rowOrder(tester), ['anita', 'Geeta', 'Mohan']);
+      expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('staff-sort-name')));
+      await tester.pump();
+      expect(rowOrder(tester), ['Mohan', 'Geeta', 'anita']);
+      expect(find.byIcon(Icons.arrow_downward_rounded), findsOneWidget);
+    });
+
+    testWidgets('wage sorts numerically, not as text', (tester) async {
+      await pump(tester);
+      await tester.tap(find.byKey(const ValueKey('staff-sort-wage')));
+      await tester.pump();
+      expect(rowOrder(tester), ['anita', 'Geeta', 'Mohan']);
+    });
+
+    testWidgets('status groups active before inactive, ties by name',
+        (tester) async {
+      await pump(tester);
+      await tester.tap(find.byKey(const ValueKey('staff-sort-status')));
+      await tester.pump();
+      expect(rowOrder(tester), ['Geeta', 'Mohan', 'anita']);
+    });
+  });
 }

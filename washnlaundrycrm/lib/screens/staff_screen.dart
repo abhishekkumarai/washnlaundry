@@ -21,6 +21,12 @@ class _StaffScreenState extends State<StaffScreen> {
   int _selectedTab = 0; // 0: All Staff, 1: Active, 2: Inactive
   String _searchQuery = '';
 
+  /// Column the table is sorted by (a roster view-model key), or null for the
+  /// backend's own order. Tapping a header sorts by it ascending; tapping the
+  /// same header again flips the direction.
+  String? _sortKey;
+  bool _sortAscending = true;
+
   static const _subTabTitles = ['All Staff', 'Active', 'Inactive'];
 
   /// Roster view-models rebuilt from the provider on each build, so adds and
@@ -76,7 +82,7 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   List<Map<String, dynamic>> get _filteredStaff {
-    return _staffMembers.where((s) {
+    final rows = _staffMembers.where((s) {
       final matchesSearch = _searchQuery.isEmpty ||
           s['name']
               .toString()
@@ -102,6 +108,80 @@ class _StaffScreenState extends State<StaffScreen> {
       }
       return matchesSearch && matchesTab;
     }).toList();
+    // No column picked: keep the backend's own order.
+    if (_sortKey != null) rows.sort(_compareRows);
+    return rows;
+  }
+
+  int _compareRows(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final key = _sortKey!;
+    final int result;
+    if (key == 'wage') {
+      result = (a['wage'] as num).compareTo(b['wage'] as num);
+    } else {
+      result = a[key]
+          .toString()
+          .toLowerCase()
+          .compareTo(b[key].toString().toLowerCase());
+    }
+    // Ties fall back to name so equal wages/roles/statuses don't shuffle.
+    final ordered = result != 0
+        ? result
+        : a['name'].toString().toLowerCase().compareTo(
+            b['name'].toString().toLowerCase());
+    return _sortAscending ? ordered : -ordered;
+  }
+
+  void _toggleSort(String key) {
+    setState(() {
+      if (_sortKey == key) {
+        _sortAscending = !_sortAscending;
+      } else {
+        _sortKey = key;
+        _sortAscending = true;
+      }
+    });
+  }
+
+  /// A table header that sorts the roster by [key] when tapped, with an arrow
+  /// showing the active column and direction.
+  Widget _sortHeader(String label, String key) {
+    final active = _sortKey == key;
+    final color = active ? const Color(0xFF1A4FD6) : const Color(0xFF94A3B8);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: InkWell(
+        key: ValueKey('staff-sort-$key'),
+        onTap: () => _toggleSort(key),
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(label,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: color)),
+              ),
+              const SizedBox(width: 3),
+              Icon(
+                active
+                    ? (_sortAscending
+                        ? Icons.arrow_upward_rounded
+                        : Icons.arrow_downward_rounded)
+                    : Icons.unfold_more_rounded,
+                size: 12,
+                color: color,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Add/edit dialog. Pass [existing] (a roster view-model) to edit that
@@ -768,44 +848,28 @@ class _StaffScreenState extends State<StaffScreen> {
                                         bottom: BorderSide(
                                             color: Color(0xFFE2E8F0))),
                                   ),
-                                  child: const Row(
+                                  child: Row(
                                     children: [
                                       Expanded(
                                           flex: 3,
-                                          child: Text('STAFF MEMBER',
-                                              style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF94A3B8)))),
+                                          child: _sortHeader(
+                                              'STAFF MEMBER', 'name')),
                                       Expanded(
                                           flex: 2,
-                                          child: Text('ROLE',
-                                              style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF94A3B8)))),
+                                          child: _sortHeader('ROLE', 'role')),
                                       Expanded(
                                           flex: 2,
-                                          child: Text('PHONE',
-                                              style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF94A3B8)))),
+                                          child:
+                                              _sortHeader('PHONE', 'phone')),
                                       Expanded(
                                           flex: 2,
-                                          child: Text('MONTHLY WAGE',
-                                              style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF94A3B8)))),
+                                          child: _sortHeader(
+                                              'MONTHLY WAGE', 'wage')),
                                       Expanded(
                                           flex: 3,
-                                          child: Text('STATUS',
-                                              style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF94A3B8)))),
-                                      SizedBox(width: 48),
+                                          child: _sortHeader(
+                                              'STATUS', 'status')),
+                                      const SizedBox(width: 48),
                                     ],
                                   ),
                                 ),

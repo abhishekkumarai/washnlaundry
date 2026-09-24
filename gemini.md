@@ -32,6 +32,13 @@ Whenever performing browser automation, session verification, or screenshot capt
 - **Frontend Port**: `http://localhost:8080` (Nginx serving compiled Flutter SPA)
 - **Backend Port**: `http://localhost:8000` (Gunicorn/Django serving REST API)
 
+### 4. Production Deployment & Git Pre-Push Hook
+- **Backend**: Render service `laundrybill-backend` (`https://laundrybill-backend.onrender.com/api`) backed by Neon Postgres (`washnlaundry-db`, pdx1).
+- **Frontend**: Vercel project `washnlaundry-crm` in team `abhishekzgithub's projects` (`https://washnlaundry-crm.vercel.app`).
+- **Automated Deploy Script**: `scripts/deploy_vercel.js` verifies the build and deploys `washnlaundrycrm/build/web` to Vercel production.
+- **Git Pre-Push Hook**: `.git/hooks/pre-push` intercepts `git push origin main`, runs Django and Flutter test suites, compiles Flutter Web release bundle (`--dart-define=API_BASE_URL=https://laundrybill-backend.onrender.com/api`), and deploys to Vercel before the commit reaches `origin/main`.
+- **Git Provider Link**: Direct GitHub auto-builds on Vercel are unlinked to prevent empty git builds from overwriting the compiled Flutter bundle with 404s.
+
 ---
 
 ## 📱 Modules & Features Implemented
