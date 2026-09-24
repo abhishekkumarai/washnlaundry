@@ -46,6 +46,9 @@ void main() {
       expect(AppProvider.navIndexForPath('/payroll'), 7);
       expect(AppProvider.navIndexForPath('/expenses'), 8);
       expect(AppProvider.navIndexForPath('/expense'), 8);
+      expect(AppProvider.navIndexForPath('/credits'), 15);
+      expect(AppProvider.navIndexForPath('/settings'), 13);
+      expect(AppProvider.navIndexForPath('/credit'), 15);
       expect(AppProvider.navIndexForPath('/reports'), 9);
       expect(AppProvider.navIndexForPath('/report'), 9);
       expect(AppProvider.navIndexForPath('/scan'), 11);

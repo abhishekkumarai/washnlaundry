@@ -15,7 +15,7 @@ from rest_framework.test import APITestCase
 
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
-    Staff, Expense, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
+    Staff, Expense, Credit, CreditCategory, DEFAULT_CREDIT_CATEGORIES, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
     OrderStatus, PaymentStatus, DeliveryType, PricingUnit,
 )
 
@@ -1046,9 +1046,54 @@ class PayrollTests(APITestCase):
         self.assertEqual(self.entry()['days_worked'], 1.0)
 
     def test_no_attendance_means_no_wages(self):
+        # Pay owed is derived from attendance only — no fallback to the
+        # contracted monthly wage when nothing was marked.
         entry = self.entry()
         self.assertEqual(entry['days_worked'], 0.0)
         self.assertEqual(entry['total_salary'], 0.0)
+
+    def test_absent_attendance_means_no_wages(self):
+        self.mark(1, Attendance.ABSENT)
+        entry = self.entry()
+        self.assertEqual(entry['days_worked'], 0.0)
+        self.assertEqual(entry['total_salary'], 0.0)
+
+    def test_floating_point_paise_residue_marks_paid(self):
+        # Fractional daily rate leaving < 1 rupee residue must be marked PAID with 0.0 pending
+        staff = Staff.objects.create(name='Fractional Staff', role='Washer', phone='99', monthly_wage=10000.0)
+        Attendance.objects.create(staff=staff, date=date(2026, 7, 1), status=Attendance.PRESENT)
+        SalaryPayment.objects.create(staff=staff, month=self.month, amount=322.0)
+        res = self.client.get('/api/payroll/', {'month': '2026-07'}).data
+        fractional_entry = [e for e in res['entries'] if e['staff'] == staff.id][0]
+        self.assertEqual(fractional_entry['pending_amount'], 0.0)
+        self.assertEqual(fractional_entry['status'], PaymentStatus.PAID)
+
+    def test_recording_payment_for_staff_without_attendance_allowed(self):
+        staff_unlogged = Staff.objects.create(name='Tarun Unlogged', role='Ironer', phone='88', monthly_wage=15000.0)
+        response = self.client.post(
+            '/api/salary-payments/',
+            {'staff': staff_unlogged.id, 'month': '2026-07-01', 'amount': 15000.0},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        res = self.client.get('/api/payroll/', {'month': '2026-07'}).data
+        entry = [e for e in res['entries'] if e['staff'] == staff_unlogged.id][0]
+        # Nothing earned (no attendance), yet the payment went through and
+        # the row reads as paid rather than UNPAID.
+        self.assertEqual(entry['total_salary'], 0.0)
+        self.assertEqual(entry['paid_amount'], 15000.0)
+        self.assertEqual(entry['pending_amount'], 0.0)
+        self.assertEqual(entry['status'], PaymentStatus.PAID)
+
+    def test_overpayment_still_rejected_when_wages_are_earned(self):
+        self.mark(1, Attendance.PRESENT)
+        owed = self.entry()['net_pay']
+        response = self.client.post(
+            '/api/salary-payments/',
+            {'staff': self.staff.id, 'month': '2026-07-01', 'amount': owed + 100},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
 
     def test_a_neighbouring_month_is_excluded(self):
         self.mark(1, Attendance.PRESENT)
@@ -1677,6 +1722,138 @@ class ExpenseDateTests(APITestCase):
         )
         titles = [e['title'] for e in self.client.get('/api/expenses/').data]
         self.assertEqual(titles, [new.title, old.title])
+
+
+class ExpenseNotesTests(APITestCase):
+    def test_expense_accepts_and_persists_notes(self):
+        response = self.client.post('/api/expenses/', {
+            'title': 'Packaging Boxes',
+            'category': 'Supplies',
+            'amount': 1200,
+            'payment_method': 'UPI',
+            'notes': 'Invoice #INV-2026-991 from Agarwal Packagers',
+        }, format='json')
+        self.assertEqual(response.status_code, 201)
+        expense = Expense.objects.get(title='Packaging Boxes')
+        self.assertEqual(expense.notes, 'Invoice #INV-2026-991 from Agarwal Packagers')
+        self.assertEqual(response.data['notes'], 'Invoice #INV-2026-991 from Agarwal Packagers')
+
+
+class CreditTests(APITestCase):
+    def test_create_credit_with_notes_and_list(self):
+        when = timezone.now() - timedelta(days=2)
+        response = self.client.post('/api/credits/', {
+            'title': 'Bulk Corporate Deposit',
+            'category': 'Customer Advance',
+            'amount': 25000,
+            'payment_method': 'BANK_TRANSFER',
+            'date': when.isoformat(),
+            'notes': 'Hotel Grand Palace advance payment for linen wash',
+        }, format='json')
+        self.assertEqual(response.status_code, 201)
+        credit = Credit.objects.get(title='Bulk Corporate Deposit')
+        self.assertEqual(credit.amount, 25000.0)
+        self.assertEqual(credit.category.name, 'Customer Advance')
+        self.assertEqual(credit.notes, 'Hotel Grand Palace advance payment for linen wash')
+        self.assertEqual(credit.date, when)
+
+        # The category still travels as its name, not an id.
+        list_res = self.client.get('/api/credits/')
+        self.assertEqual(list_res.status_code, 200)
+        self.assertEqual(len(list_res.data), 1)
+        self.assertEqual(list_res.data[0]['category'], 'Customer Advance')
+        self.assertEqual(list_res.data[0]['notes'], 'Hotel Grand Palace advance payment for linen wash')
+
+    def test_update_and_delete_credit(self):
+        credit = Credit.objects.create(
+            title='Hanger resale',
+            category=CreditCategory.objects.get(name='Other'),
+            amount=1500,
+            notes='Old hanger rack',
+        )
+        patch_res = self.client.patch(f'/api/credits/{credit.id}/', {
+            'amount': 1800,
+            'notes': 'Updated count',
+        }, format='json')
+        self.assertEqual(patch_res.status_code, 200)
+        credit.refresh_from_db()
+        self.assertEqual(credit.amount, 1800.0)
+        self.assertEqual(credit.notes, 'Updated count')
+
+        del_res = self.client.delete(f'/api/credits/{credit.id}/')
+        self.assertEqual(del_res.status_code, 204)
+        self.assertFalse(Credit.objects.filter(id=credit.id).exists())
+
+    def test_unknown_category_is_rejected(self):
+        res = self.client.post('/api/credits/', {
+            'title': 'x', 'category': 'Scrap Sale', 'amount': 10,
+        }, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('category', res.data)
+
+
+class CreditCategoryTests(APITestCase):
+    def test_migration_seeds_laundromat_defaults(self):
+        names = list(CreditCategory.objects.values_list('name', flat=True))
+        self.assertEqual(names, DEFAULT_CREDIT_CATEGORIES)
+
+    def test_meta_lists_only_active_categories(self):
+        CreditCategory.objects.filter(name='Other').update(is_active=False)
+        values = [c['value'] for c in self.client.get('/api/meta/').data['credit_categories']]
+        self.assertIn('Laundry Income', values)
+        self.assertNotIn('Other', values)
+
+    def test_add_rename_and_toggle_a_category(self):
+        res = self.client.post('/api/credit-categories/', {'name': '  Ironing Income '}, format='json')
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data['name'], 'Ironing Income')
+        self.assertEqual(res.data['credit_count'], 0)
+        cat_id = res.data['id']
+
+        res = self.client.patch(f'/api/credit-categories/{cat_id}/', {'name': 'Press & Iron Income'}, format='json')
+        self.assertEqual(res.status_code, 200)
+        res = self.client.patch(f'/api/credit-categories/{cat_id}/', {'is_active': False}, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(CreditCategory.objects.get(pk=cat_id).is_active)
+
+    def test_blank_and_duplicate_names_are_rejected(self):
+        self.assertEqual(
+            self.client.post('/api/credit-categories/', {'name': '   '}, format='json').status_code, 400)
+        res = self.client.post('/api/credit-categories/', {'name': 'laundry income'}, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('already exists', str(res.data['name']))
+
+    def test_rename_shows_on_existing_credits(self):
+        cat = CreditCategory.objects.get(name='Delivery Charges')
+        Credit.objects.create(title='Pickup fee', category=cat, amount=50)
+        self.client.patch(f'/api/credit-categories/{cat.id}/', {'name': 'Pickup & Delivery'}, format='json')
+        self.assertEqual(self.client.get('/api/credits/').data[0]['category'], 'Pickup & Delivery')
+
+    def test_category_in_use_cannot_be_deleted(self):
+        cat = CreditCategory.objects.get(name='Owner Investment')
+        Credit.objects.create(title='Top-up', category=cat, amount=5000)
+        res = self.client.delete(f'/api/credit-categories/{cat.id}/')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('1 credit uses', res.data['detail'])
+        self.assertTrue(CreditCategory.objects.filter(pk=cat.id).exists())
+
+    def test_unused_category_can_be_deleted(self):
+        cat = CreditCategory.objects.create(name='Temp')
+        self.assertEqual(self.client.delete(f'/api/credit-categories/{cat.id}/').status_code, 204)
+
+    def test_turned_off_category_blocks_new_credits_but_not_existing_ones(self):
+        cat = CreditCategory.objects.get(name='Other')
+        credit = Credit.objects.create(title='Old', category=cat, amount=10)
+        cat.is_active = False
+        cat.save()
+
+        res = self.client.post('/api/credits/', {'title': 'New', 'category': 'Other', 'amount': 10}, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('turned off', str(res.data['category']))
+
+        # Editing the old credit without changing its category still works.
+        res = self.client.patch(f'/api/credits/{credit.id}/', {'amount': 20, 'category': 'Other'}, format='json')
+        self.assertEqual(res.status_code, 200)
 
 
 class OrderProvenanceTests(APITestCase):

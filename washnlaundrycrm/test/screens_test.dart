@@ -125,8 +125,7 @@ void main() {
       expect(find.text('Save Changes'), findsOneWidget);
     });
 
-    testWidgets('the edit dialog offers an active toggle', (tester) async {
-      // Without this, a staff member could never be marked inactive at all.
+    testWidgets('the edit dialog offers a status toggle button radio', (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
@@ -136,13 +135,14 @@ void main() {
       await tester.tap(find.text('Edit details'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('Active — uncheck to remove from the roster'),
-        findsOneWidget,
-      );
+      final dialog = find.byType(AlertDialog);
+      expect(find.descendant(of: dialog, matching: find.text('Status')), findsOneWidget);
+      expect(find.descendant(of: dialog, matching: find.text('1. Active')), findsOneWidget);
+      expect(find.descendant(of: dialog, matching: find.text('2. Inactive')), findsOneWidget);
     });
 
-    testWidgets('the add dialog has no active toggle', (tester) async {
+    testWidgets('the add dialog offers a status toggle button radio defaulting to inactive',
+        (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
@@ -150,17 +150,15 @@ void main() {
       await tester.tap(find.text('Add Staff').first);
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('Active — uncheck to remove from the roster'),
-        findsNothing,
-      );
+      final dialog = find.byType(AlertDialog);
+      expect(find.descendant(of: dialog, matching: find.text('Status')), findsOneWidget);
+      expect(find.descendant(of: dialog, matching: find.text('1. Active')), findsOneWidget);
+      expect(find.descendant(of: dialog, matching: find.text('2. Inactive')), findsOneWidget);
     });
 
     testWidgets(
-        'inactive members are hidden from All Staff but reachable via the '
-        'Inactive tab', (tester) async {
-      // The "Show Inactive" checkbox that used to reveal them on this tab is
-      // gone — the dedicated "Inactive" sub-tab is the only way to see them now.
+        'All Staff shows all members, Active shows active only, Inactive shows inactive only',
+        (tester) async {
       final provider = AppProvider(autoLoad: false)
         ..seedForTest(staff: [
           ...roster,
@@ -175,13 +173,26 @@ void main() {
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
 
-      expect(find.text('Retired Person'), findsNothing);
-      expect(find.byType(Checkbox), findsNothing);
+      // All Staff tab (default) shows all 3 members including Retired Person
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Mohan Das'), findsOneWidget);
+      expect(find.text('Retired Person'), findsOneWidget);
 
-      await tester.tap(find.text('Inactive'));
+      // Tap Active sub-tab
+      await tester.tap(find.byKey(const ValueKey('staff-subtab-Active')));
+      await tester.pump();
+
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Mohan Das'), findsOneWidget);
+      expect(find.text('Retired Person'), findsNothing);
+
+      // Tap Inactive sub-tab
+      await tester.tap(find.byKey(const ValueKey('staff-subtab-Inactive')));
       await tester.pump();
 
       expect(find.text('Retired Person'), findsOneWidget);
+      expect(find.text('Ramesh Kumar'), findsNothing);
+      expect(find.text('Mohan Das'), findsNothing);
     });
 
     testWidgets('the add button opens an empty dialog', (tester) async {

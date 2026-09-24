@@ -108,6 +108,12 @@ class SidebarNavigation extends StatefulWidget {
       'disabled': false
     },
     {
+      'label': 'Credits',
+      'icon': Icons.savings_outlined,
+      'index': 15,
+      'disabled': false
+    },
+    {
       'label': 'Reports',
       'icon': Icons.bar_chart_rounded,
       'index': 9,
@@ -135,7 +141,7 @@ class SidebarNavigation extends StatefulWidget {
       'label': 'Settings',
       'icon': Icons.settings_outlined,
       'index': 13,
-      'disabled': true
+      'disabled': false
     },
     {
       'label': 'Help',

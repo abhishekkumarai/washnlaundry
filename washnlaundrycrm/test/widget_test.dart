@@ -50,7 +50,7 @@ void main() {
     expect(provider.currentNavIndex, 2);
   });
 
-  testWidgets('Settings is listed but inert while disabled', (tester) async {
+  testWidgets('Settings is enabled and navigates', (tester) async {
     final provider = AppProvider(autoLoad: false);
     await tester.pumpWidget(wrap(provider, const SidebarNavigation()));
 
@@ -59,7 +59,7 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pump();
 
-    expect(provider.currentNavIndex, 0);
+    expect(provider.currentNavIndex, 13);
   });
 
   Future<void> pumpAtWidth(WidgetTester tester, double width) async {
@@ -124,8 +124,8 @@ void main() {
     testWidgets('the last nav item is reachable on a short viewport', (tester) async {
       // 14 items do not fit a laptop-height window, so the rail must scroll to
       // its end — otherwise the tail of the list is simply unreachable.
-      // Settings is disabled, so this asserts it scrolls into view, not that it
-      // navigates; Scan is the last enabled item and does navigate.
+      // This asserts Settings scrolls into view; Scan is tapped to confirm
+      // items down there still navigate.
       final provider = AppProvider(autoLoad: false);
       tester.view
         ..physicalSize = const Size(1400, 700)

@@ -50,3 +50,4 @@ index_fetched.html
 .DS_Store
 Thumbs.db
 *.log
+.vercel/

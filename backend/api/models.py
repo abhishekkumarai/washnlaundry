@@ -416,6 +416,46 @@ class Expense(models.Model):
         return self.title
 
 
+# Shop-managed from Settings → Credit categories, unlike ExpenseCategory's fixed
+# TextChoices. Seeded by migration 0018 with DEFAULT_CREDIT_CATEGORIES.
+DEFAULT_CREDIT_CATEGORIES = [
+    'Laundry Income',
+    'Dry Cleaning Income',
+    'Delivery Charges',
+    'Customer Advance',
+    'Owner Investment',
+    'Other',
+]
+
+
+class CreditCategory(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    display_order = models.IntegerField(default=0)
+    # Turning a category off hides it from new credits but keeps it on the
+    # credits already filed under it — the only option once it is in use,
+    # since Credit.category is PROTECT.
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['display_order', 'name']
+        verbose_name_plural = 'Credit categories'
+
+    def __str__(self):
+        return self.name
+
+
+class Credit(models.Model):
+    title = models.CharField(max_length=255)
+    category = models.ForeignKey(CreditCategory, on_delete=models.PROTECT, related_name='credits')
+    amount = models.FloatField()
+    payment_method = models.CharField(max_length=50, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
+    date = models.DateTimeField(default=timezone.now)
+    notes = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return self.title
+
+
 class Staff(models.Model):
     name = models.CharField(max_length=255)
     role = models.CharField(max_length=100, default='Washer')

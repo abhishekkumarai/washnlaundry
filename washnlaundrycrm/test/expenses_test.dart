@@ -434,5 +434,52 @@ void main() {
         expect(find.text('Commercial Detergent (50L)'), findsOneWidget);
       });
     });
+
+    group('Expenses Notes', () {
+      testWidgets('Add Expense dialog includes Notes section', (tester) async {
+        final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
+        await tester.pumpWidget(host(provider, const ExpensesScreen()));
+        await tester.pump();
+
+        await tester.tap(find.widgetWithText(FilledButton, 'Add Expense'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AlertDialog), findsOneWidget);
+        expect(find.text('Notes (optional)'), findsOneWidget);
+      });
+
+      testWidgets('List item renders notes text when present', (tester) async {
+        final ledgerWithNotes = [
+          ExpenseModel(
+            id: '10',
+            title: 'Office Stationary',
+            category: 'Supplies',
+            amount: 500,
+            paymentMethod: 'CASH',
+            date: thisMonth,
+            notes: 'Bill ref: INV-9821 bought from local shop',
+          ),
+        ];
+        final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledgerWithNotes);
+        await tester.pumpWidget(host(provider, const ExpensesScreen()));
+        await tester.pump();
+
+        expect(find.text('Bill ref: INV-9821 bought from local shop'), findsOneWidget);
+      });
+
+      test('ExpenseModel fromJson and toJson preserves notes', () {
+        final json = {
+          'id': 42,
+          'title': 'Machine Maintenance',
+          'category': 'Maintenance',
+          'amount': 1500,
+          'payment_method': 'UPI',
+          'notes': 'Drum seal replaced',
+        };
+        final model = ExpenseModel.fromJson(json);
+        expect(model.notes, 'Drum seal replaced');
+        expect(model.toJson()['notes'], 'Drum seal replaced');
+      });
+    });
   });
 }

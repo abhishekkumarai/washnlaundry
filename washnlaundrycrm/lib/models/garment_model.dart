@@ -247,6 +247,7 @@ class ExpenseModel {
   final double amount;
   final String paymentMethod;
   final DateTime? date;
+  final String? notes;
 
   const ExpenseModel({
     required this.id,
@@ -255,6 +256,7 @@ class ExpenseModel {
     required this.amount,
     this.paymentMethod = 'CASH',
     this.date,
+    this.notes,
   });
 
   factory ExpenseModel.fromJson(Map<String, dynamic> json) => ExpenseModel(
@@ -264,6 +266,7 @@ class ExpenseModel {
         amount: (json['amount'] ?? 0).toDouble(),
         paymentMethod: json['payment_method'] ?? 'CASH',
         date: DateTime.tryParse(json['date'] ?? ''),
+        notes: json['notes'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -271,7 +274,76 @@ class ExpenseModel {
         'category': category,
         'amount': amount,
         'payment_method': paymentMethod,
+        if (notes != null) 'notes': notes,
       };
+}
+
+class CreditModel {
+  final String id;
+  final String title;
+  final String category;
+  final double amount;
+  final String paymentMethod;
+  final DateTime? date;
+  final String? notes;
+
+  const CreditModel({
+    required this.id,
+    required this.title,
+    required this.category,
+    required this.amount,
+    this.paymentMethod = 'CASH',
+    this.date,
+    this.notes,
+  });
+
+  factory CreditModel.fromJson(Map<String, dynamic> json) => CreditModel(
+        id: json['id'].toString(),
+        title: json['title'] ?? '',
+        category: json['category'] ?? '',
+        amount: (json['amount'] ?? 0).toDouble(),
+        paymentMethod: json['payment_method'] ?? 'CASH',
+        date: DateTime.tryParse(json['date'] ?? ''),
+        notes: json['notes'] as String?,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'category': category,
+        'amount': amount,
+        'payment_method': paymentMethod,
+        if (notes != null) 'notes': notes,
+      };
+}
+
+/// A shop-managed credit category (Settings → Credit categories). Credits
+/// carry the category by [name], so this is only needed to manage the list.
+class CreditCategoryModel {
+  final String id;
+  final String name;
+  final int displayOrder;
+  final bool isActive;
+
+  /// Credits filed under this category. Non-zero means it can only be turned
+  /// off, not deleted — the backend refuses with a 400.
+  final int creditCount;
+
+  const CreditCategoryModel({
+    required this.id,
+    required this.name,
+    this.displayOrder = 0,
+    this.isActive = true,
+    this.creditCount = 0,
+  });
+
+  factory CreditCategoryModel.fromJson(Map<String, dynamic> json) =>
+      CreditCategoryModel(
+        id: json['id'].toString(),
+        name: json['name'] ?? '',
+        displayOrder: (json['display_order'] ?? 0) as int,
+        isActive: json['is_active'] ?? true,
+        creditCount: (json['credit_count'] ?? 0) as int,
+      );
 }
 
 class AttendanceModel {
@@ -385,6 +457,16 @@ class PayrollEntryModel {
         pendingAmount: (json['pending_amount'] ?? 0).toDouble(),
         status: json['status'] ?? 'UNPAID',
       );
+
+  /// Nothing earned this month (no attendance marked, or advances cover it).
+  /// Pay owed is derived from attendance only, so there is no amount to cap
+  /// a payment against — the backend accepts one anyway (see
+  /// SalaryPaymentSerializer.validate).
+  bool get nothingEarned => netPay <= 0;
+
+  /// A payment can be recorded while something is still due, or when nothing
+  /// was earned at all (e.g. paying someone whose attendance wasn't logged).
+  bool get canRecordPayment => pendingAmount > 0 || nothingEarned;
 
   /// "24" or "23.5" — half-days are real, so a whole number should not gain a
   /// misleading ".0".
@@ -528,6 +610,7 @@ class MetaModel {
   final List<ChoiceModel> pricingUnits;
   final List<ChoiceModel> paymentMethods;
   final List<ChoiceModel> expenseCategories;
+  final List<ChoiceModel> creditCategories;
   final List<ChoiceModel> attendanceStatuses;
 
   const MetaModel({
@@ -538,6 +621,7 @@ class MetaModel {
     this.pricingUnits = const [],
     this.paymentMethods = const [],
     this.expenseCategories = const [],
+    this.creditCategories = const [],
     this.attendanceStatuses = const [],
   });
 
@@ -559,6 +643,7 @@ class MetaModel {
         pricingUnits: _list(json['pricing_units']),
         paymentMethods: _list(json['payment_methods']),
         expenseCategories: _list(json['expense_categories']),
+        creditCategories: _list(json['credit_categories']),
         attendanceStatuses: _list(json['attendance_statuses']),
       );
 }

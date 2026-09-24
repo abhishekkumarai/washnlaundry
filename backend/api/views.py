@@ -1,7 +1,7 @@
 import json
 from datetime import timedelta
 
-from django.db.models import Sum, Count, Q
+from django.db.models import ProtectedError, Sum, Count, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import viewsets
@@ -12,14 +12,14 @@ from rest_framework.response import Response
 from . import customer_import
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
-    Expense, Staff, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
+    Expense, Credit, CreditCategory, Staff, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
     OrderStatus, PaymentStatus, DeliveryType, OrderSource, PricingUnit,
     PaymentMethod, ExpenseCategory,
 )
 from .serializers import (
     ShopSerializer, CustomerSerializer, GarmentCategorySerializer,
     GarmentItemSerializer, OrderSerializer, OrderItemSerializer,
-    ExpenseSerializer, StaffSerializer, AttendanceSerializer,
+    ExpenseSerializer, CreditSerializer, CreditCategorySerializer, StaffSerializer, AttendanceSerializer,
     SalaryPaymentSerializer, SalaryAdvanceSerializer, ServiceAreaSerializer,
     TimeSlotSerializer,
 )
@@ -311,6 +311,29 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
 
 
+class CreditViewSet(viewsets.ModelViewSet):
+    queryset = Credit.objects.select_related('category').order_by('-date')
+    serializer_class = CreditSerializer
+
+
+class CreditCategoryViewSet(viewsets.ModelViewSet):
+    queryset = CreditCategory.objects.all()
+    serializer_class = CreditCategorySerializer
+
+    def destroy(self, request, *args, **kwargs):
+        category = self.get_object()
+        try:
+            category.delete()
+        except ProtectedError:
+            count = category.credits.count()
+            return Response(
+                {'detail': f'{count} credit{"s use" if count != 1 else " uses"} "{category.name}" '
+                           f'— turn it off instead.'},
+                status=400,
+            )
+        return Response(status=204)
+
+
 class StaffViewSet(viewsets.ModelViewSet):
     queryset = Staff.objects.all()
     serializer_class = StaffSerializer
@@ -501,15 +524,16 @@ def payroll_summary(request):
         net_pay = round(max(total_salary - advances_amount, 0.0), 2)
         paid_amount = round(paid.get(member.id, 0.0), 2)
         pending = round(max(net_pay - paid_amount, 0.0), 2)
+        if pending < 1.0:
+            pending = 0.0
 
-        # Same three-way rule the order payment action uses, so PAID/PARTIAL/
-        # UNPAID mean the same thing everywhere in the app.
-        if net_pay <= 0:
-            status_value = PaymentStatus.UNPAID
-        elif pending <= 0:
-            status_value = PaymentStatus.PAID
-        elif paid_amount > 0:
-            status_value = PaymentStatus.PARTIAL
+        # Status evaluation: paid staff are never marked UNPAID. If balance is under
+        # 1 rupee (due to fractional daily rates), treat as fully PAID.
+        if paid_amount > 0:
+            if pending <= 0 or paid_amount >= (net_pay - 1.0):
+                status_value = PaymentStatus.PAID
+            else:
+                status_value = PaymentStatus.PARTIAL
         else:
             status_value = PaymentStatus.UNPAID
 
@@ -714,6 +738,12 @@ def meta(request):
         'pricing_units': _choices(PricingUnit),
         'payment_methods': _choices(PaymentMethod),
         'expense_categories': _choices(ExpenseCategory),
+        # Shop-managed now, not fixed choices — only the active ones, since
+        # this list is what pickers offer for a new credit.
+        'credit_categories': [
+            {'value': c.name, 'label': c.name}
+            for c in CreditCategory.objects.filter(is_active=True)
+        ],
         'attendance_statuses': [
             {'value': value, 'label': label}
             for value, label in Attendance.STATUS_CHOICES

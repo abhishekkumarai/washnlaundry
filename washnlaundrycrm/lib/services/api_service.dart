@@ -372,6 +372,47 @@ class ApiService {
   static Future<void> deleteExpense(String id) =>
       _send('DELETE', '/expenses/$id/');
 
+  static Future<List<CreditModel>> fetchCredits() async {
+    final data = await _send('GET', '/credits/');
+    return _asList(data).map(CreditModel.fromJson).toList();
+  }
+
+  static Future<CreditModel> createCredit(
+      Map<String, dynamic> payload) async {
+    final data = await _send('POST', '/credits/', body: payload);
+    return CreditModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  static Future<CreditModel> updateCredit(
+      String id, Map<String, dynamic> payload) async {
+    final data = await _send('PATCH', '/credits/$id/', body: payload);
+    return CreditModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  static Future<void> deleteCredit(String id) =>
+      _send('DELETE', '/credits/$id/');
+
+  static Future<List<CreditCategoryModel>> fetchCreditCategories() async {
+    final data = await _send('GET', '/credit-categories/');
+    return _asList(data).map(CreditCategoryModel.fromJson).toList();
+  }
+
+  static Future<CreditCategoryModel> createCreditCategory(
+      Map<String, dynamic> payload) async {
+    final data = await _send('POST', '/credit-categories/', body: payload);
+    return CreditCategoryModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  static Future<CreditCategoryModel> updateCreditCategory(
+      String id, Map<String, dynamic> payload) async {
+    final data =
+        await _send('PATCH', '/credit-categories/$id/', body: payload);
+    return CreditCategoryModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  static Future<void> deleteCreditCategory(String id) =>
+      _send('DELETE', '/credit-categories/$id/');
+
   static Future<List<AttendanceModel>> fetchAttendance({String? date}) async {
     final data = await _send('GET', '/attendance/', query: {
       if (date != null && date.isNotEmpty) 'date': date,

@@ -18,6 +18,8 @@ class AppProvider extends ChangeNotifier {
     8: '/expenses',
     9: '/reports',
     11: '/scan',
+    13: '/settings',
+    15: '/credits',
   };
 
   static int navIndexForPath(String path) {
@@ -54,12 +56,18 @@ class AppProvider extends ChangeNotifier {
       case 'expenses':
       case 'expense':
         return 8;
+      case 'credits':
+      case 'credit':
+        return 15;
       case 'reports':
       case 'report':
         return 9;
       case 'scan':
       case 'qr':
         return 11;
+      case 'settings':
+      case 'shop-settings':
+        return 13;
       case 'dashboard':
       case '':
       default:
@@ -87,6 +95,19 @@ class AppProvider extends ChangeNotifier {
 
   List<ExpenseModel> _expenses = [];
   List<ExpenseModel> get expenses => _expenses;
+
+  List<CreditModel> _credits = [];
+  List<CreditModel> get credits => _credits;
+
+  List<CreditCategoryModel> _creditCategories = [];
+
+  /// Every credit category, active or not, in display order — what Settings →
+  /// Credit categories manages.
+  List<CreditCategoryModel> get creditCategories => _creditCategories;
+
+  /// What a new credit may be filed under.
+  List<CreditCategoryModel> get activeCreditCategories =>
+      _creditCategories.where((c) => c.isActive).toList();
 
   List<AttendanceModel> _attendance = [];
   List<AttendanceModel> get attendance => _attendance;
@@ -221,6 +242,8 @@ class AppProvider extends ChangeNotifier {
     List<CustomerModel>? customers,
     List<StaffModel>? staff,
     List<ExpenseModel>? expenses,
+    List<CreditModel>? credits,
+    List<CreditCategoryModel>? creditCategories,
     List<AttendanceModel>? attendance,
     PayrollSummaryModel? payroll,
     ReportsModel? reports,
@@ -237,6 +260,8 @@ class AppProvider extends ChangeNotifier {
     if (customers != null) _customers = customers;
     if (staff != null) _staff = staff;
     if (expenses != null) _expenses = expenses;
+    if (credits != null) _credits = credits;
+    if (creditCategories != null) _creditCategories = creditCategories;
     if (attendance != null) _attendance = attendance;
     if (payroll != null) _payroll = payroll;
     if (reports != null) _reports = reports;
@@ -432,6 +457,7 @@ class AppProvider extends ChangeNotifier {
         ApiService.fetchCustomers(),
         ApiService.fetchStaff(),
         ApiService.fetchExpenses(),
+        ApiService.fetchCredits(),
         ApiService.fetchAttendance(),
         ApiService.fetchServiceAreas(),
         ApiService.fetchTimeSlots(kind: TimeSlotModel.pickup),
@@ -439,6 +465,7 @@ class AppProvider extends ChangeNotifier {
         ApiService.fetchDashboardStats(),
         ApiService.fetchShop(),
         ApiService.fetchMeta(),
+        ApiService.fetchCreditCategories(),
       ]);
 
       _orders = results[0] as List<OrderModel>;
@@ -447,14 +474,16 @@ class AppProvider extends ChangeNotifier {
       _customers = results[3] as List<CustomerModel>;
       _staff = results[4] as List<StaffModel>;
       _expenses = results[5] as List<ExpenseModel>;
-      _attendance = results[6] as List<AttendanceModel>;
-      _serviceAreas = results[7] as List<ServiceAreaModel>;
-      _pickupSlots = results[8] as List<TimeSlotModel>;
-      _deliverySlots = results[9] as List<TimeSlotModel>;
-      _stats = results[10] as Map<String, dynamic>;
-      _shop = results[11] as Map<String, dynamic>?;
+      _credits = results[6] as List<CreditModel>;
+      _attendance = results[7] as List<AttendanceModel>;
+      _serviceAreas = results[8] as List<ServiceAreaModel>;
+      _pickupSlots = results[9] as List<TimeSlotModel>;
+      _deliverySlots = results[10] as List<TimeSlotModel>;
+      _stats = results[11] as Map<String, dynamic>;
+      _shop = results[12] as Map<String, dynamic>?;
       _applyShopFormatting();
-      _meta = results[12] as MetaModel;
+      _meta = results[13] as MetaModel;
+      _creditCategories = results[14] as List<CreditCategoryModel>;
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {
@@ -1079,6 +1108,116 @@ class AppProvider extends ChangeNotifier {
       _error = e.message;
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<bool> addCredit(Map<String, dynamic> payload) async {
+    try {
+      final credit = await ApiService.createCredit(payload);
+      _credits.insert(0, credit);
+      notifyListeners();
+      _refreshCreditCategories();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateCredit(String id, Map<String, dynamic> payload) async {
+    try {
+      final updated = await ApiService.updateCredit(id, payload);
+      final index = _credits.indexWhere((c) => c.id == updated.id);
+      if (index >= 0) {
+        _credits[index] = updated;
+      } else {
+        _credits.insert(0, updated);
+      }
+      _error = null;
+      notifyListeners();
+      _refreshCreditCategories();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteCredit(String id) async {
+    try {
+      await ApiService.deleteCredit(id);
+      _credits.removeWhere((c) => c.id == id);
+      _error = null;
+      notifyListeners();
+      _refreshCreditCategories();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Re-reads the category list so each one's credit count — which decides
+  /// whether Settings offers Delete — follows credits being added or removed.
+  /// Best-effort: a failed refresh just leaves the previous counts.
+  Future<void> _refreshCreditCategories() async {
+    try {
+      _creditCategories = await ApiService.fetchCreditCategories();
+      notifyListeners();
+    } on ApiException {
+      // Stale counts only affect whether Delete is offered, and the backend
+      // still refuses to delete a category in use.
+    }
+  }
+
+  /// Adds a credit category. Returns null on success, otherwise the backend's
+  /// message (blank or duplicate name) for the form to show inline.
+  Future<String?> addCreditCategory(String name) async {
+    try {
+      final created = await ApiService.createCreditCategory({
+        'name': name,
+        'display_order': _creditCategories.length,
+      });
+      _creditCategories = [..._creditCategories, created];
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
+  /// Renames or turns a credit category on/off. A rename also reloads credits,
+  /// since they carry the category by name. Null on success, else the error.
+  Future<String?> updateCreditCategory(
+      String id, Map<String, dynamic> payload) async {
+    try {
+      final updated = await ApiService.updateCreditCategory(id, payload);
+      _creditCategories = [
+        for (final c in _creditCategories) c.id == id ? updated : c,
+      ];
+      if (payload.containsKey('name')) {
+        _credits = await ApiService.fetchCredits();
+      }
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
+  /// Deletes an unused credit category. Null on success, else the backend's
+  /// refusal ("N credits use …") when it is in use.
+  Future<String?> deleteCreditCategory(String id) async {
+    try {
+      await ApiService.deleteCreditCategory(id);
+      _creditCategories = _creditCategories.where((c) => c.id != id).toList();
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
     }
   }
 

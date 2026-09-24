@@ -569,4 +569,65 @@ void main() {
       expect(AppProvider.monthKey(DateTime(2026, 12)), '2026-12');
     });
   });
+
+  group('Payroll unlogged attendance and float rounding', () {
+    test('unlogged attendance earns nothing but a payment can still be recorded', () {
+      final model = PayrollSummaryModel.fromJson({
+        'entries': [
+          {
+            'staff': 10,
+            'staff_name': 'Tarun Unlogged',
+            'role': 'Ironer',
+            'monthly_wage': 12000,
+            'days_worked': 0,
+            'total_salary': 0,
+            'net_pay': 0,
+            'paid_amount': 0,
+            'pending_amount': 0,
+            'status': 'UNPAID',
+          },
+        ],
+      });
+      final entry = model.entries.single;
+      expect(entry.daysWorked, 0);
+      expect(entry.totalSalary, 0);
+      expect(entry.nothingEarned, isTrue);
+      expect(entry.canRecordPayment, isTrue);
+    });
+
+    test('a fully paid month with earned wages cannot take another payment', () {
+      const entry = PayrollEntryModel(
+        staffId: '12',
+        staffName: 'Settled',
+        netPay: 9000,
+        paidAmount: 9000,
+        pendingAmount: 0,
+        status: 'PAID',
+      );
+      expect(entry.nothingEarned, isFalse);
+      expect(entry.canRecordPayment, isFalse);
+    });
+
+    test('fractional paise remainder under 1 rupee marks status as PAID with 0 pending', () {
+      final model = PayrollSummaryModel.fromJson({
+        'entries': [
+          {
+            'staff': 11,
+            'staff_name': 'Lakshman Rao',
+            'role': 'Washer',
+            'monthly_wage': 10000,
+            'days_worked': 26,
+            'total_salary': 8583.33,
+            'net_pay': 8583.33,
+            'paid_amount': 8583.0,
+            'pending_amount': 0.0,
+            'status': 'PAID',
+          },
+        ],
+      });
+      final entry = model.entries.single;
+      expect(entry.pendingAmount, 0.0);
+      expect(entry.status, 'PAID');
+    });
+  });
 }

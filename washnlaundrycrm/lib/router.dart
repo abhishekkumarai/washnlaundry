@@ -6,6 +6,7 @@ import 'models/order_model.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/attendance_screen.dart';
+import 'screens/credits_screen.dart';
 import 'screens/customers_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/expenses_screen.dart';
@@ -17,6 +18,7 @@ import 'screens/payroll_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/scan_screen.dart';
 import 'screens/services_screen.dart';
+import 'screens/settings_screen.dart';
 import 'screens/staff_screen.dart';
 import 'widgets/app_shell.dart';
 
@@ -147,6 +149,18 @@ List<RouteBase> appRoutes() => [
       GoRoute(
         path: '/expenses',
         builder: (c, s) => _section(c, 8, const ExpensesScreen()),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (c, s) => _section(
+            c,
+            13,
+            SettingsScreen(
+                initialTab: s.uri.queryParameters['tab'])),
+      ),
+      GoRoute(
+        path: '/credits',
+        builder: (c, s) => _section(c, 15, const CreditsScreen()),
       ),
       GoRoute(
         path: '/reports',

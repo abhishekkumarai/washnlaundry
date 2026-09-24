@@ -271,7 +271,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
     final provider = context.read<AppProvider>();
     final rows = <List<Object?>>[
-      const ['Title', 'Category', 'Amount', 'Payment Method', 'Date'],
+      const ['Title', 'Category', 'Amount', 'Payment Method', 'Date', 'Notes'],
       for (final e in expenses)
         [
           e.title,
@@ -279,6 +279,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           e.amount,
           _methodLabel(provider, e.paymentMethod),
           e.date == null ? '' : DateFormat('yyyy-MM-dd').format(e.date!),
+          e.notes ?? '',
         ],
     ];
 
@@ -508,6 +509,20 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             ),
                           ],
                         ),
+                        if (expenses[i].notes != null &&
+                            expenses[i].notes!.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            expenses[i].notes!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -581,6 +596,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final titleController = TextEditingController(text: existing?.title ?? '');
     final amountController = TextEditingController(
         text: existing == null ? '' : existing.amount.toStringAsFixed(0));
+    final notesController = TextEditingController(text: existing?.notes ?? '');
     final provider = context.read<AppProvider>();
 
     // Vocabularies come from `/api/meta/` now. This screen used to hold its
@@ -679,6 +695,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         if (picked != null) setDialogState(() => date = picked);
                       },
                     ),
+                    const SizedBox(height: 14),
+                    _label('Notes (optional)'),
+                    TextField(
+                      controller: notesController,
+                      style: const TextStyle(fontSize: 13),
+                      maxLines: 2,
+                      decoration: _fieldDecoration('Additional details, receipt ref, etc.'),
+                    ),
                     if (error != null) ...[
                       const SizedBox(height: 10),
                       Text(error!,
@@ -716,12 +740,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                           saving = true;
                           error = null;
                         });
+                        final notesText = notesController.text.trim();
                         final payload = {
                           'title': title,
                           'category': category,
                           'amount': amount,
                           'payment_method': method,
                           'date': date.toUtc().toIso8601String(),
+                          'notes': notesText.isEmpty ? null : notesText,
                         };
                         final ok = isEdit
                             ? await provider.updateExpense(existing.id, payload)

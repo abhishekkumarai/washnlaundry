@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem, OrderAuditLog,
-    OrderStatus, Expense, Staff, Attendance, SalaryPayment, SalaryAdvance,
+    OrderStatus, Expense, Credit, CreditCategory, Staff, Attendance, SalaryPayment, SalaryAdvance,
     ServiceArea, TimeSlot,
 )
 
@@ -110,6 +110,46 @@ class ExpenseSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class CreditCategorySerializer(serializers.ModelSerializer):
+    credit_count = serializers.IntegerField(source='credits.count', read_only=True)
+
+    class Meta:
+        model = CreditCategory
+        fields = ['id', 'name', 'display_order', 'is_active', 'credit_count']
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('Name cannot be blank.')
+        clash = CreditCategory.objects.filter(name__iexact=value)
+        if self.instance:
+            clash = clash.exclude(pk=self.instance.pk)
+        if clash.exists():
+            raise serializers.ValidationError(f'A category named "{value}" already exists.')
+        return value
+
+
+class CreditSerializer(serializers.ModelSerializer):
+    # Read and written as the category's name, so the API shape stayed a plain
+    # string when categories moved from fixed choices into their own table —
+    # and a rename in Settings shows on every existing credit.
+    category = serializers.SlugRelatedField(
+        slug_field='name', queryset=CreditCategory.objects.all())
+
+    class Meta:
+        model = Credit
+        fields = '__all__'
+
+    def validate_category(self, value):
+        # A turned-off category stays on the credits already filed under it,
+        # but can't be picked for a new credit or switched to on an edit.
+        unchanged = self.instance is not None and self.instance.category_id == value.pk
+        if not value.is_active and not unchanged:
+            raise serializers.ValidationError(
+                f'"{value.name}" is turned off. Turn it on in Settings → Credit categories first.')
+        return value
+
+
 class StaffSerializer(serializers.ModelSerializer):
     class Meta:
         model = Staff
@@ -185,7 +225,10 @@ class SalaryPaymentSerializer(serializers.ModelSerializer):
             other_payments = other_payments.exclude(pk=self.instance.pk)
         already_paid = other_payments.aggregate(total=Sum('amount'))['total'] or 0.0
 
-        if round(already_paid + amount, 2) > net_pay:
+        # Pay owed is derived from attendance only. When nothing was earned
+        # (no attendance marked, or advances cover it) there is no amount to
+        # cap against, so the payment is accepted rather than blocked at 0.
+        if net_pay > 0 and round(already_paid + amount, 2) > net_pay:
             remaining = round(max(net_pay - already_paid, 0.0), 2)
             raise serializers.ValidationError(
                 f"This payment would exceed what {staff.name} is owed for "

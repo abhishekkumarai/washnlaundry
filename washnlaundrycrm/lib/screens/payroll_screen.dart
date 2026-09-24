@@ -553,7 +553,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
               ),
               const SizedBox(width: 4),
               TextButton(
-                onPressed: entry.pendingAmount <= 0
+                onPressed: !entry.canRecordPayment
                     ? null
                     : () => _showRecordPayment(entry),
                 child: const Text('Record Payment',
@@ -683,7 +683,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: FilledButton(
-                  onPressed: entry.pendingAmount <= 0
+                  onPressed: !entry.canRecordPayment
                       ? null
                       : () => _showRecordPayment(entry),
                   child: const Text('Record Payment'),
@@ -992,8 +992,9 @@ class _PayrollScreenState extends State<PayrollScreen> {
                 }
                 // Can't pay out more than is actually owed for the month —
                 // pendingAmount is total_salary minus what's already been
-                // paid, so anything above it would be an overpayment.
-                if (amount > entry.pendingAmount) {
+                // paid, so anything above it would be an overpayment. With
+                // nothing earned there is no amount to cap against.
+                if (!entry.nothingEarned && amount > entry.pendingAmount) {
                   setDialogState(() => error =
                       'Cannot exceed the ${Money.symbol}${_money(entry.pendingAmount)} outstanding.');
                   return;

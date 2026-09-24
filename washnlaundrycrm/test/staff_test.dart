@@ -125,4 +125,88 @@ void main() {
       expect(find.text('Edit Staff Member'), findsOneWidget);
     });
   });
+
+  group('StaffScreen Status & Subtabs', () {
+    final mixedRoster = [
+      const StaffModel(
+        id: '1',
+        name: 'Ramesh Kumar',
+        role: 'Head Washer',
+        phone: '1',
+        status: 'INACTIVE',
+      ),
+      const StaffModel(
+        id: '2',
+        name: 'Geeta Devi',
+        role: 'Dry Cleaning',
+        phone: '2',
+        status: 'ACTIVE',
+      ),
+    ];
+
+    testWidgets('All Staff tab shows both active and inactive members',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(staff: mixedRoster);
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      // "All Staff" tab is selected by default and should list both
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Geeta Devi'), findsOneWidget);
+    });
+
+    testWidgets('Active and Inactive subtabs filter staff appropriately',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(staff: mixedRoster);
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      // Tap Active tab
+      await tester.tap(find.byKey(const ValueKey('staff-subtab-Active')));
+      await tester.pumpAndSettle();
+      expect(find.text('Geeta Devi'), findsOneWidget);
+      expect(find.text('Ramesh Kumar'), findsNothing);
+
+      // Tap Inactive tab
+      await tester.tap(find.byKey(const ValueKey('staff-subtab-Inactive')));
+      await tester.pumpAndSettle();
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Geeta Devi'), findsNothing);
+    });
+
+    testWidgets('Add Staff modal defaults status to Inactive with toggle radio',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(staff: mixedRoster);
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add Staff').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add Staff Member'), findsOneWidget);
+      final dialogFinder = find.byType(AlertDialog);
+      // Radio toggle options exist in modal
+      expect(find.descendant(of: dialogFinder, matching: find.text('1. Active')), findsOneWidget);
+      expect(find.descendant(of: dialogFinder, matching: find.text('2. Inactive')), findsOneWidget);
+      // Defaults to Inactive on add
+      expect(find.descendant(of: dialogFinder, matching: find.byIcon(Icons.radio_button_checked)), findsOneWidget);
+    });
+
+    testWidgets('Status column in staff table renders an on/off switch per member',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(staff: mixedRoster);
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      // One switch per row: Geeta is on (Active), Ramesh is off (Inactive).
+      final switches = tester.widgetList<Switch>(find.byType(Switch)).toList();
+      expect(switches, hasLength(2));
+      expect(switches.where((s) => s.value), hasLength(1));
+      expect(switches.where((s) => !s.value), hasLength(1));
+      expect(switches.every((s) => s.onChanged != null), isTrue);
+      // The old two-chip radio is gone from the table.
+      expect(find.text('1. Active'), findsNothing);
+      expect(find.text('2. Inactive'), findsNothing);
+    });
+  });
 }

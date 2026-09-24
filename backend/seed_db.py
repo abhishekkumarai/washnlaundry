@@ -20,7 +20,8 @@ from django.utils import timezone  # noqa: E402
 
 from api.models import (  # noqa: E402
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem, OrderAuditLog,
-    Expense, Staff, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
+    Expense, Credit, CreditCategory, DEFAULT_CREDIT_CATEGORIES,
+    Staff, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
     OrderStatus, PaymentStatus, DeliveryType, OrderSource, PricingUnit,
 )
 
@@ -125,6 +126,8 @@ def seed():
     GarmentItem.objects.all().delete()
     GarmentCategory.objects.all().delete()
     Expense.objects.all().delete()
+    Credit.objects.all().delete()
+    CreditCategory.objects.all().delete()
     Attendance.objects.all().delete()
     SalaryAdvance.objects.all().delete()
     SalaryPayment.objects.all().delete()
@@ -449,11 +452,38 @@ def seed():
             date=timezone.now() - timedelta(days=days_ago),
         )
 
+    print('Seeding Credits...')
+    # Categories are shop-managed (Settings → Credit categories); reseeding
+    # restores the defaults migration 0018 ships with.
+    credit_categories = {
+        name: CreditCategory.objects.create(name=name, display_order=order)
+        for order, name in enumerate(DEFAULT_CREDIT_CATEGORIES)
+    }
+    credits_data = [
+        ('Hotel linen contract - monthly advance', 'Customer Advance', 15000.0,
+         'BANK_TRANSFER', 4, "Advance against next month's linen wash"),
+        ('Doorstep pickup & delivery fees', 'Delivery Charges', 1250.0, 'UPI', 8, None),
+        ('Owner top-up for new dryer', 'Owner Investment', 40000.0,
+         'BANK_TRANSFER', 15, 'Towards the 15kg tumble dryer'),
+        ('Wedding sherwani dry clean (cash, no order)', 'Dry Cleaning Income', 900.0,
+         'CASH', 20, None),
+    ]
+    for title, cat, amount, method, days_ago, notes in credits_data:
+        Credit.objects.create(
+            title=title,
+            category=credit_categories[cat],
+            amount=amount,
+            payment_method=method,
+            date=timezone.now() - timedelta(days=days_ago),
+            notes=notes,
+        )
+
     print('\n[SUCCESS] Database seeded.')
     print(f'   - {len(customers_data)} customers')
     print(f'   - {len(orders_plan)} orders')
     print(f'   - {len(staff_data)} staff')
     print(f'   - {len(expenses_data)} expenses')
+    print(f'   - {len(credits_data)} credits across {len(credit_categories)} credit categories')
     print(f'   - {Attendance.objects.count()} attendance records over {attendance_days} days')
     print(f'   - {salary_payments} salary payments')
     print(f'   - {total_items} items across {len(CATALOGUE)} categories')

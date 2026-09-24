@@ -90,8 +90,8 @@ class _StaffScreenState extends State<StaffScreen> {
 
       bool matchesTab = true;
       switch (_selectedTab) {
-        case 0: // Roster / All
-          matchesTab = s['status'] == 'ACTIVE';
+        case 0: // All Staff
+          matchesTab = true;
           break;
         case 1: // Active
           matchesTab = s['status'] == 'ACTIVE';
@@ -123,7 +123,8 @@ class _StaffScreenState extends State<StaffScreen> {
     final wageCtrl = TextEditingController(
       text: ((existing?['wage'] as num?) ?? defaultWage).toStringAsFixed(0),
     );
-    bool isActive = (existing?['status'] as String?) != 'INACTIVE';
+    // Defaults to Inactive on add per shop requirements, or hydrated from existing status.
+    bool isActive = isEdit ? ((existing['status'] as String?) != 'INACTIVE') : false;
     // New hires default to joining today — almost always right, and still
     // editable before saving. An edit leaves an already-unset date alone
     // rather than backfilling one that was never actually recorded.
@@ -306,24 +307,109 @@ class _StaffScreenState extends State<StaffScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  if (isEdit)
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: isActive,
-                          activeColor: const Color(0xFF10B981),
-                          onChanged: (v) =>
-                              setModalState(() => isActive = v ?? true),
-                        ),
-                        const Expanded(
-                          child: Text(
-                            'Active — uncheck to remove from the roster',
-                            style: TextStyle(
-                                fontSize: 13, color: Color(0xFF334155)),
+                  const Text(
+                    'Status',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      InkWell(
+                        onTap: () => setModalState(() => isActive = true),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? const Color(0xFFDCFCE7)
+                                : const Color(0xFFF1F5F9),
+                            border: Border.all(
+                              color: isActive
+                                  ? const Color(0xFF16A34A)
+                                  : const Color(0xFFCBD5E1),
+                              width: 1.5,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isActive
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_unchecked,
+                                size: 16,
+                                color: isActive
+                                    ? const Color(0xFF16A34A)
+                                    : const Color(0xFF94A3B8),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '1. Active',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: isActive
+                                      ? const Color(0xFF16A34A)
+                                      : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 12),
+                      InkWell(
+                        onTap: () => setModalState(() => isActive = false),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: !isActive
+                                ? const Color(0xFFFEE2E2)
+                                : const Color(0xFFF1F5F9),
+                            border: Border.all(
+                              color: !isActive
+                                  ? const Color(0xFFDC2626)
+                                  : const Color(0xFFCBD5E1),
+                              width: 1.5,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                !isActive
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_unchecked,
+                                size: 16,
+                                color: !isActive
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFF94A3B8),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '2. Inactive',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: !isActive
+                                      ? const Color(0xFFDC2626)
+                                      : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               );
             },
@@ -353,14 +439,13 @@ class _StaffScreenState extends State<StaffScreen> {
                 // date actually persists, not just skips the field.
                 'start_date':
                     startDate == null ? null : AppProvider.dateKey(startDate!),
-                if (isEdit) 'status': isActive ? 'ACTIVE' : 'INACTIVE',
+                'status': isActive ? 'ACTIVE' : 'INACTIVE',
               };
               final ok = isEdit
                   ? await provider.updateStaff(
                       existing['id'] as String, payload)
                   : await provider.addStaff({
                       ...payload,
-                      'status': 'ACTIVE',
                       'has_app_login': false,
                     });
               if (!ctx.mounted) return;
@@ -415,32 +500,7 @@ class _StaffScreenState extends State<StaffScreen> {
             return Column(
               children: [
                 narrow ? _narrowHeaderBar() : _wideHeaderBar(),
-
-                // Sub-Tabs Bar (All Staff / Active / Inactive)
-                //
-                // ListView, not SingleChildScrollView(child: Row(...)): inside a
-                // horizontal scroll view a Row gets an unbounded max-width
-                // constraint and shrink-wraps to its content, and the parent
-                // Column's default CrossAxisAlignment.center then centers that
-                // narrow box — producing a large blank gap before "All Staff".
-                // ListView's RenderViewport always fills the available width
-                // instead, which is why orders_screen.dart's filter-chip row
-                // uses the same pattern.
-                Container(
-                  color: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                  child: SizedBox(
-                    height: 38,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _subTabTitles.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, i) =>
-                          _buildSubTab(i, _subTabTitles[i]),
-                    ),
-                  ),
-                ),
+                _subTabsBar(narrow),
 
                 Expanded(
                   child: SingleChildScrollView(
@@ -485,22 +545,49 @@ class _StaffScreenState extends State<StaffScreen> {
                   const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
             ),
           ),
-          const SizedBox(width: 16),
+        ],
+      ),
+    );
+  }
 
-          // Search Box — flexes so the header can't overflow on a
-          // narrow window; the fixed 220px version used to push the
-          // Add Staff button off the edge.
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 220),
-                child: _searchField(),
-              ),
-            ),
+  Widget _subTabsBar(bool narrow) {
+    if (narrow) {
+      return Container(
+        color: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: SizedBox(
+          height: 38,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _subTabTitles.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, i) =>
+                _buildSubTab(i, _subTabTitles[i]),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+      child: Row(
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (int i = 0; i < _subTabTitles.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                _buildSubTab(i, _subTabTitles[i]),
+              ],
+            ],
+          ),
+          const Spacer(),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 220),
+            child: _searchField(),
           ),
           const SizedBox(width: 14),
-
           ElevatedButton.icon(
             onPressed: () => _showStaffModal(context),
             icon: const Icon(Icons.add, size: 16, color: Colors.white),
@@ -712,7 +799,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                                   fontWeight: FontWeight.bold,
                                                   color: Color(0xFF94A3B8)))),
                                       Expanded(
-                                          flex: 2,
+                                          flex: 3,
                                           child: Text('STATUS',
                                               style: TextStyle(
                                                   fontSize: 10,
@@ -873,84 +960,16 @@ class _StaffScreenState extends State<StaffScreen> {
                                                 ),
                                               ),
 
-                                              // Status Badge — also Align'd,
-                                              // and now the control that
-                                              // actually flips the status.
+                                              // Status toggle switch (Active / Inactive)
                                               Expanded(
-                                                flex: 2,
+                                                flex: 3,
                                                 child: Align(
                                                   alignment:
                                                       Alignment.centerLeft,
-                                                  child: Tooltip(
-                                                    message: isActive
-                                                        ? 'Mark $name inactive'
-                                                        : 'Reactivate $name',
-                                                    child: InkWell(
-                                                      onTap: () =>
-                                                          _toggleActive(
-                                                              context, s),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              12),
-                                                      child: Container(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                                horizontal: 10,
-                                                                vertical: 5),
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color: isActive
-                                                              ? const Color(
-                                                                  0xFFECFDF5)
-                                                              : const Color(
-                                                                  0xFFFEF2F2),
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(12),
-                                                        ),
-                                                        child: Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.min,
-                                                          children: [
-                                                            Icon(Icons.circle,
-                                                                size: 6,
-                                                                color: isActive
-                                                                    ? const Color(
-                                                                        0xFF10B981)
-                                                                    : const Color(
-                                                                        0xFFEF4444)),
-                                                            const SizedBox(
-                                                                width: 5),
-                                                            Flexible(
-                                                              child: Text(
-                                                                isActive
-                                                                    ? 'Active'
-                                                                    : 'Inactive',
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
-                                                                style: TextStyle(
-                                                                    fontSize:
-                                                                        10,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .bold,
-                                                                    color: isActive
-                                                                        ? const Color(
-                                                                            0xFF10B981)
-                                                                        : const Color(
-                                                                            0xFFEF4444)),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
+                                                  child: _buildStatusToggle(
+                                                      context, s),
                                                 ),
                                               ),
-
                                               SizedBox(
                                                 width: 48,
                                                 child: PopupMenuButton<String>(
@@ -1048,6 +1067,51 @@ class _StaffScreenState extends State<StaffScreen> {
               child: _staffCard(s),
             ),
         ],
+      ),
+    );
+  }
+
+  // Status column control: one switch that flips the member between Active
+  // and Inactive through the same _toggleActive path the row menu uses.
+  Widget _buildStatusToggle(
+      BuildContext context, Map<String, dynamic> member) {
+    final isActive = member['status'] == 'ACTIVE';
+    final name = member['name'] as String;
+    return Tooltip(
+      message: isActive ? 'Mark $name inactive' : 'Reactivate $name',
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Transform.scale(
+              scale: 0.75,
+              child: Switch(
+                value: isActive,
+                activeThumbColor: Colors.white,
+                activeTrackColor: const Color(0xFF10B981),
+                inactiveThumbColor: Colors.white,
+                inactiveTrackColor: const Color(0xFFCBD5E1),
+                trackOutlineColor:
+                    WidgetStateProperty.all(Colors.transparent),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onChanged: (_) => _toggleActive(context, member),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              isActive ? 'Active' : 'Inactive',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isActive
+                    ? const Color(0xFF10B981)
+                    : const Color(0xFFEF4444),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1179,43 +1243,7 @@ class _StaffScreenState extends State<StaffScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            Tooltip(
-              message: isActive ? 'Mark $name inactive' : 'Reactivate $name',
-              child: InkWell(
-                onTap: () => _toggleActive(context, s),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? const Color(0xFFECFDF5)
-                        : const Color(0xFFFEF2F2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.circle,
-                          size: 6,
-                          color: isActive
-                              ? const Color(0xFF10B981)
-                              : const Color(0xFFEF4444)),
-                      const SizedBox(width: 5),
-                      Text(
-                        isActive ? 'Active' : 'Inactive',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: isActive
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFFEF4444)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            _buildStatusToggle(context, s),
           ],
         ),
       ),
@@ -1244,6 +1272,9 @@ class _StaffScreenState extends State<StaffScreen> {
     // InkWell, not GestureDetector — the latter gives no pointer cursor or
     // hover feedback on web, so the tabs read as static labels.
     return Material(
+      // Keyed because the Status column's switch labels reuse the same
+      // "Active"/"Inactive" text, so text alone can't pick out a tab.
+      key: ValueKey('staff-subtab-$title'),
       color: Colors.transparent,
       child: InkWell(
         onTap: () => setState(() => _selectedTab = idx),
