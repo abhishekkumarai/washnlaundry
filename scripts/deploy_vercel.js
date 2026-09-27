@@ -62,6 +62,12 @@ async function deploy() {
     return results;
   }
 
+  const srcVercelJson = path.join(rootDir, 'washnlaundrycrm', 'vercel.json');
+  const dstVercelJson = path.join(webDir, 'vercel.json');
+  if (fs.existsSync(srcVercelJson)) {
+    fs.copyFileSync(srcVercelJson, dstVercelJson);
+  }
+
   const files = getFiles(webDir);
   console.log(`[Vercel Deploy] Uploading ${files.length} files from build/web to ${PROJECT_NAME}...`);
 
