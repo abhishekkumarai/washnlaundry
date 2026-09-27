@@ -857,6 +857,15 @@ class AttendanceTests(TestCase):
         with self.assertRaises(IntegrityError):
             Attendance.objects.create(staff=staff, date=date(2026, 7, 30))
 
+    def test_filter_by_month(self):
+        staff = Staff.objects.create(name='A', role='Washer', phone='1')
+        Attendance.objects.create(staff=staff, date=date(2026, 9, 5), status=Attendance.PRESENT)
+        Attendance.objects.create(staff=staff, date=date(2026, 9, 10), status=Attendance.HALF_DAY)
+        Attendance.objects.create(staff=staff, date=date(2026, 8, 15), status=Attendance.PRESENT)
+        response = self.client.get('/api/attendance/?month=2026-09')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+
 
 class AttendanceBulkTests(APITestCase):
     """POST /api/attendance/bulk/ — the Attendance screen's Save Register.
@@ -910,6 +919,22 @@ class AttendanceBulkTests(APITestCase):
         response = self.post({'date': self.day, 'entries': [{'staff': self.a.id, 'status': 'LEAVE'}]})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Attendance.objects.get(staff=self.a).status, Attendance.LEAVE)
+
+    def test_bulk_saves_check_in_time_and_notes(self):
+        response = self.post({
+            'date': self.day,
+            'entries': [{
+                'staff': self.a.id,
+                'status': 'PRESENT',
+                'check_in_time': '09:45:00',
+                'notes': 'On time today'
+            }]
+        })
+        self.assertEqual(response.status_code, 200)
+        rec = Attendance.objects.get(staff=self.a, date=date(2026, 8, 11))
+        self.assertEqual(rec.status, Attendance.PRESENT)
+        self.assertEqual(rec.notes, 'On time today')
+        self.assertEqual(str(rec.check_in_time), '09:45:00')
 
     def test_unknown_status_is_rejected(self):
         response = self.post({'date': self.day, 'entries': [{'staff': self.a.id, 'status': 'HOLIDAY'}]})
@@ -1057,6 +1082,9 @@ class PayrollTests(APITestCase):
         entry = self.entry()
         self.assertEqual(entry['days_worked'], 0.0)
         self.assertEqual(entry['total_salary'], 0.0)
+        # Counted separately, for the staff payroll view's "0P 1A 0H 0L" chips.
+        self.assertEqual(entry['absent_days'], 1)
+        self.assertEqual(entry['present_days'], 0)
 
     def test_floating_point_paise_residue_marks_paid(self):
         # Fractional daily rate leaving < 1 rupee residue must be marked PAID with 0.0 pending
@@ -1664,6 +1692,20 @@ class PosCheckoutContractTests(APITestCase):
         self.assertEqual(response.status_code, 201, response.data)
         self.assertIsNone(response.data['scheduled_time'])
 
+    def test_home_pickup_saves_pickup_slot_and_address(self):
+        # The review step's Home pickup sends a pickup leg on top of the
+        # delivery leg (scheduled_date/time), plus the pickup address.
+        response = self._checkout(
+            delivery_type='HOME_PICKUP',
+            scheduled_date='2026-09-28', scheduled_time='09:00:00',
+            pickup_date='2026-09-27', pickup_time='11:00:00',
+            address='12 HBR Layout, Bengaluru',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['pickup_date'], '2026-09-27')
+        self.assertEqual(response.data['pickup_time'], '11:00:00')
+        self.assertEqual(response.data['address'], '12 HBR Layout, Bengaluru')
+
     def test_created_order_appears_in_the_list(self):
         self._checkout()
         listed = self.client.get('/api/orders/').data
@@ -2010,3 +2052,119 @@ class GarmentItemImageTests(APITestCase):
         )
         data = self.client.get('/api/items/').data[0]
         self.assertEqual(data['image_url'], url)
+
+
+class WhatsAppIntegrationTests(APITestCase):
+    def setUp(self):
+        self.shop = Shop.objects.create(name='Wash & Clean', currency_symbol='₹')
+        self.customer = Customer.objects.create(
+            name='Rajesh Kumar',
+            phone='9876543210',
+            address='Connaught Place'
+        )
+        self.order = Order.objects.create(
+            customer=self.customer,
+            customer_name=self.customer.name,
+            customer_phone=self.customer.phone,
+            subtotal=300.0,
+            total_amount=300.0,
+            paid_amount=100.0,
+            due_amount=200.0,
+            status=OrderStatus.PLACED,
+        )
+        OrderItem.objects.create(
+            order=self.order,
+            item_title='Shirt',
+            service_type='Wash & Iron',
+            quantity=3,
+            unit_price=100.0,
+            total_price=300.0,
+        )
+        self.staff = Staff.objects.create(
+            name='Suresh Washer',
+            role='Washer',
+            phone='9123456780',
+            monthly_wage=15000.0,
+        )
+
+    def test_phone_normalization(self):
+        from api.services.whatsapp_service import WhatsAppService
+        self.assertEqual(WhatsAppService.normalize_phone('9876543210'), '919876543210')
+        self.assertEqual(WhatsAppService.normalize_phone('+91 98765 43210'), '919876543210')
+        self.assertEqual(WhatsAppService.normalize_phone('919876543210@s.whatsapp.net'), '919876543210')
+        self.assertIsNone(WhatsAppService.normalize_phone(''))
+        self.assertIsNone(WhatsAppService.normalize_phone(None))
+
+    def test_receipt_template(self):
+        from api.services.whatsapp_templates import build_order_receipt_message
+        msg = build_order_receipt_message(self.order)
+        self.assertIn('WASH & CLEAN', msg)
+        self.assertIn('Rajesh Kumar', msg)
+        self.assertIn('3x Shirt', msg)
+        self.assertIn('300.00', msg)
+        self.assertIn('https://app.laundrybill.com/track/', msg)
+
+    def test_status_template(self):
+        from api.services.whatsapp_templates import build_order_status_message
+        self.order.status = OrderStatus.READY
+        msg = build_order_status_message(self.order)
+        self.assertIn('Ready for Pickup', msg)
+        self.assertIn('Rajesh Kumar', msg)
+
+    def test_payroll_template(self):
+        from api.services.whatsapp_templates import build_payroll_slip_message
+        msg = build_payroll_slip_message(
+            staff=self.staff,
+            month_str='August 2026',
+            days_worked=26,
+            half_days=1,
+            gross_wage=15000.0,
+            paid_amount=15000.0,
+            payment_method='Bank Transfer',
+            note='Full month bonus included'
+        )
+        self.assertIn('Suresh Washer', msg)
+        self.assertIn('Washer', msg)
+        self.assertIn('August 2026', msg)
+        self.assertIn('15,000.00', msg)
+
+    def test_order_send_whatsapp_endpoint(self):
+        response = self.client.post(f'/api/orders/{self.order.id}/send-whatsapp/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['success'])
+        # Verify audit log was recorded
+        self.assertTrue(self.order.audit_log.filter(title='WhatsApp Receipt Sent').exists())
+
+    def test_order_send_status_whatsapp_endpoint(self):
+        response = self.client.post(
+            f'/api/orders/{self.order.id}/send-status-whatsapp/',
+            {'note': 'Ready for fast pickup'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['success'])
+        self.assertTrue(self.order.audit_log.filter(title__startswith='WhatsApp Status Update').exists())
+
+    def test_payroll_send_whatsapp_endpoint(self):
+        response = self.client.post(
+            '/api/payroll/send-slip-whatsapp/',
+            {
+                'staff_id': self.staff.id,
+                'month': '2026-08',
+                'days_worked': 26,
+                'half_days': 0,
+                'gross_wage': 15000.0,
+                'paid_amount': 15000.0,
+                'payment_method': 'Cash',
+            },
+            format='json'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['success'])
+        self.assertEqual(response.data['staff_name'], 'Suresh Washer')
+
+    def test_whatsapp_status_endpoint(self):
+        response = self.client.get('/api/whatsapp/status/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('dry_run', response.data)
+

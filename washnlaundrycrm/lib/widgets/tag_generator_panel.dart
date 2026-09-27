@@ -16,12 +16,14 @@ import '../providers/app_provider.dart';
 /// [onChangeOrder] returns to that picker; it does not leave the tab.
 class TagGeneratorPanel extends StatefulWidget {
   final OrderModel order;
-  final VoidCallback onChangeOrder;
+  final VoidCallback? onChangeOrder;
+  final VoidCallback? onBackToOrders;
 
   const TagGeneratorPanel({
     super.key,
     required this.order,
-    required this.onChangeOrder,
+    this.onChangeOrder,
+    this.onBackToOrders,
   });
 
   @override
@@ -52,6 +54,7 @@ class _TagEntry {
 class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
   static const _stepConfigure = 0;
   static const _stepPreview = 1;
+  static const _stepComplete = 2;
 
   int _step = _stepConfigure;
   String _format = _TagFormat.qr;
@@ -111,68 +114,122 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
       children: [
         _header(),
         const SizedBox(height: 16),
-        _step == _stepConfigure ? _configureStep() : _previewStep(),
+        if (_step == _stepConfigure)
+          _configureStep()
+        else if (_step == _stepPreview)
+          _previewStep()
+        else
+          _completeStep(),
       ],
     );
   }
 
   Widget _header() {
-    return Row(
+    final pills = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text('#${_order.orderNumber} · ${_order.customerName}',
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
-              ),
-              TextButton(
-                onPressed: widget.onChangeOrder,
-                child: const Text('Change order'),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        _stepPill('1', 'Configure', _step == _stepConfigure),
+        _stepPill('1', 'Configure', _step == _stepConfigure, _step > _stepConfigure),
         const Icon(Icons.chevron_right_rounded,
             size: 16, color: Color(0xFFCBD5E1)),
-        _stepPill('2', 'Preview', _step == _stepPreview),
+        _stepPill('2', 'Preview', _step == _stepPreview, _step > _stepPreview),
+        const Icon(Icons.chevron_right_rounded,
+            size: 16, color: Color(0xFFCBD5E1)),
+        _stepPill('3', 'Complete', _step == _stepComplete, false),
       ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 540;
+        final orderBadge = Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text('#${_order.orderNumber} · ${_order.customerName}',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A))),
+            ),
+            if (widget.onChangeOrder != null)
+              TextButton.icon(
+                icon: const Icon(Icons.arrow_back_rounded, size: 15),
+                onPressed: widget.onChangeOrder,
+                label: const Text('Change order'),
+              ),
+          ],
+        );
+
+        if (isNarrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              orderBadge,
+              const SizedBox(height: 10),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: pills,
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: orderBadge),
+            const SizedBox(width: 12),
+            pills,
+          ],
+        );
+      },
     );
   }
 
-  Widget _stepPill(String number, String label, bool active) {
-    final colour = active ? const Color(0xFF1A4FD6) : const Color(0xFF94A3B8);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CircleAvatar(
-          radius: 10,
-          backgroundColor: active ? colour : const Color(0xFFF1F5F9),
-          child: Text(number,
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: active ? Colors.white : const Color(0xFF64748B))),
+  Widget _stepPill(String number, String label, bool active, bool done) {
+    final colour = active
+        ? const Color(0xFF1A4FD6)
+        : (done ? const Color(0xFF16A34A) : const Color(0xFF94A3B8));
+    return InkWell(
+      onTap: done
+          ? () {
+              if (number == '1') setState(() => _step = _stepConfigure);
+              if (number == '2') setState(() => _step = _stepPreview);
+            }
+          : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 10,
+              backgroundColor: done
+                  ? const Color(0xFFDCFCE7)
+                  : (active ? colour : const Color(0xFFF1F5F9)),
+              child: done
+                  ? const Icon(Icons.check, size: 12, color: Color(0xFF16A34A))
+                  : Text(number,
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: active ? Colors.white : const Color(0xFF64748B))),
+            ),
+            const SizedBox(width: 6),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.bold, color: colour)),
+          ],
         ),
-        const SizedBox(width: 6),
-        Text(label,
-            style: TextStyle(
-                fontSize: 12, fontWeight: FontWeight.bold, color: colour)),
-      ],
+      ),
     );
   }
 
@@ -365,6 +422,21 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
                 icon: const Icon(Icons.print_rounded, size: 16),
                 label: const Text('Print'),
                 style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A4FD6),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => setState(() => _step = _stepComplete),
+                icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                label: const Text('Complete'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
@@ -373,6 +445,150 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
             ),
           ],
         ),
+      ],
+    );
+  }
+
+  Widget _completeStep() {
+    final tags = _tags;
+    final totalGarments =
+        _order.items.fold<int>(0, (sum, it) => sum + it.quantity);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: const BoxDecoration(
+              color: Color(0xFFDCFCE7),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check_circle_rounded,
+              color: Color(0xFF16A34A),
+              size: 40,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Tags Ready & Generated',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'All ${tags.length} labels for order #${_order.orderNumber} have been generated and prepared for thermal printing.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                _summaryRow('Order Number', '#${_order.orderNumber}'),
+                const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                _summaryRow('Customer', '${_order.customerName} (${_order.customerPhone})'),
+                const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                _summaryRow(
+                    'Tagging Mode',
+                    _tagType == _TagType.service
+                        ? 'Service Tags (${tags.length} labels)'
+                        : 'Item Tags ($totalGarments labels)'),
+                const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                _summaryRow('Label Format',
+                    _format == _TagFormat.qr ? 'QR Code (50×60mm)' : 'Barcode'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => setState(() => _step = _stepPreview),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                  label: const Text('Back to Preview'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _toast('Sent to the printer.'),
+                  icon: const Icon(Icons.print_rounded, size: 16),
+                  label: const Text('Print Again'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    side: const BorderSide(color: Color(0xFF1A4FD6)),
+                    foregroundColor: const Color(0xFF1A4FD6),
+                  ),
+                ),
+              ),
+              if (widget.onBackToOrders != null || widget.onChangeOrder != null) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: widget.onBackToOrders ?? widget.onChangeOrder,
+                    icon: const Icon(Icons.list_alt_rounded, size: 16),
+                    label: const Text('Back to Orders'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A4FD6),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+        Text(value,
+            style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A))),
       ],
     );
   }

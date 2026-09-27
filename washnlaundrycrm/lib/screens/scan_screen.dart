@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/order_model.dart';
 import '../providers/app_provider.dart';
+import '../utils/money.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/receipt_dialog.dart';
+import '../widgets/status_pill.dart';
 import '../widgets/tag_generator_panel.dart';
 
 /// `/scan` — one sidebar destination for both "scan a tag" and "generate a
@@ -31,6 +34,7 @@ class _ScanScreenState extends State<ScanScreen>
 
   int _selectedMode = 0; // 0: Camera, 1: Manual
   final TextEditingController _orderIdController = TextEditingController();
+  final TextEditingController _tagSearchController = TextEditingController();
 
   /// Set when a lookup found nothing, so the screen can say so.
   String? _notFoundQuery;
@@ -53,6 +57,7 @@ class _ScanScreenState extends State<ScanScreen>
   void dispose() {
     _tabController.dispose();
     _orderIdController.dispose();
+    _tagSearchController.dispose();
     super.dispose();
   }
 
@@ -437,104 +442,637 @@ class _ScanScreenState extends State<ScanScreen>
       }
     }
 
+    if (selected != null) {
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: TagGeneratorPanel(
+              key: ValueKey(selected.id),
+              order: selected,
+              onChangeOrder: () => setState(() => _tagOrderId = null),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return _ordersListForTags(provider);
+  }
+
+  Widget _ordersListForTags(AppProvider provider) {
+    final query = _tagSearchQuery.trim().toLowerCase();
+    final allOrders = provider.orders;
+    final results = query.isEmpty
+        ? allOrders
+        : allOrders
+            .where((o) =>
+                o.orderNumber.toLowerCase().contains(query) ||
+                o.customerName.toLowerCase().contains(query) ||
+                o.customerPhone.toLowerCase().contains(query))
+            .toList();
+
+    final isWide = MediaQuery.sizeOf(context).width >= 760;
+
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
+        constraints: const BoxConstraints(maxWidth: 1100),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: selected == null
-              ? _orderPicker(provider)
-              : TagGeneratorPanel(
-                  key: ValueKey(selected.id),
-                  order: selected,
-                  onChangeOrder: () => setState(() => _tagOrderId = null),
-                ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top-aligned search and header section
+              _topSearchSection(allOrders.length, results.length),
+              const SizedBox(height: 20),
+              if (allOrders.isEmpty)
+                _emptyAllOrdersView()
+              else if (results.isEmpty)
+                _emptySearchResultView(query)
+              else if (isWide)
+                _ordersTable(results)
+              else
+                _ordersCardList(results),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _orderPicker(AppProvider provider) {
-    final query = _tagSearchQuery.trim().toLowerCase();
-    final results = query.isEmpty
-        ? const <OrderModel>[]
-        : provider.orders
-            .where((o) =>
-                o.orderNumber.toLowerCase().contains(query) ||
-                o.customerName.toLowerCase().contains(query))
-            .take(10)
-            .toList();
-
+  Widget _topSearchSection(int totalCount, int filteredCount) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Pick an order to generate tags for',
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
-        const SizedBox(height: 12),
-        TextField(
-          onChanged: (v) => setState(() => _tagSearchQuery = v),
-          decoration: InputDecoration(
-            hintText: 'Search by order number or customer...',
-            prefixIcon: const Icon(Icons.search_rounded, size: 20),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Pick an order to generate tags for',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'All orders are listed below. Click "Generate Tags" on any order to start the multi-step tag generator.',
+                    style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF2FF),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFC7D2FE)),
+              ),
+              child: Text(
+                '$filteredCount order${filteredCount == 1 ? '' : 's'}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A4FD6),
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 12),
-        if (query.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(
-              child: Text('Start typing an order number or customer name.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+        const SizedBox(height: 16),
+        // Search bar & Search button row aligned on top
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _tagSearchController,
+                onChanged: (v) => setState(() => _tagSearchQuery = v),
+                onSubmitted: (v) =>
+                    setState(() => _tagSearchQuery = v.trim()),
+                decoration: InputDecoration(
+                  hintText: 'Search by order number or customer...',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _tagSearchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            _tagSearchController.clear();
+                            setState(() => _tagSearchQuery = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                        color: Color(0xFF1A4FD6), width: 1.5),
+                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
             ),
-          )
-        else if (results.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Center(
-              child: Text('No order matches "$query".',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() =>
+                    _tagSearchQuery = _tagSearchController.text.trim());
+              },
+              icon: const Icon(Icons.search_rounded,
+                  size: 18, color: Colors.white),
+              label: const Text(
+                'Search',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A4FD6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
             ),
-          )
-        else
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _emptyAllOrdersView() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 48),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: const Center(
+        child: Column(
+          children: [
+            Icon(Icons.inventory_2_outlined, size: 48, color: Color(0xFF94A3B8)),
+            SizedBox(height: 12),
+            Text('No orders found in the shop.',
+                style: TextStyle(fontSize: 14, color: Color(0xFF64748B))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _emptySearchResultView(String query) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 36),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Center(
+        child: Column(
+          children: [
+            const Icon(Icons.search_off_rounded,
+                size: 48, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 12),
+            Text(
+              'No order matches "$query".',
+              style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () {
+                _tagSearchController.clear();
+                setState(() => _tagSearchQuery = '');
+              },
+              icon: const Icon(Icons.clear_rounded, size: 16),
+              label: const Text('Clear search'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _ordersTable(List<OrderModel> orders) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: [
+            // Table Header Row
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              color: const Color(0xFFF8FAFC),
+              child: const Row(
+                children: [
+                  SizedBox(
+                    width: 140,
+                    child: Text(
+                      'ORDER #',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      'CUSTOMER',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      'GARMENTS & SERVICES',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      'AMOUNT',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      'STATUS',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 160,
+                    child: Text(
+                      'TAGS / ACTION',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+            // Order Rows
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: orders.length,
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+              itemBuilder: (context, index) {
+                final order = orders[index];
+                final garmentCount =
+                    order.items.fold<int>(0, (s, it) => s + it.quantity);
+                final serviceSummary = order.items
+                    .map((it) => it.serviceType.isNotEmpty
+                        ? it.serviceType
+                        : it.itemTitle)
+                    .toSet()
+                    .take(2)
+                    .join(', ');
+
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => setState(() => _tagOrderId = order.id),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 14),
+                      child: Row(
+                        children: [
+                          // Column 1: Order #
+                          SizedBox(
+                            width: 140,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '#${order.orderNumber}',
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1A4FD6),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  DateFormat('dd MMM yyyy')
+                                      .format(order.createdAt),
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Column 2: Customer
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  order.customerName,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                if (order.customerPhone.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    order.customerPhone,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          // Column 3: Garments & Services
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              '$garmentCount item${garmentCount == 1 ? '' : 's'}'
+                              '${serviceSummary.isNotEmpty ? ' · $serviceSummary' : ''}',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                          // Column 4: Amount & Payment
+                          Expanded(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  Money.format(order.totalAmount),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: paymentColor(order.paymentStatus)
+                                        .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    order.paymentStatusLabel,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: paymentColor(order.paymentStatus),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Column 5: Status
+                          Expanded(
+                            flex: 2,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: StatusPill(
+                                status: order.status,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                          ),
+                          // Column 6: Action Column with Generate Tags
+                          SizedBox(
+                            width: 160,
+                            child: Align(
+                              alignment: Alignment.center,
+                              child: FilledButton.icon(
+                                icon: const Icon(Icons.qr_code_2_rounded,
+                                    size: 16),
+                                label: const Text('Generate Tags'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1A4FD6),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 8),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                onPressed: () =>
+                                    setState(() => _tagOrderId = order.id),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _ordersCardList(List<OrderModel> orders) {
+    return Column(
+      children: [
+        for (final order in orders)
           Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (var i = 0; i < results.length; i++)
-                  Container(
-                    decoration: BoxDecoration(
-                      border: i == 0
-                          ? null
-                          : const Border(
-                              top: BorderSide(color: Color(0xFFF1F5F9))),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: ListTile(
-                        title: Text('#${results[i].orderNumber}',
-                            style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.bold)),
-                        subtitle: Text(results[i].customerName,
-                            style: const TextStyle(fontSize: 12)),
-                        trailing: Text('${results[i].items.length} item'
-                            '${results[i].items.length == 1 ? '' : 's'}'),
-                        onTap: () =>
-                            setState(() => _tagOrderId = results[i].id),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '#${order.orderNumber}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1A4FD6),
                       ),
                     ),
+                    StatusPill(status: order.status, fontSize: 10.5),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.customerName,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        if (order.customerPhone.isNotEmpty)
+                          Text(
+                            order.customerPhone,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          Money.format(order.totalAmount),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: paymentColor(order.paymentStatus)
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            order.paymentStatusLabel,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: paymentColor(order.paymentStatus),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '${order.items.fold<int>(0, (s, it) => s + it.quantity)} items',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
                   ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.qr_code_2_rounded, size: 16),
+                    label: const Text('Generate Tags'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A4FD6),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () => setState(() => _tagOrderId = order.id),
+                  ),
+                ),
               ],
             ),
           ),

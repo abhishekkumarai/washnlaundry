@@ -8,9 +8,9 @@ FROM ghcr.io/cirruslabs/flutter:3.44.0 AS build
 
 WORKDIR /src
 
-# Resolve dependencies against the manifest alone so that editing lib/ does not
-# invalidate the pub layer. (There is no pubspec.lock in the repo.)
-COPY pubspec.yaml ./
+# Resolve dependencies against the manifest so that editing lib/ does not
+# invalidate the pub layer.
+COPY pubspec.yaml pubspec.lock* ./
 RUN flutter pub get
 
 COPY . .

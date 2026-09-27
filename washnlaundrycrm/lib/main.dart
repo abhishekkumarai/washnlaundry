@@ -1,5 +1,8 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' as rp;
+import 'package:flutter_calendar_collection/l10n/app_localizations.dart' as fcc;
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -27,12 +30,14 @@ void main() {
   final authProvider = AuthProvider();
   final router = buildRouter(authProvider);
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AppProvider()),
-        ChangeNotifierProvider.value(value: authProvider),
-      ],
-      child: WashNLaundryCrmApp(router: router),
+    rp.ProviderScope(
+      child: MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AppProvider()),
+          ChangeNotifierProvider.value(value: authProvider),
+        ],
+        child: WashNLaundryCrmApp(router: router),
+      ),
     ),
   );
 }
@@ -48,6 +53,16 @@ class WashNLaundryCrmApp extends StatelessWidget {
       title: 'WashNLaundry CRM - Professional Laundry & Dry Cleaning',
       debugShowCheckedModeBanner: false,
       scrollBehavior: AppScrollBehavior(),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        fcc.AppLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', 'US'),
+        Locale('zh', 'CN'),
+      ],
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(

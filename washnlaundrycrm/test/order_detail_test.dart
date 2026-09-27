@@ -561,4 +561,60 @@ void main() {
       expect(find.text('Print Receipt'), findsOneWidget);
     });
   });
+
+  group('generate tags bottom section', () {
+    testWidgets('renders Generate Tags card at the bottom of order details',
+        (tester) async {
+      await pump(tester, order());
+
+      expect(find.byKey(const ValueKey('order-detail-tags-card')),
+          findsOneWidget);
+      expect(find.text('Generate Tags'), findsOneWidget);
+      expect(
+          find.text('Print QR code or barcode garment & basket tags for this order'),
+          findsOneWidget);
+      expect(find.text('QR code'), findsOneWidget);
+      expect(find.text('Barcode'), findsOneWidget);
+      expect(find.text('Service Tags'), findsOneWidget);
+      expect(find.text('Item Tags'), findsOneWidget);
+      expect(find.text('Generate Preview'), findsOneWidget);
+    });
+
+    testWidgets('allows generating preview and completing tags in order detail',
+        (tester) async {
+      var backCalled = false;
+      final o = order();
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(orders: [o], shop: {'name': 'Washing'});
+      await tester.pumpWidget(
+        host(provider,
+            OrderDetailScreen(order: o, onBack: () => backCalled = true)),
+      );
+      await tester.pump();
+
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, 'Generate Preview'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Generate Preview'));
+      await tester.pump();
+
+      expect(find.text('Back'), findsOneWidget);
+      expect(find.text('Download PDF'), findsOneWidget);
+      expect(find.text('Print'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Complete'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Complete'));
+      await tester.pump();
+
+      expect(find.text('Tags Ready & Generated'), findsOneWidget);
+      expect(find.text('Back to Orders'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Back to Orders'));
+      await tester.pump();
+
+      expect(backCalled, isTrue);
+    });
+  });
 }

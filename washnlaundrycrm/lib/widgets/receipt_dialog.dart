@@ -4,33 +4,31 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/order_model.dart';
+import '../services/api_service.dart';
 import '../utils/money.dart';
 
-class ReceiptDialog extends StatelessWidget {
+class ReceiptDialog extends StatefulWidget {
   final OrderModel order;
-
-  /// The shop profile from `/api/shops/`. The header used to be hardcoded to a
-  /// Noida branch that has nothing to do with the seeded shop.
-  ///
-  /// Required — still nullable, because the shop may not have loaded yet, but
-  /// callers must pass it deliberately. Three of the four call sites used to
-  /// omit it and silently print the 'LaundryBill' fallback with no address or
-  /// phone on the receipt.
   final Map<String, dynamic>? shop;
 
   const ReceiptDialog({Key? key, required this.order, required this.shop})
       : super(key: key);
 
-  String get _shopName => (shop?['name'] as String?)?.trim().isNotEmpty == true
-      ? shop!['name'] as String
-      : 'LaundryBill';
+  @override
+  State<ReceiptDialog> createState() => _ReceiptDialogState();
+}
 
-  /// "Hbr layout, Bengaluru • +91 98765 43210" — whichever parts we have.
+class _ReceiptDialogState extends State<ReceiptDialog> {
+  bool _sending = false;
+
+  String get _shopName =>
+      (widget.shop?['name'] as String?)?.trim().isNotEmpty == true
+          ? widget.shop!['name'] as String
+          : 'LaundryBill';
+
   String get _shopSubtitle {
-    final address = (shop?['address'] as String?)?.trim() ?? '';
-    final city = (shop?['city'] as String?)?.trim() ?? '';
-    // The seeded address already ends in the city, which rendered as
-    // "Hbr layout, Bengaluru, Bengaluru".
+    final address = (widget.shop?['address'] as String?)?.trim() ?? '';
+    final city = (widget.shop?['city'] as String?)?.trim() ?? '';
     final includeCity =
         city.isNotEmpty && !address.toLowerCase().contains(city.toLowerCase());
     final where = [
@@ -38,7 +36,7 @@ class ReceiptDialog extends StatelessWidget {
       if (includeCity) city,
     ].join(', ');
 
-    final phone = (shop?['phone'] as String?)?.trim() ?? '';
+    final phone = (widget.shop?['phone'] as String?)?.trim() ?? '';
     return [
       if (where.isNotEmpty) where,
       if (phone.isNotEmpty) phone,
@@ -48,6 +46,7 @@ class ReceiptDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subtitle = _shopSubtitle;
+    final order = widget.order;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -72,8 +71,6 @@ class ReceiptDialog extends StatelessWidget {
             const Divider(height: 24),
 
             // Order Info
-            // Both columns flex — a long customer name used to overflow the
-            // 372px content width rather than eliding.
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,7 +105,7 @@ class ReceiptDialog extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                               fontSize: 13,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w600,
                               color: Color(0xFF0F172A))),
                       if (order.customerPhone.isNotEmpty)
                         Text(order.customerPhone,
@@ -121,34 +118,79 @@ class ReceiptDialog extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Garments List Table
+            // Item List Header
             Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+              color: const Color(0xFFF1F5F9),
+              child: Row(
+                children: const [
+                  Expanded(
+                      flex: 3,
+                      child: Text('ITEM',
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF475569)))),
+                  Expanded(
+                      flex: 1,
+                      child: Text('QTY',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF475569)))),
+                  Expanded(
+                      flex: 2,
+                      child: Text('PRICE',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF475569)))),
+                ],
               ),
-              child: Column(
-                children: order.items.map((it) {
+            ),
+            const SizedBox(height: 6),
+
+            // Items (capped height with scroll)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 160),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: order.items.length,
+                itemBuilder: (ctx, i) {
+                  final it = order.items[i];
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 6.0),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('${it.itemTitle} x${it.quantity}',
-                            style: const TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.w600)),
-                        Text('${Money.symbol}${it.totalPrice.toInt()}',
-                            style: const TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.bold)),
+                        Expanded(
+                            flex: 3,
+                            child: Text(it.itemTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12))),
+                        Expanded(
+                            flex: 1,
+                            child: Text('${it.quantity}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 12))),
+                        Expanded(
+                            flex: 2,
+                            child: Text(
+                                '${Money.symbol}${it.totalPrice.toInt()}',
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600))),
                       ],
                     ),
                   );
-                }).toList(),
+                },
               ),
             ),
-            const SizedBox(height: 12),
+            const Divider(height: 16),
 
             // Totals Summary
             Row(
@@ -182,15 +224,21 @@ class ReceiptDialog extends StatelessWidget {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    // No phone means a walk-in with nothing to message. It used
-                    // to fall back to a hardcoded number and bill a stranger.
-                    onPressed: order.customerPhone.isEmpty
+                    onPressed: (order.customerPhone.isEmpty || _sending)
                         ? null
                         : () => _shareWhatsapp(order),
-                    icon: const Icon(Icons.chat_rounded,
-                        color: Colors.white, size: 16),
-                    label: const Text('WhatsApp Bill',
-                        style: TextStyle(
+                    icon: _sending
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.chat_rounded,
+                            color: Colors.white, size: 16),
+                    label: Text(
+                        _sending ? 'Sending...' : 'WhatsApp Bill',
+                        style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: Colors.white)),
@@ -217,12 +265,39 @@ class ReceiptDialog extends StatelessWidget {
   }
 
   void _shareWhatsapp(OrderModel order) async {
-    final cleanPhone = order.customerPhone.replaceAll(RegExp(r'\D'), '');
-    final msg = Uri.encodeComponent(
-        'Hello ${order.customerName},\nThank you for choosing LaundryBill!\nYour Order #${order.orderNumber} is processed.\nTotal: ${Money.symbol}${order.totalAmount.toInt()}\nThank you!');
-    final url = Uri.parse('https://wa.me/91$cleanPhone?text=$msg');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
+    setState(() => _sending = true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await ApiService.sendOrderWhatsApp(order.id);
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('WhatsApp receipt delivered to ${order.customerName}!'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      }
+    } catch (err) {
+      // Fallback: If bridge is offline or error occurred, open wa.me link so user is never stuck
+      final cleanPhone = order.customerPhone.replaceAll(RegExp(r'\D'), '');
+      final msg = Uri.encodeComponent(
+          'Hello ${order.customerName},\nThank you for choosing LaundryBill!\nYour Order #${order.orderNumber} is processed.\nTotal: ${Money.symbol}${order.totalAmount.toInt()}\nThank you!');
+      final url = Uri.parse('https://wa.me/91$cleanPhone?text=$msg');
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url);
+      } else if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Could not send WhatsApp message: $err'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _sending = false);
+      }
     }
   }
 }

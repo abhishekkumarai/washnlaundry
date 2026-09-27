@@ -310,65 +310,62 @@ void main() {
     testWidgets('Checkout opens the review step, Back to items returns',
         (tester) async {
       // The real app doesn't submit straight from the cart — Checkout opens
-      // a second review step (Fulfilment / Ready by / Notes) before there's
-      // an actual Place order button.
+      // a second "Review order" step (Customer / Order type / Notes) before
+      // there's an actual Place order button.
       await pumpWithItemInCart(tester);
 
-      expect(find.text('FULFILMENT'), findsNothing);
+      expect(find.text('Order type'), findsNothing);
       await tester.tap(find.text('Checkout • ₹15'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Checkout'), findsOneWidget);
-      expect(find.text('FULFILMENT'), findsOneWidget);
-      expect(find.text('ORDER NOTES'), findsOneWidget);
-      expect(find.text('Place order'), findsOneWidget);
-      // The cart-stage Checkout button is gone now — only the grid's search
-      // bar is, and that's hidden behind the review too.
+      expect(find.text('Review order'), findsOneWidget);
+      expect(find.text('Order type'), findsOneWidget);
+      expect(find.text('Notes for this order (optional)'), findsOneWidget);
+      expect(find.text('Place order · ₹15'), findsOneWidget);
       expect(find.text('Search items or scan a tag...'), findsNothing);
 
-      await tester.tap(find.text('Back to items'));
+      await tester.tap(find.byTooltip('Back to items'));
       await tester.pumpAndSettle();
 
-      expect(find.text('FULFILMENT'), findsNothing);
+      expect(find.text('Order type'), findsNothing);
       expect(find.text('Checkout • ₹15'), findsOneWidget);
     });
 
-    testWidgets(
-        'picking a delivery type other than pickup adds an editable flat fee',
+    testWidgets('a carried order type adds an editable flat fee',
         (tester) async {
       // Checkout used to hardcode STORE_PICKUP, so there was no way to bill
       // an order that needed carrying — and no way to charge for it either.
-      // The fee itself used to be a fixed ₹50 with no way to change it.
+      // The live app bills its ₹50 Delivery line on Home pickup too.
       await pumpWithItemInCart(tester);
       await tester.tap(find.text('Checkout • ₹15'));
       await tester.pumpAndSettle();
 
-      // Just Order Notes and Discount exist before a carried type is picked.
+      // Shop pickup: just Notes and Discount.
       expect(find.byType(TextField), findsNWidgets(2));
-      expect(find.text('₹65'), findsNothing);
 
-      await tester.tap(find.text('Home Delivery'));
-      await tester.pumpAndSettle();
+      for (final type in ['Home pickup', 'Home delivery']) {
+        await tester.tap(find.text(type));
+        await tester.pumpAndSettle();
 
-      // A third field appears: the editable delivery charge, defaulting to
-      // the seed data's ₹50 rule but not locked to it.
-      expect(find.byType(TextField), findsNWidgets(3));
-      final deliveryField = tester.widget<TextField>(find.byType(TextField).at(1));
-      expect(deliveryField.controller!.text, '50');
-      expect(find.text('₹65'), findsOneWidget); // 15 subtotal + 50 fee
+        // Address, Notes, Discount, and the editable delivery charge.
+        expect(find.byType(TextField), findsNWidgets(4), reason: type);
+        final deliveryField =
+            tester.widget<TextField>(find.byType(TextField).at(3));
+        expect(deliveryField.controller!.text, '50');
+        expect(find.text('Place order · ₹65'), findsOneWidget, reason: type);
+      }
 
       // Editing it updates the total, not just displaying a fixed fee.
-      await tester.enterText(find.byType(TextField).at(1), '30');
+      await tester.enterText(find.byType(TextField).at(3), '30');
       await tester.pumpAndSettle();
-      expect(find.text('₹45'), findsOneWidget); // 15 subtotal + 30 fee
-      expect(find.text('₹65'), findsNothing);
+      expect(find.text('Place order · ₹45'), findsOneWidget);
 
-      // Switching back to a pickup type drops the fee and hides the field.
-      await tester.tap(find.text('Walk-In'));
+      // Back to Shop pickup drops the fee and hides the field.
+      await tester.tap(find.text('Shop pickup'));
       await tester.pumpAndSettle();
 
       expect(find.byType(TextField), findsNWidgets(2));
-      expect(find.text('₹45'), findsNothing);
+      expect(find.text('Place order · ₹15'), findsOneWidget);
     });
 
     testWidgets('there is no Collect payment now control anymore',
@@ -377,117 +374,144 @@ void main() {
       await tester.tap(find.text('Checkout • ₹15'));
       await tester.pumpAndSettle();
 
-      expect(find.text('PAYMENT'), findsNothing);
       expect(find.text('Collect payment now'), findsNothing);
       expect(find.byType(Switch), findsNothing);
+      // Every order here starts unpaid, so the whole total is due.
+      expect(find.text('Balance Due'), findsOneWidget);
     });
 
-    testWidgets('Walk-In shows a Ready at label, no slot chips',
-        (tester) async {
-      // Walk-In is the default fulfilment type, so this is what Checkout
-      // review shows without tapping anything.
-      await pumpWithItemInCart(tester);
-      await tester.tap(find.text('Checkout • ₹15'));
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('Ready at'), findsOneWidget);
-      expect(find.byType(ChoiceChip), findsNothing);
-    });
-
-    testWidgets(
-        'a carried fulfilment type offers 13 hourly slot chips, 9 AM to 10 PM',
+    testWidgets('Shop pickup shows an Expected ready date, no slots',
         (tester) async {
       await pumpWithItemInCart(tester);
       await tester.tap(find.text('Checkout • ₹15'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Home Delivery'));
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('Ready at'), findsNothing);
-      final chips = tester.widgetList<ChoiceChip>(find.byType(ChoiceChip)).toList();
-      expect(chips.length, 13);
-
-      // Mirrors _readyByDefaultFor: the first slot whose hour hasn't already
-      // passed today is selected by default (or 9 AM, if it's before 9 AM).
-      final now = DateTime.now();
-      final selectedIndex = chips.indexWhere((c) => c.selected);
-      expect(selectedIndex, isNot(-1));
-      if (now.hour >= 9 && now.hour <= 21) {
-        expect(selectedIndex, now.hour - 9);
-      } else {
-        // Either before opening hours (defaults to 9 AM) or after the last
-        // slot (rolls to 9 AM tomorrow, where nothing is disabled).
-        expect(selectedIndex, 0);
-      }
-      // Every chip for an hour already past today is disabled; the rest
-      // aren't.
-      for (var i = 0; i < chips.length; i++) {
-        final slotHour = 9 + i;
-        final shouldBeDisabled =
-            now.hour >= 9 && now.hour <= 21 && slotHour < now.hour;
-        expect(chips[i].onSelected == null, shouldBeDisabled,
-            reason: 'slot $slotHour AM/PM disabled state');
-      }
+      expect(find.text('Expected ready'), findsOneWidget);
+      expect(find.text('Pickup slot'), findsNothing);
+      expect(find.text('Delivery slot'), findsNothing);
     });
 
-    testWidgets('tapping a later enabled slot chip selects it instead',
+    testWidgets('Home pickup asks for pickup and delivery slots and address',
         (tester) async {
       await pumpWithItemInCart(tester);
       await tester.tap(find.text('Checkout • ₹15'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Home Delivery'));
+      await tester.tap(find.text('Home pickup'));
       await tester.pumpAndSettle();
 
-      final before =
-          tester.widgetList<ChoiceChip>(find.byType(ChoiceChip)).toList();
-      final enabledIndices = [
-        for (var i = 0; i < before.length; i++)
-          if (before[i].onSelected != null) i
-      ];
-      final target = enabledIndices.last;
-      final previouslySelected = before.indexWhere((c) => c.selected);
+      expect(find.text('Pickup date'), findsOneWidget);
+      expect(find.text('Pickup slot'), findsOneWidget);
+      expect(find.text('Delivery date'), findsOneWidget);
+      expect(find.text('Delivery slot'), findsOneWidget);
+      expect(find.text('Pickup address'), findsOneWidget);
+      expect(find.text('Expected ready'), findsNothing);
 
-      await tester.tap(find.byType(ChoiceChip).at(target));
+      await tester.tap(find.text('Home delivery'));
       await tester.pumpAndSettle();
-
-      final after =
-          tester.widgetList<ChoiceChip>(find.byType(ChoiceChip)).toList();
-      expect(after[target].selected, isTrue);
-      if (previouslySelected != target) {
-        expect(after[previouslySelected].selected, isFalse);
-      }
+      expect(find.text('Pickup slot'), findsNothing);
+      expect(find.text('Delivery address'), findsOneWidget);
     });
 
-    testWidgets('switching back to Walk-In drops the slot chips again',
+    testWidgets("slots come from the shop's own configured time slots",
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(
+          garments: _catalogue,
+          pickupSlots: const [
+            TimeSlotModel(
+                id: 'p1',
+                kind: TimeSlotModel.pickup,
+                startTime: '09:00:00',
+                endTime: '11:00:00'),
+            TimeSlotModel(
+                id: 'p2',
+                kind: TimeSlotModel.pickup,
+                startTime: '23:00:00',
+                endTime: '23:59:00'),
+            TimeSlotModel(
+                id: 'p3',
+                kind: TimeSlotModel.pickup,
+                startTime: '14:00:00',
+                endTime: '16:00:00',
+                isActive: false),
+          ],
+        );
+      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pump();
+      await tester.tap(find.text('+ Add to Cart').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Home pickup'));
+      await tester.pumpAndSettle();
+
+      // Pickup offers only the two active configured slots…
+      expect(find.text('9:00 AM - 11:00 AM'), findsOneWidget);
+      expect(find.text('11:00 PM - 11:59 PM'), findsOneWidget);
+      expect(find.text('2:00 PM - 4:00 PM'), findsNothing);
+      // …while Delivery, with none configured, falls back to hourly ones.
+      expect(find.text('9:00 PM - 10:00 PM'), findsOneWidget);
+
+      // Nothing is picked by default, as on the live app; tapping selects.
+      final late = find.byKey(const ValueKey('slot-1380'));
+      await tester.ensureVisible(late);
+      await tester.tap(late);
+      await tester.pumpAndSettle();
+      final button = tester.widget<OutlinedButton>(late);
+      expect(button.style!.backgroundColor!.resolve({}),
+          const Color(0xFF1A4FD6));
+    });
+
+    testWidgets('placing a carried order without a slot is refused',
         (tester) async {
       await pumpWithItemInCart(tester);
       await tester.tap(find.text('Checkout • ₹15'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Home Delivery'));
-      await tester.pumpAndSettle();
-      expect(find.byType(ChoiceChip), findsNWidgets(13));
-
-      await tester.tap(find.text('Walk-In'));
+      await tester.tap(find.text('Home pickup'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(ChoiceChip), findsNothing);
-      expect(find.textContaining('Ready at'), findsOneWidget);
+      final place = find.text('Place order · ₹65');
+      await tester.ensureVisible(place);
+      await tester.tap(place);
+      await tester.pump();
+
+      expect(find.text('Pick a pickup slot'), findsOneWidget);
+      expect(find.text('Review order'), findsOneWidget);
     });
 
-    testWidgets('a discount reduces the total', (tester) async {
+    testWidgets('Home pickup review fits a phone-width screen', (tester) async {
+      tester.view.physicalSize = const Size(380, 900);
+      await pumpWithItemInCart(tester);
+      final checkout = find.text('Checkout • ₹15');
+      await tester.ensureVisible(checkout);
+      await tester.tap(checkout);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Home pickup'));
+      await tester.pumpAndSettle();
+
+      // No overflow errors, and the stepper gives way to the title alone.
+      expect(tester.takeException(), isNull);
+      expect(find.text('Review order'), findsOneWidget);
+      expect(find.text('Done'), findsNothing);
+      expect(find.text('Pickup slot'), findsOneWidget);
+    });
+
+    testWidgets('a discount reduces the total, as % or ₹', (tester) async {
       await pumpWithItemInCart(tester);
       await tester.tap(find.text('Checkout • ₹15'));
       await tester.pumpAndSettle();
 
-      // ₹10 (15 subtotal - 5 discount) is unique to the discounted total —
-      // the item line and Subtotal both stay at ₹15 regardless.
-      expect(find.text('₹10'), findsNothing);
+      // Percent is the default unit: 20% of ₹15 is ₹3.
+      await tester.enterText(find.byType(TextField).last, '20');
+      await tester.pumpAndSettle();
+      expect(find.text('Place order · ₹12'), findsOneWidget);
 
+      // Flipping to ₹ reads the same number as a flat amount.
+      await tester.tap(find.text('₹').last);
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).last, '5');
       await tester.pumpAndSettle();
-
-      expect(find.text('₹10'), findsOneWidget);
+      expect(find.text('Place order · ₹10'), findsOneWidget);
     });
   });
 

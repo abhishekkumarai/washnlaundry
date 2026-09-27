@@ -39,6 +39,13 @@ void main() {
     AttendanceModel(id: '11', staffId: '2', staffName: 'Geeta Devi', date: today, status: 'LEAVE'),
   ];
 
+  /// The InkWell behind one status segment ("attendance-<staffId>-<STATUS>").
+  /// Its onTap is null when that status is already selected (nothing to
+  /// change) or the whole row is disabled.
+  InkWell segment(WidgetTester tester, String staffId, String status) =>
+      tester.widget<InkWell>(
+          find.byKey(ValueKey('attendance-$staffId-$status')));
+
   group('AttendanceScreen start date', () {
     final futureStarter = StaffModel(
       id: '4',
@@ -48,8 +55,7 @@ void main() {
       startDate: today.add(const Duration(days: 5)),
     );
 
-    testWidgets(
-        'a staff member who has not started yet shows a joins-date hint, not "not marked"',
+    testWidgets('a staff member who has not started yet shows a joins-date hint',
         (tester) async {
       final provider = AppProvider(autoLoad: false)
         ..seedForTest(staff: [futureStarter]);
@@ -57,58 +63,32 @@ void main() {
       await tester.pump();
 
       expect(find.textContaining('joins'), findsOneWidget);
-      expect(find.textContaining('not marked'), findsNothing);
     });
 
-    testWidgets('their status chips are disabled', (tester) async {
+    testWidgets('their status segments are disabled', (tester) async {
       final provider = AppProvider(autoLoad: false)
         ..seedForTest(staff: [futureStarter]);
       await tester.pumpWidget(host(provider, const AttendanceScreen()));
       await tester.pump();
 
-      final chip =
-          tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'PRESENT'));
-      expect(chip.onSelected, isNull);
+      for (final s in ['PRESENT', 'HALF_DAY', 'ABSENT', 'LEAVE']) {
+        expect(segment(tester, '4', s).onTap, isNull, reason: s);
+      }
     });
 
-    testWidgets('tapping a disabled chip does not mark them', (tester) async {
-      final provider = AppProvider(autoLoad: false)
-        ..seedForTest(staff: [futureStarter]);
-      await tester.pumpWidget(host(provider, const AttendanceScreen()));
-      await tester.pump();
-
-      await tester.tap(find.widgetWithText(ChoiceChip, 'PRESENT'), warnIfMissed: false);
-      await tester.pump();
-
-      expect(find.textContaining('joins'), findsOneWidget);
-    });
-
-    testWidgets(
-        'Save Register skips them even if a stale mark is already on file',
+    testWidgets('tapping a disabled segment does not try to save',
         (tester) async {
-      // Belt-and-braces: _save must filter them out of `marks` regardless of
-      // any already-saved row, since the backend would 400 the whole batch
-      // otherwise (though in practice this can't happen once a start date is
-      // set, since setting one is itself rejected while earlier attendance
-      // exists).
       final provider = AppProvider(autoLoad: false)
-        ..seedForTest(staff: [futureStarter], attendance: [
-          AttendanceModel(
-              id: '99',
-              staffId: '4',
-              staffName: 'Not Yet Started',
-              date: today,
-              status: 'PRESENT'),
-        ]);
+        ..seedForTest(staff: [futureStarter]);
       await tester.pumpWidget(host(provider, const AttendanceScreen()));
       await tester.pump();
 
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Save Register'));
-      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('attendance-4-PRESENT')),
+          warnIfMissed: false);
+      await tester.pumpAndSettle();
 
-      expect(
-          find.text('Nothing to save — mark at least one staff member.'),
-          findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.textContaining('joins'), findsOneWidget);
     });
   });
 
@@ -120,10 +100,10 @@ void main() {
       await tester.pumpWidget(host(provider, const AttendanceScreen()));
       await tester.pump();
 
-      expect(find.text('Ramesh Kumar'), findsOneWidget);
-      expect(find.text('Geeta Devi'), findsOneWidget);
-      expect(find.text('Mohan Das'), findsNothing);
-      expect(find.text('Anita Sharma'), findsNothing);
+      expect(find.textContaining('Ramesh Kumar'), findsWidgets);
+      expect(find.textContaining('Geeta Devi'), findsWidgets);
+      expect(find.textContaining('Mohan Das'), findsNothing);
+      expect(find.textContaining('Anita Sharma'), findsNothing);
     });
 
     testWidgets('inactive staff are not on the register', (tester) async {
@@ -131,137 +111,130 @@ void main() {
       await tester.pumpWidget(host(provider, const AttendanceScreen()));
       await tester.pump();
 
-      expect(find.text('Bhola Prasad'), findsNothing);
+      expect(find.textContaining('Bhola Prasad'), findsNothing);
     });
 
-    testWidgets('saved marks are reflected as selected chips', (tester) async {
-      final provider = AppProvider(autoLoad: false)
-        ..seedForTest(staff: roster, attendance: register);
-      await tester.pumpWidget(host(provider, const AttendanceScreen()));
-      await tester.pump();
-
-      final halfDay = tester.widget<ChoiceChip>(
-        find.widgetWithText(ChoiceChip, 'HALF DAY').first,
-      );
-      expect(halfDay.selected, isTrue);
-
-      final leave = tester.widget<ChoiceChip>(
-        find.widgetWithText(ChoiceChip, 'LEAVE').at(1),
-      );
-      expect(leave.selected, isTrue);
-    });
-
-    testWidgets('LEAVE is offered, not just the old three statuses', (tester) async {
-      // The backend has always stored LEAVE and the dashboard counts it, but
-      // the chip row only ever offered PRESENT / HALF_DAY / ABSENT.
+    testWidgets('name and role sit on one line', (tester) async {
       final provider = AppProvider(autoLoad: false)
         ..seedForTest(staff: [roster.first]);
       await tester.pumpWidget(host(provider, const AttendanceScreen()));
       await tester.pump();
 
-      expect(find.widgetWithText(ChoiceChip, 'PRESENT'), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, 'HALF DAY'), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, 'ABSENT'), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, 'LEAVE'), findsOneWidget);
+      expect(find.text('Ramesh Kumar  Head Washer'), findsOneWidget);
+      expect(find.textContaining('not marked'), findsNothing);
     });
 
-    testWidgets('an unmarked staff member says so', (tester) async {
+    testWidgets('saved marks show as the selected segment', (tester) async {
       final provider = AppProvider(autoLoad: false)
-        ..seedForTest(staff: [roster.first], attendance: []);
+        ..seedForTest(staff: roster, attendance: register);
       await tester.pumpWidget(host(provider, const AttendanceScreen()));
       await tester.pump();
 
-      // "not marked" is a different state from ABSENT and must read that way.
-      expect(find.text('Head Washer • not marked'), findsOneWidget);
+      expect(segment(tester, '1', 'HALF_DAY').onTap, isNull); // selected
+      expect(segment(tester, '1', 'PRESENT').onTap, isNotNull);
+      expect(segment(tester, '2', 'LEAVE').onTap, isNull);
+      expect(segment(tester, '2', 'ABSENT').onTap, isNotNull);
     });
 
-    testWidgets('tapping a chip selects it', (tester) async {
+    testWidgets('the four statuses read like the live app', (tester) async {
       final provider = AppProvider(autoLoad: false)
-        ..seedForTest(staff: [roster.first], attendance: []);
+        ..seedForTest(staff: [roster.first]);
       await tester.pumpWidget(host(provider, const AttendanceScreen()));
       await tester.pump();
 
-      await tester.tap(find.widgetWithText(ChoiceChip, 'ABSENT'));
-      await tester.pump();
-
-      final chip = tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'ABSENT'));
-      expect(chip.selected, isTrue);
+      for (final (status, label) in [
+        ('PRESENT', 'Present'),
+        ('HALF_DAY', 'Half'),
+        ('ABSENT', 'Absent'),
+        ('LEAVE', 'Leave'),
+      ]) {
+        expect(
+            find.descendant(
+                of: find.byKey(ValueKey('attendance-1-$status')),
+                matching: find.text(label)),
+            findsOneWidget,
+            reason: status);
+      }
+      expect(find.text('HALF DAY'), findsNothing);
     });
 
-    testWidgets('a failed save reports the error instead of claiming success',
+    testWidgets('there is no Save button — the register saves as you go',
         (tester) async {
-      // The old Save Register showed a green "saved successfully" snackbar
-      // unconditionally, without making any network call at all. A failure
-      // now surfaces as a popup (showErrorDialog), not a SnackBar — a toast
-      // was easy to miss.
-      final provider = AppProvider(autoLoad: false)..seedForTest(staff: [roster.first]);
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: [roster.first]);
       await tester.pumpWidget(host(provider, const AttendanceScreen()));
       await tester.pump();
 
-      // Mark someone first — an empty register short-circuits to "Nothing to
-      // save" before ever calling the network, which isn't the failure this
-      // test means to exercise.
-      await tester.tap(find.widgetWithText(ChoiceChip, 'PRESENT'));
+      expect(find.text('Save Register'), findsNothing);
+      expect(find.text('Daily Attendance Register'), findsNothing);
+    });
+
+    testWidgets('a tap saves at once and a failure is reported, not hidden',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: [roster.first], attendance: []);
+      await tester.pumpWidget(host(provider, const AttendanceScreen()));
       await tester.pump();
 
-      await tester.tap(find.text('Save Register'));
-      await tester.pump(); // start the save
-      await tester.pump(const Duration(seconds: 1)); // let it fail
-      await tester.pumpAndSettle(); // let the error popup's route animate in
-
-      expect(find.text('Attendance saved successfully'), findsNothing);
-      expect(find.text('Could not save the register'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('attendance-1-ABSENT')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1)); // the request fails
+      await tester.pumpAndSettle();
+      // No Save press needed — the tap itself hit the network, and the
+      // failure is a popup, not a silent success.
+      expect(find.text('Could not save Ramesh Kumar'), findsOneWidget);
       expect(find.byType(AlertDialog), findsOneWidget);
     });
 
-    testWidgets('saving an untouched register marks nobody present',
-        (tester) async {
-      // Save used to send `_pending[id] ?? saved[id] ?? 'PRESENT'` for the
-      // whole roster, so pressing it without marking anyone invented a *paid*
-      // day for every staff member — contradicting the "not marked is not
-      // ABSENT" care this screen takes everywhere else.
+    testWidgets('an untouched register marks nobody', (tester) async {
       final provider = AppProvider(autoLoad: false)
         ..seedForTest(staff: [roster.first], attendance: []);
       await tester.pumpWidget(host(provider, const AttendanceScreen()));
       await tester.pump();
 
-      await tester.tap(find.text('Save Register'));
-      await tester.pump();
-
-      expect(find.text('Nothing to save — mark at least one staff member.'),
-          findsOneWidget);
-      // Still "not marked" afterwards — saving did not quietly fill it in.
-      expect(find.text('Head Washer • not marked'), findsOneWidget);
+      for (final s in ['PRESENT', 'HALF_DAY', 'ABSENT', 'LEAVE']) {
+        expect(segment(tester, '1', s).onTap, isNotNull, reason: s);
+      }
     });
 
-    testWidgets('saving sends the staff who were marked', (tester) async {
-      final provider = AppProvider(autoLoad: false)
-        ..seedForTest(staff: [roster.first], attendance: []);
-      await tester.pumpWidget(host(provider, const AttendanceScreen()));
-      await tester.pump();
-
-      await tester.tap(find.widgetWithText(ChoiceChip, 'ABSENT'));
-      await tester.pump();
-      await tester.tap(find.text('Save Register'));
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
-
-      // It got as far as the network (which fails in tests) rather than
-      // stopping at "nothing to save".
-      expect(find.text('Nothing to save — mark at least one staff member.'),
-          findsNothing);
-    });
-
-    testWidgets('an empty roster says so and disables saving', (tester) async {
+    testWidgets('an empty roster says so', (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: []);
       await tester.pumpWidget(host(provider, const AttendanceScreen()));
       await tester.pump();
 
       expect(find.text('No active staff to mark.'), findsOneWidget);
-      final button = tester.widget<ElevatedButton>(
-        find.widgetWithText(ElevatedButton, 'Save Register'),
-      );
-      expect(button.onPressed, isNull);
+    });
+
+    testWidgets('the note field opens once someone is marked', (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: roster, attendance: [register.first]);
+      await tester.pumpWidget(host(provider, const AttendanceScreen()));
+      await tester.pump();
+
+      final fields = tester.widgetList<TextField>(find.byType(TextField)).toList();
+      expect(fields, hasLength(2));
+      expect(fields[0].enabled, isTrue); // Ramesh — marked
+      expect(fields[1].enabled, isFalse); // Geeta — not marked yet
+    });
+
+    testWidgets('a saved check-in time is shown as a clock time',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(staff: [roster.first], attendance: [
+          AttendanceModel(
+            id: '20',
+            staffId: '1',
+            staffName: 'Ramesh Kumar',
+            date: today,
+            status: 'PRESENT',
+            checkInTime: '15:47:00',
+          ),
+        ]);
+      await tester.pumpWidget(host(provider, const AttendanceScreen()));
+      await tester.pump();
+
+      expect(find.text('3:47 PM'), findsOneWidget);
+      expect(find.text('15:47:00'), findsNothing);
     });
 
     group('responsive layout', () {
@@ -274,25 +247,110 @@ void main() {
         await tester.pump();
       }
 
-      testWidgets('shows the full date on the picker button at wide width',
+      final todayLabel =
+          '${DateFormat('EEE, d MMM').format(DateTime.now())} · Today';
+
+      testWidgets('the date button reads like the live one at wide width',
           (tester) async {
         await pumpAt(tester, 1400);
-
-        final formatted =
-            DateFormat('EEEE, dd MMMM yyyy').format(DateTime.now());
-        expect(find.text(formatted), findsOneWidget);
+        expect(find.text(todayLabel), findsOneWidget);
+        expect(find.text('Attendance'), findsWidgets);
       });
 
-      testWidgets(
-          'shortens the date button and stacks it below the title at phone '
-          'width', (tester) async {
+      testWidgets('phone width stacks the header without overflowing',
+          (tester) async {
         await pumpAt(tester, 390);
-
-        final full = DateFormat('EEEE, dd MMMM yyyy').format(DateTime.now());
-        final short = DateFormat('d MMM yyyy').format(DateTime.now());
-        expect(find.text(full), findsNothing);
-        expect(find.text(short), findsOneWidget);
+        expect(find.text(todayLabel), findsOneWidget);
         expect(tester.takeException(), isNull);
+      });
+    });
+
+    group('Live attendance parity features', () {
+      testWidgets('KPI cards render a card for each status', (tester) async {
+        final provider = AppProvider(autoLoad: false)
+          ..seedForTest(staff: roster, attendance: register);
+        await tester.pumpWidget(host(provider, const AttendanceScreen()));
+        await tester.pump();
+
+        expect(find.text('Half Day'), findsWidgets);
+        expect(find.text('Not marked'), findsWidgets);
+      });
+
+      testWidgets('Mark all present saves straight away', (tester) async {
+        final provider = AppProvider(autoLoad: false)
+          ..seedForTest(staff: roster, attendance: []);
+        await tester.pumpWidget(host(provider, const AttendanceScreen()));
+        await tester.pump();
+
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Mark all present'));
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1)); // the request fails
+        await tester.pumpAndSettle();
+
+        expect(find.text('Could not mark everyone present'), findsOneWidget);
+      });
+
+      testWidgets('Day view shows the register and the month grid; Month view '
+          'only the grid', (tester) async {
+        final provider = AppProvider(autoLoad: false)
+          ..seedForTest(staff: roster, attendance: register);
+        await tester.pumpWidget(host(provider, const AttendanceScreen()));
+        await tester.pump();
+
+        expect(find.text('Note'), findsOneWidget); // register header
+        expect(find.text('Totals flow into Payroll'), findsOneWidget);
+
+        await tester.tap(find.text('Month'));
+        await tester.pumpAndSettle();
+        expect(find.text('Note'), findsNothing);
+        expect(find.text('Totals flow into Payroll'), findsOneWidget);
+
+        await tester.tap(find.text('Day'));
+        await tester.pumpAndSettle();
+        expect(find.text('Note'), findsOneWidget);
+      });
+
+      testWidgets('the month grid steps months back and forward',
+          (tester) async {
+        final provider = AppProvider(autoLoad: false)
+          ..seedForTest(staff: roster, attendance: register);
+        await tester.pumpWidget(host(provider, const AttendanceScreen()));
+        await tester.pump();
+
+        // "September" in the current year, "December 2025" otherwise.
+        String label(DateTime m) => m.year == DateTime.now().year
+            ? DateFormat('MMMM').format(m)
+            : DateFormat('MMMM yyyy').format(m);
+        final now = DateTime.now();
+        final current = DateTime(now.year, now.month);
+        final previous = DateTime(now.year, now.month - 1);
+
+        expect(find.text(label(current)), findsOneWidget);
+        await tester.tap(find.byTooltip('Previous month'));
+        await tester.pumpAndSettle();
+        expect(find.text(label(previous)), findsOneWidget);
+        await tester.tap(find.byTooltip('Next month'));
+        await tester.pumpAndSettle();
+        expect(find.text(label(current)), findsOneWidget);
+      });
+
+      testWidgets('toggling Habits switches view to Attendance Habit Tracker & Streaks', (tester) async {
+        final provider = AppProvider(autoLoad: false)
+          ..seedForTest(staff: roster, attendance: register);
+        await tester.pumpWidget(host(provider, const AttendanceScreen()));
+        await tester.pump();
+
+        expect(find.text('Attendance Habit Tracker & Streaks'), findsNothing);
+
+        await tester.tap(find.text('Habits'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Attendance Habit Tracker & Streaks'), findsOneWidget);
+        expect(find.text('Current Streak'), findsOneWidget);
+        expect(find.text('Best Streak'), findsOneWidget);
+        expect(find.text('Total Check-ins'), findsOneWidget);
+        expect(find.text('Monthly Consistency'), findsOneWidget);
+        expect(find.text('Staff Attendance Streak Leaderboard'), findsOneWidget);
       });
     });
   });

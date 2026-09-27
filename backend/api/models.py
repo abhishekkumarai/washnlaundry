@@ -246,6 +246,13 @@ class Order(models.Model):
     # keeps every existing scheduled_date comparison (is_overdue, the
     # Scheduled tab filter) working unchanged.
     scheduled_time = models.TimeField(null=True, blank=True)
+    # Home pickup only: when the agent collects from the customer. The
+    # delivery leg stays on scheduled_date / scheduled_time above.
+    pickup_date = models.DateField(null=True, blank=True)
+    pickup_time = models.TimeField(null=True, blank=True)
+    # Where a carried order is picked up from or delivered to — the review
+    # step's "Pickup address" / "Delivery address".
+    address = models.TextField(blank=True, default='')
     assigned_agent = models.ForeignKey(
         'Staff', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_orders'
     )
@@ -602,6 +609,8 @@ class Attendance(models.Model):
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='attendance')
     date = models.DateField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PRESENT)
+    check_in_time = models.TimeField(null=True, blank=True)
+    notes = models.CharField(max_length=255, blank=True, default='')
 
     class Meta:
         unique_together = ('staff', 'date')

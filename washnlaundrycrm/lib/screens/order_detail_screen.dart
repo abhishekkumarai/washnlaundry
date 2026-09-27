@@ -4,10 +4,12 @@ import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
 import '../providers/app_provider.dart';
+import '../services/api_service.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
+import '../widgets/tag_generator_panel.dart';
 import '../utils/money.dart';
 
 /// `/orders/:orderId` in the live app.
@@ -119,6 +121,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         );
                       },
                     ),
+                    const SizedBox(height: 20),
+                    _tagsCard(order),
                   ],
                 ),
               ),
@@ -163,7 +167,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             'WhatsApp',
             Icons.chat_bubble_outline_rounded,
             const Color(0xFF10B981),
-            () => _toast('WhatsApp receipt sent to ${order.customerName}.'),
+            () => _sendWhatsAppReceipt(order),
           ),
           const SizedBox(width: 8),
           _headerButton('Edit', Icons.edit_outlined, const Color(0xFF475569),
@@ -241,8 +245,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             onSelected: (action) => action(),
             itemBuilder: (context) => [
               PopupMenuItem(
-                value: () =>
-                    _toast('WhatsApp receipt sent to ${order.customerName}.'),
+                value: () => _sendWhatsAppReceipt(order),
                 child: const Text('WhatsApp'),
               ),
               PopupMenuItem(
@@ -937,10 +940,31 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  void _toast(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+  void _toast(String message, {bool success = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: success ? const Color(0xFF10B981) : null,
+    ));
   }
+
+  void _sendWhatsAppReceipt(OrderModel order) async {
+    if (order.customerPhone.isEmpty) {
+      _toast('No customer phone number available.');
+      return;
+    }
+    _toast('Sending WhatsApp receipt to ${order.customerName}...');
+    try {
+      await ApiService.sendOrderWhatsApp(order.id);
+      if (mounted) {
+        _toast('WhatsApp receipt delivered to ${order.customerName}!', success: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        _toast('WhatsApp delivery failed: $e');
+      }
+    }
+  }
+
 
   /// The "Collect Payment" dialog: amount, payment method, and whether the
   /// customer is paying in full, part now, or later. Submitting it records
@@ -1255,8 +1279,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     style: TextStyle(color: Color(0xFF64748B))),
               ),
               OutlinedButton.icon(
-                onPressed:
-                    saving ? null : () => _toast('Status shared on WhatsApp.'),
+                onPressed: saving
+                    ? null
+                    : () async {
+                        try {
+                          setDialogState(() => saving = true);
+                          await ApiService.sendOrderStatusWhatsApp(
+                            order.id,
+                            note: noteController.text.trim(),
+                          );
+                          if (mounted) {
+                            _toast('Status notification delivered to customer on WhatsApp!', success: true);
+                          }
+                        } catch (err) {
+                          if (mounted) _toast('Failed to send status on WhatsApp: $err');
+                        } finally {
+                          setDialogState(() => saving = false);
+                        }
+                      },
                 icon: const Icon(Icons.chat_bubble_outline_rounded, size: 15),
                 label: const Text('Share via WhatsApp',
                     style: TextStyle(fontSize: 12)),
@@ -1572,6 +1612,60 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       );
+
+  Widget _tagsCard(OrderModel order) {
+    return Container(
+      key: const ValueKey('order-detail-tags-card'),
+      padding: const EdgeInsets.all(20),
+      decoration: _panel,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.qr_code_2_rounded,
+                    size: 18, color: Color(0xFF1A4FD6)),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Generate Tags',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    Text(
+                      'Print QR code or barcode garment & basket tags for this order',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 16),
+          TagGeneratorPanel(
+            key: ValueKey('tags-${order.id}'),
+            order: order,
+            onBackToOrders: widget.onBack,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 const BoxDecoration _panel = BoxDecoration(

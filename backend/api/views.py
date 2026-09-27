@@ -10,6 +10,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from . import customer_import
+from .services.whatsapp_service import WhatsAppService
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
     Expense, Credit, CreditCategory, Staff, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
@@ -305,6 +306,40 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         return Response(self.get_serializer(order).data)
 
+    @action(detail=True, methods=['post'], url_path='send-whatsapp')
+    def send_whatsapp(self, request, pk=None):
+        """POST /api/orders/<id>/send-whatsapp/
+        Dispatches automated order receipt via WhatsApp.
+        """
+        order = self.get_object()
+        res = WhatsAppService.send_order_receipt(order)
+        if not res.get('ok'):
+            return Response({'detail': res.get('error', 'Failed to send WhatsApp message')}, status=400)
+        return Response({
+            'success': True,
+            'order_id': str(order.id),
+            'order_number': order.order_number,
+            'result': res,
+        })
+
+    @action(detail=True, methods=['post'], url_path='send-status-whatsapp')
+    def send_status_whatsapp(self, request, pk=None):
+        """POST /api/orders/<id>/send-status-whatsapp/
+        Dispatches status notification via WhatsApp.
+        """
+        order = self.get_object()
+        note = request.data.get('note', '')
+        res = WhatsAppService.send_order_status_update(order, note=note)
+        if not res.get('ok'):
+            return Response({'detail': res.get('error', 'Failed to send WhatsApp message')}, status=400)
+        return Response({
+            'success': True,
+            'order_id': str(order.id),
+            'order_number': order.order_number,
+            'status': order.status,
+            'result': res,
+        })
+
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     queryset = Expense.objects.all().order_by('-date')
@@ -347,6 +382,12 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         date = self.request.query_params.get('date')
         if date:
             qs = qs.filter(date=date)
+        month_str = self.request.query_params.get('month')
+        if month_str:
+            month = parse_month(month_str)
+            if month:
+                next_month = (month.replace(day=28) + timedelta(days=4)).replace(day=1)
+                qs = qs.filter(date__gte=month, date__lt=next_month)
         return qs
 
     @action(detail=False, methods=['post'])
@@ -354,7 +395,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         """POST /api/attendance/bulk/ — save a whole day's register at once.
 
             {"date": "2026-08-11",
-             "entries": [{"staff": 3, "status": "PRESENT"}, ...]}
+             "entries": [{"staff": 3, "status": "PRESENT", "check_in_time": "09:30:00", "notes": ""}, ...]}
 
         Upserts rather than creates: `unique_together = ('staff', 'date')` means
         a plain re-POST of an already-marked day would 400, and the Attendance
@@ -385,18 +426,20 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 staff_id = int(entry.get('staff'))
             except (TypeError, ValueError):
                 return Response({'detail': 'Each entry needs a staff id.'}, status=400)
-            cleaned.append((staff_id, status_value))
+            check_in = entry.get('check_in_time')
+            notes = entry.get('notes')
+            cleaned.append((staff_id, status_value, check_in, notes))
 
         staff_by_id = {
-            s.id: s for s in Staff.objects.filter(id__in=[s for s, _ in cleaned])
+            s.id: s for s in Staff.objects.filter(id__in=[s for s, _, _, _ in cleaned])
         }
-        missing = sorted({s for s, _ in cleaned} - set(staff_by_id))
+        missing = sorted({s for s, _, _, _ in cleaned} - set(staff_by_id))
         if missing:
             return Response({'detail': f'Unknown staff: {missing}.'}, status=400)
 
         not_yet_started = sorted({
             staff_by_id[staff_id].name
-            for staff_id, _ in cleaned
+            for staff_id, _, _, _ in cleaned
             if staff_by_id[staff_id].start_date and date < staff_by_id[staff_id].start_date
         })
         if not_yet_started:
@@ -408,9 +451,14 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         # Validate everything before writing anything — a half-saved register is
         # worse than a rejected one, because nothing on screen says which half.
-        for staff_id, status_value in cleaned:
+        for staff_id, status_value, check_in, notes in cleaned:
+            defaults = {'status': status_value}
+            if notes is not None:
+                defaults['notes'] = notes
+            if check_in is not None:
+                defaults['check_in_time'] = check_in if check_in else None
             Attendance.objects.update_or_create(
-                staff_id=staff_id, date=date, defaults={'status': status_value}
+                staff_id=staff_id, date=date, defaults=defaults
             )
 
         saved = Attendance.objects.select_related('staff').filter(date=date)
@@ -487,6 +535,7 @@ def payroll_summary(request):
     present = {}
     half = {}
     leave = {}
+    absent = {}
     for record in month_attendance:
         days[record.staff_id] = days.get(record.staff_id, 0.0) + record.day_value
         if record.status == Attendance.PRESENT:
@@ -495,6 +544,8 @@ def payroll_summary(request):
             half[record.staff_id] = half.get(record.staff_id, 0) + 1
         elif record.status == Attendance.LEAVE:
             leave[record.staff_id] = leave.get(record.staff_id, 0) + 1
+        elif record.status == Attendance.ABSENT:
+            absent[record.staff_id] = absent.get(record.staff_id, 0) + 1
 
     paid = {
         row['staff_id']: row['total']
@@ -546,6 +597,7 @@ def payroll_summary(request):
             'present_days': present.get(member.id, 0),
             'half_days': half.get(member.id, 0),
             'leave_days': leave.get(member.id, 0),
+            'absent_days': absent.get(member.id, 0),
             'total_salary': total_salary,
             'advances_amount': advances_amount,
             'net_pay': net_pay,
@@ -898,3 +950,74 @@ def dashboard_stats(request):
         'total_dues': orders.aggregate(s=Sum('due_amount'))['s'] or 0.0,
         'total_expenses': Expense.objects.aggregate(s=Sum('amount'))['s'] or 0.0,
     })
+
+
+@api_view(['POST'])
+def send_payroll_whatsapp(request):
+    """POST /api/payroll/send-slip-whatsapp/
+    Sends formatted salary slip to employee via WhatsApp.
+    """
+    staff_id = request.data.get('staff_id') or request.data.get('staff')
+    if not staff_id:
+        return Response({'detail': 'staff_id is required.'}, status=400)
+
+    try:
+        staff = Staff.objects.get(pk=staff_id)
+    except Staff.DoesNotExist:
+        return Response({'detail': f'Staff member {staff_id} not found.'}, status=404)
+
+    month_str = request.data.get('month') or timezone.localdate().strftime('%Y-%m')
+    try:
+        month_date = parse_month(month_str) or timezone.localdate().replace(day=1)
+    except Exception:
+        month_date = timezone.localdate().replace(day=1)
+
+    formatted_month = month_date.strftime('%B %Y')
+
+    days_worked = float(request.data.get('days_worked', 0))
+    half_days = int(request.data.get('half_days', 0))
+    gross_wage = float(request.data.get('gross_wage', staff.monthly_wage))
+    paid_amount = float(request.data.get('paid_amount', gross_wage))
+    payment_method = str(request.data.get('payment_method', 'Cash'))
+    note = str(request.data.get('note', ''))
+
+    res = WhatsAppService.send_payroll_slip(
+        staff=staff,
+        month_str=formatted_month,
+        days_worked=days_worked,
+        half_days=half_days,
+        gross_wage=gross_wage,
+        paid_amount=paid_amount,
+        payment_method=payment_method,
+        note=note,
+    )
+
+    if not res.get('ok'):
+        return Response({'detail': res.get('error', 'Failed to send WhatsApp slip.')}, status=400)
+
+    return Response({
+        'success': True,
+        'staff_id': staff.id,
+        'staff_name': staff.name,
+        'phone': staff.phone,
+        'result': res,
+    })
+
+
+@api_view(['GET'])
+def whatsapp_status(request):
+    """GET /api/whatsapp/status/
+    Returns health status of the WhatsApp microservice and current pairing state.
+    """
+    status_info = WhatsAppService.get_bridge_status()
+    return Response(status_info)
+
+
+@api_view(['GET'])
+def whatsapp_qr(request):
+    """GET /api/whatsapp/qr/
+    Returns current QR code pairing data URL.
+    """
+    qr_info = WhatsAppService.get_qr_code()
+    return Response(qr_info)
+

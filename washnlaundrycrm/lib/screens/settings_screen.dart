@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/credit_categories_panel.dart';
 import '../widgets/sidebar_navigation.dart';
+import '../widgets/whatsapp_settings_panel.dart';
 
 /// One entry in Settings' vertical tab list.
 class _SettingsTab {
@@ -32,11 +33,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   static const businessProfile = 'business-profile';
   static const creditCategories = 'credit-categories';
+  static const whatsappIntegration = 'whatsapp-integration';
 
-  /// Only [businessProfile] and [creditCategories] are built; the rest are
+  /// Only [businessProfile], [creditCategories], and [whatsappIntegration] are built; the rest are
   /// listed for parity with the real app and show a "Not available yet" panel.
   static const _mainTabs = [
     _SettingsTab(businessProfile, Icons.storefront_outlined, 'Business profile'),
+    _SettingsTab(whatsappIntegration, Icons.chat_bubble_outline_rounded, 'WhatsApp Integration'),
     _SettingsTab('tax-currency', Icons.attach_money_rounded, 'Tax & currency'),
     _SettingsTab('bank-details', Icons.account_balance_outlined, 'Bank details'),
     _SettingsTab('operations', Icons.tune_rounded, 'Operations'),
@@ -368,6 +371,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         break;
       case creditCategories:
         child = const CreditCategoriesPanel();
+        break;
+      case whatsappIntegration:
+        child = const WhatsAppSettingsPanel();
         break;
       default:
         child = _notAvailable(_current);

@@ -6,7 +6,7 @@ from .views import (
     GarmentItemViewSet, OrderViewSet, ExpenseViewSet, CreditViewSet, CreditCategoryViewSet,
     StaffViewSet, AttendanceViewSet, SalaryPaymentViewSet, SalaryAdvanceViewSet,
     ServiceAreaViewSet, TimeSlotViewSet, dashboard_stats, payroll_summary,
-    reports, meta,
+    reports, meta, send_payroll_whatsapp, whatsapp_status, whatsapp_qr,
 )
 
 router = DefaultRouter()
@@ -29,6 +29,10 @@ urlpatterns = [
     path('', include(router.urls)),
     path('dashboard/stats/', dashboard_stats, name='dashboard-stats'),
     path('payroll/', payroll_summary, name='payroll-summary'),
+    path('payroll/send-slip-whatsapp/', send_payroll_whatsapp, name='send-payroll-whatsapp'),
+    path('whatsapp/status/', whatsapp_status, name='whatsapp-status'),
+    path('whatsapp/qr/', whatsapp_qr, name='whatsapp-qr'),
     path('reports/', reports, name='reports'),
     path('meta/', meta, name='meta'),
 ]
+

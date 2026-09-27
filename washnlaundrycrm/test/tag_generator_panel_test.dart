@@ -241,6 +241,37 @@ void main() {
       await tester.pump();
       expect(find.text('Sent to the printer.'), findsOneWidget);
     });
+
+    testWidgets('Complete advances to Step 3 with summary and actions',
+        (tester) async {
+      var changed = false;
+      await tester.pumpWidget(pumpPanel(onChangeOrder: () => changed = true));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Generate Preview'));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Complete'));
+      await tester.pump();
+
+      expect(find.text('Tags Ready & Generated'), findsOneWidget);
+      expect(find.textContaining('labels for order #WA3P-00011'), findsOneWidget);
+      expect(find.text('Back to Preview'), findsOneWidget);
+      expect(find.text('Print Again'), findsOneWidget);
+      expect(find.text('Back to Orders'), findsOneWidget);
+
+      // Back to Preview returns to step 2
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Back to Preview'));
+      await tester.pump();
+      expect(find.text('Back'), findsOneWidget);
+
+      // Advance again and test Back to Orders
+      await tester.tap(find.widgetWithText(FilledButton, 'Complete'));
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Back to Orders'));
+      await tester.pump();
+      expect(changed, isTrue);
+    });
   });
 
   testWidgets(

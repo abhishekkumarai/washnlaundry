@@ -413,9 +413,13 @@ class ApiService {
   static Future<void> deleteCreditCategory(String id) =>
       _send('DELETE', '/credit-categories/$id/');
 
-  static Future<List<AttendanceModel>> fetchAttendance({String? date}) async {
+  static Future<List<AttendanceModel>> fetchAttendance({
+    String? date,
+    String? month,
+  }) async {
     final data = await _send('GET', '/attendance/', query: {
       if (date != null && date.isNotEmpty) 'date': date,
+      if (month != null && month.isNotEmpty) 'month': month,
     });
     return _asList(data).map(AttendanceModel.fromJson).toList();
   }
@@ -545,4 +549,46 @@ class ApiService {
     final data = await _send('GET', '/meta/');
     return MetaModel.fromJson((data as Map).cast<String, dynamic>());
   }
+
+  // ── WhatsApp Bridge (Hermes Stack) ──────────────────────────────────────────
+
+  /// Dispatches automated order bill/receipt to customer phone via WhatsApp bridge.
+  static Future<Map<String, dynamic>> sendOrderWhatsApp(String orderId) async {
+    final data = await _send('POST', '/orders/$orderId/send-whatsapp/');
+    return (data as Map).cast<String, dynamic>();
+  }
+
+  /// Dispatches live order status change notification via WhatsApp bridge.
+  static Future<Map<String, dynamic>> sendOrderStatusWhatsApp(
+    String orderId, {
+    String note = '',
+  }) async {
+    final data = await _send(
+      'POST',
+      '/orders/$orderId/send-status-whatsapp/',
+      body: {'note': note},
+    );
+    return (data as Map).cast<String, dynamic>();
+  }
+
+  /// Dispatches monthly salary slip notification to staff via WhatsApp bridge.
+  static Future<Map<String, dynamic>> sendPayrollWhatsApp(
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send('POST', '/payroll/send-slip-whatsapp/', body: payload);
+    return (data as Map).cast<String, dynamic>();
+  }
+
+  /// Queries the health and connection state of the WhatsApp bridge.
+  static Future<Map<String, dynamic>> fetchWhatsAppStatus() async {
+    final data = await _send('GET', '/whatsapp/status/');
+    return (data as Map).cast<String, dynamic>();
+  }
+
+  /// Fetches the current pairing QR code Data URL.
+  static Future<Map<String, dynamic>> fetchWhatsAppQr() async {
+    final data = await _send('GET', '/whatsapp/qr/');
+    return (data as Map).cast<String, dynamic>();
+  }
 }
+

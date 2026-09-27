@@ -895,6 +895,18 @@ class AppProvider extends ChangeNotifier {
     };
   }
 
+  /// Returns the full [AttendanceModel] record for a staff member on a day,
+  /// containing status, check-in time, and notes if recorded.
+  AttendanceModel? attendanceRecord(DateTime day, String staffId) {
+    final key = dateKey(day);
+    for (final a in _attendance) {
+      if (a.date != null && dateKey(a.date!) == key && a.staffId == staffId) {
+        return a;
+      }
+    }
+    return null;
+  }
+
   /// Loads one day and merges it in, replacing whatever was held for that date.
   /// Cheaper than [loadDataFromBackend] when only the date picker moved.
   Future<void> loadAttendanceFor(DateTime day) async {
@@ -911,10 +923,37 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Loads all attendance records for a whole calendar month (e.g. for the
+  /// monthly matrix / calendar heatmap) and merges them into the local cache.
+  Future<void> loadAttendanceForMonth(DateTime month) async {
+    final monthStr = '${month.year}-${month.month.toString().padLeft(2, '0')}';
+    try {
+      final fetched = await ApiService.fetchAttendance(month: monthStr);
+      _attendance = [
+        ..._attendance.where((a) {
+          if (a.date == null) return true;
+          final aMonth =
+              '${a.date!.year}-${a.date!.month.toString().padLeft(2, '0')}';
+          return aMonth != monthStr;
+        }),
+        ...fetched,
+      ];
+      notifyListeners();
+    } on ApiException catch (e) {
+      _attendanceError = e.message;
+      notifyListeners();
+    }
+  }
+
   /// Saves a day's register. [marks] is `{staffId: status}`; only the staff
   /// present in the map are written, so leaving someone unmarked leaves their
   /// existing row alone rather than defaulting them to present.
-  Future<bool> saveAttendance(DateTime day, Map<String, String> marks) async {
+  Future<bool> saveAttendance(
+    DateTime day,
+    Map<String, String> marks, {
+    Map<String, String?>? checkInTimes,
+    Map<String, String>? notes,
+  }) async {
     try {
       final saved = await ApiService.saveAttendance(
         dateKey(day),
@@ -922,7 +961,11 @@ class AppProvider extends ChangeNotifier {
           for (final entry in marks.entries)
             {
               'staff': int.tryParse(entry.key) ?? entry.key,
-              'status': entry.value
+              'status': entry.value,
+              if (checkInTimes != null && checkInTimes.containsKey(entry.key))
+                'check_in_time': checkInTimes[entry.key],
+              if (notes != null && notes.containsKey(entry.key))
+                'notes': notes[entry.key],
             },
         ],
       );
@@ -935,6 +978,24 @@ class AppProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Marks all eligible active staff members as PRESENT for [day].
+  Future<bool> markAllPresent(DateTime day) async {
+    final activeStaff =
+        staff.where((s) => s.status.toUpperCase() == 'ACTIVE').toList();
+    final eligible = activeStaff.where((s) {
+      if (s.startDate == null) return true;
+      final dayOnly = DateTime(day.year, day.month, day.day);
+      final startOnly = DateTime(s.startDate!.year, s.startDate!.month, s.startDate!.day);
+      return !dayOnly.isBefore(startOnly);
+    }).toList();
+
+    final marks = <String, String>{};
+    for (final s in eligible) {
+      marks[s.id] = 'PRESENT';
+    }
+    return saveAttendance(day, marks);
   }
 
   void _mergeAttendance(DateTime day, List<AttendanceModel> rows) {
@@ -1029,7 +1090,7 @@ class AppProvider extends ChangeNotifier {
   /// one failure doesn't leave a half-applied burst of concurrent requests,
   /// and stops at the first failure rather than pressing on past it.
   /// Returns how many entries were actually paid.
-  Future<int> payAllPending(DateTime month) async {
+  Future<int> payAllPending(DateTime month, {String method = 'CASH'}) async {
     final pending = (_payroll?.entries ?? const <PayrollEntryModel>[])
         .where((e) => e.pendingAmount > 0)
         .toList();
@@ -1039,6 +1100,7 @@ class AppProvider extends ChangeNotifier {
         staffId: entry.staffId,
         month: month,
         amount: entry.pendingAmount,
+        method: method,
         note: 'Paid via Pay all pending',
       );
       if (!ok) break;

@@ -176,5 +176,60 @@ void main() {
       expect(find.text('Generate Preview'), findsOneWidget);
       expect(find.textContaining('#WA3P-00011'), findsWidgets);
     });
+
+    testWidgets('lists all orders by default with top search button and action column',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(orders: _orders);
+      await tester.pumpWidget(host(provider, const ScanScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(Tab, 'Generate Tags'));
+      await tester.pumpAndSettle();
+
+      // All orders listed without typing
+      expect(find.text('#WA3P-00011'), findsOneWidget);
+      expect(find.text('#WA3P-00012'), findsOneWidget);
+      expect(find.text('2 orders'), findsOneWidget);
+
+      // Top aligned search button is present
+      expect(find.widgetWithText(ElevatedButton, 'Search'), findsOneWidget);
+
+      // Action column with Generate Tags button is present for each order
+      expect(find.widgetWithText(FilledButton, 'Generate Tags'), findsNWidgets(2));
+    });
+
+    testWidgets('tapping Generate Tags in the action column starts tag generator',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(orders: _orders);
+      await tester.pumpWidget(host(provider, const ScanScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(Tab, 'Generate Tags'));
+      await tester.pumpAndSettle();
+
+      // Tap the Generate Tags button in the first row
+      await tester.tap(find.widgetWithText(FilledButton, 'Generate Tags').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Generate Preview'), findsOneWidget);
+      expect(find.textContaining('#WA3P-00011'), findsWidgets);
+    });
+
+    testWidgets('top search button filters orders upon click',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(orders: _orders);
+      await tester.pumpWidget(host(provider, const ScanScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(Tab, 'Generate Tags'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, 'WA3P-00012');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Search'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('#WA3P-00012'), findsOneWidget);
+      expect(find.text('#WA3P-00011'), findsNothing);
+    });
   });
 }

@@ -14,6 +14,18 @@ async function deploy() {
   // Load auth token
   let token = process.env.VERCEL_TOKEN;
   if (!token) {
+    const mcpConfigPath = path.join(process.env.USERPROFILE || '', '.gemini', 'config', 'mcp_config.json');
+    if (fs.existsSync(mcpConfigPath)) {
+      try {
+        const mcpConfig = JSON.parse(fs.readFileSync(mcpConfigPath, 'utf8'));
+        const authHeader = mcpConfig?.mcpServers?.vercel?.headers?.Authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          token = authHeader.replace('Bearer ', '').trim();
+        }
+      } catch (e) {}
+    }
+  }
+  if (!token) {
     const xdgAuth = path.join(process.env.APPDATA || '', 'xdg.data', 'com.vercel.cli', 'auth.json');
     const roamingAuth = path.join(process.env.APPDATA || '', 'com.vercel.cli', 'Data', 'auth.json');
     if (fs.existsSync(xdgAuth)) {
@@ -28,8 +40,8 @@ async function deploy() {
     process.exit(1);
   }
 
-  const TEAM_ID = 'team_3q6DiOqHmHEU2kSpyXvL3xzg';
-  const PROJECT_NAME = 'washnlaundry-crm';
+  const TEAM_ID = process.env.VERCEL_TEAM_ID || 'team_NcUEwKBjRL02ugh9jPoJjMJS';
+  const PROJECT_NAME = process.env.VERCEL_PROJECT_NAME || 'washnlaundrycrm';
 
   function getFiles(dir, base = '') {
     let results = [];

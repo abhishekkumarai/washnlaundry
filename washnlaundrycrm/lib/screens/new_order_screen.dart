@@ -48,10 +48,23 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   /// Ready by, Notes) — a second screen the real app shows before actually
   /// placing the order, still under `/new-order`.
   bool _showCheckoutReview = false;
+
+  /// Shop pickup's "Expected ready", or the Delivery date for the two
+  /// carried types — saved as `scheduled_date`. [_deliveryWindow] is the
+  /// chosen Delivery slot, saved as `scheduled_time`; Shop pickup has none.
   DateTime? _readyBy;
-  double _discountAmount = 0;
+  _SlotWindow? _deliveryWindow;
+
+  /// Home pickup only: the day and slot the agent collects from the customer.
+  DateTime? _pickupDate;
+  _SlotWindow? _pickupWindow;
+
+  /// The live app's Discount field defaults to `%`, with a `₹` toggle.
+  double _discountValue = 0;
+  bool _discountIsPercent = true;
   late final TextEditingController _notesController;
   late final TextEditingController _discountController;
+  late final TextEditingController _addressController;
 
   /// Default the seed data already encodes (`seed_db.py`: ₹50 for
   /// HOME_DELIVERY and ONLINE) — a starting point, not a fixed charge.
@@ -61,47 +74,69 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   double _deliveryCharge = 0;
   late final TextEditingController _deliveryChargeController;
 
-  bool get _isCarriedDelivery =>
-      _deliveryType == DeliveryType.homeDelivery ||
-      _deliveryType == DeliveryType.online;
+  /// Both Home pickup and Home delivery carry the order one way or the
+  /// other, and the live app bills its ₹50 Delivery line on either.
+  bool get _isCarriedDelivery => _deliveryType != DeliveryType.storePickup;
 
   static const _slotStartHour = 9; // 9 AM
-  static const _slotEndHour = 22; // 10 PM — last slot is 9–10 PM
+  static const _slotEndHour = 22; // 10 PM — last fallback slot is 9–10 PM
 
-  /// Walk-In is ready whenever it's actually done — the counter default
-  /// is simply "now". Anything carried (Home Delivery / Pickup from Home)
-  /// needs real lead time, so its default is the first still-selectable
-  /// hourly slot today, or 9 AM tomorrow once today's slots have all passed.
-  DateTime _readyByDefaultFor(String deliveryType) {
-    final now = DateTime.now();
-    if (deliveryType == DeliveryType.storePickup) return now;
-    final today = _readySlotStarts(now).where((s) => !_isSlotDisabled(s));
-    if (today.isNotEmpty) return today.first;
-    return DateTime(now.year, now.month, now.day + 1, _slotStartHour);
+  static const _notesMaxLength = 200;
+
+  /// The shop's own Pickup/Delivery slots (Settings), which is what the live
+  /// app offers ("9:00 AM - 11:00 AM" …). A shop that hasn't configured any
+  /// falls back to hourly windows, 9 AM to 10 PM, so a carried order can
+  /// still be scheduled.
+  List<_SlotWindow> _windowsFor(AppProvider provider, String kind) {
+    final configured =
+        (kind == TimeSlotModel.pickup ? provider.pickupSlots : provider.deliverySlots)
+            .where((s) => s.isActive)
+            .map(_SlotWindow.fromSlot)
+            .whereType<_SlotWindow>()
+            .toList();
+    if (configured.isNotEmpty) return configured;
+    return [
+      for (var h = _slotStartHour; h < _slotEndHour; h++)
+        _SlotWindow(h * 60, (h + 1) * 60),
+    ];
   }
 
-  /// The hourly slot start times a carried fulfilment type can pick between,
-  /// 9 AM through 9 PM (each a 1-hour window ending by 10 PM), for whatever
-  /// date [forDate] falls on — not off any shop-configured Pickup/Delivery
-  /// slot list, so it still works for a shop that hasn't set any up.
-  List<DateTime> _readySlotStarts(DateTime forDate) => [
-        for (var h = _slotStartHour; h < _slotEndHour; h++)
-          DateTime(forDate.year, forDate.month, forDate.day, h),
-      ];
-
-  /// A slot is only disabled relative to "right now" — on any day other than
-  /// today every slot stays selectable, since lead time isn't an issue for a
-  /// future date.
-  bool _isSlotDisabled(DateTime slot) {
+  /// A slot is only unavailable relative to "right now" — once it has ended
+  /// today. On any later date every slot stays selectable.
+  bool _isWindowPast(DateTime date, _SlotWindow w) {
     final now = DateTime.now();
-    return DateUtils.isSameDay(slot, now) && slot.hour < now.hour;
+    return DateUtils.isSameDay(date, now) &&
+        w.endMinute <= now.hour * 60 + now.minute;
+  }
+
+  /// Picking an order type re-defaults its dates the way the live app does:
+  /// pickup today, delivery / expected-ready tomorrow, no slot chosen yet.
+  void _selectDeliveryType(String type) {
+    final today = DateUtils.dateOnly(DateTime.now());
+    _deliveryType = type;
+    _deliveryCharge = _isCarriedDelivery ? _deliveryFee : 0;
+    _deliveryChargeController.text = _deliveryCharge.toStringAsFixed(0);
+    _readyBy = today.add(const Duration(days: 1));
+    _deliveryWindow = null;
+    _pickupDate = type == DeliveryType.homePickup ? today : null;
+    _pickupWindow = null;
+    if (_isCarriedDelivery && _addressController.text.isEmpty) {
+      _addressController.text = _customer?.address ?? '';
+    }
+  }
+
+  double _discountFor(double subtotal) {
+    final raw =
+        _discountIsPercent ? subtotal * _discountValue / 100 : _discountValue;
+    return raw.clamp(0, subtotal).toDouble();
   }
 
   @override
   void initState() {
     super.initState();
     _notesController = TextEditingController();
-    _discountController = TextEditingController(text: '0');
+    _discountController = TextEditingController();
+    _addressController = TextEditingController();
     _deliveryChargeController =
         TextEditingController(text: _deliveryFee.toStringAsFixed(0));
   }
@@ -110,6 +145,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   void dispose() {
     _notesController.dispose();
     _discountController.dispose();
+    _addressController.dispose();
     _deliveryChargeController.dispose();
     super.dispose();
   }
@@ -212,24 +248,26 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               color: Colors.white,
               border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
             ),
-            child: const Row(
-              key: Key('newOrderHeader'),
-              children: [
-                Text(
-                  'New Order',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A)),
-                ),
-              ],
-            ),
+            child: _showCheckoutReview
+                ? _reviewHeader(showStepper: !narrow)
+                : const Row(
+                    key: Key('newOrderHeader'),
+                    children: [
+                      Text(
+                        'New Order',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
           ),
 
           if (_showCheckoutReview)
             narrow
-                ? _buildCheckoutReview()
-                : Expanded(child: _buildCheckoutReview())
+                ? _buildCheckoutReview(provider)
+                : Expanded(child: _buildCheckoutReview(provider))
           else ...[
             // Search & Filter Row
             Padding(
@@ -328,7 +366,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         mainAxisSize: narrow ? MainAxisSize.min : MainAxisSize.max,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Cart Header Title
+          // Cart Header Title — the review step's Order Summary carries its
+          // own title instead, as on the live app.
+          if (!_showCheckoutReview) ...[
           Padding(
             padding: const EdgeInsets.all(20.0),
             child: Row(
@@ -356,6 +396,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             ),
           ),
           const Divider(height: 1),
+          ],
 
           if (!_showCheckoutReview) ...[
             // Customer Selection Box
@@ -415,7 +456,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                       onPressed: (subtotal == 0 || _submitting)
                           ? null
                           : () => setState(() {
-                                _readyBy ??= _readyByDefaultFor(_deliveryType);
+                                if (_readyBy == null) {
+                                  _selectDeliveryType(_deliveryType);
+                                }
                                 _showCheckoutReview = true;
                               }),
                       style: ElevatedButton.styleFrom(
@@ -686,258 +729,408 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     );
   }
 
-  Widget _panelBox({required String title, required Widget child}) {
+  static const _ink = Color(0xFF0F172A);
+  static const _muted = Color(0xFF64748B);
+  static const _line = Color(0xFFE2E8F0);
+  static const _brand = Color(0xFF1A4FD6);
+
+  /// Review step's header: back arrow, "Review order", and the live app's
+  /// 1 Items ✓ — 2 Review — 3 Done stepper (dropped on narrow widths).
+  Widget _reviewHeader({required bool showStepper}) {
+    Widget step(String n, String label, {bool done = false, bool active = false}) {
+      final fill = active ? _brand : Colors.white;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: fill,
+              shape: BoxShape.circle,
+              border: Border.all(color: active ? _brand : _line),
+            ),
+            child: Text(n,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: active ? Colors.white : _muted)),
+          ),
+          const SizedBox(width: 8),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                  color: active ? _brand : _ink)),
+          if (done) ...[
+            const SizedBox(width: 6),
+            const Icon(Icons.check_rounded, size: 16, color: Color(0xFF16A34A)),
+          ],
+        ],
+      );
+    }
+
+    Widget connector() => Container(
+        width: 28,
+        height: 1,
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        color: _line);
+
+    return Row(
+      key: const Key('newOrderHeader'),
+      children: [
+        IconButton(
+          tooltip: 'Back to items',
+          onPressed: () => setState(() => _showCheckoutReview = false),
+          style: IconButton.styleFrom(
+            side: const BorderSide(color: _line),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          icon: const Icon(Icons.arrow_back_rounded, size: 18, color: _ink),
+        ),
+        const SizedBox(width: 12),
+        const Text('Review order',
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold, color: _ink)),
+        if (showStepper)
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                step('1', 'Items', done: true),
+                connector(),
+                step('2', 'Review', active: true),
+                connector(),
+                step('3', 'Done'),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _reviewCard({required String title, required Widget child}) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: _line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title,
               style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.6,
-                  color: Color(0xFF64748B))),
-          const SizedBox(height: 12),
+                  fontSize: 16, fontWeight: FontWeight.w600, color: _ink)),
+          const SizedBox(height: 16),
           child,
         ],
       ),
     );
   }
 
-  Widget _fulfilmentCard(String type, String label) {
+  Widget _fieldLabel(String text) => Padding(
+        padding: const EdgeInsets.only(top: 16, bottom: 8),
+        child: Text(text,
+            style: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w600, color: _muted)),
+      );
+
+  /// The live app's review customer block: avatar, name, phone, and an
+  /// outlined Change button (Add, while still billing a walk-in).
+  Widget _reviewCustomerCard() {
+    return _reviewCard(
+      title: 'Customer',
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: const Color(0xFFEEF2FF),
+            child: Text(
+              _customerName.isEmpty ? 'W' : _customerName[0].toUpperCase(),
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w600, color: _brand),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_customerName,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600, color: _ink)),
+                const SizedBox(height: 2),
+                if (_customer != null)
+                  Row(
+                    children: [
+                      const Icon(Icons.phone_outlined, size: 13, color: _muted),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(_customerPhone,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                const TextStyle(fontSize: 13, color: _muted)),
+                      ),
+                    ],
+                  )
+                else
+                  const Text('Tap to add a customer',
+                      style: TextStyle(fontSize: 13, color: _muted)),
+              ],
+            ),
+          ),
+          OutlinedButton(
+            onPressed: _pickCustomer,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _brand,
+              side: const BorderSide(color: _line),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(_customer == null ? 'Add' : 'Change',
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static const _orderTypes = [
+    (DeliveryType.storePickup, 'Shop pickup', "You'll pick up",
+        Icons.storefront_outlined),
+    (DeliveryType.homePickup, 'Home pickup', "We'll pick up",
+        Icons.local_shipping_outlined),
+    (DeliveryType.homeDelivery, 'Home delivery', "We'll deliver",
+        Icons.home_outlined),
+  ];
+
+  Widget _orderTypeOption(
+      String type, String label, String subtitle, IconData icon) {
     final isSel = _deliveryType == type;
-    final icon = type == DeliveryType.homeDelivery
-        ? Icons.local_shipping_rounded
-        : type == DeliveryType.homePickup
-            ? Icons.home_rounded
-            : Icons.store_rounded;
-    return GestureDetector(
-      onTap: () => setState(() {
-        _deliveryType = type;
-        final carried =
-            type == DeliveryType.homeDelivery || type == DeliveryType.online;
-        _deliveryCharge = carried ? _deliveryFee : 0;
-        _deliveryChargeController.text = _deliveryCharge.toStringAsFixed(0);
-        // Switching fulfilment type changes what "ready" even means (now, vs
-        // needing lead time) — re-default Ready by rather than leaving
-        // whatever the previous type had selected.
-        _readyBy = _readyByDefaultFor(type);
-      }),
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => setState(() => _selectDeliveryType(type)),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
         decoration: BoxDecoration(
-          color: isSel ? const Color(0xFFEEF2FF) : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-              color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isSel ? _brand : _line, width: isSel ? 1.5 : 1),
         ),
         child: Column(
           children: [
-            Icon(icon,
-                size: 20,
-                color:
-                    isSel ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
-            const SizedBox(height: 6),
+            Icon(icon, size: 22, color: isSel ? _brand : _muted),
+            const SizedBox(height: 8),
             Text(label,
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: isSel
-                        ? const Color(0xFF1A4FD6)
-                        : const Color(0xFF334155))),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isSel ? _brand : _ink)),
+            const SizedBox(height: 2),
+            Text(subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: _muted)),
           ],
         ),
       ),
     );
   }
 
+  /// A bordered date row: calendar icon, small label over the date, chevron.
+  Widget _dateField(
+      String label, DateTime date, ValueChanged<DateTime> onPicked) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () async {
+        final today = DateUtils.dateOnly(DateTime.now());
+        final picked = await AppDatePicker.pickDate(
+          context: context,
+          initialDate: date.isBefore(today) ? today : date,
+          firstDate: today,
+          lastDate: today.add(const Duration(days: 60)),
+        );
+        if (picked != null) setState(() => onPicked(DateUtils.dateOnly(picked)));
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _line),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.calendar_today_outlined, size: 18, color: _muted),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _muted)),
+                  Text(DateFormat('EEE d MMM').format(date),
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: _ink)),
+                ],
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded, color: _muted),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _slotPicker({
+    required List<_SlotWindow> windows,
+    required DateTime date,
+    required _SlotWindow? selected,
+    required ValueChanged<_SlotWindow> onSelected,
+  }) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: windows.map((w) {
+        final isSel = selected == w;
+        final disabled = _isWindowPast(date, w);
+        return OutlinedButton(
+          key: ValueKey('slot-${w.startMinute}'),
+          onPressed: disabled ? null : () => setState(() => onSelected(w)),
+          style: OutlinedButton.styleFrom(
+            backgroundColor: isSel ? _brand : Colors.white,
+            foregroundColor: isSel ? Colors.white : _ink,
+            disabledForegroundColor: const Color(0xFFCBD5E1),
+            side: BorderSide(color: isSel ? _brand : _line),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            minimumSize: const Size(0, 44),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: Text(w.label,
+              style:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        );
+      }).toList(),
+    );
+  }
+
+  InputDecoration _boxDecoration(String hint) => InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: _line)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: _brand)),
+      );
+
   /// The Checkout review — the real app's second step before an order is
-  /// actually placed: Fulfilment, Ready by, and Notes.
-  /// `_readyBy` is guaranteed non-null by the time this builds (the Checkout
-  /// button sets a default before flipping `_showCheckoutReview`).
-  Widget _buildCheckoutReview() {
+  /// actually placed: Customer, then Order type with whatever dates, slots
+  /// and address that type needs, then Notes. `_readyBy` is guaranteed
+  /// non-null by the time this builds (Checkout calls [_selectDeliveryType]
+  /// before flipping `_showCheckoutReview`).
+  Widget _buildCheckoutReview(AppProvider provider) {
+    final isPickup = _deliveryType == DeliveryType.homePickup;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextButton.icon(
-            onPressed: () => setState(() => _showCheckoutReview = false),
-            icon: const Icon(Icons.arrow_back_rounded,
-                size: 16, color: Color(0xFF475569)),
-            label: const Text('Back to items',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF475569))),
-            style: TextButton.styleFrom(
-                padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
-          ),
-          const SizedBox(height: 4),
-          const Text('Checkout',
-              style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
-          const SizedBox(height: 20),
-          _customerCard(),
+          _reviewCustomerCard(),
           const SizedBox(height: 16),
-          _panelBox(
-            title: 'FULFILMENT',
+          _reviewCard(
+            title: 'Order type',
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
-                  children: const [
-                    DeliveryType.storePickup,
-                    DeliveryType.homePickup,
-                    DeliveryType.homeDelivery,
-                  ]
-                      .map((type) => Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: _fulfilmentCard(
-                                  type, DeliveryType.label(type)),
-                            ),
-                          ))
-                      .toList(),
-                ),
-                const SizedBox(height: 16),
-                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.calendar_today_rounded,
-                        size: 16, color: Color(0xFF64748B)),
-                    const SizedBox(width: 8),
-                    const Text('Ready by',
-                        style:
-                            TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                    const Spacer(),
-                    Flexible(
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(6),
-                        onTap: () async {
-                          final today = DateUtils.dateOnly(DateTime.now());
-                          final picked = await AppDatePicker.pickDate(
-                            context: context,
-                            initialDate: _readyBy!,
-                            firstDate: today,
-                            lastDate: today.add(const Duration(days: 60)),
-                          );
-                          if (picked != null) {
-                            setState(() => _readyBy = DateTime(
-                                picked.year,
-                                picked.month,
-                                picked.day,
-                                _readyBy!.hour,
-                                _readyBy!.minute));
-                          }
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 4),
-                          child: Text(
-                            DateFormat('EEE, d MMM, yyyy').format(_readyBy!),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                            style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
-                                decoration: TextDecoration.underline,
-                                decorationColor: Color(0xFFCBD5E1)),
-                          ),
-                        ),
-                      ),
-                    ),
+                    for (final (i, t) in _orderTypes.indexed) ...[
+                      if (i > 0) const SizedBox(width: 12),
+                      Expanded(child: _orderTypeOption(t.$1, t.$2, t.$3, t.$4)),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 10),
-                if (_deliveryType == DeliveryType.storePickup)
-                  Row(
-                    children: [
-                      const SizedBox(width: 24),
-                      const Icon(Icons.access_time_rounded,
-                          size: 14, color: Color(0xFF94A3B8)),
-                      const SizedBox(width: 6),
-                      Text('Ready at ${DateFormat('h a').format(_readyBy!)}',
-                          style: const TextStyle(
-                              fontSize: 12, color: Color(0xFF64748B))),
-                    ],
-                  )
-                else
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: _readySlotStarts(_readyBy!).map((slot) {
-                      final isSel = _readyBy!.hour == slot.hour;
-                      final disabled = _isSlotDisabled(slot);
-                      final end = slot.add(const Duration(hours: 1));
-                      final startMeridiem = DateFormat('a').format(slot);
-                      final endMeridiem = DateFormat('a').format(end);
-                      // Drop the repeated "AM"/"PM" when both ends of the
-                      // slot share one, so each chip is short enough for
-                      // several to fit per row even on a phone-width screen.
-                      final label = startMeridiem == endMeridiem
-                          ? '${DateFormat('h').format(slot)}–'
-                              '${DateFormat('h').format(end)} $startMeridiem'
-                          : '${DateFormat('h a').format(slot)}–'
-                              '${DateFormat('h a').format(end)}';
-                      return ChoiceChip(
-                        visualDensity: VisualDensity.compact,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        labelPadding:
-                            const EdgeInsets.symmetric(horizontal: 4),
-                        label: Text(label,
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: disabled
-                                    ? const Color(0xFFCBD5E1)
-                                    : (isSel
-                                        ? Colors.white
-                                        : const Color(0xFF334155)))),
-                        selected: isSel,
-                        selectedColor: const Color(0xFF1A4FD6),
-                        backgroundColor: const Color(0xFFF1F5F9),
-                        onSelected: disabled
-                            ? null
-                            : (_) => setState(() => _readyBy = DateTime(
-                                _readyBy!.year,
-                                _readyBy!.month,
-                                _readyBy!.day,
-                                slot.hour,
-                                slot.minute)),
-                      );
-                    }).toList(),
+                const SizedBox(height: 16),
+                if (!_isCarriedDelivery)
+                  _dateField('Expected ready', _readyBy!,
+                      (d) => _readyBy = d)
+                else ...[
+                  if (isPickup) ...[
+                    _dateField('Pickup date', _pickupDate!, (d) {
+                      _pickupDate = d;
+                      if (_pickupWindow != null &&
+                          _isWindowPast(d, _pickupWindow!)) {
+                        _pickupWindow = null;
+                      }
+                    }),
+                    _fieldLabel('Pickup slot'),
+                    _slotPicker(
+                      windows: _windowsFor(provider, TimeSlotModel.pickup),
+                      date: _pickupDate!,
+                      selected: _pickupWindow,
+                      onSelected: (w) => _pickupWindow = w,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  _dateField('Delivery date', _readyBy!, (d) {
+                    _readyBy = d;
+                    if (_deliveryWindow != null &&
+                        _isWindowPast(d, _deliveryWindow!)) {
+                      _deliveryWindow = null;
+                    }
+                  }),
+                  _fieldLabel('Delivery slot'),
+                  _slotPicker(
+                    windows: _windowsFor(provider, TimeSlotModel.delivery),
+                    date: _readyBy!,
+                    selected: _deliveryWindow,
+                    onSelected: (w) => _deliveryWindow = w,
                   ),
+                  _fieldLabel(isPickup ? 'Pickup address' : 'Delivery address'),
+                  TextField(
+                    controller: _addressController,
+                    minLines: 2,
+                    maxLines: 3,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: _boxDecoration('Enter full address'),
+                  ),
+                ],
+                _fieldLabel('Notes for this order (optional)'),
+                TextField(
+                  controller: _notesController,
+                  minLines: 3,
+                  maxLines: 4,
+                  maxLength: _notesMaxLength,
+                  style: const TextStyle(fontSize: 14),
+                  buildCounter: (context,
+                          {required currentLength,
+                          required isFocused,
+                          maxLength}) =>
+                      Text('$currentLength / $maxLength',
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF94A3B8))),
+                  decoration: _boxDecoration(
+                      'Stain details, folding preference, gate code…'),
+                ),
               ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          _panelBox(
-            title: 'ORDER NOTES',
-            child: TextField(
-              controller: _notesController,
-              maxLines: 3,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                hintText: 'e.g., Ring bell twice',
-                hintStyle:
-                    const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
             ),
           ),
           const SizedBox(height: 20),
@@ -946,130 +1139,203 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     );
   }
 
-  /// The right rail once Checkout has been tapped: items, Subtotal, an
-  /// editable Discount, Total, and the actual submit button.
+  /// The right rail once Checkout has been tapped: items grouped by service
+  /// (as the live app does), Discount with a %/₹ toggle, Subtotal, Delivery,
+  /// Total, Balance Due, and the actual submit button.
   Widget _buildOrderSummary(
       AppProvider provider, List<GarmentItemModel> garments, double subtotal,
       {bool shrinkWrap = false}) {
-    final total = (subtotal + _deliveryCharge - _discountAmount)
+    final discount = _discountFor(subtotal);
+    final total = (subtotal + _deliveryCharge - discount)
         .clamp(0, double.infinity)
         .toDouble();
 
-    Widget summaryLine(String label, double amount) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+    Widget summaryLine(String label, Widget value) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label,
-                  style:
-                      const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-              Text('${Money.symbol}${amount.toInt()}',
-                  style:
-                      const TextStyle(fontSize: 13, color: Color(0xFF0F172A))),
+              Text(label, style: const TextStyle(fontSize: 14, color: _muted)),
+              value,
             ],
           ),
         );
 
+    // Group lines under their service, keeping first-seen order.
+    final groups = <String, List<OrderItemModel>>{};
+    for (final item in _cartItems(garments)) {
+      groups.putIfAbsent(item.serviceType, () => []).add(item);
+    }
+
     final itemsList = ListView(
       shrinkWrap: shrinkWrap,
       physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      children: _cartItems(garments).map((item) {
-        return ListTile(
-          title: Text(item.itemTitle,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
-          subtitle: Text(
-              '${item.quantity}x @ ${Money.symbol}${item.unitPrice.toInt()}',
-              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-          trailing: Text('${Money.symbol}${item.totalPrice.toInt()}',
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
-        );
-      }).toList(),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      children: [
+        for (final entry in groups.entries) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(entry.key,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF334155))),
+                ),
+                Text(
+                    '${Money.symbol}${entry.value.fold<double>(0, (a, i) => a + i.totalPrice).toInt()}',
+                    style: const TextStyle(fontSize: 12, color: _muted)),
+              ],
+            ),
+          ),
+          for (final item in entry.value)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Builder(builder: (_) {
+                    final art = _artFor(item.itemTitle);
+                    return Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: art.color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(art.icon, size: 20, color: art.color),
+                    );
+                  }),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.itemTitle,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: _ink)),
+                        Text('× ${item.quantity}',
+                            style:
+                                const TextStyle(fontSize: 12, color: _muted)),
+                      ],
+                    ),
+                  ),
+                  Text('${Money.symbol}${item.totalPrice.toInt()}',
+                      style: const TextStyle(fontSize: 14, color: _ink)),
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
+      ],
     );
+
+    Widget unitToggle(String label, bool percent) {
+      final isSel = _discountIsPercent == percent;
+      return InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: () => setState(() => _discountIsPercent = percent),
+        child: Container(
+          width: 30,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSel ? const Color(0xFFEEF2FF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: isSel ? _brand : Colors.transparent),
+          ),
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isSel ? _brand : _muted)),
+        ),
+      );
+    }
 
     return Column(
       mainAxisSize: shrinkWrap ? MainAxisSize.min : MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.all(20.0),
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 12),
           child: Text('Order Summary',
               style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  fontSize: 16, fontWeight: FontWeight.w600, color: _ink)),
         ),
-        const Divider(height: 1),
         shrinkWrap ? itemsList : Expanded(child: itemsList),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: const BoxDecoration(
             color: Colors.white,
-            border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+            border: Border(top: BorderSide(color: _line)),
           ),
           child: Column(
             children: [
-              summaryLine('Subtotal', subtotal),
-              if (_isCarriedDelivery) ...[
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Delivery',
-                          style: TextStyle(
-                              fontSize: 13, color: Color(0xFF64748B))),
-                      SizedBox(
-                        width: 100,
-                        height: 32,
-                        child: TextField(
-                          controller: _deliveryChargeController,
-                          textAlign: TextAlign.right,
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          style: const TextStyle(fontSize: 13),
-                          decoration: InputDecoration(
-                            prefixText: '${Money.symbol} ',
-                            prefixStyle: const TextStyle(
-                                fontSize: 13, color: Color(0xFF64748B)),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 6),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                          ),
-                          onChanged: (v) => setState(
-                              () => _deliveryCharge = double.tryParse(v) ?? 0),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Discount',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                      style: TextStyle(fontSize: 14, color: _muted)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: TextField(
+                        controller: _discountController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        style: const TextStyle(fontSize: 14),
+                        decoration: _boxDecoration('Enter discount').copyWith(
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          suffixIcon: Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                unitToggle('%', true),
+                                unitToggle(Money.symbol, false),
+                              ],
+                            ),
+                          ),
+                        ),
+                        onChanged: (v) => setState(
+                            () => _discountValue = double.tryParse(v) ?? 0),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 28),
+              summaryLine(
+                  'Subtotal',
+                  Text('${Money.symbol}${subtotal.toInt()}',
+                      style: const TextStyle(fontSize: 14, color: _ink))),
+              if (_isCarriedDelivery)
+                summaryLine(
+                  'Delivery',
                   SizedBox(
-                    width: 100,
+                    width: 90,
                     height: 32,
                     child: TextField(
-                      controller: _discountController,
+                      controller: _deliveryChargeController,
                       textAlign: TextAlign.right,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(fontSize: 13),
+                      style: const TextStyle(fontSize: 14),
                       decoration: InputDecoration(
                         prefixText: '${Money.symbol} ',
-                        prefixStyle: const TextStyle(
-                            fontSize: 13, color: Color(0xFF64748B)),
+                        prefixStyle:
+                            const TextStyle(fontSize: 14, color: _muted),
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 6),
@@ -1077,25 +1343,48 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                             borderRadius: BorderRadius.circular(8)),
                       ),
                       onChanged: (v) => setState(
-                          () => _discountAmount = double.tryParse(v) ?? 0),
+                          () => _deliveryCharge = double.tryParse(v) ?? 0),
                     ),
                   ),
-                ],
-              ),
-              const Divider(height: 24),
+                ),
+              if (discount > 0)
+                summaryLine(
+                    'Discount',
+                    Text('−${Money.symbol}${discount.toInt()}',
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xFF16A34A)))),
+              const Divider(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Total',
                       style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A))),
+                          fontWeight: FontWeight.w600,
+                          color: _ink)),
                   Text('${Money.symbol}${total.toInt()}',
                       style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A))),
+                          color: _ink)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Every order placed here starts unpaid (see _checkout), so
+              // the whole total is the balance due.
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Balance Due',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFFB91C1C))),
+                  Text('${Money.symbol}${total.toInt()}',
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFB91C1C))),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1106,9 +1395,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                       ? null
                       : () => _checkout(provider, garments, subtotal),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A4FD6),
+                    backgroundColor: _brand,
                     disabledBackgroundColor: const Color(0xFFCBD5E1),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
@@ -1119,10 +1408,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text('Place order',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
+                      : Text('Place order · ${Money.symbol}${total.toInt()}',
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                               color: Colors.white)),
                 ),
               ),
@@ -1516,15 +1805,32 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     final items = _cartItems(garments);
     if (items.isEmpty) return;
 
+    // A carried order is scheduled against real slots — the live app won't
+    // place one without them, and neither do we.
+    final missingSlot = _deliveryType == DeliveryType.homePickup &&
+            _pickupWindow == null
+        ? 'Pick a pickup slot'
+        : _isCarriedDelivery && _deliveryWindow == null
+            ? 'Pick a delivery slot'
+            : null;
+    if (missingSlot != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(missingSlot, style: const TextStyle(fontSize: 13))),
+      );
+      return;
+    }
+
     // Matches the backend's own formula (serializers.py: subtotal + delivery
     // - discount) so the payload and what the server computes agree.
-    final total = (subtotal + _deliveryCharge - _discountAmount)
+    final discount = _discountFor(subtotal);
+    final total = (subtotal + _deliveryCharge - discount)
         .clamp(0, double.infinity)
         .toDouble();
     // "Collect payment now" was removed from Checkout review — every order
     // placed from here starts unpaid; payment is collected later.
     const paid = 0.0;
     final notes = _notesController.text.trim();
+    final address = _addressController.text.trim();
 
     final payload = <String, dynamic>{
       // `order_number` is deliberately absent: the serializer marks it
@@ -1539,15 +1845,20 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       'delivery_charge': _deliveryCharge,
       'source': 'WEB',
       'subtotal': subtotal,
-      'discount_amount': _discountAmount,
+      'discount_amount': discount,
       'total_amount': total,
       'paid_amount': paid,
       'due_amount': total - paid,
       if (notes.isNotEmpty) 'notes': notes,
-      if (_readyBy != null) ...{
+      if (_readyBy != null)
         'scheduled_date': DateFormat('yyyy-MM-dd').format(_readyBy!),
-        'scheduled_time': DateFormat('HH:mm:ss').format(_readyBy!),
+      if (_isCarriedDelivery && _deliveryWindow != null)
+        'scheduled_time': _deliveryWindow!.apiStart,
+      if (_deliveryType == DeliveryType.homePickup) ...{
+        'pickup_date': DateFormat('yyyy-MM-dd').format(_pickupDate!),
+        'pickup_time': _pickupWindow!.apiStart,
       },
+      if (_isCarriedDelivery && address.isNotEmpty) 'address': address,
       'items': items.map((i) => i.toJson()).toList(),
     };
 
@@ -1583,11 +1894,16 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       _customer = null;
       _showCheckoutReview = false;
       _readyBy = null;
-      _discountAmount = 0;
+      _deliveryWindow = null;
+      _pickupDate = null;
+      _pickupWindow = null;
+      _discountValue = 0;
+      _discountIsPercent = true;
       _deliveryType = DeliveryType.storePickup;
       _deliveryCharge = 0;
       _notesController.clear();
-      _discountController.text = '0';
+      _addressController.clear();
+      _discountController.clear();
       _deliveryChargeController.text = _deliveryFee.toStringAsFixed(0);
     });
 
@@ -1646,6 +1962,48 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       fallbackColors[hash % fallbackColors.length],
     );
   }
+}
+
+/// One bookable window on the review step, in minutes since midnight —
+/// either a shop-configured [TimeSlotModel] or an hourly fallback.
+class _SlotWindow {
+  final int startMinute;
+  final int endMinute;
+  const _SlotWindow(this.startMinute, this.endMinute);
+
+  static _SlotWindow? fromSlot(TimeSlotModel slot) {
+    int? minutes(String t) {
+      final parts = t.split(':');
+      if (parts.length < 2) return null;
+      final h = int.tryParse(parts[0]);
+      final m = int.tryParse(parts[1]);
+      return (h == null || m == null) ? null : h * 60 + m;
+    }
+
+    final start = minutes(slot.startTime);
+    final end = minutes(slot.endTime);
+    return (start == null || end == null) ? null : _SlotWindow(start, end);
+  }
+
+  static String _hhmm(int minute) =>
+      '${(minute ~/ 60).toString().padLeft(2, '0')}:'
+      '${(minute % 60).toString().padLeft(2, '0')}';
+
+  /// "HH:MM:SS", for a Django `TimeField`.
+  String get apiStart => '${_hhmm(startMinute)}:00';
+
+  /// "9:00 AM - 11:00 AM", as the live app labels its slot buttons.
+  String get label => '${TimeSlotModel.formatTime(_hhmm(startMinute))} - '
+      '${TimeSlotModel.formatTime(_hhmm(endMinute))}';
+
+  @override
+  bool operator ==(Object other) =>
+      other is _SlotWindow &&
+      other.startMinute == startMinute &&
+      other.endMinute == endMinute;
+
+  @override
+  int get hashCode => Object.hash(startMinute, endMinute);
 }
 
 class _ItemArt {

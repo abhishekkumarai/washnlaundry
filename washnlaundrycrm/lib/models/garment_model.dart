@@ -352,6 +352,8 @@ class AttendanceModel {
   final String staffName;
   final DateTime? date;
   final String status;
+  final String? checkInTime;
+  final String notes;
 
   const AttendanceModel({
     required this.id,
@@ -359,6 +361,8 @@ class AttendanceModel {
     required this.staffName,
     this.date,
     this.status = 'PRESENT',
+    this.checkInTime,
+    this.notes = '',
   });
 
   factory AttendanceModel.fromJson(Map<String, dynamic> json) =>
@@ -368,6 +372,8 @@ class AttendanceModel {
         staffName: json['staff_name'] ?? '',
         date: DateTime.tryParse(json['date'] ?? ''),
         status: json['status'] ?? 'PRESENT',
+        checkInTime: json['check_in_time']?.toString(),
+        notes: json['notes']?.toString() ?? '',
       );
 }
 
@@ -409,6 +415,7 @@ class PayrollEntryModel {
   final int presentDays;
   final int halfDays;
   final int leaveDays;
+  final int absentDays;
 
   /// Gross — attendance × daily rate, before advances come off.
   final double totalSalary;
@@ -432,6 +439,7 @@ class PayrollEntryModel {
     this.presentDays = 0,
     this.halfDays = 0,
     this.leaveDays = 0,
+    this.absentDays = 0,
     this.totalSalary = 0,
     this.advancesAmount = 0,
     this.netPay = 0,
@@ -450,6 +458,7 @@ class PayrollEntryModel {
         presentDays: (json['present_days'] ?? 0) as int,
         halfDays: (json['half_days'] ?? 0) as int,
         leaveDays: (json['leave_days'] ?? 0) as int,
+        absentDays: (json['absent_days'] ?? 0) as int,
         totalSalary: (json['total_salary'] ?? 0).toDouble(),
         advancesAmount: (json['advances_amount'] ?? 0).toDouble(),
         netPay: (json['net_pay'] ?? json['total_salary'] ?? 0).toDouble(),

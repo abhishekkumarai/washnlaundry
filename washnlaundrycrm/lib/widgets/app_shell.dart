@@ -16,7 +16,13 @@ class AppShell extends StatelessWidget {
     final narrow =
         MediaQuery.sizeOf(context).width < SidebarNavigation.railMinWidth;
     if (!narrow) {
-      return Row(children: [const SidebarNavigation(), Expanded(child: body)]);
+      // stretch: the page gets the full height. With the default centre
+      // alignment a body shorter than the window (a bare scroll view, say)
+      // was vertically centred, floating the page title mid-screen.
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [const SidebarNavigation(), Expanded(child: body)],
+      );
     }
     return Column(
       children: [
