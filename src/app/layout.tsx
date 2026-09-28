@@ -1,15 +1,13 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { CartProvider } from '../context/CartContext';
-import Navbar from '../components/Navbar/Navbar';
-import Footer from '../components/Footer/Footer';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
-  title: 'WashNLaundry - Professional Laundry & Dry Cleaning on Autopilot',
-  description: 'Sustainable, clean, and fast laundry and dry cleaning services with doorstep pickup & delivery in 24 hours. Affordable neighborhood rates.',
+  title: 'WashNLaundry - Premium Eco-Care Garment Specialists',
+  description: 'Doorstep pickup, zero-harsh-chemical organic wash, artisan steam press, and 24-hour delivery across Patna.',
   keywords: 'laundry, dry cleaning, wash and fold, wash and iron, steam iron, WashNLaundry, patna, bihar, sustainable laundry',
   metadataBase: new URL('https://washnlaundry.com'),
   alternates: {
@@ -29,13 +27,9 @@ export default function RootLayout({
 
   return (
     <html lang="en">
-      <body>
+      <body className="min-h-screen">
         <CartProvider>
-          <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-            <Navbar />
-            <main style={{ flex: 1 }}>{children}</main>
-            <Footer />
-          </div>
+          {children}
         </CartProvider>
         <Analytics />
         <SpeedInsights />
@@ -59,6 +53,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-
-

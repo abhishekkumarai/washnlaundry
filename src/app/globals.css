@@ -1,227 +1,101 @@
-/* Clean design system for WashNLaundry */
-
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300&family=Comfortaa:wght@700&display=swap');
+@import "tailwindcss";
 
 :root {
-  /* Brand Theme Colors */
-  --primary-blue: #00aeef;
-  --primary-blue-rgb: 0, 174, 239;
-  --primary-blue-light: #e6f7fe;
-  --secondary-yellow: #ffffff;
-  --secondary-yellow-rgb: 255, 255, 255;
-  --secondary-yellow-dark: #00aeef;
-
-  /* Service Category Colors */
-  --color-wash-fold: #0074bc;
-  --color-wash-fold-rgb: 0, 116, 188;
-  --color-wash-iron: #c63e96;
-  --color-wash-iron-rgb: 198, 62, 150;
-  --color-steam-iron: #6850a1;
-  --color-steam-iron-rgb: 104, 80, 161;
-  --color-dry-clean: #009599;
-  --color-dry-clean-rgb: 0, 149, 153;
-  --color-express-sprint: #e76400;
-  --color-express-sprint-rgb: 231, 100, 0;
-
-  /* Neutrals */
-  --bg-light: #f8fafc;
-  --bg-white: #ffffff;
-  --text-dark: #0f172a;
-  --text-medium: #475569;
-  --text-light: #94a3b8;
-  --border-light: #e2e8f0;
-  --border-dashed: #cbd5e1;
-
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-premium: 0 20px 25px -5px rgba(0, 84, 233, 0.07), 0 10px 10px -5px rgba(0, 84, 233, 0.03);
-
-  /* Typography */
-  --font-sans: 'Outfit', sans-serif;
-  --font-serif: 'Merriweather', serif;
-  --font-logo: 'Comfortaa', cursive;
-
-  /* Layout */
-  --max-width: 1200px;
-  --border-radius-sm: 8px;
-  --border-radius-md: 16px;
-  --border-radius-lg: 24px;
+  --background: #F8F7F5;
+  --foreground: #141A24;
+  --card: #FFFFFF;
+  --card-foreground: #141A24;
+  --primary: #182C4F;
+  --primary-hover: #101E38;
+  --primary-foreground: #FAF9F6;
+  --secondary: #F0EEE9;
+  --secondary-foreground: #141A24;
+  --accent: #2563EB;
+  --accent-soft: #EFF6FF;
+  --accent-foreground: #1D4ED8;
+  --muted: #64748B;
+  --muted-background: #F1EFEA;
+  --border: #E4E0D8;
+  --border-subtle: #ECE9E2;
+  --brand: #182C4F;
 }
 
-/* Dark Mode Overrides (Optional / Sleek Minimalist) */
-[data-theme='dark'] {
-  --bg-light: #0f172a;
-  --bg-white: #1e293b;
-  --text-dark: #f8fafc;
-  --text-medium: #cbd5e1;
-  --text-light: #64748b;
-  --border-light: #334155;
-  --border-dashed: #475569;
-  --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --color-brand: var(--brand);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: Georgia, Cambria, "Times New Roman", Times, serif;
 }
 
-/* Basic Reset & Core styles */
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
-
-html {
-  scroll-behavior: smooth;
-  font-size: 16px;
+html,
+body {
+  height: 100%;
 }
 
 body {
+  background: var(--background);
+  color: var(--foreground);
   font-family: var(--font-sans);
-  color: var(--text-medium);
-  background-color: var(--bg-light);
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  letter-spacing: -0.015em;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-sans);
-  color: var(--text-dark);
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-.heading-serif {
+.font-serif {
   font-family: var(--font-serif);
 }
 
-a {
-  text-decoration: none;
-  color: inherit;
-  transition: all 0.2s ease;
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.24em;
+  color: var(--primary);
 }
 
-button, input, select, textarea {
-  font-family: inherit;
-  font-size: inherit;
+.eyebrow::before {
+  content: '';
+  display: inline-block;
+  width: 24px;
+  height: 1px;
+  background-color: var(--primary);
 }
 
-/* Utility Layouts */
-.container {
+.field {
+  height: 3rem;
   width: 100%;
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 0 24px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background-color: #FFFFFF;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  transition: all 0.15s ease;
 }
 
-.flex-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.field:focus {
+  border-color: var(--accent);
+  outline: 2px solid rgba(37, 99, 235, 0.2);
 }
 
-.section-padding {
-  padding: 80px 0;
-}
-
-@media (max-width: 768px) {
-  .section-padding {
-    padding: 60px 0;
-  }
-}
-
-/* Glassmorphism Styles */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: var(--shadow-premium);
-}
-
-[data-theme='dark'] .glass-panel {
-  background: rgba(30, 41, 59, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-/* Premium Buttons styling */
-.btn-primary {
-  background-color: var(--primary-blue);
-  color: #ffffff;
-  padding: 12px 28px;
-  border-radius: 30px;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 14px 0 rgba(0, 116, 188, 0.4);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-primary:hover {
-  background-color: #00609d;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px 0 rgba(0, 116, 188, 0.6);
-}
-
-.btn-secondary {
-  background-color: var(--secondary-yellow);
-  color: var(--primary-blue);
-  padding: 12px 28px;
-  border-radius: 30px;
-  border: 1px solid var(--primary-blue);
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 14px 0 rgba(0, 174, 239, 0.15);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-secondary:hover {
-  background-color: var(--secondary-yellow-dark);
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px 0 rgba(0, 174, 239, 0.3);
-}
-
-.btn-outline {
-  background-color: transparent;
-  color: var(--primary-blue);
-  padding: 11px 26px;
-  border-radius: 30px;
-  border: 2px solid var(--primary-blue);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-outline:hover {
-  background-color: var(--primary-blue-light);
-  transform: translateY(-2px);
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
+/* thin, subtle scrollbars for horizontal scrollers */
+.scroll-thin::-webkit-scrollbar {
   height: 8px;
+  width: 8px;
 }
-
-::-webkit-scrollbar-track {
-  background: var(--bg-light);
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
 }
-
-::-webkit-scrollbar-thumb {
-  background: var(--text-light);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-medium);
-}
-
