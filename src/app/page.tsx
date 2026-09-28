@@ -74,6 +74,21 @@ const serviceAreas = [
   { name: "Danapur Cantt & Saguna More", status: "Active Doorstep Service", timing: "09:00 AM – 07:00 PM" },
 ];
 
+const coverageAreas = [
+  { name: "Boring Road", sub: "Canal Rd · Nageshwar", timing: "08:00 AM – 08:00 PM" },
+  { name: "Patliputra", sub: "Colony · Industrial", timing: "08:00 AM – 08:00 PM" },
+  { name: "Bailey Road", sub: "Raja Bazar · Pillar 50-80", timing: "08:00 AM – 08:00 PM" },
+  { name: "Kankarbagh", sub: "Main Rd · Doctors Colony", timing: "09:00 AM – 07:00 PM" },
+  { name: "Danapur Cantt", sub: "Saguna More · Station", timing: "09:00 AM – 07:00 PM" },
+  { name: "Ashiana Nagar", sub: "Phases 1-2 · Ram Nagari", timing: "08:00 AM – 08:00 PM" },
+  { name: "Rajendra Nagar", sub: "Stadium · Kadamkuan", timing: "09:00 AM – 07:00 PM" },
+  { name: "SK Puri", sub: "Anandpuri · Children Park", timing: "08:00 AM – 08:00 PM" },
+  { name: "Exhibition Road", sub: "Dak Bunglow · Frazer Rd", timing: "09:00 AM – 07:00 PM" },
+  { name: "Anisabad", sub: "Golambar · Phulwari", timing: "09:00 AM – 07:00 PM" },
+  { name: "Gola Road", sub: "RPS More · Vivekananda", timing: "09:00 AM – 07:00 PM" },
+  { name: "Shastri Nagar", sub: "AG Colony · Rajbansi", timing: "08:00 AM – 08:00 PM" },
+];
+
 export default function LandingPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -169,6 +184,9 @@ export default function LandingPage() {
             <a href="#standard" className="transition-colors hover:text-[#182C4F]">
               Our standard
             </a>
+            <a href="#coverage" className="transition-colors hover:text-[#182C4F]">
+              Areas
+            </a>
             <button
               onClick={() => {
                 setIsLocationModalOpen(true);
@@ -210,6 +228,7 @@ export default function LandingPage() {
             <div className="flex flex-col gap-4 text-sm font-semibold text-slate-800">
               <a href="#services" onClick={() => setIsMenuOpen(false)}>Services</a>
               <a href="#standard" onClick={() => setIsMenuOpen(false)}>Our standard</a>
+              <a href="#coverage" onClick={() => setIsMenuOpen(false)}>Servicing Areas</a>
               <button
                 onClick={() => {
                   setIsMenuOpen(false);
@@ -582,6 +601,106 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        {/* Coverage & Servicing Areas - Square Box Grid */}
+        <section id="coverage" className="border-t border-[#E4E0D8] bg-[#F8F7F5] py-20">
+          <div className="mx-auto max-w-[1240px] px-5 lg:px-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+              <div>
+                <div className="eyebrow mb-3">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#2563EB]" />
+                  <span>DOORSTEP COVERAGE DIRECTORY</span>
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#182C4F]">
+                  Servicing Areas &amp; <span className="font-serif italic font-normal text-slate-700">Active Clusters</span>
+                </h2>
+                <p className="mt-2 text-sm text-slate-600 max-w-xl">
+                  Daily morning and evening pickup routes scheduled across primary neighborhoods with zero collection surcharge.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setIsLocationModalOpen(true);
+                  handleTrackCurrentLocation();
+                }}
+                className="inline-flex items-center gap-2 self-start md:self-auto rounded-[8px] border border-[#182C4F] bg-white px-4 py-2.5 text-xs font-bold text-[#182C4F] hover:bg-[#182C4F] hover:text-white transition shadow-xs cursor-pointer"
+              >
+                <Navigation size={13} className="text-[#2563EB]" />
+                <span>Verify Your Neighborhood</span>
+              </button>
+            </div>
+
+            {/* The Main Square Box Container */}
+            <div className="rounded-[16px] border border-[#E4E0D8] bg-white p-6 sm:p-8 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 mb-6 border-b border-[#ECE9E2]">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-[10px] bg-[#182C4F] flex items-center justify-center text-white">
+                    <MapPin size={20} className="text-sky-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Patna Urban Coverage Hubs</h3>
+                    <p className="text-xs text-slate-500">Tap any zone box to select it for your pickup booking</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-700 bg-[#F8F7F5] border border-[#E4E0D8] px-3 py-1.5 rounded-[8px]">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>12 Active Daily Routes</span>
+                </div>
+              </div>
+
+              {/* Grid of Square Area Boxes */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 sm:gap-4">
+                {coverageAreas.map((area, idx) => (
+                  <div
+                    key={area.name}
+                    onClick={() => {
+                      setFormData({ ...formData, address: area.name });
+                      const formElement = document.getElementById("book");
+                      if (formElement) formElement.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="group relative flex flex-col justify-between aspect-square rounded-[12px] border border-[#E4E0D8] bg-[#F8F7F5] p-3.5 sm:p-4 hover:border-[#182C4F] hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer text-left"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-[10px] font-bold text-slate-400 font-mono group-hover:text-[#2563EB] transition-colors">
+                        ZONE {String(idx + 1).padStart(2, "0")}
+                      </span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Active Daily Pickup" />
+                    </div>
+
+                    <div className="my-auto py-1">
+                      <span className="block text-xs sm:text-sm font-bold text-[#182C4F] leading-tight group-hover:text-[#2563EB] transition-colors">
+                        {area.name}
+                      </span>
+                      <span className="block text-[10px] text-slate-500 mt-1 font-medium leading-tight">
+                        {area.sub}
+                      </span>
+                    </div>
+
+                    <div className="pt-2 border-t border-[#ECE9E2] flex items-center justify-between text-[10px] text-slate-500">
+                      <span className="text-[9.5px] font-medium text-slate-500 truncate">{area.timing}</span>
+                      <span className="text-[#2563EB] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                        Select →
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Box Footer Note */}
+              <div className="mt-6 pt-5 border-t border-[#ECE9E2] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
+                <p className="flex items-center gap-2">
+                  <Clock3 size={13} className="text-[#182C4F]" />
+                  <span>Doorstep collection available 7 days a week. Same-day pickup for requests before 1:00 PM.</span>
+                </p>
+                <span className="text-[11px] text-slate-400">
+                  Dispatch Helpline: <a href="tel:08407000048" className="font-semibold text-[#182C4F] hover:underline">08407 000 048</a>
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* Clean Footer with Terms, Cookies & Location Links */}
@@ -603,6 +722,7 @@ export default function LandingPage() {
             <div className="flex flex-wrap gap-x-8 gap-y-2 text-xs font-semibold text-slate-600">
               <a href="#services" className="hover:text-slate-900">Services</a>
               <a href="#standard" className="hover:text-slate-900">Our standard</a>
+              <a href="#coverage" className="hover:text-slate-900">Servicing Areas</a>
               <button
                 onClick={() => {
                   setIsLocationModalOpen(true);
