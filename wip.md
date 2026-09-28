@@ -5,7 +5,8 @@ previous WIP notes below it, which covered an already-shipped, unrelated batch
 of work (Staff/Payroll/Expenses/Credits, all merged and in Jira review already).
 
 Jira status as of this update: KAN-109 (parent) To Do, KAN-110 Backlog,
-KAN-111 **Done**, KAN-112 In Progress, KAN-113 In Review, KAN-114 To Do.
+KAN-111 **Done**, KAN-112 In Progress (both task-4 clients now built, see
+below — ready to move to In Review), KAN-113 In Review, KAN-114 To Do.
 KAN-109 itself hasn't been rolled up to reflect that 3 of its 4 children are
 done or in review — worth doing next time Jira is touched for this epic.
 
@@ -37,8 +38,8 @@ done or in review — worth doing next time Jira is touched for this epic.
 - Still open: `app.washnlaundry.com` custom domain not attached — needs
   KAN-114's zone first.
 
-**KAN-112 — RAG chat engine** — In Progress (backend done, Flutter client
-done this session, WhatsApp bridge still pending)
+**KAN-112 — RAG chat engine** — In Progress (backend, Flutter client, and
+WhatsApp bridge all done this session — ready to move to In Review)
 - Worker `washnlaundry-rag`, live at https://washnlaundry-rag.abhishekkumarai.workers.dev
 - `cloudflare/rag-engine/` — KV (`washnlaundry-knowledge-base`) + Vectorize (`washnlaundry-kb`)
   instead of R2 (see Blocked, below)
@@ -67,6 +68,34 @@ done this session, WhatsApp bridge still pending)
     Render proxy.
   - All 228 Django tests and the full Flutter test suite pass with these
     changes.
+- **WhatsApp bridge auto-reply — built today** (`whatsapp-bridge/`):
+  - `src/autoReply.js` — pure, unit-tested functions: `extractText` (reads
+    `conversation`/`extendedTextMessage`, unwraps one level of
+    `ephemeralMessage` for disappearing-message chats), `shouldAutoReply`
+    (excludes our own outbound messages, `@g.us` groups, and
+    `status@broadcast`), `extractSseToken`/`collectSseText` (same two-shape
+    SSE tolerance as the Flutter client, but collects the full reply before
+    sending — WhatsApp has no streaming-message concept), and
+    `handleIncomingMessage`, the orchestrator wired into the socket.
+  - `src/socket.js` — added a `messages.upsert` listener (filtered to
+    `type === 'notify'` only, so Baileys' history-backfill on reconnect
+    can't trigger a reply to a days-old message) behind a settable
+    `setIncomingMessageHandler` hook, keeping the module pure transport —
+    no RAG/HTTP concerns leak into it.
+  - `src/index.js` — wires the handler to the Django RAG proxy
+    (`BACKEND_URL`, defaulting to `http://backend:8000` in Docker) and
+    `sendTextMessage`.
+  - **Deliberately opt-in and off by default**: `AUTO_REPLY_ENABLED`
+    (`WHATSAPP_AUTO_REPLY` in `.env`/`docker-compose.yml`) must be set to
+    `true` before any real customer gets an AI reply on the live,
+    already-linked WhatsApp session. This was flagged going in as a genuine
+    production behavior change, not a contained addition like the Flutter
+    piece — the default keeps that decision explicit and separate from
+    shipping the code.
+  - 15/15 new + existing `whatsapp-bridge` tests pass
+    (`node --test test/*.test.js`).
+  - **Not yet flipped on** — `WHATSAPP_AUTO_REPLY` stays `false` until it's
+    deliberately turned on, same reasoning as above.
 
 **KAN-113 — Edge reverse proxy** — In Review (unchanged)
 - Worker `washnlaundry-api-proxy`, live at https://washnlaundry-api-proxy.abhishekkumarai.workers.dev
@@ -75,13 +104,12 @@ done this session, WhatsApp bridge still pending)
 
 ## Pending
 
-- **KAN-112 — WhatsApp bridge integration** — not started. `whatsapp-bridge/`
-  (`whatsapp-bridge/src/`) is currently **send-only** (`/send`, `/send-media`)
-  — there's no inbound-message listener at all. Wiring RAG support in means
-  adding a `messages.upsert` handler that calls the RAG proxy and auto-replies
-  on the real, already-linked WhatsApp session — a genuine behavior change on
-  live customer traffic, not a contained addition like the Flutter piece was.
-  Explicitly deferred as the second half of task 4, after the Flutter chat UI.
+- **KAN-112 — turn on `WHATSAPP_AUTO_REPLY`** — code is done and tested but
+  the feature is off by default (see above). Flipping it on is a deliberate,
+  separate decision — real customers start getting AI replies the moment
+  it's set to `true`. Verify the RAG backend's answers on a few real
+  questions first (rates, policies, order lookups) before enabling on the
+  live session.
 - **KAN-110** — `app.washnlaundry.com` custom domain not attached (needs
   KAN-114's zone first). Pre-push → Cloudflare cutover is done (see above).
 - **KAN-113** — Worker isn't attached to a route on the real domain yet, only

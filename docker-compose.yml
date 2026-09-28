@@ -28,6 +28,8 @@ services:
     environment:
       - PORT=3000
       - BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-laundry_secret_bridge_token}
+      - BACKEND_URL=http://backend:8000
+      - AUTO_REPLY_ENABLED=${WHATSAPP_AUTO_REPLY:-false}
     volumes:
       - whatsapp_session:/app/session
 

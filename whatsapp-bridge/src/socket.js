@@ -21,6 +21,16 @@ let currentQr = null;
 let currentQrDataUrl = null;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
+let incomingMessageHandler = null;
+
+/**
+ * Registers the callback invoked for each genuinely-new inbound message
+ * (see autoReply.js). Kept as a settable hook rather than an import here so
+ * this module stays pure transport — no RAG/HTTP concerns.
+ */
+export function setIncomingMessageHandler(handler) {
+  incomingMessageHandler = handler;
+}
 
 // Ensure session directory exists
 if (!fs.existsSync(SESSION_DIR)) {
@@ -82,6 +92,18 @@ export async function startWhatsAppSocket() {
     });
 
     sock.ev.on('creds.update', saveCreds);
+
+    // 'notify' is a genuinely new message; Baileys also fires this event with
+    // type 'append' while backfilling history on (re)connect, which must not
+    // trigger a reply to a message from days ago.
+    sock.ev.on('messages.upsert', ({ messages, type }) => {
+      if (type !== 'notify' || !incomingMessageHandler) return;
+      for (const message of messages) {
+        Promise.resolve(incomingMessageHandler(message)).catch((err) => {
+          logger.error({ err }, 'incomingMessageHandler failed');
+        });
+      }
+    });
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
