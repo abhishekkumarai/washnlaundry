@@ -104,11 +104,58 @@ WhatsApp bridge all done this session — ready to move to In Review)
 
 ## Pending
 
+- **KAN-112 — CRITICAL: `/api/rag/chat/` hangs indefinitely under real
+  cross-origin traffic, and it can take the whole site down while it does.**
+  Found live 2026-09-28 evening while adding a chat widget to the marketing
+  site (see below): a real request to the proxy hung 100+s even after fixing
+  the `iter_content(chunk_size=None)` bug (a known requests/urllib3 gotcha —
+  switched to `chunk_size=256`, commit `bf01ce3` — **did not fix it**), even
+  though the `washnlaundry-rag` Worker itself answered the identical query in
+  ~7s when called directly. Root cause still unknown — deliberately **not**
+  debugged further against production, because:
+  - Render runs this backend with a **single sync gunicorn worker**
+    (`WEB_CONCURRENCY=1`, free/starter plan). One hung request blocks *all*
+    other traffic — dashboard, orders, everything — until it times out or
+    the service is restarted.
+  - This is exactly what happened: repeated test requests against the proxy
+    monopolized the one worker and caused a real, user-reported failure —
+    "https://washnlaundrycrm.pages.dev/new-order error while saving, timeout
+    issue" — at the same time. Fixed by `render restart
+    srv-da4j29bl550s738309ng`; confirmed `/api/dashboard/stats/`,
+    `/api/orders/`, `/api/customers/`, `/api/items/` all back to 200 OK in
+    under 1.1s afterward.
+  - **Implication for KAN-112's WhatsApp auto-reply**: it calls this exact
+    same endpoint. Enabling `WHATSAPP_AUTO_REPLY` right now risks a customer
+    message hanging the single worker and taking down the *entire site* for
+    everyone else, not just failing the chat reply. **Do not enable it until
+    this is fixed.**
+  - Next step (per explicit instruction, not started yet): reproduce the
+    hang against `manage.py runserver` locally, calling the real
+    `washnlaundry-rag` Worker, so it can be debugged without ever risking
+    live traffic again. Do not repeat direct-against-production debugging
+    for this.
+- **KAN-112 — chat UI is live on both surfaces but currently broken** as a
+  direct consequence of the bug above:
+  - Flutter CRM (`washnlaundrycrm.pages.dev`) — chat FAB present, will error
+    or hang on a real question.
+  - **New**: also added to the Next.js marketing site
+    (`washnlaundry-marketing.abhishekkumarai.workers.dev/`), scoped to the
+    home page only (`src/app/page.tsx`, not `/about` — new
+    `src/components/ChatWidget/ChatWidget.tsx`, calls the same Django proxy
+    directly client-side since `CORS_ALLOW_ALL_ORIGINS=True` already allows
+    it, no new Next.js API route or secret needed). Bottom-left FAB (bot
+    icon, matching the Flutter CRM's icon) so it doesn't collide with the
+    existing bottom-right Call/WhatsApp/Scroll-to-top stack. Deployed via
+    `wrangler deploy` from the WSL native-filesystem build (same workflow as
+    KAN-111). This half of KAN-112's task 4 (Flutter + WhatsApp bridge) has
+    grown a third client; the description should probably be read as
+    "wherever customers need support," not literally just those two.
 - **KAN-112 — turn on `WHATSAPP_AUTO_REPLY`** — code is done and tested but
-  the feature is off by default (see above). Flipping it on is a deliberate,
-  separate decision — real customers start getting AI replies the moment
-  it's set to `true`. Verify the RAG backend's answers on a few real
-  questions first (rates, policies, order lookups) before enabling on the
+  the feature is off by default (see above), and now also **blocked** on the
+  hang bug above. Flipping it on is a deliberate, separate decision — real
+  customers start getting AI replies the moment it's set to `true`. Verify
+  the RAG backend's answers on a few real questions first (rates, policies,
+  order lookups) **and confirm the hang is fixed** before enabling on the
   live session.
 - **KAN-110** — `app.washnlaundry.com` custom domain not attached (needs
   KAN-114's zone first). Pre-push → Cloudflare cutover is done (see above).
