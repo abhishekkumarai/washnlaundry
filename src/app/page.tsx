@@ -187,17 +187,17 @@ export default function LandingPage() {
       <header className="sticky top-0 z-40 border-b border-[#E4E0D8] bg-[#F8F7F5]/90 backdrop-blur-md">
         <nav className="mx-auto flex max-w-[1240px] items-center justify-between px-5 py-4 lg:px-8">
           {/* Brand */}
-          <a href="#home" className="flex items-center gap-3.5 group">
+          <a href="#home" className="flex items-center gap-4 group">
             <img 
               src="/brand-logo.png" 
               alt="WashNLaundry Emblem" 
-              className="h-14 w-14 sm:h-16 sm:w-16 object-contain rounded-full border border-[#E4E0D8] bg-white p-1 group-hover:scale-105 transition-transform shadow-xs flex-shrink-0" 
+              className="h-20 w-20 sm:h-24 sm:w-24 object-contain rounded-full border-2 border-[#E4E0D8] bg-white p-1.5 group-hover:scale-105 transition-transform shadow-md flex-shrink-0" 
             />
             <div className="flex flex-col">
-              <span className="text-[19px] sm:text-[22px] font-extrabold tracking-tight text-slate-900 leading-tight">
+              <span className="text-2xl sm:text-[28px] font-black tracking-tight text-slate-900 leading-tight">
                 Wash<span className="text-[#2563EB]">N</span>Laundry
               </span>
-              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">
+              <span className="text-xs sm:text-[13px] font-bold uppercase tracking-wider text-slate-500 mt-1">
                 Give your dirty work to us
               </span>
             </div>
@@ -754,15 +754,15 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-[1240px] flex-col justify-between gap-8 px-5 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <div className="flex items-center gap-3.5">
+              <div className="flex items-center gap-4">
                 <img 
                   src="/brand-logo.png" 
                   alt="WashNLaundry Official Emblem" 
-                  className="h-14 w-14 sm:h-16 sm:w-16 object-contain rounded-full border border-[#E4E0D8] bg-white p-1 flex-shrink-0" 
+                  className="h-18 w-18 sm:h-22 sm:w-22 object-contain rounded-full border-2 border-[#E4E0D8] bg-white p-1.5 shadow-sm flex-shrink-0" 
                 />
                 <div>
-                  <span className="font-extrabold text-slate-900 text-base sm:text-lg block leading-tight">WashNLaundry</span>
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block mt-0.5">Give your dirty work to us</span>
+                  <span className="font-black text-slate-900 text-xl sm:text-2xl block leading-tight">WashNLaundry</span>
+                  <span className="text-xs sm:text-[13px] font-bold text-slate-500 uppercase tracking-wider block mt-1">Give your dirty work to us</span>
                 </div>
               </div>
               <p className="mt-2 text-xs text-slate-500 max-w-sm">
