@@ -54,4 +54,11 @@ class RagService:
             resp.close()
             raise RagServiceError(f"RAG worker returned {resp.status_code}: {body}")
 
-        return resp.iter_content(chunk_size=None)
+        # NOT chunk_size=None: the worker's response is chunked-transfer-
+        # encoded, and requests/urllib3 has a long-standing gotcha where
+        # iter_content(chunk_size=None) can block waiting to buffer a full
+        # "chunk" instead of yielding bytes as they arrive — confirmed live,
+        # this hung the whole request past gunicorn's timeout even though
+        # the worker itself answered in ~7s. A small fixed size streams
+        # incrementally as intended.
+        return resp.iter_content(chunk_size=256)
