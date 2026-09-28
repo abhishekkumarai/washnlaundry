@@ -2,8 +2,11 @@ import json
 from datetime import timedelta
 
 from django.db.models import ProtectedError, Sum, Count, Q
+from django.http import JsonResponse, StreamingHttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from rest_framework import viewsets
 from rest_framework.decorators import api_view, action
 from rest_framework.parsers import MultiPartParser
@@ -11,6 +14,7 @@ from rest_framework.response import Response
 
 from . import customer_import
 from .services.whatsapp_service import WhatsAppService
+from .services.rag_service import RagService, RagServiceError
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
     Expense, Credit, CreditCategory, Staff, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
@@ -1020,4 +1024,34 @@ def whatsapp_qr(request):
     """
     qr_info = WhatsAppService.get_qr_code()
     return Response(qr_info)
+
+
+@csrf_exempt
+@require_POST
+def rag_chat(request):
+    """POST /api/rag/chat/
+    Proxies the washnlaundry-rag Cloudflare Worker and streams its SSE
+    response straight through. A plain Django view (not DRF) because DRF's
+    Response doesn't stream — the worker's RAG_API_KEY is attached here,
+    server-side, so it never reaches the Flutter web bundle. Body:
+    {"message": str, "history"?: [{"role": "user"|"assistant", "content": str}]}
+    """
+    try:
+        body = json.loads(request.body or b'{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'detail': 'Invalid JSON body.'}, status=400)
+
+    message = body.get('message')
+    if not message or not str(message).strip():
+        return JsonResponse({'detail': 'message is required.'}, status=400)
+
+    try:
+        upstream = RagService.stream_chat(message, body.get('history'))
+    except RagServiceError as e:
+        return JsonResponse({'detail': str(e)}, status=502)
+
+    response = StreamingHttpResponse(upstream, content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    return response
 

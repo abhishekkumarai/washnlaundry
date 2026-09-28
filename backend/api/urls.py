@@ -7,6 +7,7 @@ from .views import (
     StaffViewSet, AttendanceViewSet, SalaryPaymentViewSet, SalaryAdvanceViewSet,
     ServiceAreaViewSet, TimeSlotViewSet, dashboard_stats, payroll_summary,
     reports, meta, send_payroll_whatsapp, whatsapp_status, whatsapp_qr,
+    rag_chat,
 )
 
 router = DefaultRouter()
@@ -32,6 +33,7 @@ urlpatterns = [
     path('payroll/send-slip-whatsapp/', send_payroll_whatsapp, name='send-payroll-whatsapp'),
     path('whatsapp/status/', whatsapp_status, name='whatsapp-status'),
     path('whatsapp/qr/', whatsapp_qr, name='whatsapp-qr'),
+    path('rag/chat/', rag_chat, name='rag-chat'),
     path('reports/', reports, name='reports'),
     path('meta/', meta, name='meta'),
 ]

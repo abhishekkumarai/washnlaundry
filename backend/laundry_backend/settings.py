@@ -103,3 +103,11 @@ WHATSAPP_BRIDGE_TOKEN = os.environ.get('WHATSAPP_BRIDGE_TOKEN', '')
 WHATSAPP_DRY_RUN = os.environ.get('WHATSAPP_DRY_RUN', 'True').lower() in ('true', '1', 'yes', 'on')
 WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get('WHATSAPP_DEFAULT_COUNTRY_CODE', '91')
 
+# ── RAG Chat (Cloudflare Workers AI + Vectorize, KAN-112) ─────────────────────
+# The worker's RAG_API_KEY is a secret and must never reach the public Flutter
+# web bundle, so the backend proxies /api/rag/chat/ and attaches it here.
+RAG_WORKER_URL = os.environ.get(
+    'RAG_WORKER_URL', 'https://washnlaundry-rag.abhishekkumarai.workers.dev'
+)
+RAG_API_KEY = os.environ.get('RAG_API_KEY', '')
+

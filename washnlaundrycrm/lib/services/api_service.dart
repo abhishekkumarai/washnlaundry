@@ -590,5 +590,79 @@ class ApiService {
     final data = await _send('GET', '/whatsapp/qr/');
     return (data as Map).cast<String, dynamic>();
   }
+
+  // ── RAG Chat (Cloudflare Workers AI, KAN-112) ───────────────────────────────
+
+  /// Streams incremental assistant text from `/api/rag/chat/` — a Django
+  /// proxy in front of the washnlaundry-rag Worker (see backend/api/services/
+  /// rag_service.py) that keeps the worker's RAG_API_KEY out of this public
+  /// web bundle. [history] is prior turns in the conversation, oldest first.
+  ///
+  /// The proxy passes through the worker's raw SSE bytes unmodified, in
+  /// whichever of Workers AI's two streaming shapes the model used:
+  /// `{"response": "token"}` (text-generation models) or the OpenAI-style
+  /// `{"choices":[{"delta":{"content":"token"}}]}` (chat-tuned models, which
+  /// is what the worker's tool-calling round actually uses).
+  static Stream<String> streamRagChat(
+    String message, {
+    List<Map<String, String>> history = const [],
+  }) async* {
+    final request = http.Request('POST', _uri('/rag/chat/'))
+      ..headers.addAll(_jsonHeaders)
+      ..body = json.encode({
+        'message': message,
+        if (history.isNotEmpty) 'history': history,
+      });
+
+    late http.StreamedResponse response;
+    try {
+      response = await http.Client().send(request);
+    } catch (e) {
+      throw ApiException('Could not reach the chat service: $e');
+    }
+
+    if (response.statusCode != 200) {
+      final body = await response.stream.bytesToString();
+      throw ApiException(
+        describeError(body, '/rag/chat/'),
+        statusCode: response.statusCode,
+      );
+    }
+
+    var buffer = '';
+    await for (final chunk in response.stream.transform(utf8.decoder)) {
+      buffer += chunk;
+      final events = buffer.split('\n\n');
+      buffer = events.removeLast(); // last piece may still be incomplete
+      for (final event in events) {
+        final line = event.trim();
+        if (!line.startsWith('data:')) continue;
+        final data = line.substring(5).trim();
+        if (data.isEmpty || data == '[DONE]') continue;
+
+        String? token;
+        try {
+          final decoded = json.decode(data);
+          if (decoded is Map) {
+            final resp = decoded['response'];
+            if (resp is String) {
+              token = resp;
+            } else {
+              final choices = decoded['choices'];
+              if (choices is List && choices.isNotEmpty) {
+                final delta = choices.first['delta'];
+                if (delta is Map && delta['content'] is String) {
+                  token = delta['content'] as String;
+                }
+              }
+            }
+          }
+        } catch (_) {
+          // Malformed SSE fragment — skip it rather than crash the stream.
+        }
+        if (token != null && token.isNotEmpty) yield token;
+      }
+    }
+  }
 }
 

@@ -13,6 +13,7 @@ services:
       - WHATSAPP_BRIDGE_URL=http://whatsapp-bridge:3000
       - WHATSAPP_BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-laundry_secret_bridge_token}
       - WHATSAPP_DRY_RUN=${WHATSAPP_DRY_RUN:-1}
+      - RAG_API_KEY=${RAG_API_KEY:-}
     depends_on:
       - whatsapp-bridge
 

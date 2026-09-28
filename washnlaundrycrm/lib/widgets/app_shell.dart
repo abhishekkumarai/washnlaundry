@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 
+import 'rag_chat_panel.dart';
 import 'sidebar_navigation.dart';
 
 /// Replaces the old `Row(children: [SidebarNavigation(), Expanded(child: body)])`
 /// every screen used to build directly. Pair with [AppDrawer] on the same
 /// [Scaffold]'s `drawer:` — see `sidebar_navigation.dart`'s doc comment for the
 /// full breakpoint story.
+///
+/// Also mounts [RagChatLauncher] once here (KAN-112) rather than in each of
+/// the ~15 screens, so the support-chat FAB shows on every authenticated
+/// screen for free.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.body});
 
@@ -15,20 +20,24 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final narrow =
         MediaQuery.sizeOf(context).width < SidebarNavigation.railMinWidth;
-    if (!narrow) {
-      // stretch: the page gets the full height. With the default centre
-      // alignment a body shorter than the window (a bare scroll view, say)
-      // was vertically centred, floating the page title mid-screen.
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [const SidebarNavigation(), Expanded(child: body)],
-      );
-    }
-    return Column(
-      children: [
-        _NarrowTopBar(onMenuPressed: () => Scaffold.of(context).openDrawer()),
-        Expanded(child: body),
-      ],
+    final content = narrow
+        ? Column(
+            children: [
+              _NarrowTopBar(
+                  onMenuPressed: () => Scaffold.of(context).openDrawer()),
+              Expanded(child: body),
+            ],
+          )
+        // stretch: the page gets the full height. With the default centre
+        // alignment a body shorter than the window (a bare scroll view, say)
+        // was vertically centred, floating the page title mid-screen.
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [const SidebarNavigation(), Expanded(child: body)],
+          );
+
+    return Stack(
+      children: [content, const RagChatLauncher()],
     );
   }
 }
