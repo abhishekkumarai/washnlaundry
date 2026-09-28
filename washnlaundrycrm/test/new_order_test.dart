@@ -297,10 +297,23 @@ void main() {
   });
 
   group('NewOrderScreen checkout review', () {
-    Future<AppProvider> pumpWithItemInCart(WidgetTester tester) async {
+    Future<AppProvider> pumpWithItemInCart(
+      WidgetTester tester, {
+      CustomerModel? customer = const CustomerModel(
+        id: 'c1',
+        name: 'Priya Sundaram',
+        phone: '9000000002',
+      ),
+    }) async {
       final provider = AppProvider(autoLoad: false)
-        ..seedForTest(garments: _catalogue);
-      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+        ..seedForTest(
+          garments: _catalogue,
+          customers: customer != null ? [customer] : const [],
+        );
+      await tester.pumpWidget(host(
+        provider,
+        NewOrderScreen(initialCustomer: customer),
+      ));
       await tester.pump();
       await tester.tap(find.text('+ Add to Cart').first);
       await tester.pumpAndSettle();
@@ -436,7 +449,16 @@ void main() {
                 isActive: false),
           ],
         );
-      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pumpWidget(host(
+        provider,
+        const NewOrderScreen(
+          initialCustomer: CustomerModel(
+            id: 'c1',
+            name: 'Priya Sundaram',
+            phone: '9000000002',
+          ),
+        ),
+      ));
       await tester.pump();
       await tester.tap(find.text('+ Add to Cart').first);
       await tester.pumpAndSettle();
@@ -612,6 +634,82 @@ void main() {
 
       expect(find.text('Priya Sundaram'), findsOneWidget);
       expect(find.text('Full Name'), findsNothing);
+    });
+
+    testWidgets(
+        'tapping checkout without a customer shows Customer Required popup and blocks review',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(garments: _catalogue);
+      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('+ Add to Cart').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+
+      // Popup appears with warning title and description
+      expect(find.text('Customer Required'), findsOneWidget);
+      expect(
+          find.text(
+              'A customer is mandatory to create an order. Please select an existing customer or add a new customer to proceed.'),
+          findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+      expect(find.text('Select / Add Customer'), findsOneWidget);
+      // Did not transition to review step
+      expect(find.text('Review order'), findsNothing);
+
+      // Dismissing popup via Cancel keeps user on cart screen
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Customer Required'), findsNothing);
+      expect(find.text('Checkout • ₹15'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Customer Required popup button opens customer picker and allows checkout',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(
+          garments: _catalogue,
+          customers: const [
+            CustomerModel(id: 'c1', name: 'Priya Sundaram', phone: '9000000002'),
+          ],
+        );
+      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('+ Add to Cart').first);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Customer Required'), findsOneWidget);
+
+      // Tapping Select / Add Customer on the popup opens the picker
+      await tester.tap(find.text('Select / Add Customer'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bill to'), findsOneWidget);
+      expect(find.text('Priya Sundaram'), findsOneWidget);
+
+      // Pick the customer
+      await tester.tap(find.text('Priya Sundaram'));
+      await tester.pumpAndSettle();
+
+      // Picker is closed and customer is selected
+      expect(find.text('Priya Sundaram'), findsOneWidget);
+      expect(find.text('Customer Required'), findsNothing);
+
+      // Now tapping Checkout succeeds and opens Review order
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Review order'), findsOneWidget);
     });
   });
 

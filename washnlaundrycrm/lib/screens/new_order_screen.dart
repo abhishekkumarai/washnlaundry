@@ -14,7 +14,8 @@ import '../widgets/sidebar_navigation.dart';
 import '../utils/money.dart';
 
 class NewOrderScreen extends StatefulWidget {
-  const NewOrderScreen({super.key});
+  final CustomerModel? initialCustomer;
+  const NewOrderScreen({super.key, this.initialCustomer});
 
   @override
   State<NewOrderScreen> createState() => _NewOrderScreenState();
@@ -25,7 +26,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   String _selectedCategory = '';
   String _searchQuery = '';
 
-  /// Null until a customer is picked — the order then bills to a walk-in.
+  /// Null until a customer is picked or passed via initialCustomer.
   CustomerModel? _customer;
 
   /// Keyed by [GarmentItemModel.id].
@@ -134,11 +135,20 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   @override
   void initState() {
     super.initState();
+    _customer = widget.initialCustomer;
     _notesController = TextEditingController();
     _discountController = TextEditingController();
     _addressController = TextEditingController();
     _deliveryChargeController =
         TextEditingController(text: _deliveryFee.toStringAsFixed(0));
+  }
+
+  @override
+  void didUpdateWidget(covariant NewOrderScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialCustomer != oldWidget.initialCustomer) {
+      _customer = widget.initialCustomer;
+    }
   }
 
   @override
@@ -455,12 +465,18 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     child: ElevatedButton(
                       onPressed: (subtotal == 0 || _submitting)
                           ? null
-                          : () => setState(() {
+                          : () {
+                              if (_customer == null) {
+                                _showCustomerRequiredDialog();
+                                return;
+                              }
+                              setState(() {
                                 if (_readyBy == null) {
                                   _selectDeliveryType(_deliveryType);
                                 }
                                 _showCheckoutReview = true;
-                              }),
+                              });
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1A4FD6),
                         disabledBackgroundColor: const Color(0xFFCBD5E1),
@@ -1785,6 +1801,105 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     );
   }
 
+  Future<void> _showCustomerRequiredDialog() async {
+    final shouldPick = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.person_search_rounded,
+                    color: Color(0xFF1A4FD6),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Customer Required',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Action needed',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'A customer is mandatory to create an order. Please select an existing customer or add a new customer to proceed.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF475569),
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+            label: const Text(
+              'Select / Add Customer',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF1A4FD6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldPick == true && mounted) {
+      await _pickCustomer();
+    }
+  }
+
   Future<void> _pickCustomer() async {
     final provider = Provider.of<AppProvider>(context, listen: false);
     final picked = await showDialog<CustomerModel?>(
@@ -1792,9 +1907,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       builder: (_) => _CustomerPickerDialog(provider: provider),
     );
     // A dismissed dialog returns null and must not clear the current pick;
-    // "Bill to walk-in" returns the sentinel below.
     if (picked == null) return;
-    setState(() => _customer = picked.id.isEmpty ? null : picked);
+    if (picked.id.isNotEmpty) {
+      setState(() => _customer = picked);
+    }
   }
 
   Future<void> _checkout(
@@ -1804,6 +1920,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   ) async {
     final items = _cartItems(garments);
     if (items.isEmpty) return;
+
+    if (_customer == null) {
+      await _showCustomerRequiredDialog();
+      return;
+    }
 
     // A carried order is scheduled against real slots — the live app won't
     // place one without them, and neither do we.
@@ -2306,24 +2427,20 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                 padding: const EdgeInsets.all(16),
                 child: SizedBox(
                   width: double.infinity,
-                  child: OutlinedButton(
-                    // Empty id is the "no customer on file" sentinel the
-                    // caller maps back to a walk-in.
-                    onPressed: () => Navigator.pop(
-                      context,
-                      const CustomerModel(id: '', name: '', phone: ''),
-                    ),
+                  child: OutlinedButton.icon(
+                    onPressed: () => setState(() => _showNewCustomerForm = true),
+                    icon: const Icon(Icons.person_add_outlined, size: 16),
+                    label: const Text('+ Add New Customer',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A4FD6))),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      side: const BorderSide(color: Color(0xFF1A4FD6)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: const Text('Bill to walk-in customer',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF475569))),
                   ),
                 ),
               ),
