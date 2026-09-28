@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "washnlaundry-rag",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-28",
+  "vars": {
+    "BACKEND_ORIGIN": "https://laundrybill-backend.onrender.com",
+    "CORS_ALLOWED_ORIGINS": "https://washnlaundrycrm.pages.dev,https://app.washnlaundry.com,https://washnlaundry.com"
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "washnlaundry-kb"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KB",
+      "id": "b05bd1e9cfa7414fb7e057897783484a"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

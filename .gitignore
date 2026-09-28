@@ -51,3 +51,13 @@ index_fetched.html
 Thumbs.db
 *.log
 .vercel/
+
+# ── Secrets ───────────────────────────────────────────────────────────────────
+# OAuth client secret files (e.g. client_secret_<id>.apps.googleusercontent.com.json)
+client_secret_*.json
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
