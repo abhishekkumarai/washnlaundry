@@ -164,7 +164,7 @@ export default function AboutPage() {
           <p className={styles.ctaDesc}>
             Join the eco-friendly revolution. Save time, protect your clothes, and reduce your carbon footprint with one click.
           </p>
-          <button className="btn-secondary" onClick={() => router.push('/book')}>
+          <button className="btn-secondary" onClick={() => router.push('/#book')}>
             Schedule Your Green Pickup
           </button>
         </div>
