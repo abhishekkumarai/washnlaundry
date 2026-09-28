@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   ArrowUp
 } from "lucide-react";
+import ChatWidget from "@/components/ChatWidget/ChatWidget";
 
 const services = [
   {
@@ -1113,6 +1114,9 @@ export default function LandingPage() {
           <span className="text-sm font-bold tracking-tight pr-1 hidden sm:inline">WhatsApp</span>
         </a>
       </aside>
+
+      {/* Support chat — scoped to this page only, not site-wide (e.g. /about) */}
+      <ChatWidget />
     </div>
   );
 }
