@@ -20,6 +20,7 @@ class AppProvider extends ChangeNotifier {
     11: '/scan',
     13: '/settings',
     15: '/credits',
+    16: '/chat',
   };
 
   static int navIndexForPath(String path) {
@@ -68,6 +69,10 @@ class AppProvider extends ChangeNotifier {
       case 'settings':
       case 'shop-settings':
         return 13;
+      case 'chat':
+      case 'assistant':
+      case 'support':
+        return 16;
       case 'dashboard':
       case '':
       default:

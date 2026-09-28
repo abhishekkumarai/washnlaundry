@@ -6,6 +6,7 @@ import 'models/order_model.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/attendance_screen.dart';
+import 'screens/chat_screen.dart';
 import 'screens/credits_screen.dart';
 import 'screens/customers_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -165,6 +166,10 @@ List<RouteBase> appRoutes() => [
       GoRoute(
         path: '/reports',
         builder: (c, s) => _section(c, 9, const ReportsScreen()),
+      ),
+      GoRoute(
+        path: '/chat',
+        builder: (c, s) => _section(c, 16, const ChatScreen()),
       ),
       GoRoute(
         path: '/scan',

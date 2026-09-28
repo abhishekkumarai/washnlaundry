@@ -144,6 +144,12 @@ class SidebarNavigation extends StatefulWidget {
       'disabled': false
     },
     {
+      'label': 'Chat',
+      'icon': Icons.smart_toy_rounded,
+      'index': 16,
+      'disabled': false
+    },
+    {
       'label': 'Help',
       'icon': Icons.help_outline_rounded,
       'index': 14,
