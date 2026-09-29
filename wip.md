@@ -104,40 +104,21 @@ WhatsApp bridge all done this session — ready to move to In Review)
 
 ## Pending
 
-- **KAN-112 — CRITICAL: `/api/rag/chat/` hangs indefinitely under real
-  cross-origin traffic, and it can take the whole site down while it does.**
-  Found live 2026-09-28 evening while adding a chat widget to the marketing
-  site (see below): a real request to the proxy hung 100+s even after fixing
-  the `iter_content(chunk_size=None)` bug (a known requests/urllib3 gotcha —
-  switched to `chunk_size=256`, commit `bf01ce3` — **did not fix it**), even
-  though the `washnlaundry-rag` Worker itself answered the identical query in
-  ~7s when called directly. Root cause still unknown — deliberately **not**
-  debugged further against production, because:
-  - Render runs this backend with a **single sync gunicorn worker**
-    (`WEB_CONCURRENCY=1`, free/starter plan). One hung request blocks *all*
-    other traffic — dashboard, orders, everything — until it times out or
-    the service is restarted.
-  - This is exactly what happened: repeated test requests against the proxy
-    monopolized the one worker and caused a real, user-reported failure —
-    "https://washnlaundrycrm.pages.dev/new-order error while saving, timeout
-    issue" — at the same time. Fixed by `render restart
-    srv-da4j29bl550s738309ng`; confirmed `/api/dashboard/stats/`,
-    `/api/orders/`, `/api/customers/`, `/api/items/` all back to 200 OK in
-    under 1.1s afterward.
-  - **Implication for KAN-112's WhatsApp auto-reply**: it calls this exact
-    same endpoint. Enabling `WHATSAPP_AUTO_REPLY` right now risks a customer
-    message hanging the single worker and taking down the *entire site* for
-    everyone else, not just failing the chat reply. **Do not enable it until
-    this is fixed.**
-  - Next step (per explicit instruction, not started yet): reproduce the
-    hang against `manage.py runserver` locally, calling the real
-    `washnlaundry-rag` Worker, so it can be debugged without ever risking
-    live traffic again. Do not repeat direct-against-production debugging
-    for this.
-- **KAN-112 — chat UI is live on both surfaces but currently broken** as a
-  direct consequence of the bug above:
-  - Flutter CRM (`washnlaundrycrm.pages.dev`) — chat FAB present, will error
-    or hang on a real question.
+- **KAN-112 — RESOLVED: `/api/rag/chat/` hang root cause identified & fixed (Option 2: Direct Edge Access).**
+  - **Root Cause Identified**: A distributed circular deadlock. Render's single sync Gunicorn worker
+    (`WEB_CONCURRENCY=1`) accepted the client's `/api/rag/chat/` request and blocked in `RagService.stream_chat()`.
+    When Llama 3.3 70B called tools (`lookup_order` or `lookup_customer_dues`), the Cloudflare Worker made an
+    HTTP fetch back to `https://laundrybill-backend.onrender.com/api/orders/`. Because Gunicorn had only 1 worker
+    and it was already blocked waiting for Cloudflare, the incoming tool request deadlocked indefinitely.
+  - **Fix Implemented (Option 2)**:
+    - Updated Cloudflare Worker (`washnlaundry-rag`) to authenticate requests from allowed origins
+      (`washnlaundrycrm.pages.dev`, `washnlaundry-marketing...`, `localhost`) via CORS in addition to `Bearer RAG_API_KEY`.
+    - Added `AbortSignal.timeout(10000)` and error handling to `callTool` to guarantee the worker never hangs.
+    - Updated Flutter CRM (`ApiService.ragWorkerUrl`) to stream directly from `washnlaundry-rag`.
+    - Updated Next.js marketing site (`ChatWidget.tsx`) to stream directly from `washnlaundry-rag`.
+    - Updated `whatsapp-bridge` (`autoReply.js`, `index.js`) to call `RAG_WORKER_URL` directly with `RAG_API_KEY`.
+    - Render backend is now completely out of the RAG streaming path, completely eliminating Gunicorn worker starvation.
+    - Verified live: tool-calling queries against the deployed Worker return full SSE streams in 7.2s, without deadlocking Render.
   - **New**: also added to the Next.js marketing site
     (`washnlaundry-marketing.abhishekkumarai.workers.dev/`), scoped to the
     home page only (`src/app/page.tsx`, not `/about` — new

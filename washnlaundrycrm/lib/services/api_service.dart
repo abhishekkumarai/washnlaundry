@@ -603,11 +603,21 @@ class ApiService {
   /// `{"response": "token"}` (text-generation models) or the OpenAI-style
   /// `{"choices":[{"delta":{"content":"token"}}]}` (chat-tuned models, which
   /// is what the worker's tool-calling round actually uses).
+  /// Direct Cloudflare Worker endpoint for RAG chat (KAN-112).
+  /// Calling the worker directly from Flutter web avoids proxying SSE streams
+  /// through Render's single-worker Gunicorn backend, preventing request
+  /// deadlocks on tool calls and server starvation.
+  static String get ragWorkerUrl {
+    const raw = String.fromEnvironment('RAG_WORKER_URL', defaultValue: '');
+    if (raw.isNotEmpty) return raw;
+    return 'https://washnlaundry-rag.abhishekkumarai.workers.dev/api/rag/chat';
+  }
+
   static Stream<String> streamRagChat(
     String message, {
     List<Map<String, String>> history = const [],
   }) async* {
-    final request = http.Request('POST', _uri('/rag/chat/'))
+    final request = http.Request('POST', Uri.parse(ragWorkerUrl))
       ..headers.addAll(_jsonHeaders)
       ..body = json.encode({
         'message': message,
@@ -624,7 +634,7 @@ class ApiService {
     if (response.statusCode != 200) {
       final body = await response.stream.bytesToString();
       throw ApiException(
-        describeError(body, '/rag/chat/'),
+        describeError(body, ragWorkerUrl),
         statusCode: response.statusCode,
       );
     }
