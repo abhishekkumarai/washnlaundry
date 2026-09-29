@@ -178,6 +178,8 @@ async function handle(request: Request, env: Env): Promise<Response> {
       });
     }
 
+    const SHOP_WHATSAPP_NUMBER = '917277905904';
+
     const systemPrompt = isMarketing
       ? `You are the friendly WashNLaundry customer booking & support assistant on our official website (washnlaundry.com).
 
@@ -195,13 +197,15 @@ CORE OPERATIONAL RULES:
    - Check the prior conversation history to see which of the 4 details have already been provided.
    - Answer their inquiry first, then naturally ask for whatever details are still missing (e.g. "Would you like me to arrange a pickup for you? May I know your name and mobile number to get started?").
    - If they provide partial details, warmly acknowledge them and ask for the remainder (e.g. "Thanks [Name]! Could you also share your pickup address and what items you need cleaned?").
-   - Once ALL 4 details (Name, Phone, Address, Requirements) are collected, provide a clean, complete confirmation summary:
-     "🎉 Great! Your pickup request has been recorded:
+   - Once ALL 4 details (Name, Phone, Address, Requirements) are collected, provide a clean, complete confirmation summary AND a direct WhatsApp action link:
+     "🎉 Great! Your pickup request has been prepared:
      • Name: [Name]
      • Phone: [Phone]
      • Address: [Address]
      • Requirements: [Requirements]
-     Our team will call or WhatsApp you shortly on [Phone] to confirm your pickup slot!"
+
+     👉 Tap below to send this directly to our shop on WhatsApp for immediate confirmation:
+     [📲 Confirm & Send via WhatsApp](https://wa.me/917277905904)"
 
 Knowledge base context:
 ${contextText || '(no relevant context found)'}`
