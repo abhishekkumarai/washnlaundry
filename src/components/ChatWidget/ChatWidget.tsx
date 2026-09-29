@@ -64,6 +64,68 @@ async function* streamRagChat(message: string, history: ChatMessage[]): AsyncGen
   }
 }
 
+function renderMessageContent(content: string) {
+  const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
+  const parts: (string | React.ReactNode)[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = linkRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(content.substring(lastIndex, match.index));
+    }
+
+    const label = match[1] || match[3];
+    const url = match[2] || match[3];
+    const isWhatsApp = url.includes("wa.me") || url.includes("whatsapp.com");
+
+    if (isWhatsApp) {
+      let targetWhatsAppUrl = "https://wa.me/917277905904";
+      const summaryMatch = content.match(/•\s*Name[\s\S]*?(?=👉|\[📲|$)/i);
+      if (summaryMatch) {
+        const cleanSummary = "🧺 *New WashNLaundry Pickup Request*\n" + summaryMatch[0].trim();
+        targetWhatsAppUrl += `?text=${encodeURIComponent(cleanSummary)}`;
+      } else {
+        targetWhatsAppUrl += `?text=${encodeURIComponent("Hello WashNLaundry, I would like to schedule a laundry pickup.")}`;
+      }
+
+      parts.push(
+        <a
+          key={match.index}
+          href={targetWhatsAppUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 my-2 bg-[#25D366] hover:bg-[#20BD5A] text-white font-bold rounded-xl text-xs shadow-md hover:shadow-lg transition-all cursor-pointer no-underline block w-fit"
+        >
+          <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.634.075-1.92-.457-1.554-.641-2.535-2.227-2.613-2.331-.077-.104-.633-.843-.633-1.609 0-.766.401-1.144.543-1.298.143-.154.312-.193.416-.193.104 0 .208.001.299.006.096.005.224-.036.35.267.129.312.441 1.076.48 1.155.039.078.065.17.013.273-.052.104-.078.169-.156.26-.078.091-.164.204-.234.273-.078.078-.16.163-.069.319.091.156.404.667.868 1.08 1.05.934 1.701 1.076 1.944 1.189.243.113.386.095.53-.069.144-.165.617-.718.781-.965.165-.247.33-.206.554-.124.225.082 1.428.673 1.674.796.246.123.41.185.47.288.06.103.06.598-.084 1.003z"/>
+          </svg>
+          <span>{label.replace(/^\[?📲?\s*/, "") || "Confirm on WhatsApp"}</span>
+        </a>
+      );
+    } else {
+      parts.push(
+        <a
+          key={match.index}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 underline hover:text-blue-800"
+        >
+          {label}
+        </a>
+      );
+    }
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push(content.substring(lastIndex));
+  }
+
+  return parts;
+}
+
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -108,10 +170,6 @@ export default function ChatWidget() {
   return (
     <>
       {open && (
-        // Bottom-left, not bottom-right: that corner already stacks the
-        // Scroll-to-top / Call / WhatsApp FABs (see page.tsx), and how many
-        // of those are visible varies with scroll position, so anchoring
-        // here avoids ever overlapping them rather than guessing an offset.
         <div className="fixed bottom-24 left-5 sm:left-6 z-50 w-[calc(100vw-2.5rem)] max-w-[360px] h-[min(560px,calc(100vh-160px))] bg-white rounded-2xl shadow-2xl border border-[#E4E0D8] flex flex-col overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 bg-[#182C4F] text-white">
             <Bot size={18} />
@@ -154,13 +212,13 @@ export default function ChatWidget() {
               messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-[80%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                    className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
                       m.role === "user"
                         ? "bg-[#182C4F] text-white"
                         : "bg-[#F0EEE9] text-[#141A24]"
                     }`}
                   >
-                    {m.text || "…"}
+                    {m.role === "user" ? m.text : renderMessageContent(m.text || "…")}
                   </div>
                 </div>
               ))
