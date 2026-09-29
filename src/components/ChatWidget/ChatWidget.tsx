@@ -3,12 +3,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Bot, X, Send } from "lucide-react";
 
-// Same Django proxy the Flutter CRM chat uses (backend/api/services/rag_service.py)
-// — it attaches the washnlaundry-rag Worker's RAG_API_KEY server-side, which
-// must never reach a public JS bundle, and the backend already allows all
-// origins (CORS_ALLOW_ALL_ORIGINS), so this site calls it directly with no
-// Next.js API route of its own needed.
-const RAG_CHAT_URL = "https://laundrybill-backend.onrender.com/api/rag/chat/";
+// Points directly to the washnlaundry-rag Cloudflare Worker (KAN-112).
+// Calling the worker directly avoids proxying long-lived SSE streams through
+// Render's single-worker backend, eliminating request deadlocks on tool calls.
+const RAG_CHAT_URL = "https://washnlaundry-rag.abhishekkumarai.workers.dev/api/rag/chat";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -32,6 +30,7 @@ async function* streamRagChat(message: string, history: ChatMessage[]): AsyncGen
     body: JSON.stringify({
       message,
       history: history.map((m) => ({ role: m.role, content: m.text })),
+      channel: "marketing",
     }),
   });
 
@@ -128,9 +127,29 @@ export default function ChatWidget() {
 
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
             {messages.length === 0 ? (
-              <p className="text-center text-sm text-[#64748B] px-4 py-6">
-                Ask about pickup &amp; delivery, rates, turnaround time, or store policies.
-              </p>
+              <div className="text-center py-6 px-3 space-y-3">
+                <p className="text-xs font-medium text-[#64748B]">
+                  👋 Welcome to WashNLaundry! Ask about our services or schedule a doorstep pickup:
+                </p>
+                <div className="flex flex-col gap-1.5 pt-1">
+                  {[
+                    "🧺 I want to schedule a laundry pickup",
+                    "💰 What are your wash & iron rates?",
+                    "⏱️ What is your turnaround time?",
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => {
+                        setInput(chip);
+                      }}
+                      className="text-left text-xs bg-[#F7F5F0] hover:bg-[#EFECE4] text-[#182C4F] font-medium px-3 py-2 rounded-lg border border-[#E4E0D8] transition-colors cursor-pointer"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ) : (
               messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
