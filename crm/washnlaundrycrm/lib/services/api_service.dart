@@ -553,7 +553,7 @@ class ApiService {
   // ── RAG Chat (Cloudflare Workers AI, KAN-112) ───────────────────────────────
 
   /// Streams incremental assistant text from `/api/rag/chat/` — a Django
-  /// proxy in front of the washnlaundry-rag Worker (see backend/api/services/
+  /// proxy in front of the washnlaundry-crm-rag Worker (see backend/api/services/
   /// rag_service.py) that keeps the worker's RAG_API_KEY out of this public
   /// web bundle. [history] is prior turns in the conversation, oldest first.
   ///
@@ -569,7 +569,7 @@ class ApiService {
   static String get ragWorkerUrl {
     const raw = String.fromEnvironment('RAG_WORKER_URL', defaultValue: '');
     if (raw.isNotEmpty) return raw;
-    return 'https://washnlaundry-rag.abhishekkumarai.workers.dev/api/rag/chat';
+    return 'https://washnlaundry-crm-rag.abhishekkumarai.workers.dev/api/rag/chat';
   }
 
   static Stream<String> streamRagChat(

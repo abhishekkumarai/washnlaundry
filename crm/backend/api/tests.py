@@ -2158,7 +2158,7 @@ class LeadEmailTests(APITestCase):
 
 class PublicPickupFormTests(APITestCase):
     URL = '/api/leads/public/'
-    MARKETING = 'https://washnlaundry-marketing.abhishekkumarai.workers.dev'
+    MARKETING = 'https://washnlaundry-web.abhishekkumarai.workers.dev'
     FORM = {'name': 'Ravi', 'phone': '9123456780', 'address': 'Kankarbagh, Patna', 'service': 'Wash & Fold'}
 
     def setUp(self):

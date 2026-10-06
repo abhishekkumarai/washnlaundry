@@ -12,8 +12,8 @@ Working clone of `app.laundrybill.com` (a laundry / dry-cleaning shop CRM + POS)
 |---|---|
 | `washnlaundrycrm/` | Flutter Web SPA — the entire frontend (web is the only target) |
 | `backend/` | Django + DRF — the API origin (Render + Neon Postgres in prod, SQLite locally) |
-| `cloudflare/api-proxy/` | Worker `washnlaundry-api-proxy`: edge reverse proxy `/api/*` → Django |
-| `cloudflare/rag-engine/` | Worker `washnlaundry-rag`: chat, lead capture, 15-min cron |
+| `cloudflare/api-proxy/` | Worker `washnlaundry-crm-api`: edge reverse proxy `/api/*` → Django |
+| `cloudflare/rag-engine/` | Worker `washnlaundry-crm-rag`: chat, lead capture, 15-min cron |
 | `scripts/deploy_cloudflare_pages.js` | Uploads `washnlaundrycrm/build/web` to Cloudflare Pages |
 | `logo/` | Brand logo, shared with the separate marketing repo |
 
@@ -44,8 +44,8 @@ cd washnlaundrycrm && flutter run -d chrome
 | Target | Source | Ships via |
 |---|---|---|
 | CRM `app.washnlaundry.com` / `washnlaundrycrm.pages.dev` (Pages) | `washnlaundrycrm/` | build + `node scripts/deploy_cloudflare_pages.js` |
-| Worker `washnlaundry-rag` | `cloudflare/rag-engine/` | `npx wrangler deploy` there |
-| Worker `washnlaundry-api-proxy` | `cloudflare/api-proxy/` | `npx wrangler deploy` there |
+| Worker `washnlaundry-crm-rag` | `cloudflare/rag-engine/` | `npx wrangler deploy` there |
+| Worker `washnlaundry-crm-api` | `cloudflare/api-proxy/` | `npx wrangler deploy` there |
 | Django backend `laundrybill-backend.onrender.com` | `backend/` | Render auto-deploys on push to `main` (runs migrations) |
 | Marketing `www.washnlaundry.com` | **separate repo** `abhishekkumarai/washnlaundry` | `pnpm cf:deploy` there |
 
@@ -67,7 +67,7 @@ node ../scripts/deploy_cloudflare_pages.js   # needs CLOUDFLARE_API_TOKEN
   `DJANGO_DATABASE_URL` at the unpooled Neon URL for that one command only.
 - DNS for `washnlaundry.com` is on Cloudflare: `app` is a proxied CNAME to
   `washnlaundrycrm.pages.dev`; apex and `www` are Worker custom domains on
-  `washnlaundry-marketing`. MX and SPF records are untouched.
+  `washnlaundry-web`. MX and SPF records are untouched.
 
 ---
 

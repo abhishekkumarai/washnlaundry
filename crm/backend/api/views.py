@@ -931,7 +931,7 @@ def dashboard_stats(request):
 @require_POST
 def rag_chat(request):
     """POST /api/rag/chat/
-    Proxies the washnlaundry-rag Cloudflare Worker and streams its SSE
+    Proxies the washnlaundry-crm-rag Cloudflare Worker and streams its SSE
     response straight through. A plain Django view (not DRF) because DRF's
     Response doesn't stream — the worker's RAG_API_KEY is attached here,
     server-side, so it never reaches the Flutter web bundle. Body:
@@ -998,7 +998,7 @@ def _save_and_email_lead(body, source):
 @require_POST
 def create_lead(request):
     """POST /api/leads/
-    Called server-to-server by the washnlaundry-rag Worker once the website
+    Called server-to-server by the washnlaundry-crm-rag Worker once the website
     chat has collected a pickup request. Saves a Lead, then emails it to the
     shop. Authenticated with the shared RAG_API_KEY because the rest of this
     API is open and this one triggers outbound messages.

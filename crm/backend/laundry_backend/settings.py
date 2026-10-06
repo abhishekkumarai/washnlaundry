@@ -101,7 +101,7 @@ CORS_ALLOWED_ORIGINS = [
 # The worker's RAG_API_KEY is a secret and must never reach the public Flutter
 # web bundle, so the backend proxies /api/rag/chat/ and attaches it here.
 RAG_WORKER_URL = os.environ.get(
-    'RAG_WORKER_URL', 'https://washnlaundry-rag.abhishekkumarai.workers.dev'
+    'RAG_WORKER_URL', 'https://washnlaundry-crm-rag.abhishekkumarai.workers.dev'
 )
 RAG_API_KEY = os.environ.get('RAG_API_KEY', '')
 
@@ -121,7 +121,7 @@ LEAD_EMAIL_FROM = os.environ.get('LEAD_EMAIL_FROM', 'washnlaundry <onboarding@re
 PUBLIC_LEAD_ORIGINS = [
     o.strip() for o in os.environ.get(
         'PUBLIC_LEAD_ORIGINS',
-        'https://washnlaundry-marketing.abhishekkumarai.workers.dev,'
+        'https://washnlaundry-web.abhishekkumarai.workers.dev,'
         'https://washnlaundry.com,https://www.washnlaundry.com',
     ).split(',') if o.strip()
 ]

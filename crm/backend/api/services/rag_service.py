@@ -11,7 +11,7 @@ class RagServiceError(Exception):
 
 class RagService:
     """
-    Proxy for the washnlaundry-rag Cloudflare Worker (KAN-112). Keeps
+    Proxy for the washnlaundry-crm-rag Cloudflare Worker (KAN-112). Keeps
     RAG_API_KEY server-side — a Flutter web build can't hide a secret baked
     into its JS bundle, so the client only ever talks to this backend.
     """

@@ -1,5 +1,5 @@
 {
-  "name": "washnlaundry-rag-engine",
+  "name": "washnlaundry-crm-rag-engine",
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",

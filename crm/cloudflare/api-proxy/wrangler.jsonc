@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "washnlaundry-api-proxy",
+  "name": "washnlaundry-crm-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-28",
   "vars": {

@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "washnlaundry-marketing",
+  "name": "washnlaundry-web",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-09-28",
   "compatibility_flags": ["nodejs_compat"],

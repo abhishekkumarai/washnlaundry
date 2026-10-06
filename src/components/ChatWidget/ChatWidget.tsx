@@ -3,10 +3,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Bot, X, Send } from "lucide-react";
 
-// Points directly to the washnlaundry-rag Cloudflare Worker (KAN-112).
+// Points directly to the washnlaundry-crm-rag Cloudflare Worker (KAN-112).
 // Calling the worker directly avoids proxying long-lived SSE streams through
 // Render's single-worker backend, eliminating request deadlocks on tool calls.
-const RAG_CHAT_URL = "https://washnlaundry-rag.abhishekkumarai.workers.dev/api/rag/chat";
+const RAG_CHAT_URL = "https://washnlaundry-crm-rag.abhishekkumarai.workers.dev/api/rag/chat";
 
 type ChatMessage = {
   role: "user" | "assistant";

@@ -259,7 +259,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
       : false;
 
     const isMarketing =
-      body.channel === 'marketing' || (origin ? origin.includes('washnlaundry-marketing') : false);
+      body.channel === 'marketing' || (origin ? origin.includes('washnlaundry-web') : false);
 
     const contextChunks = await retrieveContext(env, body.message);
     const contextText = contextChunks

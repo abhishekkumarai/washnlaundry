@@ -1,5 +1,5 @@
 {
-  "name": "washnlaundry-api-proxy",
+  "name": "washnlaundry-crm-api",
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
