@@ -1,5 +1,9 @@
+import hmac
 import json
+import re
 from datetime import timedelta
+
+from django.conf import settings
 
 from django.db.models import ProtectedError, Sum, Count, Q
 from django.http import JsonResponse, StreamingHttpResponse
@@ -15,10 +19,11 @@ from rest_framework.response import Response
 from . import customer_import
 from .services.whatsapp_service import WhatsAppService
 from .services.rag_service import RagService, RagServiceError
+from .services.email_service import EmailService
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
     Expense, Credit, CreditCategory, Staff, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
-    OrderStatus, PaymentStatus, DeliveryType, OrderSource, PricingUnit,
+    Lead, OrderStatus, PaymentStatus, DeliveryType, OrderSource, PricingUnit,
     PaymentMethod, ExpenseCategory,
 )
 from .serializers import (
@@ -1055,3 +1060,66 @@ def rag_chat(request):
     response['X-Accel-Buffering'] = 'no'
     return response
 
+
+
+def _normalize_indian_mobile(raw):
+    """Return the 10-digit mobile for an Indian number typed any usual way, else None."""
+    digits = re.sub(r'\D', '', str(raw or ''))
+    if len(digits) == 12 and digits.startswith('91'):
+        digits = digits[2:]
+    elif len(digits) == 11 and digits.startswith('0'):
+        digits = digits[1:]
+    return digits if re.fullmatch(r'[6-9]\d{9}', digits) else None
+
+
+@csrf_exempt
+@require_POST
+def create_lead(request):
+    """POST /api/leads/
+    Called server-to-server by the washnlaundry-rag Worker once the website
+    chat has collected a pickup request. Saves a Lead, then emails it to the shop. Authenticated with the
+    shared RAG_API_KEY because the rest of this API is open and this one
+    triggers outbound messages. Body: {name, phone, address, requirements}.
+    """
+    expected = settings.RAG_API_KEY
+    supplied = request.headers.get('Authorization', '')
+    if not expected or not hmac.compare_digest(supplied, f'Bearer {expected}'):
+        return JsonResponse({'detail': 'Unauthorized.'}, status=401)
+
+    try:
+        body = json.loads(request.body or b'{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'detail': 'Invalid JSON body.'}, status=400)
+
+    name = str(body.get('name') or '').strip()[:120]
+    address = str(body.get('address') or '').strip()[:500]
+    requirements = str(body.get('requirements') or '').strip()[:500]
+    phone = _normalize_indian_mobile(body.get('phone'))
+    if not (name and address and requirements):
+        return JsonResponse({'detail': 'name, address and requirements are required.'}, status=400)
+    if not phone:
+        return JsonResponse({'detail': 'A valid 10-digit Indian mobile number is required.'}, status=400)
+
+    lead = Lead.objects.create(name=name, phone=phone, address=address, requirements=requirements)
+    EmailService.send_lead_alert(lead)
+    return JsonResponse(
+        {'ok': True, 'id': lead.id, 'email_status': lead.email_status},
+        status=201,
+    )
+
+
+
+@csrf_exempt
+@require_POST
+def process_leads(request):
+    """POST /api/leads/process/
+    Hit every 15 minutes by the Worker's cron trigger. Re-sends the alert
+    email for leads whose first attempt failed, and doubles as a keep-alive
+    so Render's free tier doesn't sleep between visitors. Same key as
+    /api/leads/. Returns {"retried": n, "sent": n, "pending": n}.
+    """
+    expected = settings.RAG_API_KEY
+    supplied = request.headers.get('Authorization', '')
+    if not expected or not hmac.compare_digest(supplied, f'Bearer {expected}'):
+        return JsonResponse({'detail': 'Unauthorized.'}, status=401)
+    return JsonResponse(EmailService.retry_pending())

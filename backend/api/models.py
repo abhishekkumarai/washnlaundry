@@ -621,3 +621,31 @@ class Attendance(models.Model):
 
     def __str__(self):
         return f"{self.staff.name} {self.date} {self.status}"
+
+
+class Lead(models.Model):
+    """A pickup request captured by the website chat bot, before it is an Order."""
+    SOURCE_CHAT = 'chat'
+
+    # PENDING: saved, alert email not yet delivered (provider down / no key).
+    # SENT: delivered; FAILED: gave up after MAX_EMAIL_ATTEMPTS.
+    PENDING = 'PENDING'
+    SENT = 'SENT'
+    FAILED = 'FAILED'
+    EMAIL_STATUS_CHOICES = [(PENDING, 'Pending'), (SENT, 'Sent'), (FAILED, 'Failed')]
+    MAX_EMAIL_ATTEMPTS = 5
+
+    name = models.CharField(max_length=120)
+    phone = models.CharField(max_length=20)
+    address = models.TextField()
+    requirements = models.TextField()
+    source = models.CharField(max_length=20, default=SOURCE_CHAT)
+    email_status = models.CharField(max_length=10, choices=EMAIL_STATUS_CHOICES, default=PENDING)
+    email_attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Lead {self.name} ({self.phone})"

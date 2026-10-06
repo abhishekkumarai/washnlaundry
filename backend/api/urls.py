@@ -7,7 +7,7 @@ from .views import (
     StaffViewSet, AttendanceViewSet, SalaryPaymentViewSet, SalaryAdvanceViewSet,
     ServiceAreaViewSet, TimeSlotViewSet, dashboard_stats, payroll_summary,
     reports, meta, send_payroll_whatsapp, whatsapp_status, whatsapp_qr,
-    rag_chat,
+    rag_chat, create_lead, process_leads,
 )
 
 router = DefaultRouter()
@@ -34,6 +34,8 @@ urlpatterns = [
     path('whatsapp/status/', whatsapp_status, name='whatsapp-status'),
     path('whatsapp/qr/', whatsapp_qr, name='whatsapp-qr'),
     path('rag/chat/', rag_chat, name='rag-chat'),
+    path('leads/', create_lead, name='create-lead'),
+    path('leads/process/', process_leads, name='process-leads'),
     path('reports/', reports, name='reports'),
     path('meta/', meta, name='meta'),
 ]

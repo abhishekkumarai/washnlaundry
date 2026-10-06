@@ -2168,3 +2168,106 @@ class WhatsAppIntegrationTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('dry_run', response.data)
 
+
+
+
+class LeadEmailTests(APITestCase):
+    PAYLOAD = {
+        'name': 'Asha', 'phone': '+91 98765 43210',
+        'address': 'Boring Road, Patna', 'requirements': 'Wash & iron, 10 pieces',
+    }
+
+    def setUp(self):
+        from django.test import override_settings
+        self._ov = override_settings(
+            RAG_API_KEY='k3y', RESEND_API_KEY='re_test',
+            LEAD_EMAIL_TO=['a@example.com', 'b@example.com'],
+            LEAD_EMAIL_FROM='washnlaundry <onboarding@resend.dev>',
+        )
+        self._ov.enable()
+        self.addCleanup(self._ov.disable)
+
+    def _post(self, data=None, key='k3y'):
+        headers = {'HTTP_AUTHORIZATION': f'Bearer {key}'} if key else {}
+        return self.client.post('/api/leads/', data or self.PAYLOAD, format='json', **headers)
+
+    @staticmethod
+    def _resp(status=200):
+        from unittest import mock
+        return mock.Mock(status_code=status, text='boom')
+
+    def test_rejects_missing_or_wrong_key(self):
+        self.assertEqual(self._post(key=None).status_code, 401)
+        self.assertEqual(self._post(key='nope').status_code, 401)
+
+    def test_rejects_when_server_key_unset(self):
+        from django.test import override_settings
+        with override_settings(RAG_API_KEY=''):
+            self.assertEqual(self._post(key='').status_code, 401)
+
+    def test_validates_phone_and_required_fields(self):
+        self.assertEqual(self._post({**self.PAYLOAD, 'phone': '12345'}).status_code, 400)
+        self.assertEqual(self._post({**self.PAYLOAD, 'address': ''}).status_code, 400)
+
+    def test_saves_lead_and_emails_all_recipients(self):
+        from unittest import mock
+        from .models import Lead
+        with mock.patch('api.services.email_service.requests.post', return_value=self._resp()) as post:
+            res = self._post()
+        self.assertEqual(res.status_code, 201)
+        lead = Lead.objects.get()
+        self.assertEqual((lead.phone, lead.email_status, lead.email_attempts), ('9876543210', Lead.SENT, 1))
+        sent = post.call_args.kwargs['json']
+        self.assertEqual(sent['to'], ['a@example.com', 'b@example.com'])
+        self.assertTrue(sent['subject'].startswith('washnlaundry'))
+        self.assertIn('Boring Road, Patna', sent['text'])
+
+    def test_html_in_lead_fields_is_escaped(self):
+        from unittest import mock
+        with mock.patch('api.services.email_service.requests.post', return_value=self._resp()) as post:
+            self._post({**self.PAYLOAD, 'name': '<script>x</script>'})
+        self.assertNotIn('<script>', post.call_args.kwargs['json']['html'])
+
+    def test_provider_failure_keeps_lead_pending(self):
+        from unittest import mock
+        from .models import Lead
+        with mock.patch('api.services.email_service.requests.post', return_value=self._resp(500)):
+            res = self._post()
+        self.assertEqual(res.status_code, 201)
+        lead = Lead.objects.get()
+        self.assertEqual((lead.email_status, lead.email_attempts), (Lead.PENDING, 1))
+
+    def test_missing_api_key_keeps_lead_pending(self):
+        from django.test import override_settings
+        from .models import Lead
+        with override_settings(RESEND_API_KEY=''):
+            self.assertEqual(self._post().status_code, 201)
+        self.assertEqual(Lead.objects.get().email_status, Lead.PENDING)
+
+    def test_process_retries_pending_and_gives_up_after_max_attempts(self):
+        from unittest import mock
+        from .models import Lead
+        with mock.patch('api.services.email_service.requests.post', return_value=self._resp(500)):
+            self._post()
+            auth = {'HTTP_AUTHORIZATION': 'Bearer k3y'}
+            for _ in range(Lead.MAX_EMAIL_ATTEMPTS - 1):
+                self.client.post('/api/leads/process/', **auth)
+        self.assertEqual(Lead.objects.get().email_status, Lead.FAILED)
+        with mock.patch('api.services.email_service.requests.post', return_value=self._resp()) as post:
+            res = self.client.post('/api/leads/process/', **auth)
+        self.assertEqual(res.json(), {'retried': 0, 'sent': 0, 'pending': 0})
+        post.assert_not_called()
+
+    def test_process_delivers_once_provider_recovers(self):
+        from unittest import mock
+        from .models import Lead
+        with mock.patch('api.services.email_service.requests.post', return_value=self._resp(500)):
+            self._post()
+        with mock.patch('api.services.email_service.requests.post', return_value=self._resp()):
+            res = self.client.post('/api/leads/process/', HTTP_AUTHORIZATION='Bearer k3y')
+        self.assertEqual(res.json(), {'retried': 1, 'sent': 1, 'pending': 0})
+        self.assertEqual(Lead.objects.get().email_status, Lead.SENT)
+
+    def test_process_requires_key_and_post(self):
+        self.assertEqual(self.client.post('/api/leads/process/').status_code, 401)
+        self.assertEqual(self.client.get('/api/leads/process/', HTTP_AUTHORIZATION='Bearer k3y').status_code, 405)

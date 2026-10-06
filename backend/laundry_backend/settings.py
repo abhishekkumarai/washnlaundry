@@ -111,3 +111,14 @@ RAG_WORKER_URL = os.environ.get(
 )
 RAG_API_KEY = os.environ.get('RAG_API_KEY', '')
 
+# Website-chat booking leads are emailed through Resend's HTTPS API (Render's
+# free tier blocks outbound SMTP). Without RESEND_API_KEY leads are still saved
+# and stay PENDING; the 15-minute cron retries them once a key is set.
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+LEAD_EMAIL_TO = [
+    e.strip() for e in os.environ.get(
+        'LEAD_EMAIL_TO', 'emailabhishek2@gmail.com'
+    ).split(',') if e.strip()
+]
+LEAD_EMAIL_FROM = os.environ.get('LEAD_EMAIL_FROM', 'washnlaundry <onboarding@resend.dev>')
+
