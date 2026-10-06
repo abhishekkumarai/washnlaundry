@@ -1,0 +1,38 @@
+# Secrets / local env
+.env
+.dev.vars*
+!.dev.vars.example
+!.env.example
+client_secret_*.json
+.mcp.json
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+backend/db.sqlite3
+backend/.coverage
+
+# Flutter / Dart
+washnlaundrycrm/.dart_tool/
+washnlaundrycrm/build/
+washnlaundrycrm/.flutter-plugins
+washnlaundrycrm/.flutter-plugins-dependencies
+washnlaundrycrm/.idea/
+washnlaundrycrm/coverage/
+*.iml
+
+# Node / Cloudflare
+node_modules/
+.wrangler/
+
+# Claude Code (machine-local)
+.claude/settings.local.json
+.claude/.jira-sync-marker
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log

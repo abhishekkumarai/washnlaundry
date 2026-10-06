@@ -1,0 +1,12 @@
+{
+  "name": "washnlaundry-rag-engine",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "seed": "node scripts/seed-kb.js"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260901.0",
+    "wrangler": "^4.143.0"
+  }
+}
