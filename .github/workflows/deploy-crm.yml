@@ -1,0 +1,100 @@
+name: Deploy CRM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crm/washnlaundrycrm/**"
+      - "crm/scripts/**"
+      - "crm/cloudflare/**"
+      - ".github/workflows/deploy-crm.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-crm
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.f.outputs.frontend }}
+      proxy: ${{ steps.f.outputs.proxy }}
+      rag: ${{ steps.f.outputs.rag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          # On manual runs or workflow edits, deploy everything.
+          filters: |
+            frontend:
+              - "crm/washnlaundrycrm/**"
+              - "crm/scripts/**"
+              - ".github/workflows/deploy-crm.yml"
+            proxy:
+              - "crm/cloudflare/api-proxy/**"
+              - ".github/workflows/deploy-crm.yml"
+            rag:
+              - "crm/cloudflare/rag-engine/**"
+              - ".github/workflows/deploy-crm.yml"
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crm/washnlaundrycrm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test
+      - run: >
+          flutter build web --release
+          --dart-define=API_BASE_URL=https://laundrybill-backend.onrender.com/api
+          --dart-define=GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node ../scripts/deploy_cloudflare_pages.js
+        working-directory: crm/washnlaundrycrm
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  api-proxy:
+    needs: changes
+    if: needs.changes.outputs.proxy == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: crm/cloudflare/api-proxy
+          command: deploy
+
+  rag-engine:
+    needs: changes
+    if: needs.changes.outputs.rag == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: crm/cloudflare/rag-engine
+          command: deploy
