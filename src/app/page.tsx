@@ -20,6 +20,11 @@ import {
 } from "lucide-react";
 import ChatWidget from "@/components/ChatWidget/ChatWidget";
 
+// "Request a pickup" form -> Django backend, which saves the lead and emails the
+// shop through Resend. The first request after the free-tier backend naps can
+// take well over 15s, hence the generous timeout below.
+const PICKUP_LEAD_URL = "https://laundrybill-backend.onrender.com/api/leads/public/";
+
 const services = [
   {
     number: "01",
@@ -100,6 +105,9 @@ export default function LandingPage() {
     address: "",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [honeypot, setHoneypot] = useState(""); // bots fill this hidden field; people never see it
 
   // Modals & Floating Banners
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
@@ -177,9 +185,33 @@ export default function LandingPage() {
     );
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmitted(true);
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const res = await fetch(PICKUP_LEAD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, website: honeypot }),
+        signal: AbortSignal.timeout(60000),
+      });
+      if (res.ok) {
+        setSubmitted(true);
+        return;
+      }
+      const detail = res.status === 429
+        ? "Too many requests from your connection."
+        : res.status === 400
+          ? "Please check your name, a 10-digit mobile number and your address."
+          : "We couldn't send your request.";
+      setSubmitError(detail);
+    } catch {
+      setSubmitError("We couldn't reach our server.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -613,6 +645,7 @@ export default function LandingPage() {
                       </button>
                     </div>
                     <input
+                      required
                       placeholder="e.g. Boring Road, Patliputra, Bailey Road"
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -626,12 +659,32 @@ export default function LandingPage() {
                     )}
                   </div>
 
+                  {/* Honeypot: hidden from people and assistive tech, bots fill it in */}
+                  <input
+                    type="text"
+                    name="website"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden="true"
+                    value={honeypot}
+                    onChange={(e) => setHoneypot(e.target.value)}
+                    style={{ position: "absolute", left: "-10000px", width: 1, height: 1, opacity: 0 }}
+                  />
+
+                  {submitError && (
+                    <p role="alert" className="text-xs font-semibold text-red-600">
+                      {submitError} Please try again or call{" "}
+                      <a href="tel:08407000048" className="underline">08407 000 048</a>.
+                    </p>
+                  )}
+
                   <button
                     type="submit"
-                    className="h-12 w-full rounded-[10px] bg-[#182C4F] hover:bg-[#101E38] text-white text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-2"
+                    disabled={submitting}
+                    className="h-12 w-full rounded-[10px] bg-[#182C4F] hover:bg-[#101E38] disabled:opacity-60 disabled:cursor-wait text-white text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-2"
                   >
-                    <span>Request a pickup</span>
-                    <ArrowRight size={15} />
+                    <span>{submitting ? "Sending…" : "Request a pickup"}</span>
+                    {!submitting && <ArrowRight size={15} />}
                   </button>
 
                   <p className="text-center text-[11px] text-slate-400 mt-2">
