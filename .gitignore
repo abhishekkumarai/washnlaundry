@@ -1,20 +1,12 @@
-# ── Secrets ───────────────────────────────────────────────────────────────────
-# Google Cloud Console downloads an OAuth client's secret as this filename —
-# it must never be committed. This app's Google Sign-In flow only needs the
-# Client ID (public), never the secret, so this file shouldn't need to exist
-# in the repo at all; delete it once it's no longer needed for reference.
-client_secret_*.json
-
-# docker-compose.yml reads GOOGLE_CLIENT_ID from this automatically — copy
-# .env.example to .env and fill it in once you have a real Client ID.
-# Not a secret (OAuth Client IDs for web apps are public), but kept out of
-# the repo anyway since it's local machine/deploy config, not shared code.
+# Secrets / local env
 .env
+.dev.vars*
+!.dev.vars.example
+!.env.example
+client_secret_*.json
+.mcp.json
 
-# Local-machine port remaps / overrides — not shared config.
-docker-compose.override.yml
-
-# ── Python / Django ───────────────────────────────────────────────────────────
+# Python / Django
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -23,42 +15,24 @@ venv/
 backend/db.sqlite3
 backend/.coverage
 
-# ── Flutter / Dart ────────────────────────────────────────────────────────────
+# Flutter / Dart
 washnlaundrycrm/.dart_tool/
 washnlaundrycrm/build/
 washnlaundrycrm/.flutter-plugins
 washnlaundrycrm/.flutter-plugins-dependencies
-washnlaundrycrm/android/local.properties
 washnlaundrycrm/.idea/
+washnlaundrycrm/coverage/
 *.iml
 
-# ── Node ──────────────────────────────────────────────────────────────────────
+# Node / Cloudflare
 node_modules/
+.wrangler/
 
-# ── Captured bundles from app.laundrybill.com ─────────────────────────────────
-# Third-party minified source, kept locally as reference only (see CLAUDE.md).
-# Not ours to redistribute, and re-downloadable, so it stays out of the repo.
-app_index.js
-app_ui.js
-index_fetched.html
-
-# ── Claude Code (personal, machine-local) ─────────────────────────────────────
+# Claude Code (machine-local)
 .claude/settings.local.json
 .claude/.jira-sync-marker
 
-# ── Misc ──────────────────────────────────────────────────────────────────────
+# Misc
 .DS_Store
 Thumbs.db
 *.log
-.vercel/
-
-# ── Secrets ───────────────────────────────────────────────────────────────────
-# OAuth client secret files (e.g. client_secret_<id>.apps.googleusercontent.com.json)
-client_secret_*.json
-
-# wrangler files
-.wrangler
-.dev.vars*
-!.dev.vars.example
-!.env.example
-images/**

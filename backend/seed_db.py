@@ -1,7 +1,7 @@
 """Seed the database with data mirroring the live app.laundrybill.com account.
 
 The 79-item catalogue below was captured from the live app on 2026-07-30; the
-per-category counts and price ranges match it exactly. See LIVE_AUDIT.md.
+per-category counts and price ranges match it exactly.
 
 WARNING: this wipes every table before seeding.
 """

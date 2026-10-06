@@ -19,7 +19,7 @@ function deploy() {
   const PROJECT_NAME = process.env.CLOUDFLARE_PAGES_PROJECT || 'washnlaundrycrm';
 
   // _headers / _redirects live in washnlaundrycrm/ (source), not build/web/ —
-  // same pattern as vercel.json getting copied over in deploy_vercel.js.
+  // so they are copied into the upload.
   for (const file of ['_headers', '_redirects']) {
     const src = path.join(rootDir, 'washnlaundrycrm', file);
     const dst = path.join(webDir, file);
