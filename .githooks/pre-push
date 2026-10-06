@@ -2,11 +2,10 @@
 # Git pre-push hook. Only pushes to main do anything, and only for the parts of
 # the repo that actually changed:
 #   backend/**                                   -> Django tests (Render then auto-deploys the backend)
-#   washnlaundrycrm/** or the Vercel deploy script -> Flutter tests + build + Vercel deploy
-#   anything else (bridge, docs, Cloudflare Workers) -> nothing
-# Cloudflare deploys (Pages + Workers) live on the `cloudflare` branch, not here.
+#   washnlaundrycrm/** or the Pages deploy script -> Flutter tests + build + Cloudflare Pages deploy
+#   anything else (Workers, bridge, docs)         -> nothing; Workers ship with `wrangler deploy`
 # A first push / unknown base is treated as "everything changed".
-# Requires VERCEL_TOKEN for the CRM deploy (see scripts/deploy_vercel.js).
+# Requires CLOUDFLARE_API_TOKEN for the CRM deploy (see scripts/deploy_cloudflare_pages.js).
 # Set PREPUSH_DRY_RUN=1 to print what would run instead of running it.
 
 zero="0000000000000000000000000000000000000000"
@@ -37,7 +36,7 @@ do
         do_crm=1
     elif changed=$(git diff --name-only "$remote_oid" "$local_oid" 2>/dev/null); then
         echo "$changed" | grep -q '^backend/' && do_backend=1
-        echo "$changed" | grep -qE '^(washnlaundrycrm/|scripts/deploy_vercel\.js)' && do_crm=1
+        echo "$changed" | grep -qE '^(washnlaundrycrm/|scripts/deploy_cloudflare_pages\.js)' && do_crm=1
     else
         echo "Pre-push: cannot diff against remote main; treating everything as changed."
         do_backend=1
@@ -73,10 +72,10 @@ do
             exit 1
         fi
 
-        banner "Deploying updated frontend to Vercel production..."
-        run node scripts/deploy_vercel.js
+        banner "Deploying updated frontend to Cloudflare Pages production..."
+        run node scripts/deploy_cloudflare_pages.js
         if [ $? -ne 0 ]; then
-            echo "Error: Vercel deploy failed. Push aborted." >&2
+            echo "Error: Cloudflare Pages deploy failed. Push aborted." >&2
             exit 1
         fi
     fi

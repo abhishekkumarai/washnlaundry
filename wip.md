@@ -104,11 +104,39 @@ WhatsApp bridge all done this session — ready to move to In Review)
 
 ## Pending
 
+- **KAN-112 — RESOLVED: `/api/rag/chat/` hang root cause identified & fixed (Option 2: Direct Edge Access).**
+  - **Root Cause Identified**: A distributed circular deadlock. Render's single sync Gunicorn worker
+    (`WEB_CONCURRENCY=1`) accepted the client's `/api/rag/chat/` request and blocked in `RagService.stream_chat()`.
+    When Llama 3.3 70B called tools (`lookup_order` or `lookup_customer_dues`), the Cloudflare Worker made an
+    HTTP fetch back to `https://laundrybill-backend.onrender.com/api/orders/`. Because Gunicorn had only 1 worker
+    and it was already blocked waiting for Cloudflare, the incoming tool request deadlocked indefinitely.
+  - **Fix Implemented (Option 2)**:
+    - Updated Cloudflare Worker (`washnlaundry-rag`) to authenticate requests from allowed origins
+      (`washnlaundrycrm.pages.dev`, `washnlaundry-marketing...`, `localhost`) via CORS in addition to `Bearer RAG_API_KEY`.
+    - Added `AbortSignal.timeout(10000)` and error handling to `callTool` to guarantee the worker never hangs.
+    - Updated Flutter CRM (`ApiService.ragWorkerUrl`) to stream directly from `washnlaundry-rag`.
+    - Updated Next.js marketing site (`ChatWidget.tsx`) to stream directly from `washnlaundry-rag`.
+    - Updated `whatsapp-bridge` (`autoReply.js`, `index.js`) to call `RAG_WORKER_URL` directly with `RAG_API_KEY`.
+    - Render backend is now completely out of the RAG streaming path, completely eliminating Gunicorn worker starvation.
+    - Verified live: tool-calling queries against the deployed Worker return full SSE streams in 7.2s, without deadlocking Render.
+  - **New**: also added to the Next.js marketing site
+    (`washnlaundry-marketing.abhishekkumarai.workers.dev/`), scoped to the
+    home page only (`src/app/page.tsx`, not `/about` — new
+    `src/components/ChatWidget/ChatWidget.tsx`, calls the same Django proxy
+    directly client-side since `CORS_ALLOW_ALL_ORIGINS=True` already allows
+    it, no new Next.js API route or secret needed). Bottom-left FAB (bot
+    icon, matching the Flutter CRM's icon) so it doesn't collide with the
+    existing bottom-right Call/WhatsApp/Scroll-to-top stack. Deployed via
+    `wrangler deploy` from the WSL native-filesystem build (same workflow as
+    KAN-111). This half of KAN-112's task 4 (Flutter + WhatsApp bridge) has
+    grown a third client; the description should probably be read as
+    "wherever customers need support," not literally just those two.
 - **KAN-112 — turn on `WHATSAPP_AUTO_REPLY`** — code is done and tested but
-  the feature is off by default (see above). Flipping it on is a deliberate,
-  separate decision — real customers start getting AI replies the moment
-  it's set to `true`. Verify the RAG backend's answers on a few real
-  questions first (rates, policies, order lookups) before enabling on the
+  the feature is off by default (see above), and now also **blocked** on the
+  hang bug above. Flipping it on is a deliberate, separate decision — real
+  customers start getting AI replies the moment it's set to `true`. Verify
+  the RAG backend's answers on a few real questions first (rates, policies,
+  order lookups) **and confirm the hang is fixed** before enabling on the
   live session.
 - **KAN-110** — `app.washnlaundry.com` custom domain not attached (needs
   KAN-114's zone first). Pre-push → Cloudflare cutover is done (see above).

@@ -79,22 +79,32 @@ export async function collectSseText(response) {
 }
 
 /**
- * Calls the Django RAG proxy (see backend/api/services/rag_service.py) and
- * returns the full assistant reply as plain text.
+ * Calls the Cloudflare RAG Worker directly (or Django RAG proxy as fallback)
+ * and returns the full assistant reply as plain text. Calling the worker
+ * directly avoids monopolizing Render's single-worker backend.
  */
-export async function fetchRagReply(message, { backendUrl, timeoutMs = DEFAULT_TIMEOUT_MS }) {
+export async function fetchRagReply(message, { ragWorkerUrl, ragApiKey, backendUrl, timeoutMs = DEFAULT_TIMEOUT_MS }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const targetUrl = ragWorkerUrl
+    ? `${ragWorkerUrl.replace(/\/$/, '')}/api/rag/chat`
+    : `${backendUrl.replace(/\/$/, '')}/api/rag/chat/`;
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (ragApiKey) {
+    headers['Authorization'] = `Bearer ${ragApiKey}`;
+  }
+
   try {
-    const res = await fetch(`${backendUrl}/api/rag/chat/`, {
+    const res = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ message }),
       signal: controller.signal,
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`RAG proxy returned ${res.status}: ${body.slice(0, 200)}`);
+      throw new Error(`RAG service returned ${res.status}: ${body.slice(0, 200)}`);
     }
     return await collectSseText(res);
   } finally {
@@ -108,13 +118,13 @@ export async function fetchRagReply(message, { backendUrl, timeoutMs = DEFAULT_T
  * already-linked WhatsApp session is a production behaviour change, not a
  * contained addition, so it defaults to off (AUTO_REPLY_ENABLED env var).
  */
-export async function handleIncomingMessage(message, { enabled, backendUrl, sendTextMessage, logger }) {
+export async function handleIncomingMessage(message, { enabled, ragWorkerUrl, ragApiKey, backendUrl, sendTextMessage, logger }) {
   if (!enabled || !shouldAutoReply(message)) return;
 
   const jid = message.key.remoteJid;
   const text = extractText(message);
   try {
-    const reply = await fetchRagReply(text, { backendUrl });
+    const reply = await fetchRagReply(text, { ragWorkerUrl, ragApiKey, backendUrl });
     if (reply.trim()) {
       await sendTextMessage(jid, reply.trim());
     }

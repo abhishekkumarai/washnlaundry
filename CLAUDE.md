@@ -105,47 +105,45 @@ Inspect with the `render` CLI (`render services list -o json`, `render deploys l
 - `laundrypro-api` / `laundrypro-db` in the same Render account are an unrelated
   project, not this one.
 
-**Frontend — Vercel.** Vercel has no Flutter SDK, so a Git-triggered build
-produces an empty deployment that 404s — the real site comes from uploading a
-locally built bundle, with the Render API URL baked in:
+**Frontend — Cloudflare Pages.** The Flutter bundle is built locally (Cloudflare has no Flutter
+SDK either) and uploaded to Pages project `washnlaundrycrm`, with the Render API URL baked in:
 
 ```bash
 cd washnlaundrycrm
 flutter build web --release --dart-define=API_BASE_URL=https://laundrybill-backend.onrender.com/api
-node ../scripts/deploy_vercel.js   # deploys build/web to washnlaundry-crm
+node ../scripts/deploy_cloudflare_pages.js   # deploys build/web to washnlaundrycrm
 ```
 
-### Branches: `main` = Vercel + Render, `cloudflare` = Cloudflare (decided 2026-10-06)
+### Hosting is Cloudflare-only; one deploy branch, `main` (decided 2026-10-06)
 
-The two hosting stacks are kept on separate branches so a push for one never ships the other.
-Feature branches never deploy.
+The `cloudflare` branch was merged into `main` and Vercel is retired for this project. Feature
+branches never deploy. `scripts/deploy_vercel.js` and `washnlaundrycrm/vercel.json` are legacy,
+kept only until they are deleted.
 
-| Branch | Deploys | Triggered by |
+| Target | Source | Ships via |
 |---|---|---|
-| `main` | Django backend → Render (auto, runs migrations); Flutter CRM → **Vercel** `washnlaundry-crm` | push to `main` (Render) + pre-push hook (Vercel) |
-| `cloudflare` | Flutter CRM → Cloudflare Pages `washnlaundrycrm.pages.dev`; Workers `washnlaundry-rag` (chat, lead capture, 15-min cron) and `washnlaundry-api-proxy` | pre-push hook on that branch (Pages); `npx wrangler deploy` in `cloudflare/<worker>/` (Workers) |
+| Django backend `laundrybill-backend.onrender.com` | `backend/` | Render auto-deploys on push to `main` (runs migrations) |
+| CRM `app.washnlaundry.com` / `washnlaundrycrm.pages.dev` (Cloudflare Pages) | `washnlaundrycrm/` | pre-push hook on push to `main`, or `node scripts/deploy_cloudflare_pages.js` after a `flutter build web` |
+| Worker `washnlaundry-rag` (chat + lead capture + 15-min cron) | `cloudflare/rag-engine/` | `npx wrangler deploy` from that folder |
+| Worker `washnlaundry-api-proxy` | `cloudflare/api-proxy/` | `npx wrangler deploy` from that folder |
+| Marketing `www.washnlaundry.com` / `washnlaundry.com` (Worker `washnlaundry-marketing`) | **separate repo** `abhishekkumarai/washnlaundry` | `pnpm cf:deploy` in that repo |
+| WhatsApp bridge | `whatsapp-bridge/` | local Docker only |
 
-Neutral backend code (e.g. the website-chat `Lead` model, `/api/leads/`, Resend email) lives on
-`main` because Render only deploys `main`; the Worker, cron, Pages deploy and chat UI live on
-`cloudflare`. `cloudflare/` on `main` is the older Worker source and is not deployed from here.
-The marketing site (`washnlaundry-marketing`) is a separate repo, `abhishekkumarai/washnlaundry`.
+DNS for `washnlaundry.com` is on Cloudflare (nameservers `raina`/`vin.ns.cloudflare.com`; moved
+off Namecheap 2026-10-06). `app` is a proxied CNAME to `washnlaundrycrm.pages.dev`; the apex and
+`www` are Worker custom domains on `washnlaundry-marketing`. The MX records
+(`eforward1-5.registrar-servers.com`) and the SPF TXT record were kept as they were.
 
-The **pre-push hook** (`.githooks/pre-push`, active via `core.hooksPath`) differs per branch
-(`node scripts/setup_hooks.js` copies the current branch's copy into `.git/hooks`). On `main` it is
-path-aware and only acts on pushes to `main`: `backend/**` changed → Django tests only;
-`washnlaundrycrm/**` or `scripts/deploy_vercel.js` changed → Flutter tests + build + Vercel deploy;
-anything else → nothing. A first push / undiffable base runs everything; any failing step aborts
-the push. `PREPUSH_DRY_RUN=1` prints what would run. On `cloudflare` the same logic deploys to
-Cloudflare Pages instead.
+The **pre-push hook** (`.githooks/pre-push`, active via `core.hooksPath`; `node scripts/setup_hooks.js`
+copies it into `.git/hooks`) is path-aware and only acts on pushes to `main`: `backend/**` changed →
+Django tests only; `washnlaundrycrm/**` or the Pages deploy script changed → Flutter tests + build +
+Pages deploy; anything else (Workers, bridge, docs) → nothing. A first push or an undiffable base
+runs everything. Any failing step aborts the push. `PREPUSH_DRY_RUN=1` prints what would run.
+Requires `CLOUDFLARE_API_TOKEN`.
 
-Target project is **`washnlaundry-crm`** in team "abhishekzgithub's projects"
-(`team_3q6DiOqHmHEU2kSpyXvL3xzg`); there is also an unused, empty `washnlaundrycrm`
-project there. SPA routing comes from `washnlaundrycrm/vercel.json`'s catch-all rewrite
-(no `cleanUrls` — it broke deep links). The local `.vercel/project.json` files point at a
-different team the CLI can't reach; don't trust them, link explicitly.
-**www.washnlaundry.com is not this app** — it is a separate Next.js site in another
-Vercel team; pointing it here needs that team's access or a TXT re-verification at the
-Namecheap DNS.
+Deep links resolve on Pages (verified: `/orders/abc` returns 200). The old Vercel
+project `washnlaundry-crm` (team "abhishekzgithub's projects") no longer serves anything.
+
 
 ---
 
