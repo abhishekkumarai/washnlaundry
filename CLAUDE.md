@@ -115,9 +115,29 @@ flutter build web --release --dart-define=API_BASE_URL=https://laundrybill-backe
 node ../scripts/deploy_vercel.js   # deploys build/web to washnlaundry-crm
 ```
 
-A **Git pre-push hook** (`.git/hooks/pre-push`) is installed: before any `git push` to `main`,
-it automatically runs the test suite, builds the Flutter Web release bundle, and deploys the
-updated bundle to Vercel production. If any step fails, the push to `main` is safely aborted.
+**Legacy:** the Vercel upload above is no longer what ships the CRM — see "What deploys where"
+below. `scripts/deploy_vercel.js` and `washnlaundrycrm/vercel.json` are kept but unused.
+
+### What deploys where (updated 2026-10-06)
+
+Several independent targets live in or beside this repo. Only the first two are triggered by a
+push to `main`; **feature branches never deploy anything.**
+
+| Target | Source | Ships via |
+|---|---|---|
+| Django backend `laundrybill-backend.onrender.com` | `backend/` | Render auto-deploys on push to `main` (runs migrations) |
+| CRM `washnlaundrycrm.pages.dev` (Cloudflare Pages) | `washnlaundrycrm/` | pre-push hook on push to `main`, or `node scripts/deploy_cloudflare_pages.js` after a `flutter build web` |
+| Worker `washnlaundry-rag` (chat + lead capture + 15-min cron) | `cloudflare/rag-engine/` | `npx wrangler deploy` from that folder |
+| Worker `washnlaundry-api-proxy` | `cloudflare/api-proxy/` | `npx wrangler deploy` from that folder |
+| Marketing `washnlaundry-marketing.abhishekkumarai.workers.dev` | **separate repo** `abhishekkumarai/washnlaundry` | `wrangler deploy` in that repo |
+| `washnlaundry.com`, `app.washnlaundry.com` | separate site / not attached yet | KAN-114 DNS cutover; untouched by this repo |
+| WhatsApp bridge | `whatsapp-bridge/` | local Docker only |
+
+The **pre-push hook** (`.githooks/pre-push`, active via `core.hooksPath`; `node scripts/setup_hooks.js`
+copies it into `.git/hooks`) is path-aware and only acts on pushes to `main`: `backend/**` changed →
+Django tests only; `washnlaundrycrm/**` or the Pages deploy script changed → Flutter tests + build +
+Pages deploy; anything else (Workers, bridge, docs) → nothing. A first push or an undiffable base
+runs everything. Any failing step aborts the push. `PREPUSH_DRY_RUN=1` prints what would run.
 
 Target project is **`washnlaundry-crm`** in team "abhishekzgithub's projects"
 (`team_3q6DiOqHmHEU2kSpyXvL3xzg`); there is also an unused, empty `washnlaundrycrm`
