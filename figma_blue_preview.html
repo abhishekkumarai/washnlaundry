@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WashNLaundry CRM — #0D99FF on Warm Off-White Canvas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ==============================================================
+       THEME: #0D99FF ELECTRIC AZURE ON WARM OFF-WHITE CANVASES
+       ============================================================== */
+    :root {
+      /* Default: Warm Linen Off-White */
+      --canvas-bg: #FAF8F5;
+      --card-bg: #FFFFFF;
+      --card-border: #EAE6DF;
+      --header-bg: #FAF8F5;
+      --sidebar-bg: #FFFFFF;
+      --sidebar-border: #EAE6DF;
+      --sidebar-active-bg: #EBF5FF;
+      --sidebar-active-text: #0D99FF;
+      --sidebar-text: #64748B;
+      --primary: #0D99FF;
+      --primary-hover: #0082E6;
+      --primary-text: #FFFFFF;
+      --accent-tint: #EBF5FF;
+      --accent-pill-text: #0077CC;
+      --text-main: #181D25;
+      --text-muted: #6B7280;
+      --chart-bar: #0D99FF;
+      --chart-sec: #BAE6FD;
+      --glow: rgba(13, 153, 255, 0.28);
+      --font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      --border-radius: 8px;
+      --shadow-card: 0 1px 3px rgba(24, 29, 37, 0.05);
+    }
+
+    /* Off-White Shade 1: Warm Linen (#FAF8F5) */
+    [data-offwhite="linen"] {
+      --canvas-bg: #FAF8F5;
+      --header-bg: #FAF8F5;
+      --card-border: #EAE6DF;
+      --sidebar-border: #EAE6DF;
+      --desc: "Warm Linen (#FAF8F5) — Soft architectural paper feel. Clean, serene, high card pop.";
+    }
+
+    /* Off-White Shade 2: Ivory Cotton Cream (#FDFBF7) */
+    [data-offwhite="ivory-cream"] {
+      --canvas-bg: #FDFBF7;
+      --header-bg: #FDFBF7;
+      --card-border: #EFECE6;
+      --sidebar-border: #EFECE6;
+      --desc: "Ivory Cotton Cream (#FDFBF7) — Extra gentle warmth, feels like crisp washed cotton sheets.";
+    }
+
+    /* Off-White Shade 3: Nordic Alabaster (#F5F5F2) */
+    [data-offwhite="alabaster"] {
+      --canvas-bg: #F5F5F2;
+      --header-bg: #F5F5F2;
+      --card-border: #E3E3DE;
+      --sidebar-border: #E3E3DE;
+      --desc: "Nordic Alabaster (#F5F5F2) — Slightly cooler limestone off-white with maximum card contrast.";
+    }
+
+    /* Off-White Shade 4: Soft Oatmeal Stone (#F6F4EF) */
+    [data-offwhite="oatmeal"] {
+      --canvas-bg: #F6F4EF;
+      --header-bg: #F6F4EF;
+      --card-border: #E5E2DA;
+      --sidebar-border: #E5E2DA;
+      --desc: "Soft Oatmeal (#F6F4EF) — Natural fabric texture undertone, rich tactile depth.";
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background: #090E17;
+      color: #F8FAFC;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    /* Top Studio Header */
+    .studio-panel {
+      width: 100%;
+      max-width: 1400px;
+      background: #111927;
+      border: 1px solid #1E2D42;
+      border-radius: 14px;
+      padding: 20px 26px;
+      margin-bottom: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .studio-header-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .studio-title h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .color-chip-large {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #0D99FF;
+      color: #FFFFFF;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 0 16px rgba(13, 153, 255, 0.4);
+    }
+
+    .studio-title p {
+      font-size: 13px;
+      color: #94A3B8;
+      margin-top: 4px;
+    }
+
+    .screen-toggle-box {
+      display: flex;
+      gap: 6px;
+      background: #090E17;
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid #1E2D42;
+    }
+
+    .screen-btn {
+      background: transparent;
+      border: none;
+      color: #94A3B8;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .screen-btn.active {
+      background: #0D99FF;
+      color: #FFFFFF;
+      box-shadow: 0 2px 6px rgba(13, 153, 255, 0.35);
+    }
+
+    /* 4 Off-White Shade Selector Buttons */
+    .offwhite-selector-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .ow-btn {
+      background: #0A111E;
+      border: 1px solid #1B293C;
+      border-radius: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+
+    .ow-btn:hover {
+      border-color: #0D99FF;
+      background: #0F1A2C;
+    }
+
+    .ow-btn.active {
+      background: #13243C;
+      border-color: #0D99FF;
+      box-shadow: 0 0 0 2px rgba(13, 153, 255, 0.4);
+    }
+
+    .ow-swatch-bar {
+      height: 20px;
+      border-radius: 5px;
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 6px;
+    }
+
+    .ow-swatch-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #0D99FF;
+    }
+
+    .ow-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+
+    .ow-code {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #94A3B8;
+    }
+
+    /* Explanation Banner */
+    .active-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 16px;
+      background: #080D15;
+      border-radius: 8px;
+      border: 1px solid #1A283B;
+      font-size: 13px;
+    }
+
+    .active-banner b { color: #0D99FF; }
+
+    /* App Frame Preview */
+    .app-frame {
+      width: 100%;
+      max-width: 1400px;
+      background: var(--canvas-bg);
+      border: 1px solid #1E2D42;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      height: 840px;
+      transition: background-color 0.25s ease;
+    }
+
+    .frame-bar {
+      background: #111A27;
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 1px solid #1D2B3F;
+    }
+
+    .frame-dots { display: flex; gap: 6px; }
+    .fdot { width: 11px; height: 11px; border-radius: 50%; }
+    .fdot-1 { background: #EF4444; }
+    .fdot-2 { background: #F59E0B; }
+    .fdot-3 { background: #10B981; }
+
+    .frame-url {
+      background: #090E17;
+      color: #94A3B8;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 5px 16px;
+      border-radius: 6px;
+      flex: 1;
+      max-width: 460px;
+    }
+
+    /* Inner Viewport */
+    .app-viewport {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .app-sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--sidebar-border);
+      display: flex;
+      flex-direction: column;
+      padding: 22px 14px;
+      justify-content: space-between;
+      transition: all 0.2s ease;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 8px 20px;
+      border-bottom: 1px solid var(--sidebar-border);
+      margin-bottom: 14px;
+    }
+
+    .brand-mark {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--primary);
+      color: var(--primary-text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      box-shadow: 0 2px 8px var(--glow);
+      transition: all 0.2s ease;
+    }
+
+    .brand-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.01em;
+    }
+    .brand-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .nav-links {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 12px;
+      border-radius: 7px;
+      color: var(--sidebar-text);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .nav-item:hover {
+      background: var(--sidebar-active-bg);
+      color: var(--sidebar-active-text);
+    }
+
+    .nav-item.active {
+      background: var(--sidebar-active-bg);
+      color: var(--sidebar-active-text);
+      font-weight: 600;
+      border-left: 3px solid var(--primary);
+      border-radius: 0 7px 7px 0;
+    }
+
+    .nav-item svg { width: 17px; height: 17px; stroke-width: 2; }
+
+    .user-footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 8px 0;
+      border-top: 1px solid var(--sidebar-border);
+    }
+
+    .user-pill {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--accent-tint);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .user-text { flex: 1; }
+    .uname { font-size: 12px; font-weight: 600; color: var(--text-main); }
+    .urole { font-size: 11px; color: var(--text-muted); }
+
+    /* Main Area */
+    .app-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--canvas-bg);
+      overflow-y: auto;
+      transition: background-color 0.25s ease;
+    }
+
+    .top-header {
+      height: 60px;
+      background: var(--header-bg);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      transition: background-color 0.25s ease;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 7px;
+      padding: 7px 14px;
+      width: 320px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .store-online-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #ECFDF5;
+      color: #047857;
+    }
+
+    .btn-new-order {
+      background: var(--primary);
+      color: var(--primary-text);
+      border: none;
+      padding: 8px 18px;
+      border-radius: 7px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 10px var(--glow);
+      transition: all 0.15s ease;
+    }
+
+    .btn-new-order:hover {
+      background: var(--primary-hover);
+    }
+
+    /* Content Views */
+    .view-content {
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    /* Dashboard View */
+    .dash-layout { display: flex; flex-direction: column; gap: 22px; }
+
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .title-row h2 {
+      font-size: 21px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+
+    .title-row span {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* KPI Cards */
+    .kpi-deck {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .kpi-tile {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      box-shadow: var(--shadow-card);
+      transition: all 0.2s ease;
+    }
+
+    .kpi-heading {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
+
+    .kpi-stat {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.025em;
+      font-feature-settings: "tnum" 1;
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    /* Charts & Pipelines */
+    .split-analytics {
+      display: grid;
+      grid-template-columns: 2fr 1.1fr;
+      gap: 20px;
+    }
+
+    .tile-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 22px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-top h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .chart-box {
+      display: flex;
+      align-items: flex-end;
+      height: 175px;
+      gap: 16px;
+      padding-top: 10px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .bar-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      height: 100%;
+      justify-content: flex-end;
+    }
+
+    .bar-item {
+      width: 24px;
+      border-radius: 4px 4px 0 0;
+      background: var(--chart-bar);
+      box-shadow: 0 2px 8px var(--glow);
+      transition: height 0.3s ease, background 0.2s ease;
+    }
+
+    .bar-date {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* Order Queue */
+    .queue-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .queue-entry {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: var(--canvas-bg);
+      border-radius: 7px;
+      border: 1px solid var(--card-border);
+    }
+
+    .queue-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .queue-id {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .queue-name {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .blue-status-pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: var(--accent-tint);
+      color: var(--accent-pill-text);
+    }
+
+    /* POS Screen */
+    .pos-layout {
+      display: none;
+      grid-template-columns: 2.2fr 1fr;
+      gap: 22px;
+    }
+
+    .pos-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .pos-tab {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 7px 16px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .pos-tab.active {
+      background: var(--primary);
+      color: var(--primary-text);
+      border-color: var(--primary);
+      box-shadow: 0 2px 8px var(--glow);
+    }
+
+    .pos-items {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .item-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 18px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 10px;
+      cursor: pointer;
+      box-shadow: var(--shadow-card);
+      transition: all 0.15s ease;
+    }
+
+    .item-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+    }
+
+    .item-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 7px;
+      background: var(--accent-tint);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .item-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .item-rate {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--primary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Cart Sidebar */
+    .cart-drawer {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: var(--shadow-card);
+    }
+
+    .cart-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .cart-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 18px 0;
+      flex: 1;
+    }
+
+    .cart-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+
+    .cart-iname { font-weight: 600; color: var(--text-main); }
+    .cart-iqty { font-size: 12px; color: var(--text-muted); margin-left: 6px; }
+    .cart-iprice { font-weight: 600; color: var(--text-main); font-family: 'JetBrains Mono', monospace; }
+
+    .cart-totals {
+      border-top: 1px solid var(--card-border);
+      padding-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .c-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .c-row.c-total {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-main);
+      padding-top: 8px;
+      border-top: 1px dashed var(--card-border);
+      margin-top: 4px;
+    }
+
+    .btn-checkout {
+      width: 100%;
+      background: var(--primary);
+      color: var(--primary-text);
+      border: none;
+      padding: 12px;
+      border-radius: 7px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 14px;
+      box-shadow: 0 2px 12px var(--glow);
+      transition: background 0.15s ease;
+    }
+
+    .btn-checkout:hover {
+      background: var(--primary-hover);
+    }
+  </style>
+</head>
+<body data-offwhite="linen">
+
+  <!-- Top Studio Header -->
+  <div class="studio-panel">
+    <div class="studio-header-line">
+      <div class="studio-title">
+        <h1>
+          <span>WashNLaundry CRM</span>
+          <span class="color-chip-large">#0D99FF on Off-White</span>
+        </h1>
+        <p>Tactile pure white cards elevated over warm architectural off-white canvas with #0D99FF accents.</p>
+      </div>
+
+      <div class="screen-toggle-box">
+        <button class="screen-btn active" id="btn-dash" onclick="switchView('dashboard')">Dashboard</button>
+        <button class="screen-btn" id="btn-pos" onclick="switchView('pos')">New Order POS</button>
+      </div>
+    </div>
+
+    <!-- 4 Off-White Shade Selectors -->
+    <div class="offwhite-selector-grid">
+      <!-- 1. Warm Linen -->
+      <button class="ow-btn active" onclick="setOffWhite('linen', this)">
+        <div class="ow-swatch-bar" style="background: #FAF8F5;">
+          <div class="ow-swatch-dot"></div>
+        </div>
+        <div class="ow-label">1. Warm Linen</div>
+        <div class="ow-code">#FAF8F5 (Recommended)</div>
+      </button>
+
+      <!-- 2. Ivory Cream -->
+      <button class="ow-btn" onclick="setOffWhite('ivory-cream', this)">
+        <div class="ow-swatch-bar" style="background: #FDFBF7;">
+          <div class="ow-swatch-dot"></div>
+        </div>
+        <div class="ow-label">2. Ivory Cream</div>
+        <div class="ow-code">#FDFBF7 (Gentle Cotton)</div>
+      </button>
+
+      <!-- 3. Nordic Alabaster -->
+      <button class="ow-btn" onclick="setOffWhite('alabaster', this)">
+        <div class="ow-swatch-bar" style="background: #F5F5F2;">
+          <div class="ow-swatch-dot"></div>
+        </div>
+        <div class="ow-label">3. Nordic Alabaster</div>
+        <div class="ow-code">#F5F5F2 (Clean Stone)</div>
+      </button>
+
+      <!-- 4. Soft Oatmeal -->
+      <button class="ow-btn" onclick="setOffWhite('oatmeal', this)">
+        <div class="ow-swatch-bar" style="background: #F6F4EF;">
+          <div class="ow-swatch-dot"></div>
+        </div>
+        <div class="ow-label">4. Soft Oatmeal</div>
+        <div class="ow-code">#F6F4EF (Textile Fiber)</div>
+      </button>
+    </div>
+
+    <!-- Description Bar -->
+    <div class="active-banner">
+      <div>
+        <b id="active-title">1. Warm Linen (#FAF8F5)</b> — 
+        <span id="active-desc" style="color: #94A3B8;">Soft architectural paper feel. Pure white (#FFFFFF) cards pop with tactile physical depth, zero eye strain.</span>
+      </div>
+      <div style="font-size: 12px; color: #0D99FF; font-weight: 600;">Active in Live Frame Below</div>
+    </div>
+  </div>
+
+  <!-- Live Browser Frame -->
+  <div class="app-frame">
+    <div class="frame-bar">
+      <div class="frame-dots">
+        <div class="fdot fdot-1"></div>
+        <div class="fdot fdot-2"></div>
+        <div class="fdot fdot-3"></div>
+      </div>
+      <div class="frame-url">https://app.washnlaundry.com/dashboard</div>
+    </div>
+
+    <div class="app-viewport">
+      
+      <!-- Sidebar -->
+      <aside class="app-sidebar">
+        <div>
+          <div class="brand-group">
+            <div class="brand-mark">W</div>
+            <div>
+              <div class="brand-name">Wash & Laundry</div>
+              <div class="brand-sub">Commercial CRM</div>
+            </div>
+          </div>
+
+          <ul class="nav-links">
+            <li class="nav-item active" onclick="switchView('dashboard')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+              Dashboard
+            </li>
+            <li class="nav-item" onclick="switchView('pos')">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+              New Order POS
+            </li>
+            <li class="nav-item">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+              Orders Directory
+            </li>
+            <li class="nav-item">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+              Customers
+            </li>
+            <li class="nav-item">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              Services & Rates
+            </li>
+            <li class="nav-item">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+              Staff Roster
+            </li>
+          </ul>
+        </div>
+
+        <div class="user-footer">
+          <div class="user-pill">AK</div>
+          <div class="user-text">
+            <div class="uname">Abhishek K.</div>
+            <div class="urole">Store Admin</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Body -->
+      <main class="app-main">
+        <header class="top-header">
+          <div class="search-box">
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <span>Search order #, customer, phone...</span>
+          </div>
+
+          <div class="header-right">
+            <div class="store-online-badge">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: currentColor;"></span>
+              Store Online
+            </div>
+            <button class="btn-new-order" onclick="switchView('pos')">
+              <span>+</span> New Order POS
+            </button>
+          </div>
+        </header>
+
+        <!-- DASHBOARD VIEW -->
+        <div class="view-content dash-layout" id="view-dashboard">
+          <div class="title-row">
+            <div>
+              <h2>Store Performance Dashboard</h2>
+              <span>Real-time operations and daily revenue metrics</span>
+            </div>
+            <span>Auto-refreshing live</span>
+          </div>
+
+          <!-- KPI Row -->
+          <div class="kpi-deck">
+            <div class="kpi-tile">
+              <div class="kpi-heading">Gross Revenue</div>
+              <div class="kpi-stat">$14,820</div>
+              <div class="kpi-sub">↑ +14.2% vs last week</div>
+            </div>
+            <div class="kpi-tile">
+              <div class="kpi-heading">Active Orders</div>
+              <div class="kpi-stat">38</div>
+              <div class="kpi-sub" style="color: var(--text-muted);">In Processing Pipeline</div>
+            </div>
+            <div class="kpi-tile">
+              <div class="kpi-heading">Garments In Wash</div>
+              <div class="kpi-stat">142</div>
+              <div class="kpi-sub">4 Washers Running</div>
+            </div>
+            <div class="kpi-tile">
+              <div class="kpi-heading">Completed Today</div>
+              <div class="kpi-stat">56</div>
+              <div class="kpi-sub">100% on-time delivery</div>
+            </div>
+          </div>
+
+          <!-- Split Row -->
+          <div class="split-analytics">
+            <div class="tile-panel">
+              <div class="panel-top">
+                <h3>14-Day Revenue Trajectory</h3>
+                <span style="font-size: 12px; color: var(--text-muted);">Daily Billing</span>
+              </div>
+              <div class="chart-box">
+                <div class="bar-group"><div class="bar-item" style="height: 65px;"></div><span class="bar-date">Mon</span></div>
+                <div class="bar-group"><div class="bar-item" style="height: 100px;"></div><span class="bar-date">Tue</span></div>
+                <div class="bar-group"><div class="bar-item" style="height: 85px;"></div><span class="bar-date">Wed</span></div>
+                <div class="bar-group"><div class="bar-item" style="height: 125px;"></div><span class="bar-date">Thu</span></div>
+                <div class="bar-group"><div class="bar-item" style="height: 160px;"></div><span class="bar-date">Fri</span></div>
+                <div class="bar-group"><div class="bar-item" style="height: 175px;"></div><span class="bar-date">Sat</span></div>
+                <div class="bar-group"><div class="bar-item" style="height: 115px;"></div><span class="bar-date">Sun</span></div>
+              </div>
+            </div>
+
+            <div class="tile-panel">
+              <div class="panel-top">
+                <h3>Active Order Pipeline</h3>
+                <span style="font-size: 12px; color: var(--text-muted);">Live Queue</span>
+              </div>
+              <div class="queue-list">
+                <div class="queue-entry">
+                  <div class="queue-meta">
+                    <span class="queue-id">#ORD-4029</span>
+                    <span class="queue-name">Sarah Jenkins (6 pcs)</span>
+                  </div>
+                  <span class="blue-status-pill">Washing</span>
+                </div>
+                <div class="queue-entry">
+                  <div class="queue-meta">
+                    <span class="queue-id">#ORD-4028</span>
+                    <span class="queue-name">Michael Chang (3 pcs)</span>
+                  </div>
+                  <span class="blue-status-pill">Ready</span>
+                </div>
+                <div class="queue-entry">
+                  <div class="queue-meta">
+                    <span class="queue-id">#ORD-4027</span>
+                    <span class="queue-name">Priya Patel (12 pcs)</span>
+                  </div>
+                  <span class="blue-status-pill">Placed</span>
+                </div>
+                <div class="queue-entry">
+                  <div class="queue-meta">
+                    <span class="queue-id">#ORD-4026</span>
+                    <span class="queue-name">David Ross (2 suits)</span>
+                  </div>
+                  <span class="blue-status-pill">Delivered</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- POS VIEW -->
+        <div class="view-content pos-layout" id="view-pos">
+          <div>
+            <div class="pos-tabs">
+              <button class="pos-tab active">All Garments</button>
+              <button class="pos-tab">Ironing</button>
+              <button class="pos-tab">Wash & Fold</button>
+              <button class="pos-tab">Dry Cleaning</button>
+              <button class="pos-tab">Household</button>
+              <button class="pos-tab">Premium Care</button>
+            </div>
+
+            <div class="pos-items">
+              <div class="item-card">
+                <div class="item-icon">👔</div>
+                <div class="item-name">Formal Shirt</div>
+                <div class="item-rate">$4.50</div>
+              </div>
+              <div class="item-card">
+                <div class="item-icon">👖</div>
+                <div class="item-name">Trousers / Chinos</div>
+                <div class="item-rate">$6.00</div>
+              </div>
+              <div class="item-card">
+                <div class="item-icon">🧥</div>
+                <div class="item-name">2-Piece Suit</div>
+                <div class="item-rate">$22.00</div>
+              </div>
+              <div class="item-card">
+                <div class="item-icon">👗</div>
+                <div class="item-name">Silk Dress</div>
+                <div class="item-rate">$18.50</div>
+              </div>
+              <div class="item-card">
+                <div class="item-icon">🛏️</div>
+                <div class="item-name">Bed Sheet (King)</div>
+                <div class="item-rate">$12.00</div>
+              </div>
+              <div class="item-card">
+                <div class="item-icon">🧣</div>
+                <div class="item-name">Wool Scarf</div>
+                <div class="item-rate">$7.00</div>
+              </div>
+              <div class="item-card">
+                <div class="item-icon">🧺</div>
+                <div class="item-name">Quilt / Blanket</div>
+                <div class="item-rate">$24.00</div>
+              </div>
+              <div class="item-card">
+                <div class="item-icon">👟</div>
+                <div class="item-name">Leather Care</div>
+                <div class="item-rate">$16.00</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cart Sidebar -->
+          <div class="cart-drawer">
+            <div>
+              <div class="cart-title">
+                <span>Current Order</span>
+                <span style="font-size: 12px; color: var(--text-muted);">4 Items</span>
+              </div>
+              <div class="cart-list">
+                <div class="cart-row">
+                  <div><span class="cart-iname">Formal Shirt</span><span class="cart-iqty">× 3</span></div>
+                  <span class="cart-iprice">$13.50</span>
+                </div>
+                <div class="cart-row">
+                  <div><span class="cart-iname">Trousers</span><span class="cart-iqty">× 2</span></div>
+                  <span class="cart-iprice">$12.00</span>
+                </div>
+                <div class="cart-row">
+                  <div><span class="cart-iname">2-Piece Suit</span><span class="cart-iqty">× 1</span></div>
+                  <span class="cart-iprice">$22.00</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="cart-totals">
+              <div class="c-row"><span>Subtotal</span><span>$47.50</span></div>
+              <div class="c-row"><span>Express Service (1.5×)</span><span>$0.00</span></div>
+              <div class="c-row"><span>Tax (GST)</span><span>$4.28</span></div>
+              <div class="c-row c-total"><span>Grand Total</span><span>$51.78</span></div>
+              <button class="btn-checkout">Complete & Print Bill</button>
+            </div>
+          </div>
+        </div>
+
+      </main>
+
+    </div>
+  </div>
+
+  <script>
+    const offWhiteInfo = {
+      'linen': {
+        title: "1. Warm Linen (#FAF8F5)",
+        desc: "Soft architectural paper feel. Pure white (#FFFFFF) cards pop with tactile physical depth, zero eye strain."
+      },
+      'ivory-cream': {
+        title: "2. Ivory Cotton Cream (#FDFBF7)",
+        desc: "Extra gentle warmth, feels like crisp washed cotton sheets and luxury garment care."
+      },
+      'alabaster': {
+        title: "3. Nordic Alabaster (#F5F5F2)",
+        desc: "Slightly cooler limestone off-white with maximum card contrast and crisp definition."
+      },
+      'oatmeal': {
+        title: "4. Soft Oatmeal (#F6F4EF)",
+        desc: "Natural fabric texture undertone with rich tactile depth across tables and grid cards."
+      }
+    };
+
+    function setOffWhite(shadeKey, btn) {
+      document.body.setAttribute('data-offwhite', shadeKey);
+      
+      document.querySelectorAll('.ow-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const info = offWhiteInfo[shadeKey];
+      if (info) {
+        document.getElementById('active-title').innerText = info.title;
+        document.getElementById('active-desc').innerText = info.desc;
+      }
+    }
+
+    function switchView(view) {
+      const dash = document.getElementById('view-dashboard');
+      const pos = document.getElementById('view-pos');
+      const bDash = document.getElementById('btn-dash');
+      const bPos = document.getElementById('btn-pos');
+
+      if (view === 'dashboard') {
+        dash.style.display = 'flex';
+        pos.style.display = 'none';
+        bDash.classList.add('active');
+        bPos.classList.remove('active');
+      } else {
+        dash.style.display = 'none';
+        pos.style.display = 'grid';
+        bDash.classList.remove('active');
+        bPos.classList.add('active');
+      }
+    }
+  </script>
+</body>
+</html>
