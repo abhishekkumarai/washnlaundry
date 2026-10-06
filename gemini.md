@@ -77,3 +77,6 @@ Whenever performing browser automation, session verification, or screenshot capt
 
 ## CHROME-DEVTOOLS-MCP
 - Always allow it.
+
+## 🎨 Design, Color & Theme Prototypes Rule
+- Whenever discussing design, colors, styling, or theme choices, NEVER rely solely on code snippets or abstract descriptions. ALWAYS generate a self-contained, interactive HTML preview file (with instant theme toggle switches, realistic layouts, live CSS variables, and font pairings) and automatically launch it in the browser (`Start-Process`) so the user can visually evaluate and interact with the design options directly.

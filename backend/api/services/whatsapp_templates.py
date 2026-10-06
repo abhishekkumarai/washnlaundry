@@ -141,3 +141,4 @@ Payment Mode: {payment_method.capitalize()}{note_line}
 Thank you for your hard work and dedication!"""
 
     return msg.strip()
+
