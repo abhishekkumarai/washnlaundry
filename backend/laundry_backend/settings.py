@@ -122,3 +122,14 @@ LEAD_EMAIL_TO = [
 ]
 LEAD_EMAIL_FROM = os.environ.get('LEAD_EMAIL_FROM', 'washnlaundry <onboarding@resend.dev>')
 
+# Browser origins allowed to call the public (no-secret) pickup-form endpoint
+# /api/leads/public/, and how many submissions one IP may make per hour.
+PUBLIC_LEAD_ORIGINS = [
+    o.strip() for o in os.environ.get(
+        'PUBLIC_LEAD_ORIGINS',
+        'https://washnlaundry-marketing.abhishekkumarai.workers.dev,'
+        'https://washnlaundry.com,https://www.washnlaundry.com',
+    ).split(',') if o.strip()
+]
+PUBLIC_LEAD_RATE_PER_HOUR = int(os.environ.get('PUBLIC_LEAD_RATE_PER_HOUR', '5'))
+

@@ -4,13 +4,14 @@ import re
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 
 from django.db.models import ProtectedError, Sum, Count, Q
 from django.http import JsonResponse, StreamingHttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from rest_framework import viewsets
 from rest_framework.decorators import api_view, action
 from rest_framework.parsers import MultiPartParser
@@ -1072,25 +1073,14 @@ def _normalize_indian_mobile(raw):
     return digits if re.fullmatch(r'[6-9]\d{9}', digits) else None
 
 
-@csrf_exempt
-@require_POST
-def create_lead(request):
-    """POST /api/leads/
-    Called server-to-server by the washnlaundry-rag Worker once the website
-    chat has collected a pickup request. Saves a Lead, then emails it to the shop. Authenticated with the
-    shared RAG_API_KEY because the rest of this API is open and this one
-    triggers outbound messages. Body: {name, phone, address, requirements}.
-    """
+def _has_valid_rag_key(request):
     expected = settings.RAG_API_KEY
     supplied = request.headers.get('Authorization', '')
-    if not expected or not hmac.compare_digest(supplied, f'Bearer {expected}'):
-        return JsonResponse({'detail': 'Unauthorized.'}, status=401)
+    return bool(expected) and hmac.compare_digest(supplied, f'Bearer {expected}')
 
-    try:
-        body = json.loads(request.body or b'{}')
-    except json.JSONDecodeError:
-        return JsonResponse({'detail': 'Invalid JSON body.'}, status=400)
 
+def _save_and_email_lead(body, source):
+    """Validate, save and email one lead. Returns a JsonResponse."""
     name = str(body.get('name') or '').strip()[:120]
     address = str(body.get('address') or '').strip()[:500]
     requirements = str(body.get('requirements') or '').strip()[:500]
@@ -1100,13 +1090,95 @@ def create_lead(request):
     if not phone:
         return JsonResponse({'detail': 'A valid 10-digit Indian mobile number is required.'}, status=400)
 
-    lead = Lead.objects.create(name=name, phone=phone, address=address, requirements=requirements)
+    lead = Lead.objects.create(
+        name=name, phone=phone, address=address, requirements=requirements, source=source,
+    )
     EmailService.send_lead_alert(lead)
     return JsonResponse(
         {'ok': True, 'id': lead.id, 'email_status': lead.email_status},
         status=201,
     )
 
+
+@csrf_exempt
+@require_POST
+def create_lead(request):
+    """POST /api/leads/
+    Called server-to-server by the washnlaundry-rag Worker once the website
+    chat has collected a pickup request. Saves a Lead, then emails it to the
+    shop. Authenticated with the shared RAG_API_KEY because the rest of this
+    API is open and this one triggers outbound messages.
+    Body: {name, phone, address, requirements}.
+    """
+    if not _has_valid_rag_key(request):
+        return JsonResponse({'detail': 'Unauthorized.'}, status=401)
+    try:
+        body = json.loads(request.body or b'{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'detail': 'Invalid JSON body.'}, status=400)
+    return _save_and_email_lead(body, 'chat')
+
+
+def _client_ip(request):
+    forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    return (forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR', '')) or 'unknown'
+
+
+def _with_cors(response, origin):
+    response['Access-Control-Allow-Origin'] = origin
+    response['Vary'] = 'Origin'
+    return response
+
+
+@csrf_exempt
+@require_http_methods(['POST', 'OPTIONS'])
+def public_lead(request):
+    """POST /api/leads/public/
+    The "Request a pickup" form on the marketing site. A browser can't hold a
+    secret, so instead of RAG_API_KEY this relies on an exact Origin allow-list
+    (PUBLIC_LEAD_ORIGINS), a per-IP hourly rate limit (PUBLIC_LEAD_RATE_PER_HOUR)
+    and a hidden honeypot field (`website`) that real users never fill in.
+    Body: {name, phone, address, service?, website?}.
+    """
+    origin = request.headers.get('Origin', '')
+    if origin.lower() not in {o.lower() for o in settings.PUBLIC_LEAD_ORIGINS}:
+        return JsonResponse({'detail': 'Origin not allowed.'}, status=403)
+
+    if request.method == 'OPTIONS':
+        resp = JsonResponse({}, status=204)
+        resp['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        resp['Access-Control-Allow-Headers'] = 'Content-Type'
+        resp['Access-Control-Max-Age'] = '86400'
+        return _with_cors(resp, origin)
+
+    try:
+        body = json.loads(request.body or b'{}')
+    except json.JSONDecodeError:
+        return _with_cors(JsonResponse({'detail': 'Invalid JSON body.'}, status=400), origin)
+
+    if str(body.get('website') or '').strip():
+        # Honeypot filled: look successful so the bot moves on, but save and send nothing.
+        return _with_cors(JsonResponse({'ok': True}, status=201), origin)
+
+    key = f'public_lead:{_client_ip(request)}'
+    cache.add(key, 0, 3600)
+    try:
+        count = cache.incr(key)
+    except ValueError:  # expired between add and incr
+        cache.set(key, 1, 3600)
+        count = 1
+    if count > settings.PUBLIC_LEAD_RATE_PER_HOUR:
+        return _with_cors(
+            JsonResponse({'detail': 'Too many requests. Please call us instead.'}, status=429), origin)
+
+    service = str(body.get('service') or '').strip()[:80]
+    payload = {
+        'name': body.get('name'),
+        'phone': body.get('phone'),
+        'address': body.get('address'),
+        'requirements': f'Service: {service}' if service else 'Pickup request (no details given)',
+    }
+    return _with_cors(_save_and_email_lead(payload, 'form'), origin)
 
 
 @csrf_exempt
@@ -1118,8 +1190,6 @@ def process_leads(request):
     so Render's free tier doesn't sleep between visitors. Same key as
     /api/leads/. Returns {"retried": n, "sent": n, "pending": n}.
     """
-    expected = settings.RAG_API_KEY
-    supplied = request.headers.get('Authorization', '')
-    if not expected or not hmac.compare_digest(supplied, f'Bearer {expected}'):
+    if not _has_valid_rag_key(request):
         return JsonResponse({'detail': 'Unauthorized.'}, status=401)
     return JsonResponse(EmailService.retry_pending())

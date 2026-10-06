@@ -2271,3 +2271,89 @@ class LeadEmailTests(APITestCase):
     def test_process_requires_key_and_post(self):
         self.assertEqual(self.client.post('/api/leads/process/').status_code, 401)
         self.assertEqual(self.client.get('/api/leads/process/', HTTP_AUTHORIZATION='Bearer k3y').status_code, 405)
+
+
+class PublicPickupFormTests(APITestCase):
+    URL = '/api/leads/public/'
+    MARKETING = 'https://washnlaundry-marketing.abhishekkumarai.workers.dev'
+    FORM = {'name': 'Ravi', 'phone': '9123456780', 'address': 'Kankarbagh, Patna', 'service': 'Wash & Fold'}
+
+    def setUp(self):
+        from django.core.cache import cache
+        from django.test import override_settings
+        cache.clear()
+        self._ov = override_settings(
+            RESEND_API_KEY='re_test', LEAD_EMAIL_TO=['a@example.com'],
+            PUBLIC_LEAD_ORIGINS=[self.MARKETING], PUBLIC_LEAD_RATE_PER_HOUR=3,
+        )
+        self._ov.enable()
+        self.addCleanup(self._ov.disable)
+
+    def _post(self, data=None, origin=None, ip='1.2.3.4'):
+        extra = {'HTTP_X_FORWARDED_FOR': ip}
+        origin = self.MARKETING if origin is None else origin
+        if origin != 'NONE':
+            extra['HTTP_ORIGIN'] = origin
+        return self.client.post(self.URL, data or self.FORM, format='json', **extra)
+
+    @staticmethod
+    def _resp(status=200):
+        from unittest import mock
+        return mock.Mock(status_code=status, text='boom')
+
+    def test_form_submission_saves_lead_and_sends_email(self):
+        from unittest import mock
+        from .models import Lead
+        with mock.patch('api.services.email_service.requests.post', return_value=self._resp()) as post:
+            res = self._post()
+        self.assertEqual(res.status_code, 201)
+        self.assertIn(res['Access-Control-Allow-Origin'], (self.MARKETING, '*'))  # host CORS middleware may widen to '*'
+        lead = Lead.objects.get()
+        self.assertEqual((lead.source, lead.email_status), ('form', Lead.SENT))
+        self.assertIn('Service: Wash & Fold', lead.requirements)
+        self.assertIn('pickup form', post.call_args.kwargs['json']['text'])
+
+    def test_unlisted_or_missing_origin_is_forbidden_and_saves_nothing(self):
+        from unittest import mock
+        from .models import Lead
+        for origin in ('https://evil.example', 'NONE'):
+            with mock.patch('api.services.email_service.requests.post', return_value=self._resp()) as post:
+                self.assertEqual(self._post(origin=origin).status_code, 403)
+            post.assert_not_called()
+        self.assertEqual(Lead.objects.count(), 0)
+
+    def test_preflight_allowed_only_for_listed_origin(self):
+        ok = self.client.options(self.URL, HTTP_ORIGIN=self.MARKETING)
+        self.assertEqual(ok.status_code, 204)
+        self.assertIn(ok['Access-Control-Allow-Origin'], (self.MARKETING, '*'))
+        self.assertEqual(self.client.options(self.URL, HTTP_ORIGIN='https://evil.example').status_code, 403)
+
+    def test_honeypot_fakes_success_but_saves_and_sends_nothing(self):
+        from unittest import mock
+        from .models import Lead
+        with mock.patch('api.services.email_service.requests.post', return_value=self._resp()) as post:
+            res = self._post({**self.FORM, 'website': 'http://spam.example'})
+        self.assertEqual(res.status_code, 201)
+        post.assert_not_called()
+        self.assertEqual(Lead.objects.count(), 0)
+
+    def test_rate_limit_per_ip(self):
+        from unittest import mock
+        with mock.patch('api.services.email_service.requests.post', return_value=self._resp()):
+            codes = [self._post(ip='9.9.9.9').status_code for _ in range(4)]
+            other_ip = self._post(ip='8.8.8.8').status_code
+        self.assertEqual(codes, [201, 201, 201, 429])
+        self.assertEqual(other_ip, 201)
+
+    def test_invalid_phone_rejected(self):
+        from unittest import mock
+        with mock.patch('api.services.email_service.requests.post', return_value=self._resp()) as post:
+            self.assertEqual(self._post({**self.FORM, 'phone': '123'}).status_code, 400)
+        post.assert_not_called()
+
+    def test_email_outage_still_saves_lead_as_pending(self):
+        from unittest import mock
+        from .models import Lead
+        with mock.patch('api.services.email_service.requests.post', return_value=self._resp(500)):
+            self.assertEqual(self._post().status_code, 201)
+        self.assertEqual(Lead.objects.get().email_status, Lead.PENDING)

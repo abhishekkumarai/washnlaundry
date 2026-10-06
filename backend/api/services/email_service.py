@@ -19,6 +19,7 @@ class EmailService:
     @classmethod
     def _build(cls, lead):
         when = timezone.localtime(lead.created_at).strftime('%d %b %Y, %I:%M %p')
+        origin = 'the website chat' if lead.source == 'chat' else 'the website pickup form'
         rows = [
             ('Name', lead.name),
             ('Phone', lead.phone),
@@ -26,14 +27,14 @@ class EmailService:
             ('Requirements', lead.requirements),
             ('Received', when),
         ]
-        text = 'New pickup request from the website chat\n\n' + '\n'.join(f'{k}: {v}' for k, v in rows)
+        text = f'New pickup request from {origin}\n\n' + '\n'.join(f'{k}: {v}' for k, v in rows)
         body = ''.join(
             f'<tr><td style="padding:4px 12px 4px 0;color:#555"><b>{k}</b></td>'
             f'<td style="padding:4px 0">{html.escape(str(v))}</td></tr>'
             for k, v in rows
         )
         markup = (
-            '<p>New pickup request from the website chat</p>'
+            f'<p>New pickup request from {origin}</p>'
             f'<table style="font-family:sans-serif;font-size:14px">{body}</table>'
         )
         return f'washnlaundry - New pickup request: {lead.name}', text, markup
