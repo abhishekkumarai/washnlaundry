@@ -10,29 +10,8 @@ services:
       - ./backend:/app
     environment:
       - PYTHONUNBUFFERED=1
-      - WHATSAPP_BRIDGE_URL=http://whatsapp-bridge:3000
-      - WHATSAPP_BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-laundry_secret_bridge_token}
-      - WHATSAPP_DRY_RUN=${WHATSAPP_DRY_RUN:-1}
       - RAG_API_KEY=${RAG_API_KEY:-}
       - RESEND_API_KEY=${RESEND_API_KEY:-}
-    depends_on:
-      - whatsapp-bridge
-
-  whatsapp-bridge:
-    build:
-      context: ./whatsapp-bridge
-      dockerfile: Dockerfile
-    container_name: laundry_whatsapp_bridge
-    restart: unless-stopped
-    ports:
-      - "3005:3000"
-    environment:
-      - PORT=3000
-      - BRIDGE_TOKEN=${WHATSAPP_BRIDGE_TOKEN:-laundry_secret_bridge_token}
-      - BACKEND_URL=http://backend:8000
-      - AUTO_REPLY_ENABLED=${WHATSAPP_AUTO_REPLY:-false}
-    volumes:
-      - whatsapp_session:/app/session
 
   frontend:
     build:
@@ -48,7 +27,3 @@ services:
       - "8081:80"
     depends_on:
       - backend
-
-volumes:
-  whatsapp_session:
-    name: washnlaundry_whatsapp_session

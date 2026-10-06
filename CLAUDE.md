@@ -127,7 +127,6 @@ kept only until they are deleted.
 | Worker `washnlaundry-rag` (chat + lead capture + 15-min cron) | `cloudflare/rag-engine/` | `npx wrangler deploy` from that folder |
 | Worker `washnlaundry-api-proxy` | `cloudflare/api-proxy/` | `npx wrangler deploy` from that folder |
 | Marketing `www.washnlaundry.com` / `washnlaundry.com` (Worker `washnlaundry-marketing`) | **separate repo** `abhishekkumarai/washnlaundry` | `pnpm cf:deploy` in that repo |
-| WhatsApp bridge | `whatsapp-bridge/` | local Docker only |
 
 DNS for `washnlaundry.com` is on Cloudflare (nameservers `raina`/`vin.ns.cloudflare.com`; moved
 off Namecheap 2026-10-06). `app` is a proxied CNAME to `washnlaundrycrm.pages.dev`; the apex and
@@ -137,7 +136,7 @@ off Namecheap 2026-10-06). `app` is a proxied CNAME to `washnlaundrycrm.pages.de
 The **pre-push hook** (`.githooks/pre-push`, active via `core.hooksPath`; `node scripts/setup_hooks.js`
 copies it into `.git/hooks`) is path-aware and only acts on pushes to `main`: `backend/**` changed →
 Django tests only; `washnlaundrycrm/**` or the Pages deploy script changed → Flutter tests + build +
-Pages deploy; anything else (Workers, bridge, docs) → nothing. A first push or an undiffable base
+Pages deploy; anything else (Workers, docs) → nothing. A first push or an undiffable base
 runs everything. Any failing step aborts the push. `PREPUSH_DRY_RUN=1` prints what would run.
 Requires `CLOUDFLARE_API_TOKEN`.
 

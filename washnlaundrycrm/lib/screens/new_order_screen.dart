@@ -2455,7 +2455,7 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
 /// The real app's post-checkout confirmation — a compact summary and real
 /// next actions, shown once the order is actually saved. Distinct from
 /// [ReceiptDialog] (still reachable via "View Receipt"): that one is the
-/// itemized, printable/WhatsApp-able bill; this one is just "did it work,
+/// itemized, printable bill; this one is just "did it work,
 /// and what next."
 class _OrderPlacedDialog extends StatelessWidget {
   final OrderModel order;

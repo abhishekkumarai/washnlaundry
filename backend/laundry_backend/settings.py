@@ -97,12 +97,6 @@ CORS_ALLOWED_ORIGINS = [
     origin for origin in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if origin
 ]
 
-# ── WhatsApp Bridge Configuration (Hermes Stack) ──────────────────────────────
-WHATSAPP_BRIDGE_URL = os.environ.get('WHATSAPP_BRIDGE_URL', 'http://127.0.0.1:3000')
-WHATSAPP_BRIDGE_TOKEN = os.environ.get('WHATSAPP_BRIDGE_TOKEN', '')
-WHATSAPP_DRY_RUN = os.environ.get('WHATSAPP_DRY_RUN', 'True').lower() in ('true', '1', 'yes', 'on')
-WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get('WHATSAPP_DEFAULT_COUNTRY_CODE', '91')
-
 # ── RAG Chat (Cloudflare Workers AI + Vectorize, KAN-112) ─────────────────────
 # The worker's RAG_API_KEY is a secret and must never reach the public Flutter
 # web bundle, so the backend proxies /api/rag/chat/ and attaches it here.

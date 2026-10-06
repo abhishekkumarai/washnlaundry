@@ -163,13 +163,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF0F172A))),
           const Spacer(),
-          _headerButton(
-            'WhatsApp',
-            Icons.chat_bubble_outline_rounded,
-            const Color(0xFF10B981),
-            () => _sendWhatsAppReceipt(order),
-          ),
-          const SizedBox(width: 8),
           _headerButton('Edit', Icons.edit_outlined, const Color(0xFF475569),
               _canEditOrder(order) ? _showEditOrder : null),
           const SizedBox(width: 8),
@@ -193,7 +186,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   /// Below [SidebarNavigation.contentWideBreakpoint]: drops the "Orders /" breadcrumb text (the back
-  /// arrow already says the same thing) and collapses WhatsApp/Edit/Print
+  /// arrow already says the same thing) and collapses Edit/Print
   /// Receipt — all secondary to Update Status — into one overflow menu, so
   /// everything fits in a single 64px row instead of overflowing.
   Widget _narrowHeader(OrderModel order) {
@@ -244,10 +237,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 size: 20, color: Color(0xFF475569)),
             onSelected: (action) => action(),
             itemBuilder: (context) => [
-              PopupMenuItem(
-                value: () => _sendWhatsAppReceipt(order),
-                child: const Text('WhatsApp'),
-              ),
               PopupMenuItem(
                 value: _showEditOrder,
                 enabled: _canEditOrder(order),
@@ -947,25 +936,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     ));
   }
 
-  void _sendWhatsAppReceipt(OrderModel order) async {
-    if (order.customerPhone.isEmpty) {
-      _toast('No customer phone number available.');
-      return;
-    }
-    _toast('Sending WhatsApp receipt to ${order.customerName}...');
-    try {
-      await ApiService.sendOrderWhatsApp(order.id);
-      if (mounted) {
-        _toast('WhatsApp receipt delivered to ${order.customerName}!', success: true);
-      }
-    } catch (e) {
-      if (mounted) {
-        _toast('WhatsApp delivery failed: $e');
-      }
-    }
-  }
-
-
   /// The "Collect Payment" dialog: amount, payment method, and whether the
   /// customer is paying in full, part now, or later. Submitting it records
   /// the payment (skipped entirely for Pay Later, where amount is 0) and,
@@ -1277,35 +1247,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 onPressed: saving ? null : () => Navigator.pop(ctx, false),
                 child: const Text('Cancel',
                     style: TextStyle(color: Color(0xFF64748B))),
-              ),
-              OutlinedButton.icon(
-                onPressed: saving
-                    ? null
-                    : () async {
-                        try {
-                          setDialogState(() => saving = true);
-                          await ApiService.sendOrderStatusWhatsApp(
-                            order.id,
-                            note: noteController.text.trim(),
-                          );
-                          if (mounted) {
-                            _toast('Status notification delivered to customer on WhatsApp!', success: true);
-                          }
-                        } catch (err) {
-                          if (mounted) _toast('Failed to send status on WhatsApp: $err');
-                        } finally {
-                          setDialogState(() => saving = false);
-                        }
-                      },
-                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 15),
-                label: const Text('Share via WhatsApp',
-                    style: TextStyle(fontSize: 12)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF10B981),
-                  side: const BorderSide(color: Color(0xFF10B981)),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
               ),
               FilledButton(
                 onPressed: saving

@@ -2,9 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../models/order_model.dart';
-import '../services/api_service.dart';
 import '../utils/money.dart';
 
 class ReceiptDialog extends StatefulWidget {
@@ -19,8 +17,6 @@ class ReceiptDialog extends StatefulWidget {
 }
 
 class _ReceiptDialogState extends State<ReceiptDialog> {
-  bool _sending = false;
-
   String get _shopName =>
       (widget.shop?['name'] as String?)?.trim().isNotEmpty == true
           ? widget.shop!['name'] as String
@@ -222,36 +218,7 @@ class _ReceiptDialogState extends State<ReceiptDialog> {
             // Action Buttons
             Row(
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: (order.customerPhone.isEmpty || _sending)
-                        ? null
-                        : () => _shareWhatsapp(order),
-                    icon: _sending
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.chat_rounded,
-                            color: Colors.white, size: 16),
-                    label: Text(
-                        _sending ? 'Sending...' : 'WhatsApp Bill',
-                        style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      disabledBackgroundColor: const Color(0xFFCBD5E1),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
+                const Spacer(),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close_rounded),
@@ -262,42 +229,5 @@ class _ReceiptDialogState extends State<ReceiptDialog> {
         ),
       ),
     );
-  }
-
-  void _shareWhatsapp(OrderModel order) async {
-    setState(() => _sending = true);
-    final messenger = ScaffoldMessenger.of(context);
-
-    try {
-      await ApiService.sendOrderWhatsApp(order.id);
-      if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('WhatsApp receipt delivered to ${order.customerName}!'),
-            backgroundColor: const Color(0xFF10B981),
-          ),
-        );
-      }
-    } catch (err) {
-      // Fallback: If bridge is offline or error occurred, open wa.me link so user is never stuck
-      final cleanPhone = order.customerPhone.replaceAll(RegExp(r'\D'), '');
-      final msg = Uri.encodeComponent(
-          'Hello ${order.customerName},\nThank you for choosing LaundryBill!\nYour Order #${order.orderNumber} is processed.\nTotal: ${Money.symbol}${order.totalAmount.toInt()}\nThank you!');
-      final url = Uri.parse('https://wa.me/91$cleanPhone?text=$msg');
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url);
-      } else if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Could not send WhatsApp message: $err'),
-            backgroundColor: const Color(0xFFDC2626),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _sending = false);
-      }
-    }
   }
 }

@@ -137,7 +137,6 @@ void main() {
       expect(find.text('Pay ₹5,600'), findsOneWidget);
       expect(find.byKey(const ValueKey('payroll-pay-2')), findsNothing);
       expect(find.byTooltip('Manage payments & adjustments'), findsOneWidget);
-      expect(find.byTooltip('Send on WhatsApp'), findsNWidgets(2));
     });
 
     testWidgets('the title sits at the top, not centred in a short page',

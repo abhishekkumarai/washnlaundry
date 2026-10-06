@@ -18,7 +18,6 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from . import customer_import
-from .services.whatsapp_service import WhatsAppService
 from .services.rag_service import RagService, RagServiceError
 from .services.email_service import EmailService
 from .models import (
@@ -315,40 +314,6 @@ class OrderViewSet(viewsets.ModelViewSet):
             order.customer.save()
 
         return Response(self.get_serializer(order).data)
-
-    @action(detail=True, methods=['post'], url_path='send-whatsapp')
-    def send_whatsapp(self, request, pk=None):
-        """POST /api/orders/<id>/send-whatsapp/
-        Dispatches automated order receipt via WhatsApp.
-        """
-        order = self.get_object()
-        res = WhatsAppService.send_order_receipt(order)
-        if not res.get('ok'):
-            return Response({'detail': res.get('error', 'Failed to send WhatsApp message')}, status=400)
-        return Response({
-            'success': True,
-            'order_id': str(order.id),
-            'order_number': order.order_number,
-            'result': res,
-        })
-
-    @action(detail=True, methods=['post'], url_path='send-status-whatsapp')
-    def send_status_whatsapp(self, request, pk=None):
-        """POST /api/orders/<id>/send-status-whatsapp/
-        Dispatches status notification via WhatsApp.
-        """
-        order = self.get_object()
-        note = request.data.get('note', '')
-        res = WhatsAppService.send_order_status_update(order, note=note)
-        if not res.get('ok'):
-            return Response({'detail': res.get('error', 'Failed to send WhatsApp message')}, status=400)
-        return Response({
-            'success': True,
-            'order_id': str(order.id),
-            'order_number': order.order_number,
-            'status': order.status,
-            'result': res,
-        })
 
 
 class ExpenseViewSet(viewsets.ModelViewSet):
@@ -962,76 +927,6 @@ def dashboard_stats(request):
     })
 
 
-@api_view(['POST'])
-def send_payroll_whatsapp(request):
-    """POST /api/payroll/send-slip-whatsapp/
-    Sends formatted salary slip to employee via WhatsApp.
-    """
-    staff_id = request.data.get('staff_id') or request.data.get('staff')
-    if not staff_id:
-        return Response({'detail': 'staff_id is required.'}, status=400)
-
-    try:
-        staff = Staff.objects.get(pk=staff_id)
-    except Staff.DoesNotExist:
-        return Response({'detail': f'Staff member {staff_id} not found.'}, status=404)
-
-    month_str = request.data.get('month') or timezone.localdate().strftime('%Y-%m')
-    try:
-        month_date = parse_month(month_str) or timezone.localdate().replace(day=1)
-    except Exception:
-        month_date = timezone.localdate().replace(day=1)
-
-    formatted_month = month_date.strftime('%B %Y')
-
-    days_worked = float(request.data.get('days_worked', 0))
-    half_days = int(request.data.get('half_days', 0))
-    gross_wage = float(request.data.get('gross_wage', staff.monthly_wage))
-    paid_amount = float(request.data.get('paid_amount', gross_wage))
-    payment_method = str(request.data.get('payment_method', 'Cash'))
-    note = str(request.data.get('note', ''))
-
-    res = WhatsAppService.send_payroll_slip(
-        staff=staff,
-        month_str=formatted_month,
-        days_worked=days_worked,
-        half_days=half_days,
-        gross_wage=gross_wage,
-        paid_amount=paid_amount,
-        payment_method=payment_method,
-        note=note,
-    )
-
-    if not res.get('ok'):
-        return Response({'detail': res.get('error', 'Failed to send WhatsApp slip.')}, status=400)
-
-    return Response({
-        'success': True,
-        'staff_id': staff.id,
-        'staff_name': staff.name,
-        'phone': staff.phone,
-        'result': res,
-    })
-
-
-@api_view(['GET'])
-def whatsapp_status(request):
-    """GET /api/whatsapp/status/
-    Returns health status of the WhatsApp microservice and current pairing state.
-    """
-    status_info = WhatsAppService.get_bridge_status()
-    return Response(status_info)
-
-
-@api_view(['GET'])
-def whatsapp_qr(request):
-    """GET /api/whatsapp/qr/
-    Returns current QR code pairing data URL.
-    """
-    qr_info = WhatsAppService.get_qr_code()
-    return Response(qr_info)
-
-
 @csrf_exempt
 @require_POST
 def rag_chat(request):
@@ -1060,7 +955,6 @@ def rag_chat(request):
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
     return response
-
 
 
 def _normalize_indian_mobile(raw):

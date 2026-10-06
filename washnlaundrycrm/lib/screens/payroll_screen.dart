@@ -154,7 +154,6 @@ class _PayrollScreenState extends State<PayrollScreen> {
                         _detailStaffId = slipEntry.staffId;
                         _slipStaffId = null;
                       }),
-                      onWhatsApp: () => _sendSlipOnWhatsApp(slipEntry),
                       onPrint: () => _toast('Sent to the printer.'),
                     ),
                   ),
@@ -636,12 +635,6 @@ class _PayrollScreenState extends State<PayrollScreen> {
   }
 
   Widget _rowActions(PayrollEntryModel e) {
-    final whatsapp = _squareIcon(
-      icon: Icons.chat_bubble_outline_rounded,
-      tooltip: 'Send on WhatsApp',
-      color: _green,
-      onPressed: () => _sendSlipOnWhatsApp(e),
-    );
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -670,8 +663,6 @@ class _PayrollScreenState extends State<PayrollScreen> {
             tooltip: 'Manage payments & adjustments',
             onPressed: () => setState(() => _detailStaffId = e.staffId),
           ),
-        const SizedBox(width: 8),
-        whatsapp,
       ],
     );
   }
@@ -841,7 +832,6 @@ class _PayrollScreenState extends State<PayrollScreen> {
               Navigator.of(dialogContext).pop();
               setState(() => _detailStaffId = e.staffId);
             },
-            onWhatsApp: () => _sendSlipOnWhatsApp(e),
             onPrint: () => _toast('Sent to the printer.'),
           ),
         ),
@@ -1616,47 +1606,6 @@ class _PayrollScreenState extends State<PayrollScreen> {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
-  void _sendSlipOnWhatsApp(PayrollEntryModel entry) async {
-    final phone = _staffFor(entry.staffId, context.read<AppProvider>())?.phone ??
-        '';
-    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-    if (cleanPhone.isEmpty) {
-      _toast('No phone number saved for ${entry.staffName}.');
-      return;
-    }
-
-    _toast('Sending salary slip to ${entry.staffName} on WhatsApp...');
-    try {
-      final monthStr = DateFormat('yyyy-MM').format(_selectedMonth);
-      await ApiService.sendPayrollWhatsApp({
-        'staff_id': entry.staffId,
-        'month': monthStr,
-        'days_worked': entry.daysWorked,
-        'half_days': entry.halfDays,
-        'gross_wage': entry.totalSalary,
-        'paid_amount': entry.paidAmount,
-      });
-      if (mounted) {
-        _toast('Salary slip sent to ${entry.staffName} via WhatsApp!', success: true);
-      }
-    } catch (e) {
-      // Fallback to wa.me if bridge is offline or error occurred
-      final msg = Uri.encodeComponent(
-          'Hi ${entry.staffName},\nYour salary slip for $_monthLabel:\n'
-          'Base salary: ${_rs(entry.totalSalary)}\n'
-          'Advances: -${_rs(entry.advancesAmount)}\n'
-          'Net pay: ${_rs(entry.netPay)}\n'
-          'Paid: ${_rs(entry.paidAmount)}\n'
-          'To pay: ${_rs(entry.pendingAmount)}');
-      final url = Uri.parse('https://wa.me/91$cleanPhone?text=$msg');
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url);
-      } else if (mounted) {
-        _toast('Failed to dispatch salary slip: $e');
-      }
-    }
-  }
-
   void _toast(String message, {bool success = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(message),
@@ -1674,7 +1623,6 @@ class _SalarySlip extends StatelessWidget {
   final DateTime month;
   final VoidCallback onClose;
   final VoidCallback onManage;
-  final VoidCallback onWhatsApp;
   final VoidCallback onPrint;
 
   const _SalarySlip({
@@ -1684,7 +1632,6 @@ class _SalarySlip extends StatelessWidget {
     required this.month,
     required this.onClose,
     required this.onManage,
-    required this.onWhatsApp,
     required this.onPrint,
   });
 
@@ -1945,18 +1892,6 @@ class _SalarySlip extends StatelessWidget {
                 onPressed: onPrint,
                 icon: const Icon(Icons.print_outlined, size: 15),
                 label: const Text('Print'),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: phone.isEmpty ? null : onWhatsApp,
-                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 15),
-                  label: const Text('Send on WhatsApp'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF16A34A),
-                    side: const BorderSide(color: Color(0xFF16A34A)),
-                  ),
-                ),
               ),
             ],
           ),

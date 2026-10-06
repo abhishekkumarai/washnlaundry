@@ -800,46 +800,6 @@ void main() {
         findsOneWidget,
       );
     });
-
-    testWidgets('cannot WhatsApp a walk-in with no number', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: ReceiptDialog(
-            shop: null,
-            order: OrderModel(
-              id: 'o2',
-              orderNumber: 'WASH-00017',
-              customerName: 'Walk-in customer',
-              customerPhone: '',
-              status: OrderStatus.placed,
-              paymentStatus: PaymentStatus.paid,
-              paymentMethod: 'CASH',
-              totalAmount: 15,
-              paidAmount: 15,
-              dueAmount: 0,
-              express: false,
-              createdAt: DateTime(2026, 7, 31),
-              items: const [
-                OrderItemModel(
-                  itemTitle: 'Shirt',
-                  serviceType: 'Ironing',
-                  quantity: 1,
-                  unitPrice: 15,
-                  totalPrice: 15,
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-
-      // It used to fall back to a hardcoded number and message a stranger.
-      final button = tester.widget<ElevatedButton>(
-        find.widgetWithText(ElevatedButton, 'WhatsApp Bill'),
-      );
-      expect(button.onPressed, isNull);
-    });
   });
 
   group('Responsive layout (cart panel + item grid/table)', () {

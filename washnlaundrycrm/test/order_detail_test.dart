@@ -335,12 +335,6 @@ void main() {
       expect(find.text('That is already the current status.'), findsNothing);
     });
 
-    testWidgets('keeps Share via WhatsApp', (tester) async {
-      await openDialog(tester, order());
-
-      expect(find.text('Share via WhatsApp'), findsOneWidget);
-    });
-
     testWidgets('refuses to re-apply the status the order already has',
         (tester) async {
       await openDialog(tester, order(status: OrderStatus.placed));
@@ -537,7 +531,6 @@ void main() {
         (tester) async {
       await pumpAt(tester, 1400, order());
 
-      expect(find.text('WhatsApp'), findsOneWidget);
       expect(find.text('Edit'), findsOneWidget);
       expect(find.text('Print Receipt'), findsOneWidget);
       expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
@@ -547,7 +540,6 @@ void main() {
         (tester) async {
       await pumpAt(tester, 390, order());
 
-      expect(find.text('WhatsApp'), findsNothing);
       expect(find.text('Print Receipt'), findsNothing);
       expect(find.byIcon(Icons.more_vert_rounded), findsOneWidget);
       // Update Status stays a visible primary action, not folded into the menu.
@@ -556,7 +548,6 @@ void main() {
       await tester.tap(find.byIcon(Icons.more_vert_rounded));
       await tester.pumpAndSettle();
 
-      expect(find.text('WhatsApp'), findsOneWidget);
       expect(find.text('Edit'), findsOneWidget);
       expect(find.text('Print Receipt'), findsOneWidget);
     });
