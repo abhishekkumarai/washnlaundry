@@ -115,9 +115,28 @@ flutter build web --release --dart-define=API_BASE_URL=https://laundrybill-backe
 node ../scripts/deploy_vercel.js   # deploys build/web to washnlaundry-crm
 ```
 
-A **Git pre-push hook** (`.git/hooks/pre-push`) is installed: before any `git push` to `main`,
-it automatically runs the test suite, builds the Flutter Web release bundle, and deploys the
-updated bundle to Vercel production. If any step fails, the push to `main` is safely aborted.
+### Branches: `main` = Vercel + Render, `cloudflare` = Cloudflare (decided 2026-10-06)
+
+The two hosting stacks are kept on separate branches so a push for one never ships the other.
+Feature branches never deploy.
+
+| Branch | Deploys | Triggered by |
+|---|---|---|
+| `main` | Django backend → Render (auto, runs migrations); Flutter CRM → **Vercel** `washnlaundry-crm` | push to `main` (Render) + pre-push hook (Vercel) |
+| `cloudflare` | Flutter CRM → Cloudflare Pages `washnlaundrycrm.pages.dev`; Workers `washnlaundry-rag` (chat, lead capture, 15-min cron) and `washnlaundry-api-proxy` | pre-push hook on that branch (Pages); `npx wrangler deploy` in `cloudflare/<worker>/` (Workers) |
+
+Neutral backend code (e.g. the website-chat `Lead` model, `/api/leads/`, Resend email) lives on
+`main` because Render only deploys `main`; the Worker, cron, Pages deploy and chat UI live on
+`cloudflare`. `cloudflare/` on `main` is the older Worker source and is not deployed from here.
+The marketing site (`washnlaundry-marketing`) is a separate repo, `abhishekkumarai/washnlaundry`.
+
+The **pre-push hook** (`.githooks/pre-push`, active via `core.hooksPath`) differs per branch
+(`node scripts/setup_hooks.js` copies the current branch's copy into `.git/hooks`). On `main` it is
+path-aware and only acts on pushes to `main`: `backend/**` changed → Django tests only;
+`washnlaundrycrm/**` or `scripts/deploy_vercel.js` changed → Flutter tests + build + Vercel deploy;
+anything else → nothing. A first push / undiffable base runs everything; any failing step aborts
+the push. `PREPUSH_DRY_RUN=1` prints what would run. On `cloudflare` the same logic deploys to
+Cloudflare Pages instead.
 
 Target project is **`washnlaundry-crm`** in team "abhishekzgithub's projects"
 (`team_3q6DiOqHmHEU2kSpyXvL3xzg`); there is also an unused, empty `washnlaundrycrm`
