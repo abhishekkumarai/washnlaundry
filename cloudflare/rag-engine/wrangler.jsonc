@@ -22,6 +22,9 @@
       "id": "b05bd1e9cfa7414fb7e057897783484a"
     }
   ],
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
   "observability": {
     "enabled": true
   }

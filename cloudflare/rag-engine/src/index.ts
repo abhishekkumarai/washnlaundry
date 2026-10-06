@@ -43,9 +43,75 @@ const TOOLS = [
   },
 ] as const;
 
-async function callTool(env: Env, name: string, args: Record<string, unknown>): Promise<string> {
+// Marketing-site only: hands a completed pickup request to the backend, which
+// saves it as a Lead and emails the shop. Kept out of TOOLS so the
+// staff/support channel can never trigger outbound messages.
+const BOOKING_TOOL = {
+  type: 'function',
+  function: {
+    name: 'submit_booking',
+    description:
+      'Submit a pickup request. Call this ONLY once the customer has given ALL of: name, 10-digit mobile number, pickup address, and laundry requirements. Do not call it twice for the same customer.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: "Customer's name." },
+        phone: { type: 'string', description: '10-digit Indian mobile number.' },
+        address: { type: 'string', description: 'Pickup address / locality.' },
+        requirements: {
+          type: 'string',
+          description: 'Service type, approximate garment count, preferred pickup day/time.',
+        },
+      },
+      required: ['name', 'phone', 'address', 'requirements'],
+    },
+  },
+} as const;
+
+// Text the assistant is told to include after a successful booking; used to
+// refuse a second submission within the same conversation.
+const BOOKING_SENT_MARKER = 'pickup request has been sent';
+
+async function submitBooking(
+  env: Env,
+  args: Record<string, unknown>,
+  alreadyBooked: boolean,
+): Promise<string> {
+  if (alreadyBooked) {
+    return JSON.stringify({ ok: false, error: 'A booking was already submitted in this conversation.' });
+  }
+  const phone = String(args.phone ?? '').replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, '');
+  if (!/^[6-9]\d{9}$/.test(phone)) {
+    return JSON.stringify({ ok: false, error: 'invalid_phone: ask the customer for a valid 10-digit mobile number.' });
+  }
+  try {
+    const res = await fetch(`${env.BACKEND_ORIGIN}/api/leads/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.RAG_API_KEY}` },
+      body: JSON.stringify({
+        name: String(args.name ?? ''),
+        phone,
+        address: String(args.address ?? ''),
+        requirements: String(args.requirements ?? ''),
+      }),
+      signal: AbortSignal.timeout(25000),
+    });
+    if (!res.ok) return JSON.stringify({ ok: false, error: `backend returned ${res.status}` });
+    return JSON.stringify({ ok: true });
+  } catch (err: any) {
+    return JSON.stringify({ ok: false, error: `Booking failed: ${err?.message ?? err}` });
+  }
+}
+
+async function callTool(
+  env: Env,
+  name: string,
+  args: Record<string, unknown>,
+  ctx: { alreadyBooked: boolean } = { alreadyBooked: false },
+): Promise<string> {
   const query = String(args.query ?? '');
   try {
+    if (name === 'submit_booking') return await submitBooking(env, args, ctx.alreadyBooked);
     if (name === 'lookup_order') {
       const res = await fetch(`${env.BACKEND_ORIGIN}/api/orders/?search=${encodeURIComponent(query)}`, {
         signal: AbortSignal.timeout(10000),
@@ -121,11 +187,31 @@ function corsHeaders(env: Env, origin: string | null): HeadersInit {
 }
 
 export default {
+  // Cron (every 15 min, see wrangler.jsonc): retry lead emails that failed and
+  // keep the free-tier backend awake. Failures are logged, not thrown, so one
+  // bad tick can't disable the schedule.
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      (async () => {
+        try {
+          const res = await fetch(`${env.BACKEND_ORIGIN}/api/leads/process/`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${env.RAG_API_KEY}` },
+            signal: AbortSignal.timeout(60000),
+          });
+          console.log(`lead cron: ${res.status} ${await res.text()}`);
+        } catch (err: any) {
+          console.error(`lead cron failed: ${err?.message ?? err}`);
+        }
+      })(),
+    );
+  },
+
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       return await handle(request, env);
     } catch (err: any) {
-      return new Response(JSON.stringify({ error: err?.message ?? String(err), stack: err?.stack }), {
+      return new Response(JSON.stringify({ error: 'Internal error' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -172,7 +258,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
       .map((c, i) => `[${i + 1}] (${c.source})\n${c.text}`)
       .join('\n\n');
 
-    if (url.searchParams.get('debug') === 'context') {
+    if (url.searchParams.get('debug') === 'context' && hasValidKey) {
       return new Response(JSON.stringify({ contextChunks }, null, 2), {
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -197,15 +283,9 @@ CORE OPERATIONAL RULES:
    - Check the prior conversation history to see which of the 4 details have already been provided.
    - Answer their inquiry first, then naturally ask for whatever details are still missing (e.g. "Would you like me to arrange a pickup for you? May I know your name and mobile number to get started?").
    - If they provide partial details, warmly acknowledge them and ask for the remainder (e.g. "Thanks [Name]! Could you also share your pickup address and what items you need cleaned?").
-   - Once ALL 4 details (Name, Phone, Address, Requirements) are collected, provide a clean, complete confirmation summary AND a direct WhatsApp action link:
-     "🎉 Great! Your pickup request has been prepared:
-     • Name: [Name]
-     • Phone: [Phone]
-     • Address: [Address]
-     • Requirements: [Requirements]
-
-     👉 Tap below to send this directly to our shop on WhatsApp for immediate confirmation:
-     [📲 Confirm & Send via WhatsApp](https://wa.me/917277905904)"
+   - Once ALL 4 details (Name, Phone, Address, Requirements) are collected, call the submit_booking tool exactly once. Never invent or print any link — the team is notified automatically.
+   - If submit_booking returns ok, reply with a short confirmation summarising the 4 details and include the exact phrase "Your pickup request has been sent" followed by "to our team — we will call you shortly to confirm your pickup slot."
+   - If it returns an error mentioning the phone number, ask for a valid 10-digit mobile number. For any other error, apologise and ask the customer to try again in a minute or call the shop.
 
 Knowledge base context:
 ${contextText || '(no relevant context found)'}`
@@ -218,16 +298,26 @@ don't know, say so honestly — never invent an order status or a price.
 Knowledge base context:
 ${contextText || '(no relevant context found)'}`;
 
+    // Clients may only supply user/assistant turns (never system/tool), capped
+    // in count and size so a caller can't override the prompt or inflate cost.
+    const history = (Array.isArray(body.history) ? body.history : [])
+      .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+      .slice(-20)
+      .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
+
     const messages: any[] = [
       { role: 'system', content: systemPrompt },
-      ...(body.history ?? []),
-      { role: 'user', content: body.message },
+      ...history,
+      { role: 'user', content: body.message.slice(0, 2000) },
     ];
 
-    // On the public marketing site, do not expose customer dues lookups.
-    const activeTools = isMarketing
-      ? TOOLS.filter((t) => t.function.name === 'lookup_order')
-      : TOOLS;
+    const alreadyBooked = history.some(
+      (m) => m.role === 'assistant' && m.content.toLowerCase().includes(BOOKING_SENT_MARKER),
+    );
+
+    // The public marketing site gets no order/dues lookups (they would expose
+    // customer data to anyone); it can only submit a booking.
+    const activeTools = isMarketing ? [BOOKING_TOOL] : TOOLS;
 
     // Resolve tool calls first (non-streaming), then stream the final answer.
     for (let round = 0; round < 3; round++) {
@@ -241,7 +331,7 @@ ${contextText || '(no relevant context found)'}`;
       // flattened convenience array and isn't valid to echo back as-is.
       const message = result.choices?.[0]?.message;
       const toolCalls = message?.tool_calls ?? [];
-      if (url.searchParams.get('debug') === 'tools') {
+      if (url.searchParams.get('debug') === 'tools' && hasValidKey) {
         return new Response(JSON.stringify({ round, result }, null, 2), {
           headers: { ...cors, 'Content-Type': 'application/json' },
         });
@@ -252,8 +342,13 @@ ${contextText || '(no relevant context found)'}`;
 
       messages.push({ role: 'assistant', content: message.content ?? '', tool_calls: toolCalls });
       for (const call of toolCalls) {
-        const args = JSON.parse(call.function.arguments || '{}');
-        const toolResult = await callTool(env, call.function.name, args);
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(call.function.arguments || '{}');
+        } catch {
+          // Malformed model output: let the tool report missing fields instead of 500ing.
+        }
+        const toolResult = await callTool(env, call.function.name, args, { alreadyBooked });
         messages.push({ role: 'tool', tool_call_id: call.id, content: toolResult });
       }
     }
