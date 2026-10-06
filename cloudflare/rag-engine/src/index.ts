@@ -4,6 +4,7 @@ export interface Env {
   KB: KVNamespace;
   BACKEND_ORIGIN: string;
   CORS_ALLOWED_ORIGINS: string;
+  BOOKING_ORIGINS: string;
   RAG_API_KEY: string;
 }
 
@@ -250,6 +251,13 @@ async function handle(request: Request, env: Env): Promise<Response> {
       return new Response('message is required', { status: 400, headers: cors });
     }
 
+    // Lead capture is exclusive to the marketing site: an exact Origin match,
+    // not the spoofable body.channel, so the CRM or any other allowed origin
+    // can never submit bookings or trigger lead emails.
+    const canBook = origin
+      ? env.BOOKING_ORIGINS.split(',').some((o) => o.trim().toLowerCase() === origin.toLowerCase())
+      : false;
+
     const isMarketing =
       body.channel === 'marketing' || (origin ? origin.includes('washnlaundry-marketing') : false);
 
@@ -283,9 +291,9 @@ CORE OPERATIONAL RULES:
    - Check the prior conversation history to see which of the 4 details have already been provided.
    - Answer their inquiry first, then naturally ask for whatever details are still missing (e.g. "Would you like me to arrange a pickup for you? May I know your name and mobile number to get started?").
    - If they provide partial details, warmly acknowledge them and ask for the remainder (e.g. "Thanks [Name]! Could you also share your pickup address and what items you need cleaned?").
-   - Once ALL 4 details (Name, Phone, Address, Requirements) are collected, call the submit_booking tool exactly once. Never invent or print any link — the team is notified automatically.
+${canBook ? `   - Once ALL 4 details (Name, Phone, Address, Requirements) are collected, call the submit_booking tool exactly once. Never invent or print any link — the team is notified automatically.
    - If submit_booking returns ok, reply with a short confirmation summarising the 4 details and include the exact phrase "Your pickup request has been sent" followed by "to our team — we will call you shortly to confirm your pickup slot."
-   - If it returns an error mentioning the phone number, ask for a valid 10-digit mobile number. For any other error, apologise and ask the customer to try again in a minute or call the shop.
+   - If it returns an error mentioning the phone number, ask for a valid 10-digit mobile number. For any other error, apologise and ask the customer to try again in a minute or call the shop.` : `   - You cannot take bookings in this chat. If they want a pickup, politely ask them to contact the shop directly.`}
 
 Knowledge base context:
 ${contextText || '(no relevant context found)'}`
@@ -317,7 +325,7 @@ ${contextText || '(no relevant context found)'}`;
 
     // The public marketing site gets no order/dues lookups (they would expose
     // customer data to anyone); it can only submit a booking.
-    const activeTools = isMarketing ? [BOOKING_TOOL] : TOOLS;
+    const activeTools = isMarketing ? (canBook ? [BOOKING_TOOL] : []) : TOOLS;
 
     // Resolve tool calls first (non-streaming), then stream the final answer.
     for (let round = 0; round < 3; round++) {
