@@ -145,6 +145,84 @@ Deep links resolve on Pages (verified: `/orders/abc` returns 200). The old Verce
 project `washnlaundry-crm` (team "abhishekzgithub's projects") no longer serves anything.
 
 
+> **Legacy (Vercel-era) notes.** The checklist, strategies table, FAQ and troubleshooting table
+> below were written when the CRM was hosted on Vercel (`washnlaundry-crm.vercel.app`). Vercel
+> commands, URLs and the Vercel-specific rows no longer apply; the Render backend items
+> (migrations on boot, cold starts, `ALLOWED_HOSTS`, CORS, Render redeploys) still do. Prune or
+> rewrite them for Cloudflare when next touched.
+
+### Release checklist
+
+1. Backend and Flutter tests green for what changed (`python manage.py test api`;
+   `flutter test <files>` — redirect to a file, never pipe into `tail`).
+2. Commit and `git push origin main`. **This is the backend deploy** — Render builds and
+   runs `migrate` on its own. Watch it with `render deploys list <service-id>` until `live`.
+3. Build and upload the frontend with the three commands above. A push never updates
+   the frontend.
+4. Smoke-test production: `curl -m 90 https://laundrybill-backend.onrender.com/api/meta/`
+   returns 200, then open `https://washnlaundry-crm.vercel.app/`, sign in with Demo Mode,
+   and deep-link a route (e.g. `/credits`) to prove the SPA rewrite shipped.
+5. Confirm the bundle points at Render, not `/api`:
+   `curl -s https://washnlaundry-crm.vercel.app/main.dart.js | grep -o "https://[a-z0-9.-]*onrender.com/api"`.
+
+### Deployment strategies — current and alternatives
+
+| Strategy | Status | Notes |
+|---|---|---|
+| **Render (Django) + Vercel prebuilt upload (Flutter)** | **Current** | Cheapest; backend automatic, frontend manual. Weak spot: SQLite on an ephemeral disk. |
+| Vercel builds Flutter itself | Not set up | Needs an `installCommand` that downloads the Flutter SDK on every build (slow, ~1 GB) plus `buildCommand` `flutter build web ...` and `outputDirectory` `build/web`. Would make pushes deploy the frontend too. |
+| GitHub Action builds Flutter, then `vercel deploy --prebuilt` | Not set up | Keeps Vercel builds fast; needs a `VERCEL_TOKEN` repo secret and the project/org IDs. The cleanest way to automate step 3 of the checklist. |
+| Same-origin: one Docker host running `docker compose` | Local only | nginx proxies `/api`, so the bundle keeps the default relative `/api` and no `API_BASE_URL` is needed. Any VM/Render Docker service could run it. |
+| Backend on Vercel (Python functions) | Rejected for now | Possible, but SQLite can't persist on Vercel either — it would need a Marketplace Postgres and the dev-only settings hardened first. |
+
+Moving the backend to persistent data (a Render disk on a paid plan, or Postgres via
+`DATABASE_URL`) is the real fix for production being empty; until then, treat production
+as a demo that resets.
+
+### FAQ
+
+- **Does pushing to `main` deploy everything?** No — only the backend (Render). Vercel
+  also starts a build on push, but it can't compile Flutter, so that deployment is empty.
+  Always do the manual frontend upload.
+- **Which Vercel project is live?** `washnlaundry-crm` →
+  `https://washnlaundry-crm.vercel.app`. The `washnlaundrycrm` project (no hyphen) is an
+  empty duplicate that only ever receives the useless Git builds.
+- **Where does the frontend find the API?** `API_BASE_URL`, baked in at build time via
+  `--dart-define`. Forget it and the bundle calls `/api` on Vercel, which 404s — every
+  screen then loads empty.
+- **Why is production empty after a deploy?** Render has no persistent disk and
+  `db.sqlite3` is gitignored, so each deploy/restart starts with a fresh, migrated, empty
+  database. Seed it (Render shell: `python seed_db.py`) or move to Postgres.
+- **Do I need to run migrations in production?** No — Render's start command runs
+  `migrate --noinput` on every boot.
+- **Is www.washnlaundry.com this app?** No. It's a separate Next.js marketing site in a
+  Vercel team neither the MCP nor the CLI login (`emailabhishek2@gmail.com` →
+  "abhishekzgithub's projects") can see. DNS is at Namecheap and CNAMEs to Vercel.
+- **Which GitHub repo?** `abhishekkumarai/washnlaundrycrm` (private). Render's
+  `laundrybill-backend` and both Vercel projects are connected to it. The similarly
+  named `abhishekkumarai/washnlaundry_crm` feeds the unrelated `laundrypro-api`.
+- **How do I add Google Sign-In to production?** Build with
+  `--dart-define=GOOGLE_CLIENT_ID=...` as well, and add
+  `https://washnlaundry-crm.vercel.app` to that OAuth client's Authorized JavaScript
+  origins. The current production bundle has no client ID, so only Demo Mode shows.
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Vercel URL returns `404 NOT_FOUND` on `/` | A Git-triggered (empty) build is the latest production deployment | Redo the manual prebuilt upload; it becomes the new production deployment |
+| `/` works but `/orders`, `/credits` etc. 404 on refresh | `vercel.json` missing from the uploaded folder, or `cleanUrls` re-added | `cp vercel.json build/web/` before deploying; keep `cleanUrls` out |
+| App loads but every screen is empty, console shows 404s on `/api/...` | Bundle built without `API_BASE_URL` | Rebuild with the `--dart-define` and redeploy |
+| First API call hangs 15–60 s, then works | Render free tier waking from sleep | Wait / retry with a long timeout; not a bug |
+| API returns `[]` everywhere after a deploy | Ephemeral SQLite reset | Seed via Render shell, or move to persistent storage |
+| Browser shows CORS errors against Render | `CORS_ALLOW_ALL_ORIGINS` set to `False` without the Vercel origin in `CORS_ALLOWED_ORIGINS` | Add `https://washnlaundry-crm.vercel.app` to `CORS_ALLOWED_ORIGINS` on the Render service |
+| Django 400 Bad Request | `ALLOWED_HOSTS` env var doesn't include `laundrybill-backend.onrender.com` | Fix the env var on Render |
+| `vercel whoami` → `Error: Not authorized` | CLI token expired | `vercel login` (device-code flow; a human approves the link) |
+| `vercel` can't find the project / "scope does not exist" | Local `.vercel/project.json` points at another team | Pass `--scope abhishekzgithubs-projects` and link to `washnlaundry-crm` explicitly |
+| "You don't have access to the domain washnlaundry.com" | Domain lives in another Vercel team | Get that team's access, or remove it there and re-add here (TXT verification at Namecheap) |
+| Render didn't redeploy after a push | Repo link broken (e.g. after a rename) or auto-deploy off | `render services list -o json` → check `repo` / `autoDeploy`; reconnect in the Render dashboard |
+| Raw Vercel REST call with the CLI's `auth.json` token → `invalidToken` | That token isn't accepted by the REST API | Use the `vercel` CLI or the Vercel MCP tools instead |
+
 ---
 
 ## Backend
@@ -169,7 +247,7 @@ Models (`backend/api/models.py`): `Shop`, `Customer`, `GarmentCategory`, `Garmen
 
 `Customer.id` and `Order.id` are UUIDs. `GarmentItem` carries a **column per service type** (`dry_clean_price`, `wash_iron_price`, `wash_fold_price`, `steam_press_price`, `iron_price`), and the seed sets the irrelevant ones to `0` rather than null — so "price is 0" means "service not offered for this garment", not "free".
 
-Settings are dev-only and must not ship as-is: `DEBUG = True`, hardcoded `SECRET_KEY`, `ALLOWED_HOSTS = ['*']`, `CORS_ALLOW_ALL_ORIGINS = True`.
+Settings read `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `CORS_ALLOW_ALL_ORIGINS` and `CORS_ALLOWED_ORIGINS` from the environment, but **default to the insecure dev values** (`DEBUG=True`, a hardcoded key, `*` hosts, all origins). Production must set them explicitly — see Deployment.
 
 ---
 
