@@ -115,13 +115,25 @@ flutter build web --release --dart-define=API_BASE_URL=https://laundrybill-backe
 node ../scripts/deploy_vercel.js   # deploys build/web to washnlaundry-crm
 ```
 
-**Legacy:** the Vercel upload above is no longer what ships the CRM — see "What deploys where"
-below. `scripts/deploy_vercel.js` and `washnlaundrycrm/vercel.json` are kept but unused.
+### THIS IS THE `cloudflare` BRANCH (decided 2026-10-06)
+
+The repo is split by hosting stack. **`main` = Vercel (CRM) + Render (backend). `cloudflare` =
+Cloudflare** (Pages CRM, Workers). Pushing `main` never touches Cloudflare and pushing
+`cloudflare` never touches Vercel; Render only ever deploys `main`. So:
+
+- Backend changes (Django, migrations) go on **`main`** — Render won't see them from here. The
+  website-chat Lead backend is already on `main` (commit `11e10d1`); the copy here is identical.
+- Worker / cron / Pages / chat-UI work goes on this branch. The hook below (pushes to
+  `refs/heads/cloudflare`) deploys the CRM to Cloudflare Pages; Workers ship with `wrangler deploy`.
+- Don't merge `main` into this branch blindly: their `.githooks/pre-push` and this section
+  intentionally differ (Vercel vs Cloudflare Pages); resolve toward each branch's own target.
+
+The Vercel steps above are therefore **legacy on this branch** (`scripts/deploy_vercel.js` is kept
+for `main`).
 
 ### What deploys where (updated 2026-10-06)
 
-Several independent targets live in or beside this repo. Only the first two are triggered by a
-push to `main`; **feature branches never deploy anything.**
+Several independent targets live in or beside this repo; **feature branches never deploy anything.**
 
 | Target | Source | Ships via |
 |---|---|---|
