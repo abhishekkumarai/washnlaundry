@@ -331,7 +331,8 @@ ${contextText || '(no relevant context found)'}`;
     for (let round = 0; round < 3; round++) {
       const result = (await env.AI.run(CHAT_MODEL, {
         messages,
-        tools: activeTools as any,
+        // Workers AI rejects an empty tools array, so omit the key entirely.
+        ...(activeTools.length ? { tools: activeTools as any } : {}),
       })) as any;
 
       // The OpenAI-shaped tool_calls (with id/type/function) are what the
