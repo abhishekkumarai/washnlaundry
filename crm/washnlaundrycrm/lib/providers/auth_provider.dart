@@ -267,8 +267,9 @@ class AuthProvider extends ChangeNotifier {
 
   /// On success the account exists but must confirm its email before signing in.
   Future<String?> signUpWithPassword(
-          String email, String password, String name) =>
-      _guard(() => ApiService.signUp(email.trim(), password, name.trim()));
+          String email, String password, String name, String phone) =>
+      _guard(() =>
+          ApiService.signUp(email.trim(), password, name.trim(), phone.trim()));
 
   Future<String?> confirmEmail(String token) => _guard(() async =>
       _startPasswordSession(await ApiService.verifyEmail(token)));

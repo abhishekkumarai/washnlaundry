@@ -136,11 +136,13 @@ class ApiService {
     }
   }
 
-  static Future<void> signUp(String email, String password, String name) =>
+  static Future<void> signUp(
+          String email, String password, String name, String phone) =>
       _send('POST', '/auth/signup/', auth: false, body: {
         'email': email,
         'password': password,
         'name': name,
+        'phone': phone,
         'return_to': _returnTo,
       });
 

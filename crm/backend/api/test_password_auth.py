@@ -37,13 +37,28 @@ class PasswordAuthTests(APITestCase):
         return {'HTTP_AUTHORIZATION': f'Bearer {token}'}
 
     def signup_and_verify(self, email='cust@example.com', password='correct horse'):
-        self.assertEqual(self.post('signup', {'email': email, 'password': password}).status_code, 201)
+        self.assertEqual(self.post('signup', {'email': email, 'phone': '9876500001', 'password': password}).status_code, 201)
         res = self.post('verify-email', {'token': self.link_token()})
         self.assertEqual(res.status_code, 200)
         return res.json()['token']
 
+    def test_signup_requires_a_valid_phone(self):
+        for bad in (None, '', 'abc', '12345'):
+            body = {'email': 'p@example.com', 'password': 'correct horse'}
+            if bad is not None:
+                body['phone'] = bad
+            res = self.post('signup', body)
+            self.assertEqual(res.status_code, 400, bad)
+            self.assertIn('phone', res.json()['detail'].lower())
+
+    def test_verifying_creates_a_customer_from_the_signup_phone(self):
+        from api.models import Customer
+        self.signup_and_verify('newbie@example.com')
+        customer = Customer.objects.get(email='newbie@example.com')
+        self.assertEqual(customer.phone, '9876500001')
+
     def test_signup_requires_verification_before_login(self):
-        res = self.post('signup', {'email': 'Cust@Example.com', 'password': 'correct horse'})
+        res = self.post('signup', {'email': 'Cust@Example.com', 'phone': '9876500001', 'password': 'correct horse'})
         self.assertEqual(res.status_code, 201)
         self.assertEqual(self.sent[-1][0], 'cust@example.com')
         self.assertIn('https://customer.washnlaundry.com/verify?token=', self.sent[-1][2])
@@ -62,7 +77,7 @@ class PasswordAuthTests(APITestCase):
 
     def test_unverified_email_never_gets_a_role(self):
         # Squatting on the owner's address must not make anyone owner.
-        self.post('signup', {'email': 'owner@shop.com', 'password': 'attacker pass'})
+        self.post('signup', {'email': 'owner@shop.com', 'phone': '9876500001', 'password': 'attacker pass'})
         res = self.post('login', {'email': 'owner@shop.com', 'password': 'attacker pass'})
         self.assertEqual(res.status_code, 403)
         # And a forged token is rejected.
@@ -91,13 +106,13 @@ class PasswordAuthTests(APITestCase):
         self.assertEqual(res.status_code, 429)
 
     def test_password_rules(self):
-        self.assertEqual(self.post('signup', {'email': 'a@b.com', 'password': 'short'}).status_code, 400)
-        res = self.post('signup', {'email': 'not-an-email', 'password': 'long enough pw'})
+        self.assertEqual(self.post('signup', {'email': 'a@b.com', 'phone': '9876500001', 'password': 'short'}).status_code, 400)
+        res = self.post('signup', {'email': 'not-an-email', 'phone': '9876500001', 'password': 'long enough pw'})
         self.assertEqual(res.status_code, 400)
 
     def test_existing_account_signup_does_not_reveal_or_change_it(self):
         self.signup_and_verify()
-        res = self.post('signup', {'email': 'cust@example.com', 'password': 'attacker pass'})
+        res = self.post('signup', {'email': 'cust@example.com', 'phone': '9876500001', 'password': 'attacker pass'})
         self.assertEqual(res.status_code, 201)
         self.assertIn('already have', self.sent[-1][1])
         ok = self.post('login', {'email': 'cust@example.com', 'password': 'correct horse'})
@@ -131,12 +146,12 @@ class PasswordAuthTests(APITestCase):
 
     def test_disabled_on_the_default_secret_key(self):
         with override_settings(PASSWORD_AUTH_ENABLED=False):
-            res = self.post('signup', {'email': 'a@b.com', 'password': 'long enough pw'})
+            res = self.post('signup', {'email': 'a@b.com', 'phone': '9876500001', 'password': 'long enough pw'})
             self.assertEqual(res.status_code, 503)
             self.assertEqual(self.client.get('/api/me/', **self.bearer('app.x')).status_code, 401)
 
     def test_link_origin_is_allow_listed(self):
-        self.client.post('/api/auth/signup/', {'email': 'a@b.com', 'password': 'long enough pw',
+        self.client.post('/api/auth/signup/', {'email': 'a@b.com', 'phone': '9876500001', 'password': 'long enough pw',
                                                'return_to': 'https://evil.example'}, format='json')
         self.assertIn('https://customer.washnlaundry.com/verify', self.sent[-1][2])
         self.assertNotIn('evil.example', self.sent[-1][2])
@@ -144,29 +159,29 @@ class PasswordAuthTests(APITestCase):
     def test_link_goes_back_to_the_callers_own_site(self):
         with override_settings(APP_ORIGINS=['https://app.washnlaundry.com',
                                             'https://customer.washnlaundry.com']):
-            self.client.post('/api/auth/signup/', {'email': 'a@b.com', 'password': 'long enough pw'},
+            self.client.post('/api/auth/signup/', {'email': 'a@b.com', 'phone': '9876500001', 'password': 'long enough pw'},
                              format='json', HTTP_ORIGIN='https://app.washnlaundry.com')
             self.assertIn('https://app.washnlaundry.com/verify?token=', self.sent[-1][2])
 
     def test_link_falls_back_to_app_base_url_without_an_allowed_origin(self):
         with override_settings(APP_BASE_URL='https://customer.washnlaundry.com/'):
-            self.client.post('/api/auth/signup/', {'email': 'a@b.com', 'password': 'long enough pw'},
+            self.client.post('/api/auth/signup/', {'email': 'a@b.com', 'phone': '9876500001', 'password': 'long enough pw'},
                              format='json')
             self.assertIn('https://customer.washnlaundry.com/verify?token=', self.sent[-1][2])
             self.assertNotIn('.com//verify', self.sent[-1][2])
 
     @override_settings(DEBUG=True)
     def test_localhost_origin_is_accepted_only_in_debug(self):
-        self.client.post('/api/auth/signup/', {'email': 'a@b.com', 'password': 'long enough pw'},
+        self.client.post('/api/auth/signup/', {'email': 'a@b.com', 'phone': '9876500001', 'password': 'long enough pw'},
                          format='json', HTTP_ORIGIN='http://localhost:5055')
         self.assertIn('http://localhost:5055/verify?token=', self.sent[-1][2])
         with override_settings(DEBUG=False):
-            self.client.post('/api/auth/signup/', {'email': 'c@d.com', 'password': 'long enough pw'},
+            self.client.post('/api/auth/signup/', {'email': 'c@d.com', 'phone': '9876500001', 'password': 'long enough pw'},
                              format='json', HTTP_ORIGIN='http://localhost:5055')
             self.assertNotIn('localhost', self.sent[-1][2])
 
     def test_works_without_a_csrf_token(self):
         res = Client(enforce_csrf_checks=True).post(
-            '/api/auth/signup/', {'email': 'c@d.com', 'password': 'long enough pw'},
+            '/api/auth/signup/', {'email': 'c@d.com', 'phone': '9876500001', 'password': 'long enough pw'},
             content_type='application/json')
         self.assertEqual(res.status_code, 201)

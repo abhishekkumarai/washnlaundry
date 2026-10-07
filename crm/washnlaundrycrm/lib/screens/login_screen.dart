@@ -51,6 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   bool _busy = false;
   String? _formError;
   String? _formNotice;
@@ -61,6 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _phoneCtrl.dispose();
     super.dispose();
   }
 
@@ -74,14 +76,22 @@ class _LoginScreenState extends State<LoginScreen> {
       });
       return;
     }
+    final signUp = _authTab == 1;
+    final phone = _phoneCtrl.text.trim();
+    if (signUp && !RegExp(r'^\+?\d{10,15}$').hasMatch(phone.replaceAll(RegExp(r'[\s-]'), ''))) {
+      setState(() {
+        _formError = 'Enter a valid phone number (10-15 digits).';
+        _formNotice = null;
+      });
+      return;
+    }
     setState(() {
       _busy = true;
       _formError = null;
       _formNotice = null;
     });
-    final signUp = _authTab == 1;
     final err = signUp
-        ? await auth.signUpWithPassword(email, password, '')
+        ? await auth.signUpWithPassword(email, password, '', phone)
         : await auth.signInWithPassword(email, password);
     if (!mounted) return;
     setState(() {
@@ -235,6 +245,18 @@ class _LoginScreenState extends State<LoginScreen> {
           decoration: _fieldDecoration(
               hint: 'you@example.com', icon: Icons.mail_outline_rounded),
         ),
+        if (_authTab == 1) ...[
+          const SizedBox(height: 14),
+          _fieldLabel('Phone number'),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _phoneCtrl,
+            keyboardType: TextInputType.phone,
+            autofillHints: const [AutofillHints.telephoneNumber],
+            decoration: _fieldDecoration(
+                hint: '+91 98765 43210', icon: Icons.phone_outlined),
+          ),
+        ],
         const SizedBox(height: 14),
         _fieldLabel('Password'),
         const SizedBox(height: 6),
