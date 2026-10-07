@@ -135,11 +135,11 @@ Alongside Google, the login screen's Email/Password and Sign In / Create Account
 - Session = `Authorization: Bearer app.<signed>` (30 days, `django.core.signing`, tied to the password hash); Google ID tokens still work. Both resolve to the same roles in `auth.py`.
 - Login/signup/forgot are rate limited (failures only for login). Wrong password and unknown email return the same 401.
 - **Needs `SECRET_KEY` set in the environment** (`PASSWORD_AUTH_ENABLED` is off on the public default key: tokens would be forgeable), `RESEND_API_KEY`, and, for mail to reach anyone but the Resend account owner, a verified sending domain + `AUTH_EMAIL_FROM`. `APP_ORIGINS` lists the front-ends emailed links may point at.
-- Demo Mode only exists in debug builds (or `--dart-define=ALLOW_DEMO=true`).
+- Demo Mode stays available in every build (a build can hide it with `--dart-define=ALLOW_DEMO=false`).
 
 ### Authentication (login screen)
 
-`/login` (`lib/screens/login_screen.dart`), via `AuthProvider`, matches the real app's route. The screen itself is unchanged; Google sign-in now also yields a server-verified role (see above). Demo Mode remains a client-side-only bypass.
+`/login` (`lib/screens/login_screen.dart`), via `AuthProvider`, matches the real app's route. The screen itself is unchanged; Google sign-in now also yields a server-verified role (see above). Demo Mode remains a client-side-only bypass and is kept on purpose.
 
 **The auth gate is always on** — `router.dart`'s `redirect` sends any signed-out visit to `/login` regardless of whether Google Sign-In is configured; there is no zero-config bypass. Two independent ways to satisfy it:
 
