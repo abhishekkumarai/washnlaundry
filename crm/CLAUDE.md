@@ -127,6 +127,16 @@ One Google login for everyone; the backend (`backend/api/auth.py`) verifies the 
 - Flutter: `AuthProvider.role` drives `router.dart`'s `authRedirect`; `ApiService.tokenProvider` attaches the token and refreshes once on 401. Staff form has a "Sign-in email" field (it sets `has_app_login`). Demo Mode is always `owner` and only works while enforcement is off.
 - The same Flutter build is meant to serve customer.washnlaundry.com (role decides the view); the old Next.js `customer-web/` is kept until that cutover is verified.
 
+### Email + password sign-in (added 2026-10-07)
+
+Alongside Google, the login screen's Email/Password and Sign In / Create Account tabs are real (`backend/api/password_auth.py`, `lib/screens/auth_link_screens.dart`).
+
+- Accounts are Django `User` rows (username = lower-cased email). They stay **inactive until the emailed `/verify?token=` link is clicked**: roles are matched by email, so an unverified signup must never get one. `forgot-password` emails a `/reset?token=` link (Django's `PasswordResetTokenGenerator`, 1 h, single use); a reset also verifies the email and signs out old sessions.
+- Session = `Authorization: Bearer app.<signed>` (30 days, `django.core.signing`, tied to the password hash); Google ID tokens still work. Both resolve to the same roles in `auth.py`.
+- Login/signup/forgot are rate limited (failures only for login). Wrong password and unknown email return the same 401.
+- **Needs `SECRET_KEY` set in the environment** (`PASSWORD_AUTH_ENABLED` is off on the public default key: tokens would be forgeable), `RESEND_API_KEY`, and, for mail to reach anyone but the Resend account owner, a verified sending domain + `AUTH_EMAIL_FROM`. `APP_ORIGINS` lists the front-ends emailed links may point at.
+- Demo Mode only exists in debug builds (or `--dart-define=ALLOW_DEMO=true`).
+
 ### Authentication (login screen)
 
 `/login` (`lib/screens/login_screen.dart`), via `AuthProvider`, matches the real app's route. The screen itself is unchanged; Google sign-in now also yields a server-verified role (see above). Demo Mode remains a client-side-only bypass.
