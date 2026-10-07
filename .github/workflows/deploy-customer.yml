@@ -2,7 +2,7 @@ name: Deploy customer portal
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/customer-portal]
     paths:
       - "customer-web/**"
       - ".github/workflows/deploy-customer.yml"
