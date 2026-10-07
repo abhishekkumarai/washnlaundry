@@ -42,3 +42,4 @@ flutter:
   assets:
     - assets/config/role_views.json
     - assets/images/logo.png
+    - assets/images/logo_mark.png

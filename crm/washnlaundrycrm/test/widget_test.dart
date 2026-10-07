@@ -114,7 +114,8 @@ void main() {
         ..devicePixelRatio = 1.0;
       await tester.pumpWidget(wrap(provider, const SidebarNavigation()));
 
-      await tester.tap(find.byIcon(Icons.chevron_left_rounded));
+      // The collapse/expand toggle is the hamburger (menu) icon.
+      await tester.tap(find.byIcon(Icons.menu_rounded));
       await tester.pumpAndSettle();
 
       expect(provider.sidebarCollapsed, isTrue);
@@ -146,8 +147,7 @@ void main() {
     testWidgets('the toggle is not offered below the breakpoint', (tester) async {
       // The rail is already forced collapsed, so a collapse control would lie.
       await pumpAtWidth(tester, 900);
-      expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
-      expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
+      expect(find.byIcon(Icons.menu_rounded), findsNothing);
     });
   });
 
@@ -175,7 +175,7 @@ void main() {
         wrap(provider, const SidebarNavigation(inDrawer: true)),
       );
 
-      expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
+      expect(find.byIcon(Icons.menu_rounded), findsNothing);
     });
 
     testWidgets('tapping a nav tile still calls goSection', (tester) async {
