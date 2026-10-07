@@ -572,12 +572,14 @@ class _CreditsScreenState extends State<CreditsScreen> {
                 Container(
                   width: 38,
                   height: 38,
+                  // Money in: the arrow is green like the "+" amount, whatever
+                  // the category's own color (that stays on the chip below).
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.12),
+                    color: const Color(0xFF10B981).withOpacity(0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.arrow_downward_rounded,
-                      size: 17, color: color),
+                  child: const Icon(Icons.arrow_downward_rounded,
+                      size: 17, color: Color(0xFF10B981)),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
