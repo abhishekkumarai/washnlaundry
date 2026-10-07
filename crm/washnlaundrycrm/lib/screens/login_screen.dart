@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -21,7 +20,7 @@ import '../utils/google_signin_button.dart';
 /// Account tabs are real (api/password_auth.py): creating an account emails a
 /// confirmation link, and "Forgot password?" emails a reset link. Google
 /// sign-in works alongside. "Sign in with mobile number instead" is layout
-/// parity only, and Demo Mode exists in debug builds only.
+/// parity only. Demo Mode stays available (see `_allowDemo`).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -44,10 +43,11 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _formError;
   String? _formNotice;
 
-  /// Demo Mode skips every check, so it only exists in debug builds (or when a
-  /// build explicitly opts in with --dart-define=ALLOW_DEMO=true).
-  static const _allowDemo = bool.fromEnvironment('ALLOW_DEMO');
-  static bool get _showDemo => kDebugMode || _allowDemo;
+  /// Demo Mode (a one-tap owner session with no checks) is part of the product
+  /// and stays on in every build. A build can hide it with
+  /// --dart-define=ALLOW_DEMO=false.
+  static const _allowDemo = bool.fromEnvironment('ALLOW_DEMO', defaultValue: true);
+  static bool get _showDemo => _allowDemo;
 
   @override
   void dispose() {
