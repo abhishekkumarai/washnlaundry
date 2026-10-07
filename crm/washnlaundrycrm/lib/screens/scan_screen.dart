@@ -99,7 +99,7 @@ class _ScanScreenState extends State<ScanScreen>
     final provider = Provider.of<AppProvider>(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: Column(
@@ -125,7 +125,7 @@ class _ScanScreenState extends State<ScanScreen>
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Column(
         children: [
@@ -136,11 +136,11 @@ class _ScanScreenState extends State<ScanScreen>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
+                    color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.qr_code_scanner_rounded,
-                      size: 20, color: Color(0xFF1A4FD6)),
+                      size: 20, color: Color(0xFF182C4F)),
                 ),
                 const SizedBox(width: 14),
                 const Expanded(
@@ -153,7 +153,7 @@ class _ScanScreenState extends State<ScanScreen>
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A))),
+                              color: Color(0xFF141A24))),
                       Text('Look up an order, or generate its garment tags',
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -168,9 +168,9 @@ class _ScanScreenState extends State<ScanScreen>
             controller: _tabController,
             isScrollable: true,
             tabAlignment: TabAlignment.start,
-            labelColor: const Color(0xFF1A4FD6),
+            labelColor: const Color(0xFF182C4F),
             unselectedLabelColor: const Color(0xFF64748B),
-            indicatorColor: const Color(0xFF1A4FD6),
+            indicatorColor: const Color(0xFF182C4F),
             labelStyle:
                 const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
             tabs: const [
@@ -199,7 +199,7 @@ class _ScanScreenState extends State<ScanScreen>
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: const Color(0xFFF1EFEA),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
@@ -229,7 +229,7 @@ class _ScanScreenState extends State<ScanScreen>
                               Icon(Icons.camera_alt_outlined,
                                   size: 16,
                                   color: _selectedMode == 0
-                                      ? const Color(0xFF0F172A)
+                                      ? const Color(0xFF141A24)
                                       : const Color(0xFF64748B)),
                               const SizedBox(width: 8),
                               Text(
@@ -240,7 +240,7 @@ class _ScanScreenState extends State<ScanScreen>
                                       ? FontWeight.bold
                                       : FontWeight.w500,
                                   color: _selectedMode == 0
-                                      ? const Color(0xFF0F172A)
+                                      ? const Color(0xFF141A24)
                                       : const Color(0xFF64748B),
                                 ),
                               ),
@@ -274,7 +274,7 @@ class _ScanScreenState extends State<ScanScreen>
                               Icon(Icons.keyboard_outlined,
                                   size: 16,
                                   color: _selectedMode == 1
-                                      ? const Color(0xFF0F172A)
+                                      ? const Color(0xFF141A24)
                                       : const Color(0xFF64748B)),
                               const SizedBox(width: 8),
                               Text(
@@ -285,7 +285,7 @@ class _ScanScreenState extends State<ScanScreen>
                                       ? FontWeight.bold
                                       : FontWeight.w500,
                                   color: _selectedMode == 1
-                                      ? const Color(0xFF0F172A)
+                                      ? const Color(0xFF141A24)
                                       : const Color(0xFF64748B),
                                 ),
                               ),
@@ -305,7 +305,7 @@ class _ScanScreenState extends State<ScanScreen>
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: const Color(0xFFE4E0D8)),
                 ),
                 child: _selectedMode == 0
                     ? Column(
@@ -313,11 +313,11 @@ class _ScanScreenState extends State<ScanScreen>
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: const BoxDecoration(
-                              color: Color(0xFFEEF2FF),
+                              color: Color(0xFFEFF6FF),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.qr_code_scanner_rounded,
-                                size: 48, color: Color(0xFF1A4FD6)),
+                                size: 48, color: Color(0xFF182C4F)),
                           ),
                           const SizedBox(height: 20),
                           const Text(
@@ -337,7 +337,7 @@ class _ScanScreenState extends State<ScanScreen>
                                 style: TextStyle(
                                     fontSize: 13, fontWeight: FontWeight.bold)),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1A4FD6),
+                              backgroundColor: const Color(0xFF182C4F),
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 24, vertical: 14),
                               shape: RoundedRectangleBorder(
@@ -372,7 +372,7 @@ class _ScanScreenState extends State<ScanScreen>
                               border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide:
-                                      const BorderSide(color: Color(0xFFCBD5E1))),
+                                      const BorderSide(color: Color(0xFFD9D5CB))),
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 14),
                             ),
@@ -383,7 +383,7 @@ class _ScanScreenState extends State<ScanScreen>
                             child: ElevatedButton(
                               onPressed: () => _handleSearchOrder(provider),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1A4FD6),
+                                backgroundColor: const Color(0xFF182C4F),
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
@@ -518,7 +518,7 @@ class _ScanScreenState extends State<ScanScreen>
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
+                      color: Color(0xFF141A24),
                     ),
                   ),
                   SizedBox(height: 4),
@@ -532,7 +532,7 @@ class _ScanScreenState extends State<ScanScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFEEF2FF),
+                color: const Color(0xFFEFF6FF),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: const Color(0xFFC7D2FE)),
               ),
@@ -541,7 +541,7 @@ class _ScanScreenState extends State<ScanScreen>
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A4FD6),
+                  color: Color(0xFF182C4F),
                 ),
               ),
             ),
@@ -573,16 +573,16 @@ class _ScanScreenState extends State<ScanScreen>
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    borderSide: const BorderSide(color: Color(0xFFD9D5CB)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    borderSide: const BorderSide(color: Color(0xFFE4E0D8)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: const BorderSide(
-                        color: Color(0xFF1A4FD6), width: 1.5),
+                        color: Color(0xFF182C4F), width: 1.5),
                   ),
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -606,7 +606,7 @@ class _ScanScreenState extends State<ScanScreen>
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1A4FD6),
+                backgroundColor: const Color(0xFF182C4F),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                 shape: RoundedRectangleBorder(
@@ -628,7 +628,7 @@ class _ScanScreenState extends State<ScanScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: const Center(
         child: Column(
@@ -650,7 +650,7 @@ class _ScanScreenState extends State<ScanScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Center(
         child: Column(
@@ -682,7 +682,7 @@ class _ScanScreenState extends State<ScanScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -698,7 +698,7 @@ class _ScanScreenState extends State<ScanScreen>
             // Table Header Row
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              color: const Color(0xFFF8FAFC),
+              color: const Color(0xFFF8F7F5),
               child: const Row(
                 children: [
                   SizedBox(
@@ -777,14 +777,14 @@ class _ScanScreenState extends State<ScanScreen>
                 ],
               ),
             ),
-            const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+            const Divider(height: 1, thickness: 1, color: Color(0xFFE4E0D8)),
             // Order Rows
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: orders.length,
               separatorBuilder: (_, __) =>
-                  const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+                  const Divider(height: 1, thickness: 1, color: Color(0xFFF1EFEA)),
               itemBuilder: (context, index) {
                 final order = orders[index];
                 final garmentCount =
@@ -817,7 +817,7 @@ class _ScanScreenState extends State<ScanScreen>
                                   style: const TextStyle(
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1A4FD6),
+                                    color: Color(0xFF182C4F),
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -843,7 +843,7 @@ class _ScanScreenState extends State<ScanScreen>
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFF0F172A),
+                                    color: Color(0xFF141A24),
                                   ),
                                 ),
                                 if (order.customerPhone.isNotEmpty) ...[
@@ -882,7 +882,7 @@ class _ScanScreenState extends State<ScanScreen>
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0F172A),
+                                    color: Color(0xFF141A24),
                                   ),
                                 ),
                                 Container(
@@ -926,7 +926,7 @@ class _ScanScreenState extends State<ScanScreen>
                                     size: 16),
                                 label: const Text('Generate Tags'),
                                 style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFF1A4FD6),
+                                  backgroundColor: const Color(0xFF182C4F),
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 14, vertical: 8),
@@ -966,7 +966,7 @@ class _ScanScreenState extends State<ScanScreen>
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: const Color(0xFFE4E0D8)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.02),
@@ -986,7 +986,7 @@ class _ScanScreenState extends State<ScanScreen>
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A4FD6),
+                        color: Color(0xFF182C4F),
                       ),
                     ),
                     StatusPill(status: order.status, fontSize: 10.5),
@@ -1004,7 +1004,7 @@ class _ScanScreenState extends State<ScanScreen>
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF0F172A),
+                            color: Color(0xFF141A24),
                           ),
                         ),
                         if (order.customerPhone.isNotEmpty)
@@ -1025,7 +1025,7 @@ class _ScanScreenState extends State<ScanScreen>
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
+                            color: Color(0xFF141A24),
                           ),
                         ),
                         Container(
@@ -1064,7 +1064,7 @@ class _ScanScreenState extends State<ScanScreen>
                     icon: const Icon(Icons.qr_code_2_rounded, size: 16),
                     label: const Text('Generate Tags'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF1A4FD6),
+                      backgroundColor: const Color(0xFF182C4F),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),

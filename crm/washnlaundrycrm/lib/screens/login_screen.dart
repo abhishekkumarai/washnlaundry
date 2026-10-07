@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../utils/google_signin_button.dart';
+import '../widgets/brand_logo.dart';
 
 /// `/login` in the live app. Unauthenticated, so — unlike every other
 /// screen — this one is reached *before* `AppProvider`'s shop/order data
@@ -40,11 +41,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const _brandBlue = Color(0xFF1A4FD6);
-  static const _ink = Color(0xFF0F172A);
+  static const _brandBlue = Color(0xFF182C4F);
+  static const _ink = Color(0xFF141A24);
   static const _muted = Color(0xFF64748B);
-  static const _border = Color(0xFFE2E8F0);
-  static const _disabled = Color(0xFFCBD5E1);
+  static const _border = Color(0xFFE4E0D8);
+  static const _disabled = Color(0xFFD9D5CB);
 
   int _authTab = 0; // 0: Sign In, 1: Create Account
   bool _obscurePassword = true;
@@ -142,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.watch<AuthProvider>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 380),
@@ -356,7 +357,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   fontSize: 13, fontWeight: FontWeight.w600, color: _brandBlue),
             ),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFCBD5E1)),
+              side: const BorderSide(color: Color(0xFFD9D5CB)),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
@@ -412,7 +413,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: const Color(0xFFF1EFEA),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -459,16 +460,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _brandMark() => Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: _brandBlue,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: const Icon(Icons.dry_cleaning_rounded,
-            color: Colors.white, size: 32),
-      );
+  Widget _brandMark() => const BrandLogo(size: 72);
 
   Widget _wordmark() => RichText(
         text: const TextSpan(

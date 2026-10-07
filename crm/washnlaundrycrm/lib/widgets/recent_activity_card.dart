@@ -32,7 +32,7 @@ class RecentActivityCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
+              color: const Color(0xFFF1EFEA),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -52,7 +52,7 @@ class RecentActivityCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1A4FD6),
+                color: Color(0xFF182C4F),
               ),
             ),
           ),
@@ -110,12 +110,12 @@ class RecentActivityCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        hoverColor: const Color(0xFFF8FAFC),
+        hoverColor: const Color(0xFFF8F7F5),
         onTap: () => context.go('/orders/${order.id}'),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+            border: Border(top: BorderSide(color: Color(0xFFF1EFEA))),
           ),
           child: Row(
             children: [
@@ -126,7 +126,7 @@ class RecentActivityCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF0F172A),
+                    color: Color(0xFF141A24),
                   ),
                 ),
               ),
@@ -138,7 +138,7 @@ class RecentActivityCard extends StatelessWidget {
                     fontSize: 12,
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A4FD6),
+                    color: Color(0xFF182C4F),
                   ),
                 ),
               ),
@@ -150,7 +150,7 @@ class RecentActivityCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF0F172A),
+                    color: Color(0xFF141A24),
                   ),
                 ),
               ),
@@ -230,7 +230,7 @@ class RecentActivityCard extends StatelessWidget {
                     ),
                   ),
                   icon: const Icon(Icons.receipt_outlined,
-                      size: 17, color: Color(0xFF1A4FD6)),
+                      size: 17, color: Color(0xFF182C4F)),
                 ),
               ),
             ],

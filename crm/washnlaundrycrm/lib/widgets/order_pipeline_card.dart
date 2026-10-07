@@ -21,7 +21,7 @@ class OrderPipelineCard extends StatelessWidget {
       {
         'label': 'Processing',
         'count': provider.pipelineProcessing,
-        'color': const Color(0xFF1A4FD6)
+        'color': const Color(0xFF182C4F)
       },
       {
         'label': 'Ready',
@@ -49,7 +49,7 @@ class OrderPipelineCard extends StatelessWidget {
         style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF0F172A)),
+            color: Color(0xFF141A24)),
       ),
       child: Column(
         children: stages.map((st) {
@@ -75,7 +75,7 @@ class OrderPipelineCard extends StatelessWidget {
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                             color: (st['count'] as int) > 0
-                                ? const Color(0xFF0F172A)
+                                ? const Color(0xFF141A24)
                                 : const Color(0xFF64748B),
                           ),
                         ),
@@ -87,7 +87,7 @@ class OrderPipelineCard extends StatelessWidget {
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                         color: (st['count'] as int) > 0
-                            ? const Color(0xFF0F172A)
+                            ? const Color(0xFF141A24)
                             : const Color(0xFF64748B),
                       ),
                     ),

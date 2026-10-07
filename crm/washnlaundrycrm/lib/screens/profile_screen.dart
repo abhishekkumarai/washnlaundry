@@ -18,10 +18,10 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  static const _brand = Color(0xFF1A4FD6);
-  static const _ink = Color(0xFF0F172A);
+  static const _brand = Color(0xFF182C4F);
+  static const _ink = Color(0xFF141A24);
   static const _muted = Color(0xFF64748B);
-  static const _line = Color(0xFFE2E8F0);
+  static const _line = Color(0xFFE4E0D8);
 
   final _name = TextEditingController();
   final _address = TextEditingController();
@@ -87,7 +87,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (customer != null && !_loaded) _fillFrom(customer);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: Column(
@@ -148,7 +148,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         CircleAvatar(
           radius: 28,
-          backgroundColor: const Color(0xFFEEF2FF),
+          backgroundColor: const Color(0xFFEFF6FF),
           child: Text(initials,
               style: const TextStyle(
                   fontSize: 18, fontWeight: FontWeight.bold, color: _brand)),
@@ -184,7 +184,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 size: 16, color: Color(0xFF94A3B8))
             : null,
         filled: true,
-        fillColor: locked ? const Color(0xFFF1F5F9) : Colors.white,
+        fillColor: locked ? const Color(0xFFF1EFEA) : Colors.white,
         isDense: true,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 14),

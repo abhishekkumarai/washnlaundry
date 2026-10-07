@@ -95,7 +95,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: LayoutBuilder(
@@ -134,7 +134,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Row(
         children: [
@@ -142,7 +142,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
               style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
           const SizedBox(width: 8),
           Text('$total Total',
               style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
@@ -153,7 +153,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: const Color(0xFFF1EFEA),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -190,7 +190,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF334155))),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              side: const BorderSide(color: Color(0xFFE4E0D8)),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -207,7 +207,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF334155))),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              side: const BorderSide(color: Color(0xFFE4E0D8)),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -219,7 +219,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text('Add'),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF1A4FD6),
+              backgroundColor: const Color(0xFF182C4F),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -240,7 +240,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -252,7 +252,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
+                        color: Color(0xFF141A24))),
               ),
               Text('$total Total',
                   style:
@@ -264,7 +264,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 child: FilledButton(
                   onPressed: _showAddCustomer,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A4FD6),
+                    backgroundColor: const Color(0xFF182C4F),
                     padding: EdgeInsets.zero,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
@@ -280,7 +280,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: const Color(0xFFF1EFEA),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -320,7 +320,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF334155))),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    side: const BorderSide(color: Color(0xFFE4E0D8)),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -339,7 +339,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF334155))),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    side: const BorderSide(color: Color(0xFFE4E0D8)),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -361,11 +361,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     final cards = [
       _kpi('all', 'Total', '${customers.length}', Icons.people_outline_rounded,
-          const Color(0xFF1A4FD6)),
+          const Color(0xFF182C4F)),
       _kpi('active', 'Active', '$active', Icons.verified_user_outlined,
           const Color(0xFF10B981)),
       _kpi('new', 'New', '$isNew', Icons.person_add_alt_1_outlined,
-          const Color(0xFFA855F7)),
+          const Color(0xFF2563EB)),
     ];
 
     return LayoutBuilder(
@@ -397,7 +397,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-              color: isSel ? color : const Color(0xFFE2E8F0),
+              color: isSel ? color : const Color(0xFFE4E0D8),
               width: isSel ? 1.5 : 1),
         ),
         child: Row(
@@ -422,7 +422,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
+                        color: Color(0xFF141A24))),
               ],
             ),
           ],
@@ -453,10 +453,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
               style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A)),
+                  color: Color(0xFF141A24)),
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const Divider(height: 1, color: Color(0xFFE4E0D8)),
           if (customers.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 48),
@@ -492,7 +492,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           else ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: const Color(0xFFF8FAFC),
+              color: const Color(0xFFF8F7F5),
               child: const Row(
                 children: [
                   Expanded(flex: 4, child: _ColHead('CUSTOMER')),
@@ -524,7 +524,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: const Color(0xFFE4E0D8)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -533,13 +533,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
               children: [
                 CircleAvatar(
                   radius: 18,
-                  backgroundColor: const Color(0xFFEEF2FF),
+                  backgroundColor: const Color(0xFFEFF6FF),
                   child: Text(
                     c.name.isNotEmpty ? c.name[0].toUpperCase() : 'C',
                     style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A4FD6)),
+                        color: Color(0xFF182C4F)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -552,7 +552,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A))),
+                              color: Color(0xFF141A24))),
                       Text(c.phone.isEmpty ? '—' : c.phone,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -604,7 +604,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
               ],
             ),
             const SizedBox(height: 10),
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            const Divider(height: 1, color: Color(0xFFF1EFEA)),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -647,7 +647,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
+                color: Color(0xFF141A24))),
       ],
     );
   }
@@ -658,7 +658,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+          border: Border(top: BorderSide(color: Color(0xFFE4E0D8))),
         ),
         child: Row(
           children: [
@@ -668,13 +668,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 children: [
                   CircleAvatar(
                     radius: 16,
-                    backgroundColor: const Color(0xFFEEF2FF),
+                    backgroundColor: const Color(0xFFEFF6FF),
                     child: Text(
                       c.name.isNotEmpty ? c.name[0].toUpperCase() : 'C',
                       style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A4FD6)),
+                          color: Color(0xFF182C4F)),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -687,7 +687,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A))),
+                                color: Color(0xFF141A24))),
                         Text(c.phone.isEmpty ? '—' : c.phone,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -717,7 +717,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A))),
+                      color: Color(0xFF141A24))),
             ),
             Expanded(
               flex: 3,
@@ -772,7 +772,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     ],
                   ),
                   const Icon(Icons.chevron_right_rounded,
-                      size: 20, color: Color(0xFFCBD5E1)),
+                      size: 20, color: Color(0xFFD9D5CB)),
                 ],
               ),
             ),
@@ -876,7 +876,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
+                    color: Color(0xFF141A24))),
             content: SizedBox(
               width: math.min(420.0, MediaQuery.sizeOf(ctx).width - 48),
               child: Column(
@@ -942,7 +942,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         }
                       },
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A4FD6),
+                  backgroundColor: const Color(0xFF182C4F),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                 ),
@@ -977,7 +977,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
+                color: Color(0xFF141A24))),
         content: Text(
           'Are you sure you want to delete "${c.name}"? Their past orders keep '
           'their own record of the name and phone number, but the link to this '
@@ -1053,7 +1053,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
 const BoxDecoration _panel = BoxDecoration(
   color: Colors.white,
   borderRadius: BorderRadius.all(Radius.circular(12)),
-  border: Border.fromBorderSide(BorderSide(color: Color(0xFFE2E8F0))),
+  border: Border.fromBorderSide(BorderSide(color: Color(0xFFE4E0D8))),
 );
 
 class _ColHead extends StatelessWidget {
@@ -1198,7 +1198,7 @@ class _ImportCustomersDialogState extends State<_ImportCustomersDialog> {
           style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF0F172A))),
+              color: Color(0xFF141A24))),
       content: SizedBox(
         width: 480,
         child: SingleChildScrollView(child: _content()),
@@ -1229,7 +1229,7 @@ class _ImportCustomersDialogState extends State<_ImportCustomersDialog> {
           icon: const Icon(Icons.upload_file_rounded, size: 16),
           label: Text(_loading ? 'Reading file…' : 'Choose File'),
           style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Color(0xFFE2E8F0)),
+            side: const BorderSide(color: Color(0xFFE4E0D8)),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
@@ -1335,7 +1335,7 @@ class _ImportCustomersDialogState extends State<_ImportCustomersDialog> {
           SizedBox(
             width: 90,
             child: Text('$label${required ? ' *' : ''}',
-                style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A))),
+                style: const TextStyle(fontSize: 13, color: Color(0xFF141A24))),
           ),
           Expanded(
             child: DropdownButtonFormField<String?>(
@@ -1376,7 +1376,7 @@ class _ImportCustomersDialogState extends State<_ImportCustomersDialog> {
             style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
+                color: Color(0xFF141A24))),
         if (updated > 0) ...[
           const SizedBox(height: 8),
           Text(
@@ -1384,7 +1384,7 @@ class _ImportCustomersDialogState extends State<_ImportCustomersDialog> {
               style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
         ],
         if (skippedMissing > 0) ...[
           const SizedBox(height: 8),
@@ -1412,7 +1412,7 @@ class _ImportCustomersDialogState extends State<_ImportCustomersDialog> {
                   (_result!['created'] as int) > 0 ||
                       ((_result!['updated'] as int?) ?? 0) > 0),
           style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF1A4FD6),
+            backgroundColor: const Color(0xFF182C4F),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
@@ -1429,7 +1429,7 @@ class _ImportCustomersDialogState extends State<_ImportCustomersDialog> {
         FilledButton(
           onPressed: _loading ? null : _commit,
           style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF1A4FD6),
+            backgroundColor: const Color(0xFF182C4F),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),

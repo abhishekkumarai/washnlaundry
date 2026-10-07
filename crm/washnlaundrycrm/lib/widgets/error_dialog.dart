@@ -25,7 +25,7 @@ Future<void> showErrorDialog(
                 style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
+                    color: Color(0xFF141A24))),
           ),
         ],
       ),
@@ -35,7 +35,7 @@ Future<void> showErrorDialog(
         ElevatedButton(
           onPressed: () => Navigator.pop(ctx),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1A4FD6),
+            backgroundColor: const Color(0xFF182C4F),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),

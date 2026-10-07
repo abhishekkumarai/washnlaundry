@@ -288,7 +288,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             decoration: const BoxDecoration(
               color: Colors.white,
-              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+              border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
             ),
             child: _showCheckoutReview
                 ? _reviewHeader(showStepper: !narrow)
@@ -300,7 +300,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                         style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A)),
+                            color: Color(0xFF141A24)),
                       ),
                     ],
                   ),
@@ -321,7 +321,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
+                      color: const Color(0xFFF1EFEA),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -369,12 +369,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                                       ? Colors.white
                                       : const Color(0xFF334155))),
                           selected: isSel,
-                          selectedColor: const Color(0xFF1A4FD6),
+                          selectedColor: const Color(0xFF182C4F),
                           backgroundColor: Colors.white,
                           side: BorderSide(
                               color: isSel
-                                  ? const Color(0xFF1A4FD6)
-                                  : const Color(0xFFE2E8F0)),
+                                  ? const Color(0xFF182C4F)
+                                  : const Color(0xFFE4E0D8)),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(20)),
                           onSelected: (_) =>
@@ -419,20 +419,20 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
+                        color: Color(0xFF141A24))),
                 const SizedBox(width: 8),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
+                    color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text('$_totalItems',
                       style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A4FD6))),
+                          color: Color(0xFF182C4F))),
                 ),
               ],
             ),
@@ -460,7 +460,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
                 color: Colors.white,
-                border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                border: Border(top: BorderSide(color: Color(0xFFE4E0D8))),
               ),
               child: Column(
                 children: [
@@ -472,7 +472,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                               fontSize: 13, color: Color(0xFF64748B))),
                       Text('${Money.symbol}${subtotal.toInt()}',
                           style: const TextStyle(
-                              fontSize: 13, color: Color(0xFF0F172A))),
+                              fontSize: 13, color: Color(0xFF141A24))),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -483,12 +483,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                           style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A))),
+                              color: Color(0xFF141A24))),
                       Text('${Money.symbol}${subtotal.toInt()}',
                           style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A))),
+                              color: Color(0xFF141A24))),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -510,8 +510,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                               });
                             },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1A4FD6),
-                        disabledBackgroundColor: const Color(0xFFCBD5E1),
+                        backgroundColor: const Color(0xFF182C4F),
+                        disabledBackgroundColor: const Color(0xFFD9D5CB),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
@@ -539,7 +539,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: LayoutBuilder(
@@ -556,7 +556,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       border:
-                          Border(left: BorderSide(color: Color(0xFFE2E8F0))),
+                          Border(left: BorderSide(color: Color(0xFFE4E0D8))),
                     ),
                     child: buildCart(narrow: false),
                   ),
@@ -583,7 +583,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: const Color(0xFFE4E0D8)),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     clipBehavior: Clip.antiAlias,
@@ -612,7 +612,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
-                color: Color(0xFFF1F5F9),
+                color: Color(0xFFF1EFEA),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.shopping_bag_outlined,
@@ -623,7 +623,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
+                    color: Color(0xFF141A24))),
             const Text('Tap products to add them to the order',
                 style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
           ],
@@ -659,7 +659,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
+                        color: Color(0xFF141A24))),
                 Text('${Money.symbol}${g.price.toInt()} each',
                     style: const TextStyle(
                         fontSize: 11, color: Color(0xFF64748B))),
@@ -670,7 +670,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           Container(
             height: 32,
             decoration: BoxDecoration(
-              color: const Color(0xFFEEF2FF),
+              color: const Color(0xFFEFF6FF),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -678,7 +678,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.remove,
-                      size: 14, color: Color(0xFF1A4FD6)),
+                      size: 14, color: Color(0xFF182C4F)),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                   onPressed: () => setState(() {
@@ -696,11 +696,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                       style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A4FD6))),
+                          color: Color(0xFF182C4F))),
                 ),
                 IconButton(
                   icon:
-                      const Icon(Icons.add, size: 14, color: Color(0xFF1A4FD6)),
+                      const Icon(Icons.add, size: 14, color: Color(0xFF182C4F)),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                   onPressed: () =>
@@ -729,14 +729,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: const Color(0xFFF8F7F5),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: const Color(0xFFE2E8F0),
+            backgroundColor: const Color(0xFFE4E0D8),
             child: Text(
               _customerName.isEmpty ? 'W' : _customerName[0].toUpperCase(),
               style: const TextStyle(
@@ -752,7 +752,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A)),
+                        color: Color(0xFF141A24)),
                     overflow: TextOverflow.ellipsis),
                 Text(
                   _customer == null ? 'Tap to add a customer' : _customerPhone,
@@ -770,7 +770,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A4FD6)),
+                  color: Color(0xFF182C4F)),
             ),
           ),
         ],
@@ -778,10 +778,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     );
   }
 
-  static const _ink = Color(0xFF0F172A);
+  static const _ink = Color(0xFF141A24);
   static const _muted = Color(0xFF64748B);
-  static const _line = Color(0xFFE2E8F0);
-  static const _brand = Color(0xFF1A4FD6);
+  static const _line = Color(0xFFE4E0D8);
+  static const _brand = Color(0xFF182C4F);
 
   /// Review step's header: back arrow, "Review order", and the live app's
   /// 1 Items ✓ — 2 Review — 3 Done stepper (dropped on narrow widths).
@@ -897,7 +897,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         children: [
           CircleAvatar(
             radius: 22,
-            backgroundColor: const Color(0xFFEEF2FF),
+            backgroundColor: const Color(0xFFEFF6FF),
             child: Text(
               _customerName.isEmpty ? 'W' : _customerName[0].toUpperCase(),
               style: const TextStyle(
@@ -1024,7 +1024,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           style: OutlinedButton.styleFrom(
             backgroundColor: isSel ? _brand : Colors.white,
             foregroundColor: isSel ? Colors.white : _ink,
-            disabledForegroundColor: const Color(0xFFCBD5E1),
+            disabledForegroundColor: const Color(0xFFD9D5CB),
             side: BorderSide(color: isSel ? _brand : _line),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             minimumSize: const Size(0, 44),
@@ -1194,7 +1194,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             margin: const EdgeInsets.only(bottom: 4),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: const Color(0xFFF8F7F5),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Row(
@@ -1265,7 +1265,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           height: 26,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isSel ? const Color(0xFFEEF2FF) : Colors.transparent,
+            color: isSel ? const Color(0xFFEFF6FF) : Colors.transparent,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: isSel ? _brand : Colors.transparent),
           ),
@@ -1417,7 +1417,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                       : () => _checkout(provider, garments, subtotal),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _brand,
-                    disabledBackgroundColor: const Color(0xFFCBD5E1),
+                    disabledBackgroundColor: const Color(0xFFD9D5CB),
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
@@ -1520,7 +1520,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: const Color(0xFFE4E0D8)),
         ),
         child: Column(
           children: [
@@ -1528,7 +1528,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: const BoxDecoration(
-                color: Color(0xFFF8FAFC),
+                color: Color(0xFFF8F7F5),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
               ),
               child: Row(
@@ -1556,7 +1556,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+        border: const Border(top: BorderSide(color: Color(0xFFE4E0D8))),
         color: qty > 0 ? const Color(0xFFF8FAFF) : null,
       ),
       child: Row(
@@ -1568,14 +1568,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               height: 40,
               child: item.imageUrl.isEmpty
                   ? Container(
-                      color: const Color(0xFFF8FAFC),
+                      color: const Color(0xFFF8F7F5),
                       child: Icon(art.icon, size: 20, color: art.color),
                     )
                   : Image.network(
                       item.imageUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
-                        color: const Color(0xFFF8FAFC),
+                        color: const Color(0xFFF8F7F5),
                         child: Icon(art.icon, size: 20, color: art.color),
                       ),
                     ),
@@ -1589,7 +1589,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF0F172A))),
+                    color: Color(0xFF141A24))),
           ),
           Expanded(
             flex: 2,
@@ -1605,7 +1605,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A4FD6))),
+                    color: Color(0xFF182C4F))),
           ),
           SizedBox(
             width: 150,
@@ -1642,7 +1642,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: const BoxDecoration(
-                color: Color(0xFFF1F5F9), shape: BoxShape.circle),
+                color: Color(0xFFF1EFEA), shape: BoxShape.circle),
             child: Icon(icon, size: 32, color: const Color(0xFF94A3B8)),
           ),
           const SizedBox(height: 12),
@@ -1650,7 +1650,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
           const SizedBox(height: 4),
           SizedBox(
             width: 320,
@@ -1676,7 +1676,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-            color: qty > 0 ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
+            color: qty > 0 ? const Color(0xFF182C4F) : const Color(0xFFE4E0D8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1685,7 +1685,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: const Color(0xFFF8F7F5),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Stack(
@@ -1723,7 +1723,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
           Row(
             children: [
               Flexible(
@@ -1732,7 +1732,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A4FD6))),
+                        color: Color(0xFF182C4F))),
               ),
               const SizedBox(width: 4),
               Flexible(
@@ -1767,7 +1767,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           ? OutlinedButton(
               onPressed: () => setState(() => _cartQuantities[item.id] = 1),
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                side: const BorderSide(color: Color(0xFFE4E0D8)),
                 shape:
                     RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1776,13 +1776,13 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A4FD6))),
+                      color: Color(0xFF182C4F))),
             )
           : Container(
               height: 38,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFFEEF2FF),
+                color: const Color(0xFFEFF6FF),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -1790,7 +1790,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.check_circle_rounded,
-                      size: 15, color: Color(0xFF1A4FD6)),
+                      size: 15, color: Color(0xFF182C4F)),
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text('In Cart · $qty',
@@ -1798,7 +1798,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                         style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A4FD6))),
+                            color: Color(0xFF182C4F))),
                   ),
                 ],
               ),
@@ -1823,12 +1823,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
+                    color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
                     Icons.person_search_rounded,
-                    color: Color(0xFF1A4FD6),
+                    color: Color(0xFF182C4F),
                     size: 24,
                   ),
                 ),
@@ -1842,7 +1842,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
+                          color: Color(0xFF141A24),
                         ),
                       ),
                       SizedBox(height: 2),
@@ -1889,7 +1889,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
             ),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF1A4FD6),
+              backgroundColor: const Color(0xFF182C4F),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -2064,7 +2064,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       'shorts': _ItemArt(Icons.dry_cleaning_outlined, Color(0xFF10B981)),
       'saree': _ItemArt(Icons.woman_rounded, Color(0xFFEC4899)),
       'blazer': _ItemArt(Icons.business_center_rounded, Color(0xFF64748B)),
-      'curtain': _ItemArt(Icons.curtains_rounded, Color(0xFF8B5CF6)),
+      'curtain': _ItemArt(Icons.curtains_rounded, Color(0xFF2563EB)),
       'blanket': _ItemArt(Icons.bed_rounded, Color(0xFF0EA5E9)),
       'carpet': _ItemArt(Icons.texture_rounded, Color(0xFFA16207)),
       'shoe': _ItemArt(Icons.ice_skating_rounded, Color(0xFF14B8A6)),
@@ -2087,7 +2087,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       Color(0xFFF97316),
       Color(0xFF10B981),
       Color(0xFFEC4899),
-      Color(0xFF8B5CF6),
+      Color(0xFF2563EB),
       Color(0xFF06B6D4),
     ];
     final hash = name.codeUnits.fold<int>(0, (a, b) => a + b);
@@ -2214,11 +2214,11 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
         padding: const EdgeInsets.symmetric(vertical: 10),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFEEF2FF) : Colors.white,
+          color: selected ? const Color(0xFFEFF6FF) : Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
               color:
-                  selected ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
+                  selected ? const Color(0xFF182C4F) : const Color(0xFFE4E0D8)),
         ),
         child: Text(
           label,
@@ -2226,7 +2226,7 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
               fontSize: 12,
               fontWeight: FontWeight.bold,
               color:
-                  selected ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
+                  selected ? const Color(0xFF182C4F) : const Color(0xFF64748B)),
         ),
       ),
     );
@@ -2294,7 +2294,7 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                       style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A))),
+                          color: Color(0xFF141A24))),
                   const Spacer(),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
@@ -2354,7 +2354,7 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                   child: FilledButton(
                     onPressed: _saving ? null : _submitNewCustomer,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF1A4FD6),
+                      backgroundColor: const Color(0xFF182C4F),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
@@ -2372,7 +2372,7 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                    border: Border.all(color: const Color(0xFFD9D5CB)),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -2413,7 +2413,7 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                           return ListTile(
                             leading: CircleAvatar(
                               radius: 16,
-                              backgroundColor: const Color(0xFFE2E8F0),
+                              backgroundColor: const Color(0xFFE4E0D8),
                               child: Text(
                                 c.name.isEmpty ? '?' : c.name[0].toUpperCase(),
                                 style: const TextStyle(
@@ -2426,7 +2426,7 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                                 style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0F172A))),
+                                    color: Color(0xFF141A24))),
                             subtitle: Text(c.phone,
                                 style: const TextStyle(
                                     fontSize: 11, color: Color(0xFF64748B))),
@@ -2447,9 +2447,9 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A4FD6))),
+                            color: Color(0xFF182C4F))),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF1A4FD6)),
+                      side: const BorderSide(color: Color(0xFF182C4F)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
@@ -2500,7 +2500,7 @@ class _OrderPlacedDialog extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
+                    color: Color(0xFF141A24))),
             const SizedBox(height: 4),
             const Text('Your order has been created successfully',
                 style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
@@ -2508,7 +2508,7 @@ class _OrderPlacedDialog extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: const Color(0xFFF1EFEA),
                   borderRadius: BorderRadius.circular(8)),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -2520,7 +2520,7 @@ class _OrderPlacedDialog extends StatelessWidget {
                       style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A))),
+                          color: Color(0xFF141A24))),
                 ],
               ),
             ),
@@ -2556,12 +2556,12 @@ class _OrderPlacedDialog extends StatelessWidget {
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
+                        color: Color(0xFF141A24))),
                 Text('${Money.symbol}${order.totalAmount.toInt()}',
                     style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A4FD6))),
+                        color: Color(0xFF182C4F))),
               ],
             ),
             const SizedBox(height: 20),
@@ -2579,7 +2579,7 @@ class _OrderPlacedDialog extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         color: Colors.white)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A4FD6),
+                  backgroundColor: const Color(0xFF182C4F),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
@@ -2608,7 +2608,7 @@ class _OrderPlacedDialog extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  side: const BorderSide(color: Color(0xFFE4E0D8)),
                 ),
               ),
             ),
@@ -2625,7 +2625,7 @@ class _OrderPlacedDialog extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      side: const BorderSide(color: Color(0xFFE4E0D8)),
                     ),
                     child: const Text('View Receipt',
                         style: TextStyle(
@@ -2645,7 +2645,7 @@ class _OrderPlacedDialog extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      side: const BorderSide(color: Color(0xFFE4E0D8)),
                     ),
                     child: const Text('Order Details',
                         style: TextStyle(
@@ -2674,7 +2674,7 @@ class _OrderPlacedDialog extends StatelessWidget {
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: valueColor ?? const Color(0xFF0F172A))),
+                  color: valueColor ?? const Color(0xFF141A24))),
         ],
       ),
     );

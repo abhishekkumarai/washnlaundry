@@ -35,10 +35,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
   /// come back is server-driven now, so colours can no longer be hardcoded per
   /// label the way they were.
   static const _palette = [
-    Color(0xFF1A4FD6),
+    Color(0xFF182C4F),
     Color(0xFF10B981),
     Color(0xFFF59E0B),
-    Color(0xFFA855F7),
+    Color(0xFF2563EB),
     Color(0xFFEF4444),
     Color(0xFF0284C7),
     Color(0xFFD97706),
@@ -56,7 +56,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       case 'OVERDUE':
         return const Color(0xFFEF4444);
       case 'READY':
-        return const Color(0xFF1A4FD6);
+        return const Color(0xFF182C4F);
       case 'PENDING':
         return const Color(0xFFF59E0B);
       default:
@@ -131,7 +131,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final provider = context.watch<AppProvider>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: LayoutBuilder(
@@ -159,7 +159,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,7 +175,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A))),
+                            color: Color(0xFF141A24))),
                     Text(_periodText,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -222,17 +222,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                       color: _selectedPeriod == 2
-                          ? const Color(0xFF1A4FD6)
+                          ? const Color(0xFF182C4F)
                           : const Color(0xFF334155),
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
                         color: _selectedPeriod == 2
-                            ? const Color(0xFF1A4FD6)
-                            : const Color(0xFFE2E8F0)),
+                            ? const Color(0xFF182C4F)
+                            : const Color(0xFFE4E0D8)),
                     backgroundColor: _selectedPeriod == 2
-                        ? const Color(0xFFEEF2FF)
+                        ? const Color(0xFFEFF6FF)
                         : Colors.white,
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -254,7 +254,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Row(
         children: [
@@ -266,7 +266,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A))),
+                      color: Color(0xFF141A24))),
               Text(_periodText,
                   style:
                       const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
@@ -288,17 +288,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 color: _selectedPeriod == 2
-                    ? const Color(0xFF1A4FD6)
+                    ? const Color(0xFF182C4F)
                     : const Color(0xFF334155),
               ),
             ),
             style: OutlinedButton.styleFrom(
               side: BorderSide(
                   color: _selectedPeriod == 2
-                      ? const Color(0xFF1A4FD6)
-                      : const Color(0xFFE2E8F0)),
+                      ? const Color(0xFF182C4F)
+                      : const Color(0xFFE4E0D8)),
               backgroundColor:
-                  _selectedPeriod == 2 ? const Color(0xFFEEF2FF) : Colors.white,
+                  _selectedPeriod == 2 ? const Color(0xFFEFF6FF) : Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
@@ -319,7 +319,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF94A3B8))),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              side: const BorderSide(color: Color(0xFFE4E0D8)),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
@@ -332,8 +332,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
             label: const Text('Export PDF',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1A4FD6),
-              disabledBackgroundColor: const Color(0xFFCBD5E1),
+              backgroundColor: const Color(0xFF182C4F),
+              disabledBackgroundColor: const Color(0xFFD9D5CB),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
@@ -433,8 +433,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
           _money(r.revenue),
           ReportsModel.changeLabel(r.revenueChange) ?? 'no prior period',
           revenueDown ? Icons.trending_down_rounded : Icons.trending_up_rounded,
-          revenueDown ? const Color(0xFFEF4444) : const Color(0xFF1A4FD6),
-          revenueDown ? const Color(0xFFFEF2F2) : const Color(0xFFEEF2FF)),
+          revenueDown ? const Color(0xFFEF4444) : const Color(0xFF182C4F),
+          revenueDown ? const Color(0xFFFEF2F2) : const Color(0xFFEFF6FF)),
       _buildMetricCard('Collected', _money(r.collected), collectedSub,
           Icons.payments_outlined, const Color(0xFF10B981),
           const Color(0xFFECFDF5)),
@@ -461,8 +461,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
           '${r.orderCount}',
           'avg ${_money(r.averageOrderValue)}',
           Icons.shopping_bag_outlined,
-          const Color(0xFFA855F7),
-          const Color(0xFFF3E8FF)),
+          const Color(0xFF2563EB),
+          const Color(0xFFEFF6FF)),
     ];
 
     return LayoutBuilder(
@@ -496,7 +496,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: const Color(0xFFE4E0D8)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -508,10 +508,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                              color: const Color(0xFFEEF2FF),
+                              color: const Color(0xFFEFF6FF),
                               borderRadius: BorderRadius.circular(8)),
                           child: const Icon(Icons.show_chart_rounded,
-                              size: 18, color: Color(0xFF1A4FD6)),
+                              size: 18, color: Color(0xFF182C4F)),
                         ),
                         const SizedBox(width: 12),
                         const Expanded(
@@ -523,7 +523,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                   style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0F172A))),
+                                      color: Color(0xFF141A24))),
                               Text('Last 8 months',
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -540,7 +540,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             width: 10,
                             height: 10,
                             decoration: BoxDecoration(
-                                color: const Color(0xFF1A4FD6),
+                                color: const Color(0xFF182C4F),
                                 borderRadius: BorderRadius.circular(2))),
                         const SizedBox(width: 4),
                         const Text('Revenue',
@@ -609,7 +609,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: const Color(0xFFE4E0D8)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -618,7 +618,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
+                        color: Color(0xFF141A24))),
                 const Spacer(),
                 Center(
                   child: Stack(
@@ -632,7 +632,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           // and the arc cannot draw either.
                           value: ((r.margin ?? 0) / 100).clamp(0.0, 1.0),
                           strokeWidth: 14,
-                          backgroundColor: const Color(0xFFF1F5F9),
+                          backgroundColor: const Color(0xFFF1EFEA),
                           valueColor: AlwaysStoppedAnimation<Color>(profitColor),
                         ),
                       ),
@@ -716,7 +716,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -726,10 +726,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
+                    color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(8)),
                 child: const Icon(Icons.list_alt_rounded,
-                    size: 18, color: Color(0xFF1A4FD6)),
+                    size: 18, color: Color(0xFF182C4F)),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -741,7 +741,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A))),
+                            color: Color(0xFF141A24))),
                     Text('${r.orderCount} orders in this period',
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -794,7 +794,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -804,10 +804,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
+                    color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(8)),
                 child: const Icon(Icons.credit_card_rounded,
-                    size: 18, color: Color(0xFF1A4FD6)),
+                    size: 18, color: Color(0xFF182C4F)),
               ),
               const SizedBox(width: 12),
               const Expanded(
@@ -819,7 +819,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A))),
+                            color: Color(0xFF141A24))),
                     Text('Collected by method',
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -897,8 +897,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
       onPressed: () => _selectPeriod(idx),
       style: OutlinedButton.styleFrom(
         side: BorderSide(
-            color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
-        backgroundColor: isSel ? const Color(0xFFEEF2FF) : Colors.white,
+            color: isSel ? const Color(0xFF182C4F) : const Color(0xFFE4E0D8)),
+        backgroundColor: isSel ? const Color(0xFFEFF6FF) : Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
@@ -907,7 +907,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         style: TextStyle(
           fontSize: 12,
           fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-          color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF334155),
+          color: isSel ? const Color(0xFF182C4F) : const Color(0xFF334155),
         ),
       ),
     );
@@ -920,7 +920,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -948,7 +948,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
           const SizedBox(height: 2),
           Text(sub,
               maxLines: 1,
@@ -979,7 +979,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 // Min height keeps a zero-value bar hoverable.
                 height: height(month.revenue).clamp(3.0, double.infinity),
                 decoration: const BoxDecoration(
-                  color: Color(0xFF1A4FD6),
+                  color: Color(0xFF182C4F),
                   borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
                 ),
               ),
@@ -1023,7 +1023,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
         ],
       ),
     );
@@ -1041,7 +1041,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF0F172A))),
+                      color: Color(0xFF141A24))),
             ),
             const SizedBox(width: 8),
             Text('${_money(row.amount)} (${row.percent.round()}%)',
@@ -1054,7 +1054,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           // Straight from the server, not parsed back out of the label the way
           // this used to do with double.parse(pct.replaceAll('%', '')).
           value: (row.percent / 100).clamp(0.0, 1.0),
-          backgroundColor: const Color(0xFFF1F5F9),
+          backgroundColor: const Color(0xFFF1EFEA),
           valueColor: AlwaysStoppedAnimation<Color>(color),
           minHeight: 6,
           borderRadius: BorderRadius.circular(4),

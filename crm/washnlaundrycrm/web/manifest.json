@@ -1,11 +1,11 @@
 {
-    "name": "washnlaundrycrm",
-    "short_name": "washnlaundrycrm",
+    "name": "WashNLaundry CRM",
+    "short_name": "WashNLaundry",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F8F7F5",
+    "theme_color": "#182C4F",
+    "description": "Orders, customers and billing for WashNLaundry.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

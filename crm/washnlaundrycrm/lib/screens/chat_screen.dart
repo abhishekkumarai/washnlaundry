@@ -85,7 +85,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: LayoutBuilder(
@@ -120,7 +120,7 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: EdgeInsets.symmetric(horizontal: narrow ? 16 : 24),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Row(
         children: [
@@ -128,7 +128,7 @@ class _ChatScreenState extends State<ChatScreen> {
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-              color: const Color(0xFF1A4FD6),
+              color: const Color(0xFF182C4F),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.smart_toy_rounded,
@@ -139,7 +139,7 @@ class _ChatScreenState extends State<ChatScreen> {
               style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
           const SizedBox(width: 8),
           const Text(
             'WashNLaundry Assistant',
@@ -182,7 +182,7 @@ class _ChatScreenState extends State<ChatScreen> {
           horizontal: narrow ? 16 : 24, vertical: 14),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(top: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Center(
         child: ConstrainedBox(
@@ -203,11 +203,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      borderSide: const BorderSide(color: Color(0xFFE4E0D8)),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      borderSide: const BorderSide(color: Color(0xFFE4E0D8)),
                     ),
                   ),
                   style: const TextStyle(fontSize: 13),
@@ -217,8 +217,8 @@ class _ChatScreenState extends State<ChatScreen> {
               IconButton(
                 onPressed: _sending ? null : _send,
                 style: IconButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A4FD6),
-                  disabledBackgroundColor: const Color(0xFFCBD5E1),
+                  backgroundColor: const Color(0xFF182C4F),
+                  disabledBackgroundColor: const Color(0xFFD9D5CB),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -257,13 +257,13 @@ class _Bubble extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         constraints: const BoxConstraints(maxWidth: 520),
         decoration: BoxDecoration(
-          color: isUser ? const Color(0xFF1A4FD6) : const Color(0xFFF1F5F9),
+          color: isUser ? const Color(0xFF182C4F) : const Color(0xFFF1EFEA),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
           message.text.isEmpty ? '…' : message.text,
           style: TextStyle(
-            color: isUser ? Colors.white : const Color(0xFF0F172A),
+            color: isUser ? Colors.white : const Color(0xFF141A24),
             fontSize: 13,
             height: 1.4,
           ),

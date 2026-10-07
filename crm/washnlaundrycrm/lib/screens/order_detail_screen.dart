@@ -68,7 +68,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final isCustomer = context.signedInRole == 'customer';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: Column(
@@ -151,7 +151,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Row(
         children: [
@@ -161,7 +161,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               child: Icon(Icons.arrow_back_rounded,
-                  size: 18, color: Color(0xFF1A4FD6)),
+                  size: 18, color: Color(0xFF182C4F)),
             ),
           ),
           const SizedBox(width: 8),
@@ -171,7 +171,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
           const Spacer(),
           if (!isCustomer) ...[
             _headerButton('Edit', Icons.edit_outlined, const Color(0xFF475569),
@@ -187,7 +187,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               icon: const Icon(Icons.autorenew_rounded, size: 16),
               label: const Text('Update Status'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF1A4FD6),
+                backgroundColor: const Color(0xFF182C4F),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -209,7 +209,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Row(
         children: [
@@ -219,7 +219,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               child: Icon(Icons.arrow_back_rounded,
-                  size: 18, color: Color(0xFF1A4FD6)),
+                  size: 18, color: Color(0xFF182C4F)),
             ),
           ),
           const SizedBox(width: 4),
@@ -229,7 +229,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
+                    color: Color(0xFF141A24))),
           ),
           const SizedBox(width: 4),
           if (!isCustomer) ...[
@@ -238,9 +238,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               onPressed: _canUpdateStatus(order) ? _showUpdateStatus : null,
               icon: const Icon(Icons.autorenew_rounded, size: 18),
               style: IconButton.styleFrom(
-                backgroundColor: const Color(0xFF1A4FD6),
+                backgroundColor: const Color(0xFF182C4F),
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: const Color(0xFFCBD5E1),
+                disabledBackgroundColor: const Color(0xFFD9D5CB),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
@@ -271,7 +271,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Widget _headerButton(
       String label, IconData icon, Color color, VoidCallback? onTap) {
-    final effectiveColor = onTap == null ? const Color(0xFFCBD5E1) : color;
+    final effectiveColor = onTap == null ? const Color(0xFFD9D5CB) : color;
     return OutlinedButton.icon(
       onPressed: onTap,
       icon: Icon(icon, size: 15, color: effectiveColor),
@@ -281,7 +281,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               fontWeight: FontWeight.bold,
               color: effectiveColor)),
       style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: const BorderSide(color: Color(0xFFE4E0D8)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),
@@ -298,19 +298,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
+                color: Color(0xFF141A24))),
         StatusPill(status: order.status, fontSize: 12),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: const Color(0xFFEEF2FF),
+            color: const Color(0xFFEFF6FF),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(order.deliveryTypeLabel,
               style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A4FD6))),
+                  color: Color(0xFF182C4F))),
         ),
         if (order.express)
           Container(
@@ -373,8 +373,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   height: 3,
                   margin: const EdgeInsets.only(bottom: 28),
                   color: i <= reached
-                      ? const Color(0xFF1A4FD6)
-                      : const Color(0xFFE2E8F0),
+                      ? const Color(0xFF182C4F)
+                      : const Color(0xFFE4E0D8),
                 ),
               ),
             // Unconstrained before this, each step's Column sized itself to
@@ -411,7 +411,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           width: 32,
           height: 32,
           decoration: BoxDecoration(
-            color: done ? const Color(0xFF1A4FD6) : const Color(0xFFF1F5F9),
+            color: done ? const Color(0xFF182C4F) : const Color(0xFFF1EFEA),
             shape: BoxShape.circle,
             border: current
                 ? Border.all(color: const Color(0xFFBFDBFE), width: 3)
@@ -435,7 +435,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 fontSize: 11,
                 fontWeight: done ? FontWeight.bold : FontWeight.normal,
                 color:
-                    done ? const Color(0xFF0F172A) : const Color(0xFF94A3B8))),
+                    done ? const Color(0xFF141A24) : const Color(0xFF94A3B8))),
         const SizedBox(height: 2),
         Text(at == null ? '—' : DateFormat('h:mm a').format(at),
             style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
@@ -465,20 +465,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
+                        color: Color(0xFF141A24))),
                 const SizedBox(width: 8),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
+                    color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text('${order.items.length}',
                       style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A4FD6))),
+                          color: Color(0xFF182C4F))),
                 ),
               ],
             ),
@@ -487,7 +487,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFFF8FAFC),
+              color: const Color(0xFFF8F7F5),
               child: Text(entry.key,
                   style: const TextStyle(
                       fontSize: 10,
@@ -497,7 +497,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
             for (final item in entry.value) _itemRow(item, order.express),
           ],
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const Divider(height: 1, color: Color(0xFFE4E0D8)),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -514,7 +514,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   _totalRow('Discount', -order.discountAmount),
                 ],
                 const SizedBox(height: 12),
-                const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                const Divider(height: 1, color: Color(0xFFE4E0D8)),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -523,13 +523,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A))),
+                            color: Color(0xFF141A24))),
                     Text(
                         '${Money.symbol}${order.totalAmount.toStringAsFixed(0)}',
                         style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A))),
+                            color: Color(0xFF141A24))),
                   ],
                 ),
               ],
@@ -544,18 +544,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(top: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFFEEF2FF),
+              color: const Color(0xFFEFF6FF),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.dry_cleaning_rounded,
-                size: 16, color: Color(0xFF1A4FD6)),
+                size: 16, color: Color(0xFF182C4F)),
           ),
           const SizedBox(width: 10),
           // Was a single unbounded Row with the icon + title/pill/badge +
@@ -577,7 +577,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A))),
+                              color: Color(0xFF141A24))),
                     ),
                     const SizedBox(width: 6),
                     StatusPill(status: item.status, fontSize: 9),
@@ -616,7 +616,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A))),
+                            color: Color(0xFF141A24))),
                   ],
                 ),
               ],
@@ -637,7 +637,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
+                color: Color(0xFF141A24))),
       ],
     );
   }
@@ -660,13 +660,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
+                        color: Color(0xFF141A24))),
               ),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: const Color(0xFFF1EFEA),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text('Auto Recorded',
@@ -695,7 +695,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           height: 10,
                           margin: const EdgeInsets.only(top: 3),
                           decoration: const BoxDecoration(
-                            color: Color(0xFF1A4FD6),
+                            color: Color(0xFF182C4F),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -703,7 +703,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           Container(
                               width: 2,
                               height: 26,
-                              color: const Color(0xFFE2E8F0)),
+                              color: const Color(0xFFE4E0D8)),
                       ],
                     ),
                     const SizedBox(width: 12),
@@ -715,7 +715,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0F172A))),
+                                  color: Color(0xFF141A24))),
                           Text(
                               DateFormat('MMM d, h:mm a').format(entries[i].at),
                               style: const TextStyle(
@@ -741,7 +741,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ),
               ),
           if (order.notes != null && order.notes!.trim().isNotEmpty) ...[
-            const Divider(height: 20, color: Color(0xFFE2E8F0)),
+            const Divider(height: 20, color: Color(0xFFE4E0D8)),
             const Text('NOTES & AUDIT LOG',
                 style: TextStyle(
                     fontSize: 10,
@@ -777,7 +777,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: const Color(0xFFEEF2FF),
+                backgroundColor: const Color(0xFFEFF6FF),
                 child: Text(
                   order.customerName.isNotEmpty
                       ? order.customerName[0].toUpperCase()
@@ -785,7 +785,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A4FD6)),
+                      color: Color(0xFF182C4F)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -798,7 +798,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A))),
+                            color: Color(0xFF141A24))),
                     Text(
                       order.customerPhone.isEmpty
                           ? 'No phone on file'
@@ -866,7 +866,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
         ),
       ],
     );
@@ -993,7 +993,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A))),
+                      color: Color(0xFF141A24))),
               content: SizedBox(
                 width: 420,
                 child: SingleChildScrollView(
@@ -1189,7 +1189,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
+                    color: Color(0xFF141A24))),
             content: SizedBox(
               width: 420,
               child: SingleChildScrollView(
@@ -1297,7 +1297,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         }
                       },
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A4FD6),
+                  backgroundColor: const Color(0xFF182C4F),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                 ),
@@ -1325,7 +1325,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }) {
     final isSelected = selected == value;
     final accent =
-        destructive ? const Color(0xFFDC2626) : const Color(0xFF1A4FD6);
+        destructive ? const Color(0xFFDC2626) : const Color(0xFF182C4F);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -1339,7 +1339,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSelected ? accent : const Color(0xFFE2E8F0),
+              color: isSelected ? accent : const Color(0xFFE4E0D8),
             ),
           ),
           child: Row(
@@ -1349,7 +1349,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 height: 22,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isSelected ? accent : const Color(0xFFF1F5F9),
+                  color: isSelected ? accent : const Color(0xFFF1EFEA),
                 ),
                 child: isSelected
                     ? const Icon(Icons.circle, size: 8, color: Colors.white)
@@ -1375,7 +1375,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             fontWeight: FontWeight.bold,
                             color: destructive
                                 ? const Color(0xFFDC2626)
-                                : const Color(0xFF0F172A))),
+                                : const Color(0xFF141A24))),
                     if (subtitle != null)
                       Text(subtitle,
                           style: const TextStyle(
@@ -1388,7 +1388,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE2E8F0),
+                    color: const Color(0xFFE4E0D8),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text('CURRENT',
@@ -1428,7 +1428,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
+                    color: Color(0xFF141A24))),
             content: SizedBox(
               width: 420,
               child: SingleChildScrollView(
@@ -1504,7 +1504,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         }
                       },
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A4FD6),
+                  backgroundColor: const Color(0xFF182C4F),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                 ),
@@ -1542,11 +1542,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEEF2FF),
+                  color: const Color(0xFFEFF6FF),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.qr_code_2_rounded,
-                    size: 18, color: Color(0xFF1A4FD6)),
+                    size: 18, color: Color(0xFF182C4F)),
               ),
               const SizedBox(width: 10),
               const Expanded(
@@ -1558,7 +1558,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
+                        color: Color(0xFF141A24),
                       ),
                     ),
                     Text(
@@ -1571,7 +1571,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const Divider(height: 1, color: Color(0xFFE4E0D8)),
           const SizedBox(height: 16),
           TagGeneratorPanel(
             key: ValueKey('tags-${order.id}'),
@@ -1587,5 +1587,5 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 const BoxDecoration _panel = BoxDecoration(
   color: Colors.white,
   borderRadius: BorderRadius.all(Radius.circular(12)),
-  border: Border.fromBorderSide(BorderSide(color: Color(0xFFE2E8F0))),
+  border: Border.fromBorderSide(BorderSide(color: Color(0xFFE4E0D8))),
 );

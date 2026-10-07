@@ -47,9 +47,9 @@ class _CreditsScreenState extends State<CreditsScreen> {
 
   static const _palette = [
     Color(0xFF10B981),
-    Color(0xFF1A4FD6),
+    Color(0xFF182C4F),
     Color(0xFFF59E0B),
-    Color(0xFF8B5CF6),
+    Color(0xFF2563EB),
     Color(0xFF0EA5E9),
     Color(0xFFEC4899),
     Color(0xFF64748B),
@@ -125,7 +125,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
         monthFiltered.fold<double>(0, (sum, c) => sum + c.amount);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: Column(
@@ -233,7 +233,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
+          color: const Color(0xFFF1EFEA),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -272,7 +272,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
               fontWeight: FontWeight.bold,
               color: Color(0xFF334155))),
       style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: const BorderSide(color: Color(0xFFE4E0D8)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
@@ -322,7 +322,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
           onPressed: () => _stepMonth(-1),
           style: IconButton.styleFrom(
             backgroundColor: Colors.white,
-            side: const BorderSide(color: Color(0xFFE2E8F0)),
+            side: const BorderSide(color: Color(0xFFE4E0D8)),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
@@ -333,7 +333,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: const Color(0xFFE4E0D8)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -346,7 +346,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
+                  color: Color(0xFF141A24),
                 ),
               ),
             ],
@@ -359,7 +359,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
           onPressed: () => _stepMonth(1),
           style: IconButton.styleFrom(
             backgroundColor: Colors.white,
-            side: const BorderSide(color: Color(0xFFE2E8F0)),
+            side: const BorderSide(color: Color(0xFFE4E0D8)),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
@@ -384,7 +384,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
             'All Time',
             '${Money.symbol}${allTimeTotal.toStringAsFixed(0)}',
             'Total credits logged',
-            const Color(0xFF1A4FD6),
+            const Color(0xFF182C4F),
             Icons.account_balance_wallet_rounded,
           ),
           _summaryCard(
@@ -431,7 +431,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Row(
         children: [
@@ -459,7 +459,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
                     style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
+                        color: Color(0xFF141A24))),
                 const SizedBox(height: 2),
                 Text(sub,
                     style: const TextStyle(
@@ -498,7 +498,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
                 side: BorderSide(
                   color: _category == c
                       ? const Color(0xFF16A34A)
-                      : const Color(0xFFCBD5E1),
+                      : const Color(0xFFD9D5CB),
                 ),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
@@ -525,12 +525,12 @@ class _CreditsScreenState extends State<CreditsScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: const Color(0xFFE4E0D8)),
         ),
         child: Column(
           children: [
             const Icon(Icons.account_balance_wallet_outlined,
-                size: 40, color: Color(0xFFCBD5E1)),
+                size: 40, color: Color(0xFFD9D5CB)),
             const SizedBox(height: 12),
             Text(message,
                 style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
@@ -554,14 +554,14 @@ class _CreditsScreenState extends State<CreditsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: ListView.separated(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: credits.length,
         separatorBuilder: (_, __) =>
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            const Divider(height: 1, color: Color(0xFFF1EFEA)),
         itemBuilder: (context, i) {
           final c = credits[i];
           final color = _colorFor(c.category);
@@ -590,7 +590,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
                           style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A))),
+                              color: Color(0xFF141A24))),
                       const SizedBox(height: 4),
                       Wrap(
                         crossAxisAlignment: WrapCrossAlignment.center,
@@ -783,7 +783,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
                     value: category,
                     decoration: _fieldDecoration(''),
                     style: const TextStyle(
-                        fontSize: 13, color: Color(0xFF0F172A)),
+                        fontSize: 13, color: Color(0xFF141A24)),
                     items: [
                       for (final c in categoryList)
                         DropdownMenuItem(value: c, child: Text(c)),
@@ -807,7 +807,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
                     value: method,
                     decoration: _fieldDecoration(''),
                     style: const TextStyle(
-                        fontSize: 13, color: Color(0xFF0F172A)),
+                        fontSize: 13, color: Color(0xFF141A24)),
                     items: [
                       for (final m in methodList)
                         DropdownMenuItem(value: m.value, child: Text(m.label)),
@@ -972,17 +972,17 @@ class _CreditsScreenState extends State<CreditsScreen> {
         hintText: hint,
         hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
         filled: true,
-        fillColor: const Color(0xFFF8FAFC),
+        fillColor: const Color(0xFFF8F7F5),
         isDense: true,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+          borderSide: const BorderSide(color: Color(0xFFD9D5CB)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+          borderSide: const BorderSide(color: Color(0xFFD9D5CB)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),

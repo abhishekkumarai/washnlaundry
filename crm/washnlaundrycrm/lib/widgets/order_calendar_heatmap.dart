@@ -17,10 +17,10 @@ class OrderCalendarHeatmap extends StatefulWidget {
   final Map<DateTime, int> countsByDay;
   final DateTime? initialFocusedDay;
 
-  static const Color primaryBlue = Color(0xFF1A4FD6);
-  static const Color slateText = Color(0xFF0F172A);
+  static const Color primaryBlue = Color(0xFF182C4F);
+  static const Color slateText = Color(0xFF141A24);
   static const Color mutedText = Color(0xFF64748B);
-  static const Color borderColor = Color(0xFFE2E8F0);
+  static const Color borderColor = Color(0xFFE4E0D8);
 
   /// Launches the heatmap in a dialog and resolves to the tapped day, or
   /// `null` if dismissed without a selection.

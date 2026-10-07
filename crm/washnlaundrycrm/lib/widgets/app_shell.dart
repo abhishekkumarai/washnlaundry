@@ -56,21 +56,21 @@ class _NarrowTopBar extends StatelessWidget {
         height: 44,
         decoration: const BoxDecoration(
           color: Colors.white,
-          border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+          border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 6),
         child: Row(
           children: [
             IconButton(
               tooltip: 'Menu',
-              icon: const Icon(Icons.menu_rounded, color: Color(0xFF0F172A)),
+              icon: const Icon(Icons.menu_rounded, color: Color(0xFF141A24)),
               onPressed: onMenuPressed,
             ),
             Container(
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: const Color(0xFF1A4FD6),
+                color: const Color(0xFF182C4F),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.dry_cleaning_rounded,

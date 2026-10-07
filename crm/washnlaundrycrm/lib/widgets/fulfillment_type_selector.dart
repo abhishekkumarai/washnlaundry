@@ -22,10 +22,10 @@ class FulfillmentTypeSelector extends StatelessWidget {
       if (DeliveryType.selectable.contains(t.$1)) t,
   ];
 
-  static const _ink = Color(0xFF0F172A);
+  static const _ink = Color(0xFF141A24);
   static const _muted = Color(0xFF64748B);
-  static const _line = Color(0xFFE2E8F0);
-  static const _brand = Color(0xFF1A4FD6);
+  static const _line = Color(0xFFE4E0D8);
+  static const _brand = Color(0xFF182C4F);
 
   final String value;
   final ValueChanged<String> onChanged;

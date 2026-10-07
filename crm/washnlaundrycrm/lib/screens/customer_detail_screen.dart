@@ -55,7 +55,7 @@ class CustomerDetailScreen extends StatelessWidget {
     final lastOrder = orders.isEmpty ? null : orders.first.createdAt;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: LayoutBuilder(
@@ -119,7 +119,7 @@ class CustomerDetailScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Row(
         children: [
@@ -131,19 +131,19 @@ class CustomerDetailScreen extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(Icons.arrow_back_rounded,
-                      size: 18, color: Color(0xFF1A4FD6)),
+                      size: 18, color: Color(0xFF182C4F)),
                   SizedBox(width: 6),
                   Text('Back to Customers',
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A4FD6))),
+                          color: Color(0xFF182C4F))),
                 ],
               ),
             ),
           ),
           const SizedBox(width: 16),
-          Container(height: 20, width: 1, color: const Color(0xFFCBD5E1)),
+          Container(height: 20, width: 1, color: const Color(0xFFD9D5CB)),
           const SizedBox(width: 16),
           const Text('Customers / ',
               style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
@@ -154,7 +154,7 @@ class CustomerDetailScreen extends StatelessWidget {
               style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A)),
+                  color: Color(0xFF141A24)),
             ),
           ),
           const Spacer(),
@@ -164,7 +164,7 @@ class CustomerDetailScreen extends StatelessWidget {
               icon: const Icon(Icons.add_rounded, size: 18),
               label: const Text('New Order'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF1A4FD6),
+                backgroundColor: const Color(0xFF182C4F),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
@@ -185,7 +185,7 @@ class CustomerDetailScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Row(
         children: [
@@ -195,7 +195,7 @@ class CustomerDetailScreen extends StatelessWidget {
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               child: Icon(Icons.arrow_back_rounded,
-                  size: 18, color: Color(0xFF1A4FD6)),
+                  size: 18, color: Color(0xFF182C4F)),
             ),
           ),
           const SizedBox(width: 4),
@@ -206,7 +206,7 @@ class CustomerDetailScreen extends StatelessWidget {
               style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A)),
+                  color: Color(0xFF141A24)),
             ),
           ),
           if (onNewOrder != null)
@@ -216,7 +216,7 @@ class CustomerDetailScreen extends StatelessWidget {
               child: FilledButton(
                 onPressed: onNewOrder,
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A4FD6),
+                  backgroundColor: const Color(0xFF182C4F),
                   padding: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
@@ -238,7 +238,7 @@ class CustomerDetailScreen extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor: const Color(0xFF1A4FD6),
+            backgroundColor: const Color(0xFF182C4F),
             child: Text(
               customer.name.isNotEmpty ? customer.name[0].toUpperCase() : 'C',
               style: const TextStyle(
@@ -256,7 +256,7 @@ class CustomerDetailScreen extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
+                        color: Color(0xFF141A24))),
                 const SizedBox(height: 4),
                 Text(
                   customer.phone.isEmpty ? 'No phone on file' : customer.phone,
@@ -300,12 +300,12 @@ class CustomerDetailScreen extends StatelessWidget {
           Icons.account_balance_wallet_outlined,
           const Color(0xFF10B981)),
       _kpi('Total Orders', '${customer.totalOrders}',
-          Icons.shopping_bag_outlined, const Color(0xFF1A4FD6)),
+          Icons.shopping_bag_outlined, const Color(0xFF182C4F)),
       _kpi(
           'Avg order value',
           '${Money.symbol}${customer.avgOrderValue.toStringAsFixed(0)}',
           Icons.trending_up_rounded,
-          const Color(0xFFA855F7)),
+          const Color(0xFF2563EB)),
       _kpi('Last order', lastOrder == null ? '—' : relativeTime(lastOrder),
           Icons.access_time_rounded, const Color(0xFFF59E0B)),
     ];
@@ -361,7 +361,7 @@ class CustomerDetailScreen extends StatelessWidget {
             style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A)),
+                color: Color(0xFF141A24)),
           ),
         ],
       ),
@@ -382,25 +382,25 @@ class CustomerDetailScreen extends StatelessWidget {
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
+                        color: Color(0xFF141A24))),
                 const SizedBox(width: 8),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
+                    color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text('${orders.length}',
                       style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A4FD6))),
+                          color: Color(0xFF182C4F))),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const Divider(height: 1, color: Color(0xFFE4E0D8)),
           if (orders.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 36),
@@ -425,7 +425,7 @@ class CustomerDetailScreen extends StatelessWidget {
           else ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: const Color(0xFFF8FAFC),
+              color: const Color(0xFFF8F7F5),
               child: const Row(
                 children: [
                   Expanded(flex: 3, child: _ColHead('ORDER')),
@@ -443,7 +443,7 @@ class CustomerDetailScreen extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                  border: Border(top: BorderSide(color: Color(0xFFE4E0D8))),
                 ),
                 child: Row(
                   children: [
@@ -454,7 +454,7 @@ class CustomerDetailScreen extends StatelessWidget {
                           style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A4FD6))),
+                              color: Color(0xFF182C4F))),
                     ),
                     Expanded(
                       flex: 3,
@@ -484,7 +484,7 @@ class CustomerDetailScreen extends StatelessWidget {
                           style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A))),
+                              color: Color(0xFF141A24))),
                     ),
                   ],
                 ),
@@ -504,7 +504,7 @@ class CustomerDetailScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -517,7 +517,7 @@ class CustomerDetailScreen extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A4FD6))),
+                        color: Color(0xFF182C4F))),
               ),
               StatusPill(status: o.status),
             ],
@@ -536,7 +536,7 @@ class CustomerDetailScreen extends StatelessWidget {
                   style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A))),
+                      color: Color(0xFF141A24))),
             ],
           ),
         ],
@@ -590,8 +590,8 @@ class CustomerDetailScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     color: empty
-                        ? const Color(0xFFCBD5E1)
-                        : const Color(0xFF0F172A),
+                        ? const Color(0xFFD9D5CB)
+                        : const Color(0xFF141A24),
                     fontStyle: empty ? FontStyle.italic : FontStyle.normal,
                   ),
                 ),
@@ -607,7 +607,7 @@ class CustomerDetailScreen extends StatelessWidget {
 const BoxDecoration _panel = BoxDecoration(
   color: Colors.white,
   borderRadius: BorderRadius.all(Radius.circular(12)),
-  border: Border.fromBorderSide(BorderSide(color: Color(0xFFE2E8F0))),
+  border: Border.fromBorderSide(BorderSide(color: Color(0xFFE4E0D8))),
 );
 
 class _ColHead extends StatelessWidget {

@@ -76,7 +76,7 @@ class _PanelCardState extends State<PanelCard> {
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
+                  color: Color(0xFF141A24),
                 ),
               ),
               if (widget.subtitle != null)
@@ -121,7 +121,7 @@ class _PanelCardState extends State<PanelCard> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,7 +184,7 @@ class StatRow extends StatelessWidget {
     required this.label,
     this.caption,
     required this.value,
-    this.valueColor = const Color(0xFF0F172A),
+    this.valueColor = const Color(0xFF141A24),
   });
 
   @override
@@ -218,7 +218,7 @@ class StatRow extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF0F172A),
+                      color: Color(0xFF141A24),
                     ),
                   ),
                   if (caption != null)

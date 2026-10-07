@@ -4,12 +4,12 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 
-const _brandBlue = Color(0xFF1A4FD6);
-const _ink = Color(0xFF0F172A);
+const _brandBlue = Color(0xFF182C4F);
+const _ink = Color(0xFF141A24);
 const _muted = Color(0xFF64748B);
 
 Widget _frame(Widget child) => Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 380),

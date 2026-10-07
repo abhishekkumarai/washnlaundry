@@ -77,7 +77,7 @@ void main() {
         value: provider,
         child: MaterialApp(
           home: Scaffold(
-            backgroundColor: const Color(0xFFF8FAFC),
+            backgroundColor: const Color(0xFFF8F7F5),
             body: Padding(
               padding: const EdgeInsets.all(24),
               child: SizedBox(width: 760, child: RecentActivityCard()),

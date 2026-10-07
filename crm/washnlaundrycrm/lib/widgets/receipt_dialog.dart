@@ -58,7 +58,7 @@ class _ReceiptDialogState extends State<ReceiptDialog> {
                 style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A4FD6))),
+                    color: Color(0xFF182C4F))),
             if (subtitle.isNotEmpty)
               Text(subtitle,
                   textAlign: TextAlign.center,
@@ -84,7 +84,7 @@ class _ReceiptDialogState extends State<ReceiptDialog> {
                           style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A))),
+                              color: Color(0xFF141A24))),
                     ],
                   ),
                 ),
@@ -102,7 +102,7 @@ class _ReceiptDialogState extends State<ReceiptDialog> {
                           style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF0F172A))),
+                              color: Color(0xFF141A24))),
                       if (order.customerPhone.isNotEmpty)
                         Text(order.customerPhone,
                             style: const TextStyle(
@@ -117,7 +117,7 @@ class _ReceiptDialogState extends State<ReceiptDialog> {
             // Item List Header
             Container(
               padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-              color: const Color(0xFFF1F5F9),
+              color: const Color(0xFFF1EFEA),
               child: Row(
                 children: const [
                   Expanded(
@@ -199,7 +199,7 @@ class _ReceiptDialogState extends State<ReceiptDialog> {
                     style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A4FD6))),
+                        color: Color(0xFF182C4F))),
               ],
             ),
             const SizedBox(height: 16),

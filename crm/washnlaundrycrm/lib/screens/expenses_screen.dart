@@ -50,10 +50,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 
   static const _categoryColors = {
-    'Supplies': Color(0xFF1A4FD6),
+    'Supplies': Color(0xFF182C4F),
     'Rent': Color(0xFFDC2626),
     'Utilities': Color(0xFFF59E0B),
-    'Maintenance': Color(0xFF8B5CF6),
+    'Maintenance': Color(0xFF2563EB),
     'Salary': Color(0xFF10B981),
     'Transport': Color(0xFF0EA5E9),
   };
@@ -100,7 +100,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         monthFiltered.fold<double>(0, (sum, e) => sum + e.amount);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: Column(
@@ -164,7 +164,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 child: FilledButton(
                   onPressed: _showAddExpense,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A4FD6),
+                    backgroundColor: const Color(0xFF182C4F),
                     padding: EdgeInsets.zero,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
@@ -197,7 +197,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           icon: const Icon(Icons.add_rounded, size: 18),
           label: const Text('Add Expense'),
           style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF1A4FD6),
+            backgroundColor: const Color(0xFF182C4F),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -213,7 +213,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
+          color: const Color(0xFFF1EFEA),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -252,7 +252,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               fontWeight: FontWeight.bold,
               color: Color(0xFF334155))),
       style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: const BorderSide(color: Color(0xFFE4E0D8)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
@@ -302,7 +302,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -317,7 +317,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A)),
+                color: Color(0xFF141A24)),
           ),
           IconButton(
             icon: const Icon(Icons.chevron_right_rounded, size: 20),
@@ -338,9 +338,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           const Color(0xFFDC2626)),
       _summaryCard('Total logged (all time)',
           '${Money.symbol}${allTimeTotal.toStringAsFixed(0)}',
-          Icons.account_balance_wallet_outlined, const Color(0xFF1A4FD6)),
+          Icons.account_balance_wallet_outlined, const Color(0xFF182C4F)),
       _summaryCard('Entries this month', '$count', Icons.receipt_long_outlined,
-          const Color(0xFF8B5CF6)),
+          const Color(0xFF2563EB)),
     ];
 
     return LayoutBuilder(
@@ -385,7 +385,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A))),
+                        color: Color(0xFF141A24))),
               ],
             ),
           ),
@@ -411,11 +411,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               color: _category == c ? Colors.white : const Color(0xFF475569),
             ),
             backgroundColor: Colors.white,
-            selectedColor: const Color(0xFF1A4FD6),
+            selectedColor: const Color(0xFF182C4F),
             side: BorderSide(
               color: _category == c
-                  ? const Color(0xFF1A4FD6)
-                  : const Color(0xFFE2E8F0),
+                  ? const Color(0xFF182C4F)
+                  : const Color(0xFFE4E0D8),
             ),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -455,7 +455,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               decoration: BoxDecoration(
                 border: i == 0
                     ? null
-                    : const Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                    : const Border(top: BorderSide(color: Color(0xFFE4E0D8))),
               ),
               child: Row(
                 children: [
@@ -479,7 +479,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A))),
+                                color: Color(0xFF141A24))),
                         const SizedBox(height: 3),
                         Row(
                           children: [
@@ -625,7 +625,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
+                    color: Color(0xFF141A24))),
             content: SizedBox(
               width: 440,
               child: SingleChildScrollView(
@@ -655,7 +655,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       initialValue: category,
                       isDense: true,
                       style: const TextStyle(
-                          fontSize: 13, color: Color(0xFF0F172A)),
+                          fontSize: 13, color: Color(0xFF141A24)),
                       decoration: _fieldDecoration(''),
                       items: [
                         for (final c in categoryChoices)
@@ -671,7 +671,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       initialValue: method,
                       isDense: true,
                       style: const TextStyle(
-                          fontSize: 13, color: Color(0xFF0F172A)),
+                          fontSize: 13, color: Color(0xFF141A24)),
                       decoration: _fieldDecoration(''),
                       items: [
                         for (final m in methodChoices)
@@ -764,7 +764,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         }
                       },
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A4FD6),
+                  backgroundColor: const Color(0xFF182C4F),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                 ),
@@ -799,7 +799,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
+                color: Color(0xFF141A24))),
         content: Text(
             'Are you sure you want to delete "${e.title}"? This action cannot be undone.'),
         actions: [
@@ -853,5 +853,5 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 const BoxDecoration _panel = BoxDecoration(
   color: Colors.white,
   borderRadius: BorderRadius.all(Radius.circular(12)),
-  border: Border.fromBorderSide(BorderSide(color: Color(0xFFE2E8F0))),
+  border: Border.fromBorderSide(BorderSide(color: Color(0xFFE4E0D8))),
 );

@@ -10,10 +10,10 @@ import 'package:flutter/material.dart';
 class AppDatePicker {
   AppDatePicker._();
 
-  static const Color primaryBlue = Color(0xFF1A4FD6);
-  static const Color slateText = Color(0xFF0F172A);
+  static const Color primaryBlue = Color(0xFF182C4F);
+  static const Color slateText = Color(0xFF141A24);
   static const Color mutedText = Color(0xFF64748B);
-  static const Color borderColor = Color(0xFFE2E8F0);
+  static const Color borderColor = Color(0xFFE4E0D8);
 
   /// Launches a single date picker modal dialog styled for Web and Android.
   static Future<DateTime?> pickDate({
@@ -224,7 +224,7 @@ class AppDateButton extends StatelessWidget {
         minimumSize: Size(width ?? double.infinity, 44),
         backgroundColor: backgroundColor ?? Colors.white,
         foregroundColor: textColor ?? const Color(0xFF334155),
-        side: const BorderSide(color: Color(0xFFCBD5E1)),
+        side: const BorderSide(color: Color(0xFFD9D5CB)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       ),

@@ -191,7 +191,7 @@ class _CreditCategoriesPanelState extends State<CreditCategoriesPanel> {
             style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
+                color: Color(0xFF141A24))),
         const Text(
             'What money coming into the shop can be filed under on the '
             'Credits page. Turned-off categories stay on past credits but '
@@ -232,7 +232,7 @@ class _CreditCategoriesPanelState extends State<CreditCategoriesPanel> {
                       fontWeight: FontWeight.bold,
                       color: Colors.white)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1A4FD6),
+                backgroundColor: const Color(0xFF182C4F),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 shape: RoundedRectangleBorder(
@@ -252,7 +252,7 @@ class _CreditCategoriesPanelState extends State<CreditCategoriesPanel> {
         else
           Container(
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: const Color(0xFFE4E0D8)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -285,7 +285,7 @@ class _CreditCategoriesPanelState extends State<CreditCategoriesPanel> {
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: c.isActive
-                            ? const Color(0xFF0F172A)
+                            ? const Color(0xFF141A24)
                             : const Color(0xFF94A3B8))),
                 Text(
                   inUse ? _credits(c.creditCount) : 'Not used yet',
@@ -316,7 +316,7 @@ class _CreditCategoriesPanelState extends State<CreditCategoriesPanel> {
             icon: Icon(Icons.delete_outline,
                 size: 18,
                 color: inUse
-                    ? const Color(0xFFCBD5E1)
+                    ? const Color(0xFFD9D5CB)
                     : const Color(0xFFDC2626)),
             onPressed: inUse ? null : () => _delete(c),
           ),

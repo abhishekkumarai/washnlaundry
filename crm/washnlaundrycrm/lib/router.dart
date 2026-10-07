@@ -56,7 +56,7 @@ Widget _section(BuildContext context, int navIndex, Widget screen) {
 /// non-detail states `/orders/:id` can be in — matches the chrome every
 /// other screen has instead of a bare spinner or bare error text.
 Widget _ordersFrame(Widget body) => Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(body: body),
     );

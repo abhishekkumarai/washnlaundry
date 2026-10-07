@@ -64,7 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final provider = context.watch<AppProvider>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: Column(
@@ -164,7 +164,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   heroTag: 'dashboard_scroll_to_top',
                   tooltip: 'Scroll to top',
                   onPressed: _scrollToTop,
-                  backgroundColor: const Color(0xFF1A4FD6),
+                  backgroundColor: const Color(0xFF182C4F),
                   foregroundColor: Colors.white,
                   child: const Icon(Icons.arrow_upward_rounded),
                 ),

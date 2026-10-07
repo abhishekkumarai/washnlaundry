@@ -81,15 +81,22 @@ class WashNLaundryCrmApp extends StatelessWidget {
       ],
       theme: ThemeData(
         useMaterial3: true,
+        // Same tokens as the marketing site (src/app/globals.css): warm paper
+        // background, near-black ink, navy primary, hairline warm borders.
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1A4FD6),
-          primary: const Color(0xFF1A4FD6),
-          surface: const Color(0xFFF8FAFC),
+          seedColor: const Color(0xFF182C4F),
+          primary: const Color(0xFF182C4F),
+          onPrimary: const Color(0xFFFAF9F6),
+          secondary: const Color(0xFF2563EB),
+          surface: const Color(0xFFF8F7F5),
+          onSurface: const Color(0xFF141A24),
+          outline: const Color(0xFFE4E0D8),
+          outlineVariant: const Color(0xFFECE9E2),
         ),
         textTheme: GoogleFonts.ibmPlexSansTextTheme(
           Theme.of(context).textTheme,
         ),
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        scaffoldBackgroundColor: const Color(0xFFF8F7F5),
       ),
       routerConfig: router,
       // Overlays a spinner in place of whatever route matched underneath
@@ -104,14 +111,14 @@ class WashNLaundryCrmApp extends StatelessWidget {
         final auth = context.watch<AuthProvider>();
         if (auth.initializing) {
           return const Scaffold(
-            backgroundColor: Color(0xFFF8FAFC),
+            backgroundColor: Color(0xFFF8F7F5),
             body: Center(child: CircularProgressIndicator()),
           );
         }
         // Signed in but the backend hasn't said who this is yet.
         if (auth.isSignedIn && auth.role == null) {
           return Scaffold(
-            backgroundColor: const Color(0xFFF8FAFC),
+            backgroundColor: const Color(0xFFF8F7F5),
             body: Center(
               child: auth.roleLoading || auth.roleError == null
                   ? const CircularProgressIndicator()

@@ -36,7 +36,7 @@ class TopHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: LayoutBuilder(builder: (context, constraints) {
         final narrow =
@@ -51,7 +51,7 @@ class TopHeader extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
+                  color: Color(0xFF141A24),
                 ),
               ),
             ),
@@ -74,7 +74,7 @@ class TopHeader extends StatelessWidget {
             fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
       ),
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF1A4FD6),
+        backgroundColor: const Color(0xFF182C4F),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -91,7 +91,7 @@ class TopHeader extends StatelessWidget {
         child: ElevatedButton(
           onPressed: onActionPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1A4FD6),
+            backgroundColor: const Color(0xFF182C4F),
             padding: EdgeInsets.zero,
             elevation: 0,
             shape:

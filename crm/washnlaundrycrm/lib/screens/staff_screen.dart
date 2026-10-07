@@ -148,7 +148,7 @@ class _StaffScreenState extends State<StaffScreen> {
   /// showing the active column and direction.
   Widget _sortHeader(String label, String key) {
     final active = _sortKey == key;
-    final color = active ? const Color(0xFF1A4FD6) : const Color(0xFF94A3B8);
+    final color = active ? const Color(0xFF182C4F) : const Color(0xFF94A3B8);
     return Align(
       alignment: Alignment.centerLeft,
       child: InkWell(
@@ -225,7 +225,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
+                    color: Color(0xFF141A24))),
             IconButton(
               icon: const Icon(Icons.close_rounded,
                   size: 20, color: Color(0xFF94A3B8)),
@@ -381,7 +381,7 @@ class _StaffScreenState extends State<StaffScreen> {
                           }
                         },
                         icon: const Icon(Icons.calendar_month_rounded,
-                            size: 16, color: Color(0xFF1A4FD6)),
+                            size: 16, color: Color(0xFF182C4F)),
                         label: Text(
                           startDate == null
                               ? 'Not set'
@@ -389,11 +389,11 @@ class _StaffScreenState extends State<StaffScreen> {
                           style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A4FD6)),
+                              color: Color(0xFF182C4F)),
                         ),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF1A4FD6)),
-                          backgroundColor: const Color(0xFFEEF2FF),
+                          side: const BorderSide(color: Color(0xFF182C4F)),
+                          backgroundColor: const Color(0xFFEFF6FF),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 10),
                           shape: RoundedRectangleBorder(
@@ -432,11 +432,11 @@ class _StaffScreenState extends State<StaffScreen> {
                           decoration: BoxDecoration(
                             color: isActive
                                 ? const Color(0xFFDCFCE7)
-                                : const Color(0xFFF1F5F9),
+                                : const Color(0xFFF1EFEA),
                             border: Border.all(
                               color: isActive
                                   ? const Color(0xFF16A34A)
-                                  : const Color(0xFFCBD5E1),
+                                  : const Color(0xFFD9D5CB),
                               width: 1.5,
                             ),
                             borderRadius: BorderRadius.circular(8),
@@ -478,11 +478,11 @@ class _StaffScreenState extends State<StaffScreen> {
                           decoration: BoxDecoration(
                             color: !isActive
                                 ? const Color(0xFFFEE2E2)
-                                : const Color(0xFFF1F5F9),
+                                : const Color(0xFFF1EFEA),
                             border: Border.all(
                               color: !isActive
                                   ? const Color(0xFFDC2626)
-                                  : const Color(0xFFCBD5E1),
+                                  : const Color(0xFFD9D5CB),
                               width: 1.5,
                             ),
                             borderRadius: BorderRadius.circular(8),
@@ -582,7 +582,7 @@ class _StaffScreenState extends State<StaffScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1A4FD6),
+              backgroundColor: const Color(0xFF182C4F),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
@@ -600,7 +600,7 @@ class _StaffScreenState extends State<StaffScreen> {
     _syncFromProvider(context.watch<AppProvider>());
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: LayoutBuilder(
@@ -636,7 +636,7 @@ class _StaffScreenState extends State<StaffScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Row(
         children: [
@@ -644,7 +644,7 @@ class _StaffScreenState extends State<StaffScreen> {
               style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
@@ -706,7 +706,7 @@ class _StaffScreenState extends State<StaffScreen> {
                     fontWeight: FontWeight.w600,
                     color: Colors.white)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1A4FD6),
+              backgroundColor: const Color(0xFF182C4F),
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               shape: RoundedRectangleBorder(
@@ -727,7 +727,7 @@ class _StaffScreenState extends State<StaffScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -738,7 +738,7 @@ class _StaffScreenState extends State<StaffScreen> {
                   style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A))),
+                      color: Color(0xFF141A24))),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -754,7 +754,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 child: ElevatedButton(
                   onPressed: () => _showStaffModal(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A4FD6),
+                    backgroundColor: const Color(0xFF182C4F),
                     padding: EdgeInsets.zero,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
@@ -777,8 +777,8 @@ class _StaffScreenState extends State<StaffScreen> {
       height: 36,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: const Color(0xFFF8F7F5),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -813,14 +813,14 @@ class _StaffScreenState extends State<StaffScreen> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
                               border:
-                                  Border.all(color: const Color(0xFFE2E8F0)),
+                                  Border.all(color: const Color(0xFFE4E0D8)),
                             ),
                             child: Column(
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(20),
                                   decoration: const BoxDecoration(
-                                    color: Color(0xFFF1F5F9),
+                                    color: Color(0xFFF1EFEA),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(Icons.person_rounded,
@@ -831,7 +831,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                     style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF0F172A))),
+                                        color: Color(0xFF141A24))),
                                 const SizedBox(height: 4),
                                 const Text(
                                     'Add your first staff member to get started.',
@@ -842,7 +842,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                 ElevatedButton(
                                   onPressed: () => _showStaffModal(context),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1A4FD6),
+                                    backgroundColor: const Color(0xFF182C4F),
                                     shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(8)),
                                   ),
@@ -859,7 +859,7 @@ class _StaffScreenState extends State<StaffScreen> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
                               border:
-                                  Border.all(color: const Color(0xFFE2E8F0)),
+                                  Border.all(color: const Color(0xFFE4E0D8)),
                             ),
                             child: narrow
                                 ? _staffCardList()
@@ -870,12 +870,12 @@ class _StaffScreenState extends State<StaffScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 20, vertical: 14),
                                   decoration: const BoxDecoration(
-                                    color: Color(0xFFF8FAFC),
+                                    color: Color(0xFFF8F7F5),
                                     borderRadius: BorderRadius.vertical(
                                         top: Radius.circular(16)),
                                     border: Border(
                                         bottom: BorderSide(
-                                            color: Color(0xFFE2E8F0))),
+                                            color: Color(0xFFE4E0D8))),
                                   ),
                                   child: Row(
                                     children: [
@@ -925,7 +925,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                       child: InkWell(
                                         onTap: () => _showStaffModal(context,
                                             existing: s),
-                                        hoverColor: const Color(0xFFF8FAFC),
+                                        hoverColor: const Color(0xFFF8F7F5),
                                         borderRadius: isLast
                                             ? const BorderRadius.vertical(
                                                 bottom: Radius.circular(16))
@@ -944,9 +944,9 @@ class _StaffScreenState extends State<StaffScreen> {
                                                       radius: 18,
                                                       backgroundColor: isActive
                                                           ? const Color(
-                                                              0xFFEEF2FF)
+                                                              0xFFEFF6FF)
                                                           : const Color(
-                                                              0xFFF1F5F9),
+                                                              0xFFF1EFEA),
                                                       child: Text(
                                                         name.isEmpty
                                                             ? '?'
@@ -958,7 +958,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                                               FontWeight.bold,
                                                           color: isActive
                                                               ? const Color(
-                                                                  0xFF1A4FD6)
+                                                                  0xFF182C4F)
                                                               : const Color(
                                                                   0xFF94A3B8),
                                                         ),
@@ -982,7 +982,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                                                     FontWeight
                                                                         .bold,
                                                                 color: Color(
-                                                                    0xFF0F172A)),
+                                                                    0xFF141A24)),
                                                           ),
                                                         ],
                                                       ),
@@ -1006,7 +1006,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                                         vertical: 3),
                                                     decoration: BoxDecoration(
                                                         color: const Color(
-                                                            0xFFF1F5F9),
+                                                            0xFFF1EFEA),
                                                         borderRadius:
                                                             BorderRadius
                                                                 .circular(6)),
@@ -1049,7 +1049,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                                       fontSize: 13,
                                                       fontWeight:
                                                           FontWeight.bold,
-                                                      color: Color(0xFF0F172A)),
+                                                      color: Color(0xFF141A24)),
                                                 ),
                                               ),
 
@@ -1185,7 +1185,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 activeThumbColor: Colors.white,
                 activeTrackColor: const Color(0xFF10B981),
                 inactiveThumbColor: Colors.white,
-                inactiveTrackColor: const Color(0xFFCBD5E1),
+                inactiveTrackColor: const Color(0xFFD9D5CB),
                 trackOutlineColor:
                     WidgetStateProperty.all(Colors.transparent),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1220,7 +1220,7 @@ class _StaffScreenState extends State<StaffScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: const Color(0xFFE4E0D8)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1230,15 +1230,15 @@ class _StaffScreenState extends State<StaffScreen> {
                 CircleAvatar(
                   radius: 18,
                   backgroundColor: isActive
-                      ? const Color(0xFFEEF2FF)
-                      : const Color(0xFFF1F5F9),
+                      ? const Color(0xFFEFF6FF)
+                      : const Color(0xFFF1EFEA),
                   child: Text(
                     name.isEmpty ? '?' : name[0].toUpperCase(),
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                         color: isActive
-                            ? const Color(0xFF1A4FD6)
+                            ? const Color(0xFF182C4F)
                             : const Color(0xFF94A3B8)),
                   ),
                 ),
@@ -1252,13 +1252,13 @@ class _StaffScreenState extends State<StaffScreen> {
                           style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A))),
+                              color: Color(0xFF141A24))),
                       Container(
                         margin: const EdgeInsets.only(top: 2),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
+                          color: const Color(0xFFF1EFEA),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -1324,7 +1324,7 @@ class _StaffScreenState extends State<StaffScreen> {
               ],
             ),
             const SizedBox(height: 10),
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            const Divider(height: 1, color: Color(0xFFF1EFEA)),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -1355,7 +1355,7 @@ class _StaffScreenState extends State<StaffScreen> {
             style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
+                color: Color(0xFF141A24))),
       ],
     );
   }
@@ -1372,22 +1372,22 @@ class _StaffScreenState extends State<StaffScreen> {
       child: InkWell(
         onTap: () => setState(() => _selectedTab = idx),
         borderRadius: BorderRadius.circular(8),
-        hoverColor: const Color(0xFFEEF2FF),
+        hoverColor: const Color(0xFFEFF6FF),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: isSel ? const Color(0xFFEEF2FF) : Colors.transparent,
+            color: isSel ? const Color(0xFFEFF6FF) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
                 color:
-                    isSel ? const Color(0xFF1A4FD6) : const Color(0xFFE2E8F0)),
+                    isSel ? const Color(0xFF182C4F) : const Color(0xFFE4E0D8)),
           ),
           child: Text(
             title,
             style: TextStyle(
               fontSize: 13,
               fontWeight: isSel ? FontWeight.w600 : FontWeight.w500,
-              color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF334155),
+              color: isSel ? const Color(0xFF182C4F) : const Color(0xFF334155),
             ),
           ),
         ),

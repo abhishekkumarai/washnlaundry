@@ -47,7 +47,7 @@ class RevenueAnalyticsCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A4FD6),
+                  color: Color(0xFF182C4F),
                 ),
               ),
             ],
@@ -58,8 +58,8 @@ class RevenueAnalyticsCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: (progress / 100).clamp(0.0, 1.0),
               minHeight: 8,
-              backgroundColor: const Color(0xFFF1F5F9),
-              valueColor: const AlwaysStoppedAnimation(Color(0xFF1A4FD6)),
+              backgroundColor: const Color(0xFFF1EFEA),
+              valueColor: const AlwaysStoppedAnimation(Color(0xFF182C4F)),
             ),
           ),
           const SizedBox(height: 8),
@@ -80,7 +80,7 @@ class RevenueAnalyticsCard extends StatelessWidget {
           Row(
             children: [
               _figure('Sales', formatRupees(analytics['sales']),
-                  const Color(0xFF0F172A)),
+                  const Color(0xFF141A24)),
               _figure('Collected', formatRupees(analytics['collected']),
                   const Color(0xFF10B981)),
               _figure('Uncollected', formatRupees(analytics['uncollected']),
@@ -88,7 +88,7 @@ class RevenueAnalyticsCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const Divider(height: 1, color: Color(0xFFF1EFEA)),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -119,11 +119,11 @@ class RevenueAnalyticsCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A4FD6),
+                      color: Color(0xFF182C4F),
                     ),
                   ),
                   SizedBox(width: 3),
-                  Icon(Icons.arrow_forward, size: 12, color: Color(0xFF1A4FD6)),
+                  Icon(Icons.arrow_forward, size: 12, color: Color(0xFF182C4F)),
                 ],
               ),
             ),

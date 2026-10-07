@@ -50,7 +50,7 @@ class StoreHealthCard extends StatelessWidget {
                       child: CircularProgressIndicator(
                         value: score / 100,
                         strokeWidth: 7,
-                        backgroundColor: const Color(0xFFF1F5F9),
+                        backgroundColor: const Color(0xFFF1EFEA),
                         valueColor: AlwaysStoppedAnimation(scoreColor),
                       ),
                     ),
@@ -106,7 +106,7 @@ class StoreHealthCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const Divider(height: 1, color: Color(0xFFF1EFEA)),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -125,12 +125,12 @@ class StoreHealthCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A4FD6),
+                        color: Color(0xFF182C4F),
                       ),
                     ),
                     SizedBox(width: 3),
                     Icon(Icons.arrow_forward,
-                        size: 12, color: Color(0xFF1A4FD6)),
+                        size: 12, color: Color(0xFF182C4F)),
                   ],
                 ),
               ),
@@ -154,7 +154,7 @@ class StoreHealthCard extends StatelessWidget {
             style: const TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A),
+              color: Color(0xFF141A24),
             ),
           ),
         ],

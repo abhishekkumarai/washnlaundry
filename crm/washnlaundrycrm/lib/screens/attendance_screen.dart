@@ -48,7 +48,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     'PRESENT': Color(0xFF10B981),
     'HALF_DAY': Color(0xFFF59E0B),
     'ABSENT': Color(0xFFEF4444),
-    'LEAVE': Color(0xFF8B5CF6),
+    'LEAVE': Color(0xFF2563EB),
   };
 
   bool _notYetStarted(StaffModel s, [DateTime? targetDate]) {
@@ -200,7 +200,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final roster = provider.staff.where((s) => s.isActive).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: Column(
@@ -236,14 +236,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 24),
         decoration: const BoxDecoration(
           color: Colors.white,
-          border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+          border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
         ),
         child: const Text(
           'Attendance',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF0F172A),
+            color: Color(0xFF141A24),
           ),
         ),
       );
@@ -311,9 +311,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       key: const ValueKey('attendance-date-button'),
       onPressed: _pickDate,
       style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: const BorderSide(color: Color(0xFFE4E0D8)),
         backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        foregroundColor: const Color(0xFF141A24),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
@@ -370,7 +370,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       icon: Icon(icon, size: 20),
       tooltip: tooltip,
       style: IconButton.styleFrom(
-        side: const BorderSide(color: Color(0xFFCBD5E1)),
+        side: const BorderSide(color: Color(0xFFD9D5CB)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         padding: const EdgeInsets.all(8),
         minimumSize: const Size(36, 36),
@@ -381,7 +381,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   Widget _viewModeToggle({bool isNarrow = false}) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: const Color(0xFFF1EFEA),
         borderRadius: BorderRadius.circular(8),
       ),
       padding: const EdgeInsets.all(3),
@@ -551,14 +551,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         count: leaveCount,
         icon: Icons.flight_takeoff_rounded,
         iconColor: const Color(0xFF64748B),
-        bgColor: const Color(0xFFF1F5F9),
+        bgColor: const Color(0xFFF1EFEA),
       ),
       _kpiCard(
         title: 'Not marked',
         count: notMarkedCount,
         icon: Icons.help_outline_rounded,
         iconColor: const Color(0xFF64748B),
-        bgColor: const Color(0xFFF8FAFC),
+        bgColor: const Color(0xFFF8F7F5),
       ),
     ];
 
@@ -593,7 +593,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -629,7 +629,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
+                    color: Color(0xFF141A24),
                   ),
                 ),
               ],
@@ -652,7 +652,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -724,13 +724,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ],
           ),
         ),
-        const Divider(height: 1, color: Color(0xFFE2E8F0)),
+        const Divider(height: 1, color: Color(0xFFE4E0D8)),
         ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: roster.length,
           separatorBuilder: (_, __) =>
-              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              const Divider(height: 1, color: Color(0xFFF1EFEA)),
           itemBuilder: (context, idx) {
             final s = roster[idx];
             final saved = provider.attendanceFor(_selectedDate);
@@ -749,7 +749,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: roster.length,
       separatorBuilder: (_, __) =>
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const Divider(height: 1, color: Color(0xFFF1EFEA)),
       itemBuilder: (context, idx) {
         final s = roster[idx];
         final saved = provider.attendanceFor(_selectedDate);
@@ -830,15 +830,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     isDense: true,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(6),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                      borderSide: const BorderSide(color: Color(0xFFD9D5CB)),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(6),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      borderSide: const BorderSide(color: Color(0xFFE4E0D8)),
                     ),
                     disabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(6),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      borderSide: const BorderSide(color: Color(0xFFE4E0D8)),
                     ),
                   ),
                   style: const TextStyle(fontSize: 12),
@@ -858,7 +858,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: checkIn != null
-                    ? const Color(0xFF0F172A)
+                    ? const Color(0xFF141A24)
                     : const Color(0xFF94A3B8),
               ),
             ),
@@ -934,7 +934,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF0F172A)),
+              color: Color(0xFF141A24)),
         ),
         TextSpan(
           text: '  $role',
@@ -976,7 +976,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             border: Border(
               left: first
                   ? BorderSide.none
-                  : const BorderSide(color: Color(0xFFE2E8F0)),
+                  : const BorderSide(color: Color(0xFFE4E0D8)),
             ),
             borderRadius: BorderRadius.horizontal(
               left: first ? const Radius.circular(6) : Radius.zero,
@@ -989,7 +989,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               fontSize: 12,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               color: notYetStarted
-                  ? const Color(0xFFCBD5E1)
+                  ? const Color(0xFFD9D5CB)
                   : selected
                       ? colour
                       : const Color(0xFF334155),
@@ -1003,7 +1003,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Row(
@@ -1038,7 +1038,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1064,7 +1064,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
+                    color: Color(0xFF141A24),
                   ),
                 ),
                 IconButton(
@@ -1078,7 +1078,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const Divider(height: 1, color: Color(0xFFE4E0D8)),
 
           // Scrollable Grid Table
           SingleChildScrollView(
@@ -1132,7 +1132,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ),
           ),
 
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const Divider(height: 1, color: Color(0xFFF1EFEA)),
 
           // Footer: Legend and "Totals flow into Payroll"
           Padding(
@@ -1154,7 +1154,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       height: 14,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        border: Border.all(color: const Color(0xFFD9D5CB)),
                         borderRadius: BorderRadius.circular(3),
                       ),
                       child: const Text('?',
@@ -1291,7 +1291,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF0F172A)),
+                      color: Color(0xFF141A24)),
                 ),
               ),
             ],
@@ -1354,12 +1354,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         content = const Icon(Icons.close, size: 14, color: Color(0xFFEF4444));
         break;
       case 'LEAVE':
-        bgColor = const Color(0xFFF1F5F9);
+        bgColor = const Color(0xFFF1EFEA);
         content = const Icon(Icons.flight_takeoff,
             size: 12, color: Color(0xFF64748B));
         break;
       default:
-        border = Border.all(color: const Color(0xFFCBD5E1));
+        border = Border.all(color: const Color(0xFFD9D5CB));
         content = const Text('?',
             style: TextStyle(fontSize: 11, color: Color(0xFF64748B)));
         break;
@@ -1465,7 +1465,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
           SizedBox(height: 4),
           Text('Add someone on the Staff screen first.',
               style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
@@ -1566,7 +1566,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1590,7 +1590,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ],
                   ),
           ),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const Divider(height: 1, color: Color(0xFFF1EFEA)),
 
           Padding(
             padding: const EdgeInsets.all(20),
@@ -1660,7 +1660,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
+                color: Color(0xFF141A24),
               ),
             ),
           ],
@@ -1685,7 +1685,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
             selected: _selectedHabitStaffId == null,
             selectedColor: const Color(0xFF2563EB),
-            backgroundColor: const Color(0xFFF1F5F9),
+            backgroundColor: const Color(0xFFF1EFEA),
             labelStyle: TextStyle(
               color: _selectedHabitStaffId == null
                   ? Colors.white
@@ -1705,7 +1705,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         fontSize: 11, fontWeight: FontWeight.bold)),
                 selected: isSel,
                 selectedColor: const Color(0xFF2563EB),
-                backgroundColor: const Color(0xFFF1F5F9),
+                backgroundColor: const Color(0xFFF1EFEA),
                 labelStyle: TextStyle(
                   color: isSel ? Colors.white : const Color(0xFF475569),
                 ),
@@ -1797,9 +1797,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: const Color(0xFFF8F7F5),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1833,7 +1833,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A)),
+                color: Color(0xFF141A24)),
           ),
           const SizedBox(height: 2),
           Text(
@@ -1862,9 +1862,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: const Color(0xFFF8F7F5),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1894,7 +1894,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   ? (monthCompleted / monthTotal).clamp(0.0, 1.0)
                   : 0.0,
               minHeight: 8,
-              backgroundColor: const Color(0xFFE2E8F0),
+              backgroundColor: const Color(0xFFE4E0D8),
               valueColor: AlwaysStoppedAnimation<Color>(barColor),
             ),
           ),
@@ -1912,20 +1912,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF0F172A)),
+              color: Color(0xFF141A24)),
         ),
         const SizedBox(height: 10),
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: const Color(0xFFE4E0D8)),
           ),
           child: ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: stats.length,
             separatorBuilder: (_, __) =>
-                const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                const Divider(height: 1, color: Color(0xFFF1EFEA)),
             itemBuilder: (context, idx) {
               final item = stats[idx];
               final s = item.staff as StaffModel;
@@ -1955,13 +1955,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     const SizedBox(width: 8),
                     CircleAvatar(
                       radius: 14,
-                      backgroundColor: const Color(0xFFEEF2FF),
+                      backgroundColor: const Color(0xFFEFF6FF),
                       child: Text(
                         s.name.isEmpty ? '?' : s.name[0].toUpperCase(),
                         style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A4FD6)),
+                            color: Color(0xFF182C4F)),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -1974,7 +1974,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                               style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0F172A))),
+                                  color: Color(0xFF141A24))),
                           Text(s.role,
                               style: const TextStyle(
                                   fontSize: 11, color: Color(0xFF64748B))),
@@ -1987,7 +1987,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       decoration: BoxDecoration(
                         color: currentStreak > 0
                             ? const Color(0xFFFFF7ED)
-                            : const Color(0xFFF1F5F9),
+                            : const Color(0xFFF1EFEA),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -2050,7 +2050,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A)),
+                  color: Color(0xFF141A24)),
             ),
             const Spacer(),
             Text(
@@ -2072,7 +2072,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             final isCompleted = counter.isCompleted(date);
             final isToday = DateUtils.isSameDay(date, now);
 
-            Color bgColor = const Color(0xFFF1F5F9);
+            Color bgColor = const Color(0xFFF1EFEA);
             Color textColor = const Color(0xFF64748B);
             Widget icon = const SizedBox.shrink();
 
@@ -2082,8 +2082,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               icon =
                   const Icon(Icons.check, size: 10, color: Color(0xFF10B981));
             } else if (isFuture) {
-              bgColor = const Color(0xFFF8FAFC);
-              textColor = const Color(0xFFCBD5E1);
+              bgColor = const Color(0xFFF8F7F5);
+              textColor = const Color(0xFFD9D5CB);
             }
 
             return Container(
@@ -2094,7 +2094,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 borderRadius: BorderRadius.circular(6),
                 border: isToday
                     ? Border.all(color: const Color(0xFF2563EB), width: 1.5)
-                    : Border.all(color: const Color(0xFFE2E8F0)),
+                    : Border.all(color: const Color(0xFFE4E0D8)),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,

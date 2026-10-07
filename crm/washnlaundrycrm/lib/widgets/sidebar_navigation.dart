@@ -5,6 +5,7 @@ import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/navigation.dart';
 import '../utils/role_views.dart';
+import 'brand_logo.dart';
 import 'panel_card.dart';
 
 /// Left navigation rail.
@@ -48,10 +49,10 @@ class SidebarNavigation extends StatefulWidget {
   static const double railWidth = 72;
   static const double narrowRailWidth = 60;
 
-  static const _brandBlue = Color(0xFF1A4FD6);
-  static const _ink = Color(0xFF0F172A);
+  static const _brandBlue = Color(0xFF182C4F);
+  static const _ink = Color(0xFF141A24);
   static const _muted = Color(0xFF64748B);
-  static const _disabled = Color(0xFFCBD5E1);
+  static const _disabled = Color(0xFFD9D5CB);
 
   // disabled: greyed out, marked "Soon", non-clickable
   static const List<Map<String, Object>> _navItems = [
@@ -200,7 +201,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
         color: Colors.white,
         border: widget.inDrawer
             ? null
-            : const Border(right: BorderSide(color: Color(0xFFE2E8F0))),
+            : const Border(right: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Column(
         children: [
@@ -215,16 +216,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
 
   Widget _brand(BuildContext context,
       {required bool expanded, required bool canExpand}) {
-    final mark = Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: _brandBlue,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child:
-          const Icon(Icons.dry_cleaning_rounded, color: Colors.white, size: 22),
-    );
+    const mark = BrandLogo(size: 40);
 
     if (!expanded) {
       return Padding(
@@ -355,7 +347,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                 else
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    child: Divider(height: 1, color: Color(0xFFF1EFEA)),
                   ),
                 tile,
               ],
@@ -409,7 +401,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
+                    color: const Color(0xFFF1EFEA),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text(
@@ -429,7 +421,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     final tile = Container(
       margin: const EdgeInsets.only(bottom: 2),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFEEF2FF) : Colors.transparent,
+        color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Material(
@@ -498,7 +490,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
 
     final avatar = CircleAvatar(
       radius: 18,
-      backgroundColor: const Color(0xFFEEF2FF),
+      backgroundColor: const Color(0xFFEFF6FF),
       child: Text(
         initialsFor(avatarSource),
         style: const TextStyle(
@@ -510,7 +502,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
       padding:
           EdgeInsets.fromLTRB(expanded ? 12 : 6, 12, expanded ? 12 : 6, 12),
       decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+        border: Border(top: BorderSide(color: Color(0xFFF1EFEA))),
       ),
       child: expanded
           ? Row(

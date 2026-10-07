@@ -496,7 +496,7 @@ void main() {
       await tester.pumpAndSettle();
       final button = tester.widget<OutlinedButton>(late);
       expect(button.style!.backgroundColor!.resolve({}),
-          const Color(0xFF1A4FD6));
+          const Color(0xFF182C4F));
     });
 
     testWidgets('placing a carried order without a slot is refused',

@@ -47,7 +47,7 @@ class RevenueChartCard extends StatelessWidget {
             style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A)),
+                color: Color(0xFF141A24)),
           ),
           const SizedBox(height: 4),
           Text(
@@ -150,7 +150,7 @@ class RevenueChartCard extends StatelessWidget {
                             // A day with no revenue still draws a stub, so the
                             // axis reads as 14 days rather than a gap.
                             toY: val == 0 ? 4 : val,
-                            color: const Color(0xFF1A4FD6),
+                            color: const Color(0xFF182C4F),
                             width: 12,
                             borderRadius: const BorderRadius.only(
                               topLeft: Radius.circular(4),
@@ -169,7 +169,7 @@ class RevenueChartCard extends StatelessWidget {
 
   static FlLine getHorizontalLine(double value) {
     return const FlLine(
-      color: Color(0xFFF1F5F9),
+      color: Color(0xFFF1EFEA),
       strokeWidth: 1,
     );
   }

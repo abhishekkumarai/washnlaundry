@@ -36,7 +36,7 @@ class KpiCardsRow extends StatelessWidget {
         'subtextColor': _changeColor(provider.ordersTodayChange),
         'icon': Icons.inventory_2_outlined,
         'iconBg': const Color(0xFFEFF6FF),
-        'iconColor': const Color(0xFF1A4FD6),
+        'iconColor': const Color(0xFF182C4F),
       },
       {
         'title': 'Revenue today',
@@ -51,10 +51,10 @@ class KpiCardsRow extends StatelessWidget {
         'title': 'Ready for pickup',
         'value': '${provider.readyForPickup}',
         'subtext': '• live in queue',
-        'subtextColor': const Color(0xFF1A4FD6),
+        'subtextColor': const Color(0xFF182C4F),
         'icon': Icons.inventory_2_outlined,
         'iconBg': const Color(0xFFEFF6FF),
-        'iconColor': const Color(0xFF1A4FD6),
+        'iconColor': const Color(0xFF182C4F),
       },
       {
         'title': 'Overdue',
@@ -71,8 +71,8 @@ class KpiCardsRow extends StatelessWidget {
         'subtext': '+${provider.customersNewToday ?? 0} new today',
         'subtextColor': (provider.customersNewToday ?? 0) > 0 ? _up : _muted,
         'icon': Icons.credit_card_outlined,
-        'iconBg': const Color(0xFFF3E8FF),
-        'iconColor': const Color(0xFFA855F7),
+        'iconBg': const Color(0xFFEFF6FF),
+        'iconColor': const Color(0xFF2563EB),
       },
     ];
 
@@ -118,7 +118,7 @@ class KpiCardsRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,7 +151,7 @@ class KpiCardsRow extends StatelessWidget {
             style: const TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
+                color: Color(0xFF141A24),
                 height: 1.1),
           ),
           const SizedBox(height: 8),

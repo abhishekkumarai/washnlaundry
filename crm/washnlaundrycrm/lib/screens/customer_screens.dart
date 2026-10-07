@@ -7,7 +7,7 @@ import '../services/api_service.dart';
 /// Sign-up step for a Google account that is neither staff nor a customer yet.
 /// Signed-in customers use the same CRM screens as everyone else (see
 /// `router.dart`); this is the only customer-specific screen left.
-const _ink = Color(0xFF0F172A);
+const _ink = Color(0xFF141A24);
 const _muted = Color(0xFF64748B);
 
 /// A Google account that is neither staff nor a customer yet: collect a name
@@ -59,7 +59,7 @@ class _CustomerStartScreenState extends State<CustomerStartScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),

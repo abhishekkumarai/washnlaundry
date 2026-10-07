@@ -57,11 +57,11 @@ class _PayrollScreenState extends State<PayrollScreen> {
   /// null for the list itself.
   String? _detailStaffId;
 
-  static const _ink = Color(0xFF0F172A);
+  static const _ink = Color(0xFF141A24);
   static const _muted = Color(0xFF64748B);
   static const _faint = Color(0xFF94A3B8);
-  static const _line = Color(0xFFE2E8F0);
-  static const _brand = Color(0xFF1A4FD6);
+  static const _line = Color(0xFFE4E0D8);
+  static const _brand = Color(0xFF182C4F);
   static const _green = Color(0xFF16A34A);
   static const _amber = Color(0xFFD97706);
 
@@ -117,7 +117,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
     final provider = context.watch<AppProvider>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: LayoutBuilder(
@@ -363,7 +363,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
       ),
       _kpiCard(
         icon: Icons.people_outline_rounded,
-        tint: const Color(0xFF7C3AED),
+        tint: const Color(0xFF2563EB),
         label: 'Staff',
         value: '${payroll?.staffCount ?? 0}',
         sub: 'active staff',
@@ -458,7 +458,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 18),
       decoration: BoxDecoration(
         color: background,
-        border: const Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+        border: const Border(bottom: BorderSide(color: Color(0xFFF1EFEA))),
       ),
       child: Row(
         children: [
@@ -511,7 +511,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
         _statusPill(e.status),
         _rowActions(e),
       ],
-      background: selected ? const Color(0xFFEFF4FF) : null,
+      background: selected ? const Color(0xFFEFF6FF) : null,
       height: 58,
     );
   }
@@ -544,7 +544,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
       width: size,
       height: size,
       decoration: const BoxDecoration(
-        color: Color(0xFFEEF2FF),
+        color: Color(0xFFEFF6FF),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
@@ -685,7 +685,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+        border: Border(bottom: BorderSide(color: Color(0xFFF1EFEA))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -737,7 +737,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
   Widget _expensesNote() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      color: const Color(0xFFEEF2FF),
+      color: const Color(0xFFEFF6FF),
       child: Row(
         children: [
           const Icon(Icons.info_outline_rounded, size: 16, color: _brand),
@@ -906,7 +906,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
     final chips = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: const Color(0xFFF1EFEA),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -916,7 +916,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
             ('P', entry?.presentDays ?? 0, const Color(0xFF16A34A)),
             ('A', entry?.absentDays ?? 0, const Color(0xFFDC2626)),
             ('H', entry?.halfDays ?? 0, const Color(0xFFD97706)),
-            ('L', entry?.leaveDays ?? 0, const Color(0xFF7C3AED)),
+            ('L', entry?.leaveDays ?? 0, const Color(0xFF2563EB)),
           ]) ...[
             Text('$count$label',
                 style: TextStyle(
@@ -978,7 +978,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  const Divider(height: 1, color: Color(0xFFF1EFEA)),
                   const SizedBox(height: 8),
                   line('Salary earned', _rs(entry.totalSalary)),
                   line('Advances', '-${_rs(entry.advancesAmount)}',
@@ -1255,7 +1255,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
         height: 38,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFEFF4FF) : Colors.white,
+          color: selected ? const Color(0xFFEFF6FF) : Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: selected ? _brand : _line),
         ),
@@ -1635,9 +1635,9 @@ class _SalarySlip extends StatelessWidget {
     required this.onPrint,
   });
 
-  static const _ink = Color(0xFF0F172A);
+  static const _ink = Color(0xFF141A24);
   static const _muted = Color(0xFF64748B);
-  static const _line = Color(0xFFE2E8F0);
+  static const _line = Color(0xFFE4E0D8);
 
   static String _rs(num? v) => Money.grouped(v);
 
@@ -1750,7 +1750,7 @@ class _SalarySlip extends StatelessWidget {
                         width: 26,
                         height: 26,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1A4FD6),
+                          color: const Color(0xFF182C4F),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         alignment: Alignment.center,
@@ -1816,7 +1816,7 @@ class _SalarySlip extends StatelessWidget {
                   _kv('Base salary', _rs(entry.totalSalary)),
                   _kv('Other earnings', _rs(0)),
                   _kv('Gross salary', _rs(entry.totalSalary),
-                      colour: const Color(0xFF1A4FD6), bold: true),
+                      colour: const Color(0xFF182C4F), bold: true),
                   _section('Deductions'),
                   _kv('Advances', '-${_rs(entry.advancesAmount)}'),
                   _kv('Other deductions', _rs(0)),
@@ -1873,7 +1873,7 @@ class _SalarySlip extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
-                              color: Color(0xFF1A4FD6))),
+                              color: Color(0xFF182C4F))),
                     ),
                   ),
                 ],

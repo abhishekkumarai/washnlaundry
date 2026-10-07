@@ -151,7 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _hydrate(shop);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
         body: LayoutBuilder(
@@ -197,7 +197,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       width: 240,
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(right: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(right: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Column(
         children: [
@@ -208,13 +208,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: const Color(0xFFEEF2FF),
+                  backgroundColor: const Color(0xFFEFF6FF),
                   child: Text(
                     shopName.isEmpty ? '?' : shopName[0].toUpperCase(),
                     style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A4FD6)),
+                        color: Color(0xFF182C4F)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -228,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A)),
+                            color: Color(0xFF141A24)),
                       ),
                       const Text('Admin',
                           style: TextStyle(
@@ -299,12 +299,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               avatar: Icon(tab.icon,
                   size: 16,
                   color: isSel
-                      ? const Color(0xFF1A4FD6)
+                      ? const Color(0xFF182C4F)
                       : const Color(0xFF64748B)),
               label: Text(tab.title, style: const TextStyle(fontSize: 12)),
               selected: isSel,
               showCheckmark: false,
-              selectedColor: const Color(0xFFEEF2FF),
+              selectedColor: const Color(0xFFEFF6FF),
               onSelected: (_) => setState(() => _selectedTab = tab.slug),
             );
           },
@@ -320,7 +320,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: EdgeInsets.symmetric(horizontal: narrow ? 16 : 24),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
       ),
       child: Row(
         children: [
@@ -328,7 +328,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
           const Spacer(),
           // Only Business profile has a form to save; Credit categories
           // saves each change as it is made.
@@ -336,7 +336,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ElevatedButton(
               onPressed: _saving ? null : () => _save(context),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1A4FD6),
+                backgroundColor: const Color(0xFF182C4F),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -379,7 +379,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: const Color(0xFFE4E0D8)),
         ),
         child: child,
       ),
@@ -394,7 +394,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
+                color: Color(0xFF141A24))),
         const SizedBox(height: 16),
         Row(
           children: [
@@ -418,7 +418,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
+                color: Color(0xFF141A24))),
         const Text(
             'Your shop identity, contact and location.',
             style: TextStyle(
@@ -432,7 +432,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: const Color(0xFF1A4FD6),
+                color: const Color(0xFF182C4F),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Icon(Icons.storefront_rounded,
@@ -460,7 +460,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           borderRadius:
                               BorderRadius.circular(10),
                           borderSide: const BorderSide(
-                              color: Color(0xFFCBD5E1))),
+                              color: Color(0xFFD9D5CB))),
                     ),
                   ),
                 ],
@@ -476,13 +476,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Row(
           children: const [
             Icon(Icons.phone_outlined,
-                size: 18, color: Color(0xFF1A4FD6)),
+                size: 18, color: Color(0xFF182C4F)),
             SizedBox(width: 8),
             Text('Contact Information',
                 style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
+                    color: Color(0xFF141A24))),
           ],
         ),
         const SizedBox(height: 20),
@@ -499,13 +499,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           readOnly: true,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF8FAFC),
+            fillColor: const Color(0xFFF8F7F5),
             contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14, vertical: 12),
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(
-                    color: Color(0xFFE2E8F0))),
+                    color: Color(0xFFE4E0D8))),
           ),
         ),
         const Text(
@@ -525,7 +525,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           controller: _whatsappController,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF8FAFC),
+            fillColor: const Color(0xFFF8F7F5),
             suffixIcon: const Icon(Icons.close_rounded,
                 size: 18, color: Color(0xFF94A3B8)),
             contentPadding: const EdgeInsets.symmetric(
@@ -533,7 +533,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(
-                    color: Color(0xFFE2E8F0))),
+                    color: Color(0xFFE4E0D8))),
           ),
         ),
         const Text(
@@ -554,7 +554,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           readOnly: true,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF8FAFC),
+            fillColor: const Color(0xFFF8F7F5),
             suffixIcon: const Icon(Icons.more_horiz_rounded,
                 size: 18, color: Color(0xFF94A3B8)),
             contentPadding: const EdgeInsets.symmetric(
@@ -562,7 +562,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(
-                    color: Color(0xFFE2E8F0))),
+                    color: Color(0xFFE4E0D8))),
           ),
         ),
         const Text('Registered email cannot be changed',
@@ -576,13 +576,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Row(
           children: const [
             Icon(Icons.location_on_outlined,
-                size: 18, color: Color(0xFF1A4FD6)),
+                size: 18, color: Color(0xFF182C4F)),
             SizedBox(width: 8),
             Text('Store Location',
                 style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A))),
+                    color: Color(0xFF141A24))),
           ],
         ),
         const SizedBox(height: 16),
@@ -591,10 +591,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Container(
           height: 180,
           decoration: BoxDecoration(
-            color: const Color(0xFFE2E8F0),
+            color: const Color(0xFFE4E0D8),
             borderRadius: BorderRadius.circular(14),
             border:
-                Border.all(color: const Color(0xFFCBD5E1)),
+                Border.all(color: const Color(0xFFD9D5CB)),
           ),
           child: Stack(
             children: [
@@ -604,7 +604,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       MainAxisAlignment.center,
                   children: const [
                     Icon(Icons.map_rounded,
-                        size: 44, color: Color(0xFF1A4FD6)),
+                        size: 44, color: Color(0xFF182C4F)),
                     SizedBox(height: 8),
                     Text(
                         "Tap 'Get Location' or drag the marker to set your shop address.",
@@ -628,7 +628,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           color: Colors.white)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor:
-                        const Color(0xFF1A4FD6),
+                        const Color(0xFF182C4F),
                     shape: RoundedRectangleBorder(
                         borderRadius:
                             BorderRadius.circular(10)),
@@ -655,7 +655,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(
-                    color: Color(0xFFCBD5E1))),
+                    color: Color(0xFFD9D5CB))),
           ),
         ),
         const SizedBox(height: 16),
@@ -684,7 +684,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           borderRadius:
                               BorderRadius.circular(10),
                           borderSide: const BorderSide(
-                              color: Color(0xFFCBD5E1))),
+                              color: Color(0xFFD9D5CB))),
                     ),
                   ),
                 ],
@@ -712,7 +712,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           borderRadius:
                               BorderRadius.circular(10),
                           borderSide: const BorderSide(
-                              color: Color(0xFFCBD5E1))),
+                              color: Color(0xFFD9D5CB))),
                     ),
                   ),
                 ],
@@ -737,7 +737,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(
-                    color: Color(0xFFCBD5E1))),
+                    color: Color(0xFFD9D5CB))),
           ),
         ),
         const SizedBox(height: 20),
@@ -747,10 +747,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
+            color: const Color(0xFFF8F7F5),
             borderRadius: BorderRadius.circular(12),
             border:
-                Border.all(color: const Color(0xFFE2E8F0)),
+                Border.all(color: const Color(0xFFE4E0D8)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -759,7 +759,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A))),
+                      color: Color(0xFF141A24))),
               SizedBox(height: 4),
               Text('No location captured yet',
                   style: TextStyle(
@@ -780,7 +780,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // The selected background lives on the Material rather than a plain
       // DecoratedBox, otherwise it hides the ListTile's own ink splashes.
       child: Material(
-        color: isSel ? const Color(0xFFEEF2FF) : Colors.transparent,
+        color: isSel ? const Color(0xFFEFF6FF) : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         child: ListTile(
           dense: true,
@@ -788,13 +788,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           leading: Icon(tab.icon,
               size: 18,
-              color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF64748B)),
+              color: isSel ? const Color(0xFF182C4F) : const Color(0xFF64748B)),
           title: Text(
             tab.title,
             style: TextStyle(
               fontSize: 12,
               fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-              color: isSel ? const Color(0xFF1A4FD6) : const Color(0xFF334155),
+              color: isSel ? const Color(0xFF182C4F) : const Color(0xFF334155),
             ),
           ),
           trailing: tab.hasArrow

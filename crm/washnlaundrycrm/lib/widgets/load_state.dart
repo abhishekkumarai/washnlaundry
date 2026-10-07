@@ -28,7 +28,7 @@ class ErrorState extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: const BoxDecoration(
-                color: Color(0xFFF1F5F9),
+                color: Color(0xFFF1EFEA),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -44,7 +44,7 @@ class ErrorState extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
+                color: Color(0xFF141A24),
               ),
             ),
             const SizedBox(height: 6),
@@ -60,7 +60,7 @@ class ErrorState extends StatelessWidget {
             ElevatedButton(
               onPressed: () => context.read<AppProvider>().refresh(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1A4FD6),
+                backgroundColor: const Color(0xFF182C4F),
                 foregroundColor: Colors.white,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 26, vertical: 13),
@@ -91,7 +91,7 @@ class LoadingState extends StatelessWidget {
         width: 30,
         height: 30,
         child:
-            CircularProgressIndicator(strokeWidth: 3, color: Color(0xFF1A4FD6)),
+            CircularProgressIndicator(strokeWidth: 3, color: Color(0xFF182C4F)),
       ),
     );
   }

@@ -130,10 +130,10 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
       children: [
         _stepPill('1', 'Configure', _step == _stepConfigure, _step > _stepConfigure),
         const Icon(Icons.chevron_right_rounded,
-            size: 16, color: Color(0xFFCBD5E1)),
+            size: 16, color: Color(0xFFD9D5CB)),
         _stepPill('2', 'Preview', _step == _stepPreview, _step > _stepPreview),
         const Icon(Icons.chevron_right_rounded,
-            size: 16, color: Color(0xFFCBD5E1)),
+            size: 16, color: Color(0xFFD9D5CB)),
         _stepPill('3', 'Complete', _step == _stepComplete, false),
       ],
     );
@@ -150,14 +150,14 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: const Color(0xFFF1EFEA),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text('#${_order.orderNumber} · ${_order.customerName}',
                   style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A))),
+                      color: Color(0xFF141A24))),
             ),
             if (widget.onChangeOrder != null)
               TextButton.icon(
@@ -195,7 +195,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
 
   Widget _stepPill(String number, String label, bool active, bool done) {
     final colour = active
-        ? const Color(0xFF1A4FD6)
+        ? const Color(0xFF182C4F)
         : (done ? const Color(0xFF16A34A) : const Color(0xFF94A3B8));
     return InkWell(
       onTap: done
@@ -214,7 +214,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
               radius: 10,
               backgroundColor: done
                   ? const Color(0xFFDCFCE7)
-                  : (active ? colour : const Color(0xFFF1F5F9)),
+                  : (active ? colour : const Color(0xFFF1EFEA)),
               child: done
                   ? const Icon(Icons.check, size: 12, color: Color(0xFF16A34A))
                   : Text(number,
@@ -294,7 +294,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: const Color(0xFFE4E0D8)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,12 +314,12 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
                     children: [
                       Text(entry.key,
                           style: const TextStyle(
-                              fontSize: 13, color: Color(0xFF0F172A))),
+                              fontSize: 13, color: Color(0xFF141A24))),
                       Text('×${entry.value}',
                           style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A4FD6))),
+                              color: Color(0xFF182C4F))),
                     ],
                   ),
                 ),
@@ -396,7 +396,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  side: const BorderSide(color: Color(0xFFE4E0D8)),
                 ),
                 child: const Text('Back'),
               ),
@@ -411,7 +411,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  side: const BorderSide(color: Color(0xFFE4E0D8)),
                 ),
               ),
             ),
@@ -422,7 +422,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
                 icon: const Icon(Icons.print_rounded, size: 16),
                 label: const Text('Print'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A4FD6),
+                  backgroundColor: const Color(0xFF182C4F),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
@@ -460,7 +460,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -490,7 +490,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF0F172A),
+              color: Color(0xFF141A24),
             ),
           ),
           const SizedBox(height: 6),
@@ -503,22 +503,22 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: const Color(0xFFF8F7F5),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: const Color(0xFFE4E0D8)),
             ),
             child: Column(
               children: [
                 _summaryRow('Order Number', '#${_order.orderNumber}'),
-                const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                const Divider(height: 16, color: Color(0xFFE4E0D8)),
                 _summaryRow('Customer', '${_order.customerName} (${_order.customerPhone})'),
-                const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                const Divider(height: 16, color: Color(0xFFE4E0D8)),
                 _summaryRow(
                     'Tagging Mode',
                     _tagType == _TagType.service
                         ? 'Service Tags (${tags.length} labels)'
                         : 'Item Tags ($totalGarments labels)'),
-                const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                const Divider(height: 16, color: Color(0xFFE4E0D8)),
                 _summaryRow('Label Format',
                     _format == _TagFormat.qr ? 'QR Code (50×60mm)' : 'Barcode'),
               ],
@@ -536,7 +536,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
-                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    side: const BorderSide(color: Color(0xFFD9D5CB)),
                   ),
                 ),
               ),
@@ -550,8 +550,8 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
-                    side: const BorderSide(color: Color(0xFF1A4FD6)),
-                    foregroundColor: const Color(0xFF1A4FD6),
+                    side: const BorderSide(color: Color(0xFF182C4F)),
+                    foregroundColor: const Color(0xFF182C4F),
                   ),
                 ),
               ),
@@ -563,7 +563,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
                     icon: const Icon(Icons.list_alt_rounded, size: 16),
                     label: const Text('Back to Orders'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF1A4FD6),
+                      backgroundColor: const Color(0xFF182C4F),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),
@@ -588,7 +588,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
             style: const TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A))),
+                color: Color(0xFF141A24))),
       ],
     );
   }
@@ -600,7 +600,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF0F172A)),
+        border: Border.all(color: const Color(0xFF141A24)),
       ),
       child: Column(
         children: [
@@ -622,7 +622,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
               style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A))),
+                  color: Color(0xFF141A24))),
           Text('${tag.index}/${tag.total}',
               style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
           const SizedBox(height: 4),
@@ -658,19 +658,19 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFEFF4FF) : Colors.white,
+          color: selected ? const Color(0xFFEFF6FF) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
               color: selected
-                  ? const Color(0xFF1A4FD6)
-                  : const Color(0xFFE2E8F0)),
+                  ? const Color(0xFF182C4F)
+                  : const Color(0xFFE4E0D8)),
         ),
         child: Column(
           children: [
             Icon(icon,
                 size: 22,
                 color: selected
-                    ? const Color(0xFF1A4FD6)
+                    ? const Color(0xFF182C4F)
                     : const Color(0xFF64748B)),
             const SizedBox(height: 6),
             Text(title,
@@ -679,8 +679,8 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: selected
-                        ? const Color(0xFF1A4FD6)
-                        : const Color(0xFF0F172A))),
+                        ? const Color(0xFF182C4F)
+                        : const Color(0xFF141A24))),
             if (subtitle != null) ...[
               const SizedBox(height: 2),
               Text(subtitle,

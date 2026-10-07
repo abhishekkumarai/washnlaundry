@@ -26,8 +26,8 @@ class NeedsAttentionCard extends StatelessWidget {
         children: [
           StatRow(
             icon: Icons.event_available_rounded,
-            iconColor: const Color(0xFF1A4FD6),
-            iconBackground: const Color(0xFFEEF2FF),
+            iconColor: const Color(0xFF182C4F),
+            iconBackground: const Color(0xFFEFF6FF),
             label: 'Scheduled ahead',
             caption: 'Booked for a later day',
             value: '${count('scheduled_ahead')}',
@@ -114,7 +114,7 @@ class OrderChannelsCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
+                          color: Color(0xFF141A24),
                         ),
                       ),
                     ],
@@ -125,9 +125,9 @@ class OrderChannelsCard extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: total == 0 ? 0 : count(key) / total,
                       minHeight: 5,
-                      backgroundColor: const Color(0xFFF1F5F9),
+                      backgroundColor: const Color(0xFFF1EFEA),
                       valueColor:
-                          const AlwaysStoppedAnimation(Color(0xFF1A4FD6)),
+                          const AlwaysStoppedAnimation(Color(0xFF182C4F)),
                     ),
                   ),
                 ],

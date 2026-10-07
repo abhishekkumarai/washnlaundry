@@ -12,7 +12,7 @@ Color statusColor(String status) {
     case OrderStatus.ironing:
       return const Color(0xFF0284C7);
     case OrderStatus.ready:
-      return const Color(0xFF1A4FD6);
+      return const Color(0xFF182C4F);
     case OrderStatus.outForDelivery:
       return const Color(0xFFD97706);
     case OrderStatus.delivered:
