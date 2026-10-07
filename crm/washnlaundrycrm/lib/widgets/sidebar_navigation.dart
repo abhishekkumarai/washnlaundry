@@ -308,6 +308,12 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
 
   Widget _navList(AppProvider provider,
       {required bool expanded, required bool narrow}) {
+    // Staff (non-owner) only get the day-to-day screens; see `staffRoutes` in
+    // router.dart and IsOwner in the backend's api/auth.py.
+    const staffNav = {1, 2, 3, 11};
+    final items = provider.role == 'staff'
+        ? _navItems.where((i) => staffNav.contains(i['index'])).toList()
+        : _navItems;
     // Scrollbar so it's discoverable that the rail scrolls when 14 items don't
     // fit a short window.
     return Scrollbar(
@@ -316,11 +322,11 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
       child: ListView.builder(
         controller: _navScrollController,
         primary: false,
-        itemCount: _navItems.length,
+        itemCount: items.length,
         padding:
             EdgeInsets.symmetric(horizontal: expanded ? 10 : 6, vertical: 4),
         itemBuilder: (context, index) {
-          final item = _navItems[index];
+          final item = items[index];
           final navIndex = item['index'] as int;
           final disabled = item['disabled'] as bool;
           final isSelected = !disabled && provider.currentNavIndex == navIndex;
@@ -335,7 +341,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
           );
 
           // Group separator before "Apps".
-          if (index == 10) {
+          if (navIndex == 10) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

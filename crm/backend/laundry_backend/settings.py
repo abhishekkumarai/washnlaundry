@@ -130,3 +130,19 @@ PUBLIC_LEAD_ORIGINS = [
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 PUBLIC_LEAD_RATE_PER_HOUR = int(os.environ.get('PUBLIC_LEAD_RATE_PER_HOUR', '5'))
 
+
+# ── API auth (api/auth.py) ────────────────────────────────────────────────────
+# When True every /api/ DRF endpoint requires a Google ID token belonging to
+# staff; the customer portal's /api/customer/* views are scoped to the caller.
+# Off by default so the Flutter app (which must send tokens first) can roll out
+# before the API is locked down; turn on in Render once it has.
+API_AUTH_ENFORCED = os.environ.get('API_AUTH_ENFORCED', 'False') == 'True'
+# Owner/bootstrap emails that count as staff even without a Staff row.
+STAFF_EMAILS = [
+    e.strip().lower() for e in os.environ.get('STAFF_EMAILS', '').split(',') if e.strip()
+]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': ['api.auth.GoogleTokenAuthentication'],
+    'DEFAULT_PERMISSION_CLASSES': ['api.auth.IsStaff'],
+}

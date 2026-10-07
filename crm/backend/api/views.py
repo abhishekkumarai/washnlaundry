@@ -13,11 +13,12 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_http_methods
 from rest_framework import viewsets
-from rest_framework.decorators import api_view, action
+from rest_framework.decorators import api_view, action, permission_classes
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from . import customer_import
+from .auth import IsOwner, IsOwnerOrStaffReadOnly
 from .services.rag_service import RagService, RagServiceError
 from .services.email_service import EmailService
 from .models import (
@@ -36,6 +37,7 @@ from .serializers import (
 
 
 class ShopViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwnerOrStaffReadOnly]
     queryset = Shop.objects.all()
     serializer_class = ShopSerializer
 
@@ -167,11 +169,13 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
 
 class GarmentCategoryViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwnerOrStaffReadOnly]
     queryset = GarmentCategory.objects.all().order_by('display_order')
     serializer_class = GarmentCategorySerializer
 
 
 class GarmentItemViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwnerOrStaffReadOnly]
     serializer_class = GarmentItemSerializer
 
     def get_queryset(self):
@@ -317,16 +321,19 @@ class OrderViewSet(viewsets.ModelViewSet):
 
 
 class ExpenseViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwner]
     queryset = Expense.objects.all().order_by('-date')
     serializer_class = ExpenseSerializer
 
 
 class CreditViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwner]
     queryset = Credit.objects.select_related('category').order_by('-date')
     serializer_class = CreditSerializer
 
 
 class CreditCategoryViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwner]
     queryset = CreditCategory.objects.all()
     serializer_class = CreditCategorySerializer
 
@@ -345,11 +352,13 @@ class CreditCategoryViewSet(viewsets.ModelViewSet):
 
 
 class StaffViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwner]
     queryset = Staff.objects.all()
     serializer_class = StaffSerializer
 
 
 class AttendanceViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwner]
     serializer_class = AttendanceSerializer
 
     def get_queryset(self):
@@ -441,6 +450,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
 
 class SalaryPaymentViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwner]
     serializer_class = SalaryPaymentSerializer
 
     def get_queryset(self):
@@ -457,6 +467,7 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
 class SalaryAdvanceViewSet(viewsets.ModelViewSet):
     """An advance against a month's wages — see `SalaryAdvance` for how this
     differs from a `SalaryPayment`."""
+    permission_classes = [IsOwner]
     serializer_class = SalaryAdvanceSerializer
 
     def get_queryset(self):
@@ -480,6 +491,7 @@ def parse_month(raw):
 
 
 @api_view(['GET'])
+@permission_classes([IsOwner])
 def payroll_summary(request):
     """GET /api/payroll/?month=YYYY-MM — the Payroll screen, in one call.
 
@@ -594,6 +606,7 @@ def payroll_summary(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsOwner])
 def reports(request):
     """GET /api/reports/?from=YYYY-MM-DD&to=YYYY-MM-DD — the Reports screen.
 
@@ -728,11 +741,13 @@ def reports(request):
 
 
 class ServiceAreaViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwnerOrStaffReadOnly]
     queryset = ServiceArea.objects.all()
     serializer_class = ServiceAreaSerializer
 
 
 class TimeSlotViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsOwnerOrStaffReadOnly]
     serializer_class = TimeSlotSerializer
 
     def get_queryset(self):
@@ -779,6 +794,7 @@ def meta(request):
 
 
 @api_view(['GET'])
+@permission_classes([IsOwner])
 def dashboard_stats(request):
     today = timezone.localdate()
     yesterday = today - timedelta(days=1)

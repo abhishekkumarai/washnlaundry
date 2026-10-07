@@ -28,12 +28,24 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy();
   final authProvider = AuthProvider();
+  final appProvider = AppProvider(autoLoad: false);
+  // The shop data is for owner/staff only and the API rejects it without a
+  // matching token, so load it once the backend has confirmed the role rather
+  // than at startup.
+  var loadedFor = false;
+  authProvider.addListener(() {
+    final role = authProvider.role;
+    final internal = role == 'owner' || role == 'staff';
+    if (internal) appProvider.role = role!;
+    if (internal && !loadedFor) appProvider.loadDataFromBackend();
+    loadedFor = internal;
+  });
   final router = buildRouter(authProvider);
   runApp(
     rp.ProviderScope(
       child: MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => AppProvider()),
+          ChangeNotifierProvider.value(value: appProvider),
           ChangeNotifierProvider.value(value: authProvider),
         ],
         child: WashNLaundryCrmApp(router: router),
@@ -90,6 +102,29 @@ class WashNLaundryCrmApp extends StatelessWidget {
           return const Scaffold(
             backgroundColor: Color(0xFFF8FAFC),
             body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        // Signed in but the backend hasn't said who this is yet.
+        if (auth.isSignedIn && auth.role == null) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFF8FAFC),
+            body: Center(
+              child: auth.roleLoading || auth.roleError == null
+                  ? const CircularProgressIndicator()
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(auth.roleError!, textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                            onPressed: auth.refreshRole,
+                            child: const Text('Try again')),
+                        TextButton(
+                            onPressed: auth.signOut,
+                            child: const Text('Sign out')),
+                      ],
+                    ),
+            ),
           );
         }
         return child ?? const SizedBox.shrink();

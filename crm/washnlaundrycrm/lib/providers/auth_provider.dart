@@ -2,13 +2,16 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Google Sign-In state for the `/login` screen.
+import '../services/api_service.dart';
+
+/// Google Sign-In state for the `/login` screen, plus the server-verified role.
 ///
-/// Deliberately UI-only: it gates which screen `main.dart` shows, matching
-/// the real app's `/login` -> `/dashboard` swap once `onAuthStateChanged`
-/// fires. It does **not** protect the Django API — that stays open, as
-/// documented in CLAUDE.md ("no auth, no permissions"). Wiring a real,
-/// server-verified session is a separate, larger change.
+/// After Google sign-in the ID token is sent to the backend as a Bearer token
+/// (`ApiService.tokenProvider`) and `/api/me/` says whether this account is
+/// `owner` (everything), `staff` (orders, customers, scanning), a `customer` (their own orders only) or `unlinked`.
+/// The router picks the UI from [role]; the API enforces it when the backend
+/// has API_AUTH_ENFORCED on. Demo Mode has no token, so it is always `owner`
+/// and only works against a backend that is not enforcing auth.
 class AuthProvider extends ChangeNotifier {
   /// The Client ID from Google Cloud Console — Credentials > OAuth 2.0
   /// Client IDs > (Web application). Passed the same way `API_BASE_URL` is:
@@ -35,8 +38,57 @@ class AuthProvider extends ChangeNotifier {
   String? _error;
   String? get error => _error;
 
+  /// 'owner' | 'staff' | 'customer' | 'unlinked'; null until `/api/me/` answers.
+  String? _role;
+  String? get role => _role;
+  Map<String, dynamic>? _me;
+  Map<String, dynamic>? get me => _me;
+  bool _roleLoading = false;
+  bool get roleLoading => _roleLoading;
+  String? _roleError;
+  String? get roleError => _roleError;
+  bool _isDemo = false;
+
   AuthProvider() {
+    ApiService.tokenProvider = _idToken;
+    ApiService.onUnauthorized = _refreshToken;
     _init();
+  }
+
+  Future<String?> _idToken() async => _account?.authentication.idToken;
+
+  /// Google ID tokens last about an hour; ask GIS for a fresh one after a 401.
+  Future<bool> _refreshToken() async {
+    if (!isConfigured || _isDemo) return false;
+    try {
+      await _googleSignIn.attemptLightweightAuthentication();
+    } catch (_) {
+      return false;
+    }
+    return _account != null;
+  }
+
+  /// Fetches `/api/me/` and stores the role. Safe to call again to retry.
+  Future<void> refreshRole() async {
+    if (_isDemo) {
+      _role = 'owner';
+      notifyListeners();
+      return;
+    }
+    if (_account == null) return;
+    _roleLoading = true;
+    _roleError = null;
+    notifyListeners();
+    try {
+      _me = await ApiService.fetchMe();
+      _role = _me!['role'] as String?;
+    } on ApiException catch (e) {
+      _role = null;
+      _roleError = e.message;
+    } finally {
+      _roleLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> _init() async {
@@ -48,6 +100,8 @@ class AuthProvider extends ChangeNotifier {
       _isPersistedSignedIn = prefs.getBool('is_signed_in') ?? false;
       _persistedEmail = prefs.getString('user_email');
       _persistedName = prefs.getString('user_name');
+      _isDemo = prefs.getBool('is_demo') ?? false;
+      if (_isDemo) _role = 'owner';
 
       if (isConfigured) {
         await _googleSignIn.initialize(clientId: _clientId);
@@ -59,6 +113,14 @@ class AuthProvider extends ChangeNotifier {
         // the real app's `onAuthStateChanged` firing on a page reload, rather
         // than forcing every reload back through the sign-in button.
         await _googleSignIn.attemptLightweightAuthentication();
+      }
+      // A persisted Google session with no live account has no ID token to
+      // send, so the API would reject everything: make the user sign in again.
+      if (!_isDemo && _isPersistedSignedIn && _account == null) {
+        _isPersistedSignedIn = false;
+        _persistedEmail = null;
+        _persistedName = null;
+        await prefs.remove('is_signed_in');
       }
     } on GoogleSignInException catch (e) {
       _error = _messageFor(e);
@@ -75,28 +137,41 @@ class AuthProvider extends ChangeNotifier {
     switch (event) {
       case GoogleSignInAuthenticationEventSignIn():
         _account = event.user;
+        _isDemo = false;
         _isPersistedSignedIn = true;
         _persistedEmail = event.user.email;
         _persistedName = event.user.displayName;
         SharedPreferences.getInstance().then((prefs) {
           prefs.setBool('is_signed_in', true);
           prefs.setString('user_email', event.user.email);
+          prefs.remove('is_demo');
           if (event.user.displayName != null) {
             prefs.setString('user_name', event.user.displayName!);
           }
         });
+        refreshRole();
       case GoogleSignInAuthenticationEventSignOut():
         _account = null;
         _isPersistedSignedIn = false;
         _persistedEmail = null;
         _persistedName = null;
+        _clearRole();
         SharedPreferences.getInstance().then((prefs) {
+          prefs.remove('is_demo');
           prefs.remove('is_signed_in');
           prefs.remove('user_email');
           prefs.remove('user_name');
         });
     }
     notifyListeners();
+  }
+
+  void _clearRole() {
+    _role = null;
+    _me = null;
+    _roleError = null;
+    _roleLoading = false;
+    _isDemo = false;
   }
 
   String _messageFor(Object e) {
@@ -129,11 +204,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> signInAsDemo() async {
+    _isDemo = true;
+    _role = 'owner';
     _isPersistedSignedIn = true;
     _persistedEmail = 'demo@laundrybill.com';
     _persistedName = 'Demo Owner';
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('is_signed_in', true);
+    await prefs.setBool('is_demo', true);
     await prefs.setString('user_email', 'demo@laundrybill.com');
     await prefs.setString('user_name', 'Demo Owner');
     _error = null;
@@ -148,7 +226,9 @@ class AuthProvider extends ChangeNotifier {
     _isPersistedSignedIn = false;
     _persistedEmail = null;
     _persistedName = null;
+    _clearRole();
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('is_demo');
     await prefs.remove('is_signed_in');
     await prefs.remove('user_email');
     await prefs.remove('user_name');

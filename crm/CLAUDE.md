@@ -73,7 +73,7 @@ node ../scripts/deploy_cloudflare_pages.js   # needs CLOUDFLARE_API_TOKEN
 
 ## Backend
 
-Django 5 / DRF / SQLite, app label `api`. Everything is a plain `ModelViewSet` on a `DefaultRouter` — no auth, no permissions, no pagination, no filtering.
+Django 5 / DRF / SQLite, app label `api`. Everything is a plain `ModelViewSet` on a `DefaultRouter` — no pagination, no filtering. Auth is Google ID-token based (see **Roles and auth** below); it is **off until `API_AUTH_ENFORCED=True`**, so by default the API is still open.
 
 Models (`backend/api/models.py`): `Shop`, `Customer`, `GarmentCategory`, `GarmentItem`, `Order`, `OrderItem`, `Expense`, `Credit`, `CreditCategory`, `Staff`, `Attendance`, `SalaryPayment`.
 
@@ -111,9 +111,25 @@ Flutter Web, Material 3, `provider` for state, `fl_chart` for charts, `google_fo
 
 Adding a screen now means: write it, add a `navItems` entry with a new index, add its path to `AppProvider.routePaths`, add a `GoRoute` in `router.dart`.
 
-### Authentication
+### Roles and auth (added 2026-10-07)
 
-`/login` (`lib/screens/login_screen.dart`), via `AuthProvider`, matches the real app's route — and, like the rest of this section describes, **UI-only**: it gates which screen the router shows, exactly as the backend's own doc comment says the API stays ("no auth, no permissions"). Wiring a real, server-verified session is a separate, larger change than this covers.
+One Google login for everyone; the backend (`backend/api/auth.py`) verifies the ID token (`Authorization: Bearer`) against `GOOGLE_CLIENT_ID` and `GET /api/me/` returns the role:
+
+| Role | Who | Gets |
+|---|---|---|
+| `owner` | email in `STAFF_EMAILS` env, or an ACTIVE `Staff` row with that email, `has_app_login`, and role Owner/Manager | everything |
+| `staff` | any other ACTIVE `Staff` row with email + `has_app_login` | orders, new order, customers, scan; read-only catalogue/shop. Not payroll, reports, expenses, credits, staff, attendance, dashboard stats |
+| `customer` | a `Customer` whose email matches | `/my/*` only: own orders, rate card, pickup form (`/api/customer/*`) |
+| `unlinked` | valid Google account, no record | `/my/start` to sign up |
+
+- `API_AUTH_ENFORCED` (default False) turns enforcement on in `IsStaff`/`IsOwner`/`IsOwnerOrStaffReadOnly`. Ship the Flutter app first, then flip it on Render. Set `STAFF_EMAILS` before flipping or nobody can get in.
+- A customer typing a phone number the store already has creates an `EmailLinkRequest` (no OTP, so no auto-link); the owner approves in Django admin or `POST /api/link-requests/<id>/approve/`.
+- Flutter: `AuthProvider.role` drives `router.dart`'s `authRedirect`; `ApiService.tokenProvider` attaches the token and refreshes once on 401. Staff form has a "Sign-in email" field (it sets `has_app_login`). Demo Mode is always `owner` and only works while enforcement is off.
+- The same Flutter build is meant to serve customer.washnlaundry.com (role decides the view); the old Next.js `customer-web/` is kept until that cutover is verified.
+
+### Authentication (login screen)
+
+`/login` (`lib/screens/login_screen.dart`), via `AuthProvider`, matches the real app's route. The screen itself is unchanged; Google sign-in now also yields a server-verified role (see above). Demo Mode remains a client-side-only bypass.
 
 **The auth gate is always on** — `router.dart`'s `redirect` sends any signed-out visit to `/login` regardless of whether Google Sign-In is configured; there is no zero-config bypass. Two independent ways to satisfy it:
 

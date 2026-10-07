@@ -193,6 +193,9 @@ class StaffModel {
   final String name;
   final String role;
   final String phone;
+
+  /// Google account used to sign in to the CRM (empty = no CRM access).
+  final String email;
   final double monthlyWage;
   final String status;
   final bool hasAppLogin;
@@ -206,6 +209,7 @@ class StaffModel {
     required this.name,
     required this.role,
     required this.phone,
+    this.email = '',
     this.monthlyWage = 0,
     this.status = 'ACTIVE',
     this.hasAppLogin = false,
@@ -219,6 +223,7 @@ class StaffModel {
         name: json['name'] ?? '',
         role: json['role'] ?? '',
         phone: json['phone'] ?? '',
+        email: json['email'] ?? '',
         monthlyWage: (json['monthly_wage'] ?? 0).toDouble(),
         status: json['status'] ?? 'ACTIVE',
         hasAppLogin: json['has_app_login'] ?? false,

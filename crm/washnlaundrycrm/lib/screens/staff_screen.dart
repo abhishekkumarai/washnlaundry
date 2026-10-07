@@ -40,6 +40,7 @@ class _StaffScreenState extends State<StaffScreen> {
               'name': s.name,
               'role': s.role,
               'phone': s.phone,
+              'email': s.email,
               'wage': s.monthlyWage,
               'status': s.status,
               'hasAppLogin': s.hasAppLogin,
@@ -198,6 +199,8 @@ class _StaffScreenState extends State<StaffScreen> {
         TextEditingController(text: existing?['name'] as String? ?? '');
     final phoneCtrl =
         TextEditingController(text: existing?['phone'] as String? ?? '');
+    final emailCtrl =
+        TextEditingController(text: existing?['email'] as String? ?? '');
     final roleCtrl = TextEditingController(
         text: existing?['role'] as String? ?? defaultRole);
     final wageCtrl = TextEditingController(
@@ -268,6 +271,29 @@ class _StaffScreenState extends State<StaffScreen> {
                     keyboardType: TextInputType.phone,
                     decoration: InputDecoration(
                       hintText: '+91 98765 43210',
+                      hintStyle: const TextStyle(
+                          fontSize: 13, color: Color(0xFF94A3B8)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Sign-in email (Google)',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF475569))),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      hintText: 'Leave blank for no CRM access',
+                      helperText:
+                          'Staff see orders, customers and scanning. Role '
+                          '"Owner" or "Manager" sees everything.',
                       hintStyle: const TextStyle(
                           fontSize: 13, color: Color(0xFF94A3B8)),
                       contentPadding: const EdgeInsets.symmetric(
@@ -514,6 +540,9 @@ class _StaffScreenState extends State<StaffScreen> {
                     ? defaultRole
                     : roleCtrl.text.trim(),
                 'phone': phoneCtrl.text.trim(),
+                'email': emailCtrl.text.trim().toLowerCase(),
+                // A sign-in email is what grants CRM access (api/auth.py).
+                'has_app_login': emailCtrl.text.trim().isNotEmpty,
                 'monthly_wage': double.tryParse(wageCtrl.text) ?? defaultWage,
                 // Sent explicitly (even as null) so clearing an already-set
                 // date actually persists, not just skips the field.

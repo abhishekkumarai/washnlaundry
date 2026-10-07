@@ -12,10 +12,11 @@ import re
 from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_http_methods
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token
 
-from .models import Customer, GarmentCategory, Order
+from google.oauth2 import id_token  # noqa: F401  (tests patch api.customer_views.id_token)
+
+from .auth import customer_for_email, normalize_phone, verified_email
+from .models import Customer, EmailLinkRequest, GarmentCategory, Order
 
 _STATUS_TIMESTAMPS = (
     'placed_at', 'processing_at', 'ironing_at', 'ready_at',
@@ -23,30 +24,18 @@ _STATUS_TIMESTAMPS = (
 )
 
 
-def _verified_email(request):
-    """Return the Google-verified email from the Bearer token, else None."""
-    header = request.headers.get('Authorization', '')
-    if not header.lower().startswith('bearer ') or not settings.GOOGLE_CLIENT_ID:
-        return None
-    try:
-        claims = id_token.verify_oauth2_token(
-            header[7:].strip(), google_requests.Request(), settings.GOOGLE_CLIENT_ID)
-    except ValueError:
-        return None
-    if not claims.get('email_verified') or not claims.get('email'):
-        return None
-    return claims['email']
-
-
 def _customer_for(request):
     """(customer, error_response). Exactly one is None."""
-    email = _verified_email(request)
+    email = verified_email(request)
     if not email:
         return None, JsonResponse({'detail': 'Sign in required.'}, status=401)
-    customer = Customer.objects.filter(email__iexact=email).first()
+    customer = customer_for_email(email)
     if customer is None:
+        pending = EmailLinkRequest.objects.filter(
+            email__iexact=email, status=EmailLinkRequest.PENDING).exists()
         return None, JsonResponse(
-            {'detail': 'No account is linked to this email.', 'email': email}, status=404)
+            {'detail': 'No account is linked to this email.', 'email': email,
+             'pending': pending}, status=404)
     return customer, None
 
 
@@ -94,6 +83,7 @@ def _me_json(customer):
         'name': customer.name,
         'email': customer.email,
         'total_orders': customer.total_orders,
+        'total_spent': customer.total_spent,
         'due_amount': customer.due_amount,
     }
 
@@ -103,17 +93,18 @@ def customer_me(request):
     """GET: the signed-in customer. POST {name, phone}: first-time signup.
 
     Signup creates a Customer for the verified email. A phone that already
-    belongs to a customer is refused rather than linked: without an OTP, linking
-    would let anyone claim a stranger's order history by typing their number.
+    belongs to a customer queues an EmailLinkRequest for staff to approve (202)
+    instead of linking: without an OTP, linking directly would let anyone claim
+    a stranger's order history by typing their number.
     """
     if request.method == 'GET':
         customer, err = _customer_for(request)
         return err or JsonResponse(_me_json(customer))
 
-    email = _verified_email(request)
+    email = verified_email(request)
     if not email:
         return JsonResponse({'detail': 'Sign in required.'}, status=401)
-    if Customer.objects.filter(email__iexact=email).exists():
+    if customer_for_email(email):
         return JsonResponse({'detail': 'Account already exists.'}, status=409)
     try:
         body = json.loads(request.body or b'{}')
@@ -123,10 +114,15 @@ def customer_me(request):
     phone = re.sub(r'[\s-]', '', str(body.get('phone') or ''))
     if not name or not re.fullmatch(r'\+?\d{10,15}', phone):
         return JsonResponse({'detail': 'Enter your name and a valid phone number.'}, status=400)
-    if Customer.objects.filter(phone=phone).exists():
+    existing = Customer.objects.filter(phone__endswith=normalize_phone(phone)).first()
+    if existing:
+        EmailLinkRequest.objects.get_or_create(
+            customer=existing, email=email, status=EmailLinkRequest.PENDING)
         return JsonResponse({
-            'detail': 'That phone number is already registered with the store. '
-                      'Ask us to add your email to it.'}, status=409)
+            'pending': True,
+            'detail': 'That number is already registered with the store. We have asked the '
+                      'store to link your email; your orders appear once it is approved.'},
+            status=202)
     customer = Customer.objects.create(name=name, phone=phone, email=email)
     return JsonResponse(_me_json(customer), status=201)
 

@@ -9,6 +9,7 @@ from .views import (
     reports, meta,
     rag_chat, create_lead, public_lead, process_leads,
 )
+from .role_views import me, link_requests, link_request_approve, link_request_reject
 from .customer_views import (
     customer_me, customer_orders, customer_order_detail, customer_rate_card,
 )
@@ -39,6 +40,10 @@ urlpatterns = [
     path('leads/process/', process_leads, name='process-leads'),
     path('reports/', reports, name='reports'),
     path('meta/', meta, name='meta'),
+    path('me/', me, name='me'),
+    path('link-requests/', link_requests, name='link-requests'),
+    path('link-requests/<int:pk>/approve/', link_request_approve, name='link-request-approve'),
+    path('link-requests/<int:pk>/reject/', link_request_reject, name='link-request-reject'),
     path('customer/me/', customer_me, name='customer-me'),
     path('customer/orders/', customer_orders, name='customer-orders'),
     path('customer/orders/<str:order_number>/', customer_order_detail, name='customer-order-detail'),

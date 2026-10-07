@@ -139,7 +139,7 @@ class Customer(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     phone = models.CharField(max_length=20, unique=True)
-    email = models.EmailField(blank=True, null=True)
+    email = models.EmailField(blank=True, null=True, db_index=True)
     address = models.TextField(blank=True, null=True)
     area = models.CharField(max_length=120, blank=True, default='')
     total_orders = models.IntegerField(default=0)
@@ -467,6 +467,9 @@ class Staff(models.Model):
     name = models.CharField(max_length=255)
     role = models.CharField(max_length=100, default='Washer')
     phone = models.CharField(max_length=20)
+    # Google account used to sign in to the CRM. Only counts as CRM access when
+    # `has_app_login` is also set and the status is ACTIVE (see api/auth.py).
+    email = models.EmailField(blank=True, default='')
     monthly_wage = models.FloatField(default=15000.0)
     status = models.CharField(max_length=20, default='ACTIVE')
     # Whether this person has credentials for the Staff/Agent mobile app.
@@ -649,3 +652,42 @@ class Lead(models.Model):
 
     def __str__(self):
         return f"Lead {self.name} ({self.phone})"
+
+
+class EmailLinkRequest(models.Model):
+    """A signed-in Google account asking to be attached to an existing Customer.
+
+    Created when someone claims a phone number that already has a Customer
+    record. Without an OTP, linking automatically would let anyone take over a
+    stranger's order history by typing their number, so staff approve it
+    (Django admin, or /api/link-requests/<id>/approve/) before the email is
+    written onto the Customer.
+    """
+    PENDING = 'PENDING'
+    APPROVED = 'APPROVED'
+    REJECTED = 'REJECTED'
+    STATUS_CHOICES = [(PENDING, 'Pending'), (APPROVED, 'Approved'), (REJECTED, 'Rejected')]
+
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='link_requests')
+    email = models.EmailField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def approve(self):
+        """Attach the email to the customer, unless they already have a different one."""
+        if self.status != self.PENDING:
+            return False
+        if self.customer.email and self.customer.email.lower() != self.email.lower():
+            return False
+        Customer.objects.filter(pk=self.customer_id).update(email=self.email.lower())
+        self.status = self.APPROVED
+        self.resolved_at = timezone.now()
+        self.save(update_fields=['status', 'resolved_at'])
+        return True
+
+    def __str__(self):
+        return f"{self.email} -> {self.customer} [{self.status}]"
