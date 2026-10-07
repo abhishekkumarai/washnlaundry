@@ -49,17 +49,23 @@ class AuthProvider extends ChangeNotifier {
   String? get roleError => _roleError;
   bool _isDemo = false;
 
+  /// Session token from email/password sign-in (`Bearer app.…`), if that's how
+  /// the user signed in. Google sign-in uses the Google ID token instead.
+  String? _appToken;
+
   AuthProvider() {
     ApiService.tokenProvider = _idToken;
     ApiService.onUnauthorized = _refreshToken;
     _init();
   }
 
-  Future<String?> _idToken() async => _account?.authentication.idToken;
+  Future<String?> _idToken() async =>
+      _appToken ?? _account?.authentication.idToken;
 
   /// Google ID tokens last about an hour; ask GIS for a fresh one after a 401.
   Future<bool> _refreshToken() async {
-    if (!isConfigured || _isDemo) return false;
+    // A password session can't be silently renewed; it just ends.
+    if (!isConfigured || _isDemo || _appToken != null) return false;
     try {
       await _googleSignIn.attemptLightweightAuthentication();
     } catch (_) {
@@ -83,7 +89,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (_account == null) return;
+    if (_account == null && _appToken == null) return;
     _roleLoading = true;
     _roleError = null;
     notifyListeners();
@@ -93,6 +99,11 @@ class AuthProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _role = null;
       _roleError = e.message;
+      if (e.statusCode == 401 && _appToken != null) {
+        // Expired or revoked (e.g. password changed elsewhere): back to /login.
+        await signOut();
+        _error = 'Your session expired. Please sign in again.';
+      }
     } finally {
       _roleLoading = false;
       notifyListeners();
@@ -110,6 +121,7 @@ class AuthProvider extends ChangeNotifier {
       _persistedName = prefs.getString('user_name');
       _isDemo = prefs.getBool('is_demo') ?? false;
       if (_isDemo) _role = 'owner';
+      _appToken = prefs.getString('app_token');
 
       if (isConfigured) {
         await _googleSignIn.initialize(clientId: _clientId);
@@ -124,7 +136,9 @@ class AuthProvider extends ChangeNotifier {
       }
       // A persisted Google session with no live account has no ID token to
       // send, so the API would reject everything: make the user sign in again.
-      if (!_isDemo && _isPersistedSignedIn && _account == null) {
+      if (_appToken != null && _isPersistedSignedIn) {
+        await refreshRole();
+      } else if (!_isDemo && _isPersistedSignedIn && _account == null) {
         _isPersistedSignedIn = false;
         _persistedEmail = null;
         _persistedName = null;
@@ -145,6 +159,7 @@ class AuthProvider extends ChangeNotifier {
     switch (event) {
       case GoogleSignInAuthenticationEventSignIn():
         _account = event.user;
+        _appToken = null;
         _isDemo = false;
         _isPersistedSignedIn = true;
         _persistedEmail = event.user.email;
@@ -153,6 +168,7 @@ class AuthProvider extends ChangeNotifier {
           prefs.setBool('is_signed_in', true);
           prefs.setString('user_email', event.user.email);
           prefs.remove('is_demo');
+          prefs.remove('app_token');
           if (event.user.displayName != null) {
             prefs.setString('user_name', event.user.displayName!);
           }
@@ -166,6 +182,7 @@ class AuthProvider extends ChangeNotifier {
         _clearRole();
         SharedPreferences.getInstance().then((prefs) {
           prefs.remove('is_demo');
+          prefs.remove('app_token');
           prefs.remove('is_signed_in');
           prefs.remove('user_email');
           prefs.remove('user_name');
@@ -175,6 +192,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void _clearRole() {
+    _appToken = null;
     _role = null;
     _me = null;
     _roleError = null;
@@ -211,6 +229,56 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // ── Email + password ───────────────────────────────────────────────────────
+  // Each returns an error message to show, or null on success.
+
+  Future<String?> _guard(Future<void> Function() call) async {
+    try {
+      await call();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
+  Future<void> _startPasswordSession(Map<String, dynamic> res) async {
+    _appToken = res['token'] as String;
+    _isDemo = false;
+    _isPersistedSignedIn = true;
+    _persistedEmail = res['email'] as String?;
+    _persistedName = null;
+    _error = null;
+    _role = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_signed_in', true);
+    await prefs.remove('is_demo');
+    await prefs.setString('app_token', _appToken!);
+    if (_persistedEmail != null) {
+      await prefs.setString('user_email', _persistedEmail!);
+    }
+    notifyListeners();
+    await refreshRole();
+  }
+
+  Future<String?> signInWithPassword(String email, String password) =>
+      _guard(() async => _startPasswordSession(
+          await ApiService.logIn(email.trim(), password)));
+
+  /// On success the account exists but must confirm its email before signing in.
+  Future<String?> signUpWithPassword(
+          String email, String password, String name) =>
+      _guard(() => ApiService.signUp(email.trim(), password, name.trim()));
+
+  Future<String?> confirmEmail(String token) => _guard(() async =>
+      _startPasswordSession(await ApiService.verifyEmail(token)));
+
+  Future<String?> requestPasswordReset(String email) =>
+      _guard(() => ApiService.forgotPassword(email.trim()));
+
+  Future<String?> resetPassword(String token, String password) =>
+      _guard(() async => _startPasswordSession(
+          await ApiService.resetPassword(token, password)));
+
   Future<void> signInAsDemo() async {
     _isDemo = true;
     _role = 'owner';
@@ -237,6 +305,7 @@ class AuthProvider extends ChangeNotifier {
     _clearRole();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('is_demo');
+    await prefs.remove('app_token');
     await prefs.remove('is_signed_in');
     await prefs.remove('user_email');
     await prefs.remove('user_name');

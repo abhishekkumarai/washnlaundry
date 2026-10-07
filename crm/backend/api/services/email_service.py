@@ -82,6 +82,25 @@ class EmailService:
         return ok
 
     @classmethod
+    def send(cls, to, subject, text):
+        """Send one plain-text transactional email. Returns (ok, error). Never raises."""
+        key = getattr(settings, 'RESEND_API_KEY', '')
+        if not key:
+            return False, 'RESEND_API_KEY is not set'
+        try:
+            resp = requests.post(
+                RESEND_URL,
+                headers={'Authorization': f'Bearer {key}'},
+                json={'from': settings.AUTH_EMAIL_FROM, 'to': [to], 'subject': subject, 'text': text},
+                timeout=10,
+            )
+        except requests.exceptions.RequestException as e:
+            return False, str(e)
+        if resp.status_code < 300:
+            return True, None
+        return False, f'Resend {resp.status_code}: {resp.text[:200]}'
+
+    @classmethod
     def retry_pending(cls):
         from api.models import Lead
 

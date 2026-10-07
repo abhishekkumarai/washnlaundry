@@ -125,6 +125,43 @@ class ApiService {
     }
   }
 
+  // ── Email + password sign-in (no token yet, so auth: false) ──────────────
+
+  /// Where the emailed verify / reset links should land: this app's own origin.
+  static String get _returnTo {
+    try {
+      return Uri.base.origin;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static Future<void> signUp(String email, String password, String name) =>
+      _send('POST', '/auth/signup/', auth: false, body: {
+        'email': email,
+        'password': password,
+        'name': name,
+        'return_to': _returnTo,
+      });
+
+  /// Returns `{token, email}`.
+  static Future<Map<String, dynamic>> logIn(String email, String password) async =>
+      Map<String, dynamic>.from(await _send('POST', '/auth/login/',
+          auth: false, body: {'email': email, 'password': password}) as Map);
+
+  static Future<Map<String, dynamic>> verifyEmail(String token) async =>
+      Map<String, dynamic>.from(await _send('POST', '/auth/verify-email/',
+          auth: false, body: {'token': token}) as Map);
+
+  static Future<void> forgotPassword(String email) =>
+      _send('POST', '/auth/forgot-password/',
+          auth: false, body: {'email': email, 'return_to': _returnTo});
+
+  static Future<Map<String, dynamic>> resetPassword(
+          String token, String password) async =>
+      Map<String, dynamic>.from(await _send('POST', '/auth/reset-password/',
+          auth: false, body: {'token': token, 'password': password}) as Map);
+
   // ── Roles and the customer view ────────────────────────────────────────────
 
   /// `/me/` - `{role: staff|customer|unlinked, email, customer?, pending_link?}`.

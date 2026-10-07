@@ -110,5 +110,18 @@ void main() {
       expect(find.text('Continue with Apple'), findsNothing);
       expect(find.text('Try Demo Mode'), findsOneWidget);
     });
+
+    testWidgets('the Sign In button validates instead of faking a Demo login',
+        (tester) async {
+      final auth = AuthProvider();
+      await tester.pumpWidget(host(auth, const LoginScreen()));
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Sign In'));
+      await tester.pump();
+
+      expect(find.text('Enter your email and password.'), findsOneWidget);
+      expect(auth.isSignedIn, isFalse);
+    });
   });
 }

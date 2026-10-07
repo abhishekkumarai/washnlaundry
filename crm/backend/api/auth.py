@@ -1,8 +1,9 @@
 """Server-verified identity and roles for the CRM API.
 
-The CRM and the customer portal share one Google login. The Google ID token
-(`Authorization: Bearer <token>`) is verified against GOOGLE_CLIENT_ID, and the
-verified email decides the role:
+The CRM and the customer portal share one login: Google, or email + password
+(password_auth.py). Either way the caller sends `Authorization: Bearer <token>`
+(a Google ID token verified against GOOGLE_CLIENT_ID, or an `app.` session
+token), and the verified email decides the role:
 
 * owner    - an address in the STAFF_EMAILS env allow-list, or an ACTIVE `Staff`
              row with that email whose `role` is Owner or Manager. Everything.
@@ -19,6 +20,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core import signing
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 from rest_framework.authentication import BaseAuthentication
@@ -33,14 +36,52 @@ CUSTOMER = 'customer'
 UNLINKED = 'unlinked'
 
 
+SESSION_SALT = 'app-session'
+SESSION_MAX_AGE = 30 * 24 * 3600
+APP_TOKEN_PREFIX = 'app.'
+
+
+def mint_session_token(user):
+    """A signed session token for an email/password account (`Bearer app.<token>`).
+
+    Carries the tail of the password hash, so changing the password signs out
+    every existing session.
+    """
+    payload = {'e': user.email, 'f': user.password[-16:]}
+    return APP_TOKEN_PREFIX + signing.dumps(payload, salt=SESSION_SALT)
+
+
+def _app_token_email(token):
+    if not settings.PASSWORD_AUTH_ENABLED:
+        return None
+    try:
+        data = signing.loads(token, salt=SESSION_SALT, max_age=SESSION_MAX_AGE)
+    except signing.BadSignature:
+        return None
+    user = get_user_model().objects.filter(username=data.get('e'), is_active=True).first()
+    if user is None or user.password[-16:] != data.get('f'):
+        return None
+    return user.email
+
+
 def verified_email(request):
-    """Return the Google-verified, lower-cased email from the Bearer token, else None."""
+    """Return the verified, lower-cased email behind the Bearer token, else None.
+
+    Two kinds of token: a Google ID token (verified against GOOGLE_CLIENT_ID) or
+    an `app.` session token from email/password sign-in (an account only becomes
+    active once its email link has been clicked, so the email is always proven).
+    """
     header = request.headers.get('Authorization', '')
-    if not header.lower().startswith('bearer ') or not settings.GOOGLE_CLIENT_ID:
+    if not header.lower().startswith('bearer '):
+        return None
+    token = header[7:].strip()
+    if token.startswith(APP_TOKEN_PREFIX):
+        return _app_token_email(token[len(APP_TOKEN_PREFIX):])
+    if not settings.GOOGLE_CLIENT_ID:
         return None
     try:
         claims = id_token.verify_oauth2_token(
-            header[7:].strip(), google_requests.Request(), settings.GOOGLE_CLIENT_ID)
+            token, google_requests.Request(), settings.GOOGLE_CLIENT_ID)
     except ValueError:
         return None
     if not claims.get('email_verified') or not claims.get('email'):

@@ -9,6 +9,7 @@ from .views import (
     reports, meta,
     rag_chat, create_lead, public_lead, process_leads,
 )
+from .password_auth import signup, verify_email, login, forgot_password, reset_password
 from .role_views import me, link_requests, link_request_approve, link_request_reject
 from .customer_views import (
     customer_me, customer_orders, customer_order_detail, customer_rate_card,
@@ -41,6 +42,11 @@ urlpatterns = [
     path('reports/', reports, name='reports'),
     path('meta/', meta, name='meta'),
     path('me/', me, name='me'),
+    path('auth/signup/', signup, name='auth-signup'),
+    path('auth/verify-email/', verify_email, name='auth-verify-email'),
+    path('auth/login/', login, name='auth-login'),
+    path('auth/forgot-password/', forgot_password, name='auth-forgot-password'),
+    path('auth/reset-password/', reset_password, name='auth-reset-password'),
     path('link-requests/', link_requests, name='link-requests'),
     path('link-requests/<int:pk>/approve/', link_request_approve, name='link-request-approve'),
     path('link-requests/<int:pk>/reject/', link_request_reject, name='link-request-reject'),

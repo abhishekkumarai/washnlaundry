@@ -3,9 +3,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    'SECRET_KEY', 'django-insecure-laundrybill-crm-secret-key-super-secure'
-)
+_INSECURE_SECRET_KEY = 'django-insecure-laundrybill-crm-secret-key-super-secure'
+SECRET_KEY = os.environ.get('SECRET_KEY', _INSECURE_SECRET_KEY)
 
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
@@ -146,3 +145,21 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ['api.auth.GoogleTokenAuthentication'],
     'DEFAULT_PERMISSION_CLASSES': ['api.auth.IsStaff'],
 }
+
+# ── Email + password sign-in (api/password_auth.py) ───────────────────────────
+# Session and email-link tokens are signed with SECRET_KEY, so password sign-in
+# refuses to run on the public default key: anyone could forge a token for the
+# owner's email. Set SECRET_KEY in the environment to enable it.
+PASSWORD_AUTH_ENABLED = SECRET_KEY != _INSECURE_SECRET_KEY
+PASSWORD_RESET_TIMEOUT = 3600  # seconds a reset link stays valid
+# Sender for verification / reset emails. With Resend's shared onboarding@ sender
+# only the Resend account owner's address can receive mail: verify a domain
+# there and set this (e.g. "washnlaundry <no-reply@washnlaundry.com>").
+AUTH_EMAIL_FROM = os.environ.get('AUTH_EMAIL_FROM', LEAD_EMAIL_FROM)
+# Front-end origins the verify / reset links in emails may point at.
+APP_ORIGINS = [
+    o.strip() for o in os.environ.get(
+        'APP_ORIGINS',
+        'https://app.washnlaundry.com,https://customer.washnlaundry.com',
+    ).split(',') if o.strip()
+]

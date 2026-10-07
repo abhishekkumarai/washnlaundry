@@ -22,6 +22,17 @@ void main() {
     expect(authRedirectFor(auth, '/login'), isNull);
   });
 
+  test('email links (/verify, /reset) open for anyone, signed in or not', () async {
+    for (final auth in [
+      await session(signedIn: false),
+      await session(signedIn: true, role: 'customer'),
+      await session(signedIn: true, role: 'staff'),
+    ]) {
+      expect(authRedirectFor(auth, '/verify'), isNull);
+      expect(authRedirectFor(auth, '/reset'), isNull);
+    }
+  });
+
   test('signed in but role not yet known: no redirect', () async {
     final auth = await session(signedIn: true);
     expect(authRedirectFor(auth, '/payroll'), isNull);

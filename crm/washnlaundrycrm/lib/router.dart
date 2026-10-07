@@ -7,6 +7,7 @@ import 'models/order_model.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/attendance_screen.dart';
+import 'screens/auth_link_screens.dart';
 import 'screens/chat_screen.dart';
 import 'screens/credits_screen.dart';
 import 'screens/customer_screens.dart';
@@ -65,6 +66,17 @@ Widget _ordersFrame(Widget body) => Scaffold(
 List<RouteBase> appRoutes() => [
       GoRoute(path: '/', redirect: (_, __) => '/dashboard'),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      // Links from the confirmation / password-reset emails (public).
+      GoRoute(
+        path: '/verify',
+        builder: (_, s) =>
+            VerifyEmailScreen(token: s.uri.queryParameters['token']),
+      ),
+      GoRoute(
+        path: '/reset',
+        builder: (_, s) =>
+            ResetPasswordScreen(token: s.uri.queryParameters['token']),
+      ),
       // Customer-only view. `authRedirect` keeps customers on these and staff off.
       GoRoute(path: '/my/start', builder: (_, __) => const CustomerStartScreen()),
       GoRoute(path: '/my/orders', builder: (_, __) => const MyOrdersScreen()),
@@ -222,6 +234,8 @@ String? authRedirect(AuthProvider auth, GoRouterState state) =>
 @visibleForTesting
 String? authRedirectFor(AuthProvider auth, String loc) {
   if (auth.initializing) return null;
+  // The email links work whether or not anyone is signed in.
+  if (loc == '/verify' || loc == '/reset') return null;
   final loggingIn = loc == '/login';
   if (!auth.isSignedIn) return loggingIn ? null : '/login';
   final role = auth.role;
