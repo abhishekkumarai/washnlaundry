@@ -24,8 +24,10 @@
 # main.dart.js is NOT content-hashed, so it must revalidate on every load (a cheap
 # 304 when unchanged). Without this, a browser keeps running the previous build
 # for hours after a deploy, e.g. still calling a backend that has since moved.
+# "private" matters: the washnlaundry.com zone has Browser Cache TTL = 4h, which
+# Cloudflare applies over a bare "no-cache" (it leaves private/no-store alone).
 /main.dart.js
-  Cache-Control: no-cache
+  Cache-Control: private, no-cache
 
 # Hashed/immutable build assets can be cached forever.
 /assets/*
