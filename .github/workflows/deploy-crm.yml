@@ -56,7 +56,7 @@ jobs:
       - run: flutter pub get
       - run: >
           flutter build web --release
-          --dart-define=API_BASE_URL=https://laundrybill-backend.onrender.com/api
+          --dart-define=API_BASE_URL=https://washnlaundry-backend.onrender.com/api
           --dart-define=GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
       - uses: actions/setup-node@v4
         with:

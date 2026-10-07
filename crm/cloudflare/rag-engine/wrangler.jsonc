@@ -4,7 +4,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-28",
   "vars": {
-    "BACKEND_ORIGIN": "https://laundrybill-backend.onrender.com",
+    "BACKEND_ORIGIN": "https://washnlaundry-backend.onrender.com",
     "BOOKING_ORIGINS": "https://washnlaundry-web.abhishekkumarai.workers.dev",
     "CORS_ALLOWED_ORIGINS": "https://washnlaundrycrm.pages.dev,https://app.washnlaundry.com,https://washnlaundry.com,https://washnlaundry-web.abhishekkumarai.workers.dev,http://localhost:3000,http://localhost:8080,http://127.0.0.1:8000"
   },

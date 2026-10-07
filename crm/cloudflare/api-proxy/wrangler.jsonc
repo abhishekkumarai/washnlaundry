@@ -4,7 +4,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-28",
   "vars": {
-    "BACKEND_ORIGIN": "https://laundrybill-backend.onrender.com"
+    "BACKEND_ORIGIN": "https://washnlaundry-backend.onrender.com"
   },
   "observability": {
     "enabled": true

@@ -23,7 +23,7 @@ import ChatWidget from "@/components/ChatWidget/ChatWidget";
 // "Request a pickup" form -> Django backend, which saves the lead and emails the
 // shop through Resend. The first request after the free-tier backend naps can
 // take well over 15s, hence the generous timeout below.
-const PICKUP_LEAD_URL = "https://laundrybill-backend.onrender.com/api/leads/public/";
+const PICKUP_LEAD_URL = "https://washnlaundry-backend.onrender.com/api/leads/public/";
 
 const services = [
   {
