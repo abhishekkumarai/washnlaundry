@@ -89,6 +89,23 @@ def _me_json(customer):
     }
 
 
+def clean_phone(raw):
+    """The phone with spaces/dashes removed if it looks valid (10-15 digits, optional +), else None."""
+    phone = re.sub(r'[\s-]', '', str(raw or ''))
+    return phone if re.fullmatch(r'\+?\d{10,15}', phone) else None
+
+
+def register_customer(email, name, phone):
+    """(customer, pending). A phone the store already has queues an EmailLinkRequest
+    for staff to approve instead of linking; otherwise a new Customer is created."""
+    existing = Customer.objects.filter(phone__endswith=normalize_phone(phone)).first()
+    if existing:
+        EmailLinkRequest.objects.get_or_create(
+            customer=existing, email=email, status=EmailLinkRequest.PENDING)
+        return existing, True
+    return Customer.objects.create(name=name, phone=phone, email=email), False
+
+
 # csrf_exempt: auth is a Bearer token, never a cookie, so there is nothing for
 # CSRF to protect (and a browser client has no CSRF cookie to send).
 @csrf_exempt
@@ -115,19 +132,16 @@ def customer_me(request):
     except json.JSONDecodeError:
         return JsonResponse({'detail': 'Invalid JSON body.'}, status=400)
     name = str(body.get('name') or '').strip()[:255]
-    phone = re.sub(r'[\s-]', '', str(body.get('phone') or ''))
-    if not name or not re.fullmatch(r'\+?\d{10,15}', phone):
+    phone = clean_phone(body.get('phone'))
+    if not name or not phone:
         return JsonResponse({'detail': 'Enter your name and a valid phone number.'}, status=400)
-    existing = Customer.objects.filter(phone__endswith=normalize_phone(phone)).first()
-    if existing:
-        EmailLinkRequest.objects.get_or_create(
-            customer=existing, email=email, status=EmailLinkRequest.PENDING)
+    customer, pending = register_customer(email, name, phone)
+    if pending:
         return JsonResponse({
             'pending': True,
             'detail': 'That number is already registered with the store. We have asked the '
                       'store to link your email; your orders appear once it is approved.'},
             status=202)
-    customer = Customer.objects.create(name=name, phone=phone, email=email)
     return JsonResponse(_me_json(customer), status=201)
 
 

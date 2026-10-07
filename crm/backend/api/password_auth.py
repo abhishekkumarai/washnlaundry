@@ -30,7 +30,8 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from .auth import mint_session_token
+from .auth import customer_for_email, is_owner_email, is_staff_email, mint_session_token
+from .customer_views import clean_phone, register_customer
 from .services.email_service import EmailService
 
 logger = logging.getLogger(__name__)
@@ -124,8 +125,8 @@ def _session(user):
     return JsonResponse({'token': mint_session_token(user), 'email': user.email})
 
 
-def _send_verification(user, origin):
-    token = signing.dumps({'e': user.email}, salt=VERIFY_SALT)
+def _send_verification(user, origin, phone=''):
+    token = signing.dumps({'e': user.email, 'p': phone}, salt=VERIFY_SALT)
     return _send(
         user.email, 'Confirm your washnlaundry email',
         f'Welcome to washnlaundry!\n\nConfirm your email to finish creating your account:\n'
@@ -145,6 +146,9 @@ def signup(request):
         return _err('Enter a valid email address.', 400)
     if not MIN_PASSWORD <= len(password) <= MAX_PASSWORD:
         return _err(f'Password must be {MIN_PASSWORD}-{MAX_PASSWORD} characters.', 400)
+    phone = clean_phone(body.get('phone'))
+    if not phone:
+        return _err('Enter a valid phone number (10-15 digits).', 400)
     if _throttled(f'signup:ip:{_client_ip(request)}', 10, 3600) or _throttled(f'signup:{email}', 5, 3600):
         return _err('Too many attempts. Try again later.', 429)
 
@@ -166,7 +170,7 @@ def signup(request):
     user.first_name = str(body.get('name') or '').strip()[:30]
     user.is_active = False
     user.save()
-    if not _send_verification(user, origin) and not settings.DEBUG:
+    if not _send_verification(user, origin, phone) and not settings.DEBUG:
         return _err('We could not send the confirmation email. Try again later.', 503)
     return JsonResponse({'verify_sent': True}, status=201)
 
@@ -187,6 +191,12 @@ def verify_email(request):
     if not user.is_active:
         user.is_active = True
         user.save(update_fields=['is_active'])
+    # The phone given at signup becomes their customer record (or a link request
+    # if the store already has that number). Owner/staff emails keep their roles.
+    phone = clean_phone(data.get('p'))
+    if (phone and not is_owner_email(user.email) and not is_staff_email(user.email)
+            and not customer_for_email(user.email)):
+        register_customer(user.email, user.first_name or user.email.split('@')[0], phone)
     return _session(user)
 
 
