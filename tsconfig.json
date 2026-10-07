@@ -38,6 +38,7 @@
   ],
   "exclude": [
     "crm",
+    "customer-web",
     "node_modules"
   ]
 }

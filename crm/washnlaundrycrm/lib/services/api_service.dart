@@ -58,36 +58,58 @@ class ApiService {
   static const _jsonHeaders = {'Content-Type': 'application/json'};
   static const _timeout = Duration(seconds: 15);
 
+  /// Supplies the Google ID token sent as `Authorization: Bearer`. Set by
+  /// `AuthProvider`; null (or a null result) sends no header, which is what
+  /// Demo Mode and a backend with API_AUTH_ENFORCED off expect.
+  static Future<String?> Function()? tokenProvider;
+
+  /// Called once on a 401 to get a fresh token (Google ID tokens last ~1h).
+  /// Returning true retries the request once with the new token.
+  static Future<bool> Function()? onUnauthorized;
+
   static Future<dynamic> _send(
     String method,
     String path, {
     Map<String, String>? query,
     Object? body,
+    bool retried = false,
+    bool auth = true,
   }) async {
     final uri = _uri(path, query);
     try {
+      final token = auth ? await tokenProvider?.call() : null;
+      final headers = <String, String>{
+        if (method == 'POST' || method == 'PATCH') ..._jsonHeaders,
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
       late http.Response response;
       switch (method) {
         case 'GET':
-          response = await http.get(uri).timeout(_timeout);
+          response = await http.get(uri, headers: headers).timeout(_timeout);
           break;
         case 'POST':
           response = await http
-              .post(uri, headers: _jsonHeaders, body: json.encode(body))
+              .post(uri, headers: headers, body: json.encode(body))
               .timeout(_timeout);
           break;
         case 'PATCH':
           response = await http
-              .patch(uri, headers: _jsonHeaders, body: json.encode(body))
+              .patch(uri, headers: headers, body: json.encode(body))
               .timeout(_timeout);
           break;
         case 'DELETE':
-          response = await http.delete(uri).timeout(_timeout);
+          response = await http.delete(uri, headers: headers).timeout(_timeout);
           break;
         default:
           throw ApiException('Unsupported method $method');
       }
 
+      if (response.statusCode == 401 && !retried && onUnauthorized != null) {
+        if (await onUnauthorized!()) {
+          return await _send(method, path,
+              query: query, body: body, retried: true, auth: auth);
+        }
+      }
       if (response.statusCode >= 200 && response.statusCode < 300) {
         if (response.body.isEmpty) return null;
         return json.decode(response.body);
@@ -102,6 +124,84 @@ class ApiService {
       throw ApiException('Could not reach the server ($path): $e');
     }
   }
+
+  // ── Email + password sign-in (no token yet, so auth: false) ──────────────
+
+  /// Where the emailed verify / reset links should land: this app's own origin.
+  static String get _returnTo {
+    try {
+      return Uri.base.origin;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static Future<void> signUp(String email, String password, String name) =>
+      _send('POST', '/auth/signup/', auth: false, body: {
+        'email': email,
+        'password': password,
+        'name': name,
+        'return_to': _returnTo,
+      });
+
+  /// Returns `{token, email}`.
+  static Future<Map<String, dynamic>> logIn(String email, String password) async =>
+      Map<String, dynamic>.from(await _send('POST', '/auth/login/',
+          auth: false, body: {'email': email, 'password': password}) as Map);
+
+  static Future<Map<String, dynamic>> verifyEmail(String token) async =>
+      Map<String, dynamic>.from(await _send('POST', '/auth/verify-email/',
+          auth: false, body: {'token': token}) as Map);
+
+  static Future<void> forgotPassword(String email) =>
+      _send('POST', '/auth/forgot-password/',
+          auth: false, body: {'email': email, 'return_to': _returnTo});
+
+  static Future<Map<String, dynamic>> resetPassword(
+          String token, String password) async =>
+      Map<String, dynamic>.from(await _send('POST', '/auth/reset-password/',
+          auth: false, body: {'token': token, 'password': password}) as Map);
+
+  // ── Roles and the customer view ────────────────────────────────────────────
+
+  /// `/me/` - `{role: staff|customer|unlinked, email, customer?, pending_link?}`.
+  static Future<Map<String, dynamic>> fetchMe() async =>
+      Map<String, dynamic>.from(await _send('GET', '/me/') as Map);
+
+  static Future<List<Map<String, dynamic>>> fetchMyOrders() async {
+    final data = await _send('GET', '/customer/orders/') as Map;
+    return (data['orders'] as List)
+        .map((o) => Map<String, dynamic>.from(o as Map))
+        .toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchRateCard() async {
+    final data = await _send('GET', '/customer/rate-card/') as Map;
+    return (data['categories'] as List)
+        .map((c) => Map<String, dynamic>.from(c as Map))
+        .toList();
+  }
+
+  /// First sign-in for an unlinked Google account. A 201 means a Customer was
+  /// created; a 202 (`pending: true`) means the phone already belongs to a
+  /// customer and staff must approve the email link.
+  static Future<Map<String, dynamic>> customerSignup(
+          String name, String phone) async =>
+      Map<String, dynamic>.from(await _send('POST', '/customer/me/',
+          body: {'name': name, 'phone': phone}) as Map);
+
+  static Future<void> requestPickup(
+          {required String name,
+          required String phone,
+          required String address,
+          required String service}) =>
+      // No token: that endpoint's CORS preflight only allows Content-Type.
+      _send('POST', '/leads/public/', auth: false, body: {
+        'name': name,
+        'phone': phone,
+        'address': address,
+        'service': service,
+      });
 
   /// DRF error bodies are JSON, not prose — a raw dump like
   /// `{"start_date":["This staff member already has attendance recorded

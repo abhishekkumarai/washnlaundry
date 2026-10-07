@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -15,14 +16,12 @@ import '../utils/google_signin_button.dart';
 /// restores a still-live Google session so a page reload doesn't force
 /// today's-already-signed-in owner back through the button.
 ///
-/// Card layout below mirrors the real `app.laundrybill.com/login` (captured
-/// live for reference), minus its "Continue with Apple" button — Email /
-/// Password, the Sign In / Create Account tabs, "Forgot password?", and
-/// "Sign in with mobile number instead" are all rendered to match, but this
-/// clone's Django backend has no User/password model to back them with, so
-/// submitting either tab just starts a Demo Mode session
-/// ([AuthProvider.signInAsDemo]) and the two secondary links show a toast
-/// instead of navigating anywhere.
+/// Card layout below mirrors the real `app.laundrybill.com/login`, minus its
+/// "Continue with Apple" button. Email / Password and the Sign In / Create
+/// Account tabs are real (api/password_auth.py): creating an account emails a
+/// confirmation link, and "Forgot password?" emails a reset link. Google
+/// sign-in works alongside. "Sign in with mobile number instead" is layout
+/// parity only, and Demo Mode exists in debug builds only.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -39,15 +38,86 @@ class _LoginScreenState extends State<LoginScreen> {
 
   int _authTab = 0; // 0: Sign In, 1: Create Account
   bool _obscurePassword = true;
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  bool _busy = false;
+  String? _formError;
+  String? _formNotice;
 
-  void _notAvailable(String what) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$what isn\'t available in this demo'),
-        backgroundColor: _muted,
-        duration: const Duration(seconds: 2),
+  /// Demo Mode skips every check, so it only exists in debug builds (or when a
+  /// build explicitly opts in with --dart-define=ALLOW_DEMO=true).
+  static const _allowDemo = bool.fromEnvironment('ALLOW_DEMO');
+  static bool get _showDemo => kDebugMode || _allowDemo;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit(AuthProvider auth) async {
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
+    if (email.isEmpty || password.isEmpty) {
+      setState(() {
+        _formError = 'Enter your email and password.';
+        _formNotice = null;
+      });
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _formError = null;
+      _formNotice = null;
+    });
+    final signUp = _authTab == 1;
+    final err = signUp
+        ? await auth.signUpWithPassword(email, password, '')
+        : await auth.signInWithPassword(email, password);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _formError = err;
+      if (signUp && err == null) {
+        _formNotice = 'Check your inbox: we sent a link to confirm $email. '
+            'Open it to finish creating your account.';
+        _passwordCtrl.clear();
+      }
+    });
+  }
+
+  Future<void> _forgotPassword(AuthProvider auth) async {
+    final ctrl = TextEditingController(text: _emailCtrl.text.trim());
+    final email = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset your password'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(labelText: 'Email'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text('Send reset link')),
+        ],
       ),
     );
+    if (email == null || email.isEmpty) return;
+    final err = await auth.requestPasswordReset(email);
+    if (!mounted) return;
+    setState(() {
+      _formError = err;
+      _formNotice = err == null
+          ? 'If $email has an account, we sent a link to reset the password.'
+          : null;
+    });
   }
 
   @override
@@ -122,6 +192,10 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ],
+        if (_formError != null)
+          _banner(_formError!, const Color(0xFFFEF2F2), const Color(0xFFDC2626)),
+        if (_formNotice != null)
+          _banner(_formNotice!, const Color(0xFFECFDF5), const Color(0xFF047857)),
         // The web GIS button renders itself against `_clientId` and gets
         // stuck on "Getting ready" forever if that's empty — there's no
         // config it can fall back to, so skip it (and the now-pointless "OR"
@@ -147,7 +221,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _fieldLabel('Email'),
         const SizedBox(height: 6),
         TextField(
+          controller: _emailCtrl,
           keyboardType: TextInputType.emailAddress,
+          autofillHints: const [AutofillHints.email],
           decoration: _fieldDecoration(
               hint: 'you@example.com', icon: Icons.mail_outline_rounded),
         ),
@@ -155,7 +231,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _fieldLabel('Password'),
         const SizedBox(height: 6),
         TextField(
+          controller: _passwordCtrl,
           obscureText: _obscurePassword,
+          onSubmitted: (_) => _submit(auth),
           decoration: _fieldDecoration(
             hint: 'Enter your password',
             icon: Icons.lock_outline_rounded,
@@ -176,7 +254,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Align(
           alignment: Alignment.centerLeft,
           child: InkWell(
-            onTap: () => _notAvailable('Password reset'),
+            onTap: () => _forgotPassword(auth),
             child: const Padding(
               padding: EdgeInsets.symmetric(vertical: 4),
               child: Text(
@@ -194,7 +272,7 @@ class _LoginScreenState extends State<LoginScreen> {
           width: double.infinity,
           height: 46,
           child: ElevatedButton(
-            onPressed: auth.signInAsDemo,
+            onPressed: _busy ? null : () => _submit(auth),
             style: ElevatedButton.styleFrom(
               backgroundColor: _brandBlue,
               elevation: 0,
@@ -202,7 +280,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   borderRadius: BorderRadius.circular(10)),
             ),
             child: Text(
-              _authTab == 0 ? 'Sign In' : 'Create Account',
+              _busy
+                  ? 'Please wait…'
+                  : (_authTab == 0 ? 'Sign In' : 'Create Account'),
               style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -218,6 +298,7 @@ class _LoginScreenState extends State<LoginScreen> {
           style: TextStyle(
               fontSize: 12, color: _disabled, fontWeight: FontWeight.w600),
         ),
+        if (_showDemo) ...[
         const SizedBox(height: 20),
         Row(
           children: const [
@@ -252,9 +333,19 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+        ],
       ],
     );
   }
+
+  Widget _banner(String text, Color bg, Color fg) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+        child: Text(text, style: TextStyle(fontSize: 12, color: fg)),
+      );
 
   Widget _fieldLabel(String text) => Align(
         alignment: Alignment.centerLeft,

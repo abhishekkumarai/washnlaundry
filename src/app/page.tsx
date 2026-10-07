@@ -267,6 +267,14 @@ export default function LandingPage() {
             </a>
           </div>
 
+          {/* Customer login / signup */}
+          <a
+            href="https://customer.washnlaundry.com"
+            className="hidden text-[13px] font-semibold text-[#182C4F] transition-colors hover:text-[#2563EB] md:block"
+          >
+            Log in
+          </a>
+
           {/* Direct CTA */}
           <a
             href="#book"
@@ -293,6 +301,7 @@ export default function LandingPage() {
               <a href="#services" onClick={() => setIsMenuOpen(false)}>Services</a>
               <a href="#standard" onClick={() => setIsMenuOpen(false)}>Our standard</a>
               <a href="#coverage" onClick={() => setIsMenuOpen(false)}>Servicing Areas</a>
+              <a href="https://customer.washnlaundry.com" onClick={() => setIsMenuOpen(false)}>Log in / Sign up</a>
               <button
                 onClick={() => {
                   setIsMenuOpen(false);

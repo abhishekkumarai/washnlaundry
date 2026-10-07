@@ -445,10 +445,54 @@ class AppProvider extends ChangeNotifier {
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
+  /// Which role the signed-in user has ('owner' or 'staff'); set from
+  /// `AuthProvider` in main.dart. Staff's API access stops at orders,
+  /// customers, the catalogue and shop details, so they skip the owner-only
+  /// fetches below (a 403 there would fail the whole load).
+  String role = 'owner';
+
+  /// The staff version of [loadDataFromBackend]: only what staff may read.
+  Future<void> _loadForStaff() async {
+    try {
+      final results = await Future.wait([
+        ApiService.fetchOrders(),
+        ApiService.fetchGarmentItems(includeInactive: true),
+        ApiService.fetchCategories(),
+        ApiService.fetchCustomers(),
+        ApiService.fetchServiceAreas(),
+        ApiService.fetchTimeSlots(kind: TimeSlotModel.pickup),
+        ApiService.fetchTimeSlots(kind: TimeSlotModel.delivery),
+        ApiService.fetchShop(),
+        ApiService.fetchMeta(),
+      ]);
+      _orders = results[0] as List<OrderModel>;
+      _garments = results[1] as List<GarmentItemModel>;
+      _categories = results[2] as List<GarmentCategoryModel>;
+      _customers = results[3] as List<CustomerModel>;
+      _serviceAreas = results[4] as List<ServiceAreaModel>;
+      _pickupSlots = results[5] as List<TimeSlotModel>;
+      _deliverySlots = results[6] as List<TimeSlotModel>;
+      _shop = results[7] as Map<String, dynamic>?;
+      _applyShopFormatting();
+      _meta = results[8] as MetaModel;
+    } on ApiException catch (e) {
+      _error = e.message;
+    } catch (e) {
+      _error = 'Something went wrong loading your shop: $e';
+    }
+  }
+
   Future<void> loadDataFromBackend() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
+
+    if (role == 'staff') {
+      await _loadForStaff();
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
 
     try {
       final results = await Future.wait([

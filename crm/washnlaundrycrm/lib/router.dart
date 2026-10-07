@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -6,8 +7,10 @@ import 'models/order_model.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/attendance_screen.dart';
+import 'screens/auth_link_screens.dart';
 import 'screens/chat_screen.dart';
 import 'screens/credits_screen.dart';
+import 'screens/customer_screens.dart';
 import 'screens/customers_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/expenses_screen.dart';
@@ -63,6 +66,27 @@ Widget _ordersFrame(Widget body) => Scaffold(
 List<RouteBase> appRoutes() => [
       GoRoute(path: '/', redirect: (_, __) => '/dashboard'),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      // Links from the confirmation / password-reset emails (public).
+      GoRoute(
+        path: '/verify',
+        builder: (_, s) =>
+            VerifyEmailScreen(token: s.uri.queryParameters['token']),
+      ),
+      GoRoute(
+        path: '/reset',
+        builder: (_, s) =>
+            ResetPasswordScreen(token: s.uri.queryParameters['token']),
+      ),
+      // Customer-only view. `authRedirect` keeps customers on these and staff off.
+      GoRoute(path: '/my/start', builder: (_, __) => const CustomerStartScreen()),
+      GoRoute(path: '/my/orders', builder: (_, __) => const MyOrdersScreen()),
+      GoRoute(
+        path: '/my/orders/:number',
+        builder: (_, s) =>
+            MyOrderDetailScreen(orderNumber: s.pathParameters['number']!),
+      ),
+      GoRoute(path: '/my/rate-card', builder: (_, __) => const RateCardScreen()),
+      GoRoute(path: '/my/book', builder: (_, __) => const BookPickupScreen()),
       GoRoute(
         path: '/dashboard',
         builder: (c, s) => _section(c, 0, const DashboardScreen()),
@@ -183,23 +207,61 @@ List<RouteBase> appRoutes() => [
       ),
     ];
 
+/// Where each role lands after sign-in.
+String homeFor(String? role) => switch (role) {
+      'customer' => '/my/orders',
+      'unlinked' => '/my/start',
+      'staff' => '/orders',
+      _ => '/dashboard',
+    };
+
+/// The routes a `staff` (non-owner) user may open; everything else is
+/// owner-only. Mirrors the API's IsOwner permissions in api/auth.py.
+const staffRoutes = ['/new-order', '/orders', '/customers', '/scan'];
+
+bool _staffMayOpen(String loc) =>
+    staffRoutes.any((r) => loc == r || loc.startsWith('$r/'));
+
+/// The auth + role gate. Signed-out visits go to `/login`; once the backend
+/// has said who the user is (`AuthProvider.role`), owners get the CRM, staff
+/// get its day-to-day screens ([staffRoutes]) and customers are kept on `/my/*` (an unlinked Google account on `/my/start`).
+/// While the role is still loading nothing redirects: `main.dart` overlays a
+/// spinner (or a retry screen if `/api/me/` failed) in the meantime.
+String? authRedirect(AuthProvider auth, GoRouterState state) =>
+    authRedirectFor(auth, state.matchedLocation);
+
+/// [authRedirect] on a plain location, so it can be tested without a router.
+@visibleForTesting
+String? authRedirectFor(AuthProvider auth, String loc) {
+  if (auth.initializing) return null;
+  // The email links work whether or not anyone is signed in.
+  if (loc == '/verify' || loc == '/reset') return null;
+  final loggingIn = loc == '/login';
+  if (!auth.isSignedIn) return loggingIn ? null : '/login';
+  final role = auth.role;
+  if (role == null) return null;
+  final home = homeFor(role);
+  if (loggingIn || loc == '/') return home;
+  final inMy = loc.startsWith('/my/');
+  if (role == 'owner') return inMy ? home : null;
+  if (role == 'staff') return inMy || !_staffMayOpen(loc) ? home : null;
+  // customer / unlinked: only their own area.
+  if (!inMy) return home;
+  if (role == 'unlinked' && loc != '/my/start') return home;
+  if (role == 'customer' && loc == '/my/start') return home;
+  return null;
+}
+
 /// The real router, wrapping [appRoutes] with the auth gate.
 ///
-/// `redirect`/`refreshListenable` gate purely on [AuthProvider.isSignedIn]: a
-/// signed-out visit is sent to `/login`; `/login` itself redirects away once
-/// signed in. Google Sign-In and `AuthProvider.signInAsDemo()` are both valid
-/// ways to satisfy that — the gate applies the same whether or not
-/// `GOOGLE_CLIENT_ID` is configured, so Demo Mode works, and Sign Out, in
-/// every local run.
+/// `redirect`/`refreshListenable` gate on [AuthProvider.isSignedIn] and
+/// [AuthProvider.role]. Google Sign-In and `AuthProvider.signInAsDemo()` are
+/// both valid ways to sign in (Demo Mode is always `staff`); the gate applies
+/// the same whether or not `GOOGLE_CLIENT_ID` is configured, so Demo Mode
+/// works, and Sign Out, in every local run.
 GoRouter buildRouter(AuthProvider auth) => GoRouter(
       initialLocation: '/dashboard',
       refreshListenable: auth,
-      redirect: (context, state) {
-        if (auth.initializing) return null;
-        final loggingIn = state.matchedLocation == '/login';
-        if (!auth.isSignedIn) return loggingIn ? null : '/login';
-        if (loggingIn) return '/dashboard';
-        return null;
-      },
+      redirect: (context, state) => authRedirect(auth, state),
       routes: appRoutes(),
     );

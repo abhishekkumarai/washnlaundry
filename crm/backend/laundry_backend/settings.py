@@ -3,9 +3,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    'SECRET_KEY', 'django-insecure-laundrybill-crm-secret-key-super-secure'
-)
+_INSECURE_SECRET_KEY = 'django-insecure-laundrybill-crm-secret-key-super-secure'
+SECRET_KEY = os.environ.get('SECRET_KEY', _INSECURE_SECRET_KEY)
 
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
@@ -122,8 +121,45 @@ PUBLIC_LEAD_ORIGINS = [
     o.strip() for o in os.environ.get(
         'PUBLIC_LEAD_ORIGINS',
         'https://washnlaundry-web.abhishekkumarai.workers.dev,'
-        'https://washnlaundry.com,https://www.washnlaundry.com',
+        'https://washnlaundry.com,https://www.washnlaundry.com,'
+        'https://customer.washnlaundry.com',
     ).split(',') if o.strip()
 ]
+# Google OAuth web client ID the customer portal's ID tokens are verified against.
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 PUBLIC_LEAD_RATE_PER_HOUR = int(os.environ.get('PUBLIC_LEAD_RATE_PER_HOUR', '5'))
 
+
+# ── API auth (api/auth.py) ────────────────────────────────────────────────────
+# When True every /api/ DRF endpoint requires a Google ID token belonging to
+# staff; the customer portal's /api/customer/* views are scoped to the caller.
+# Off by default so the Flutter app (which must send tokens first) can roll out
+# before the API is locked down; turn on in Render once it has.
+API_AUTH_ENFORCED = os.environ.get('API_AUTH_ENFORCED', 'False') == 'True'
+# Owner/bootstrap emails that count as staff even without a Staff row.
+STAFF_EMAILS = [
+    e.strip().lower() for e in os.environ.get('STAFF_EMAILS', '').split(',') if e.strip()
+]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': ['api.auth.GoogleTokenAuthentication'],
+    'DEFAULT_PERMISSION_CLASSES': ['api.auth.IsStaff'],
+}
+
+# ── Email + password sign-in (api/password_auth.py) ───────────────────────────
+# Session and email-link tokens are signed with SECRET_KEY, so password sign-in
+# refuses to run on the public default key: anyone could forge a token for the
+# owner's email. Set SECRET_KEY in the environment to enable it.
+PASSWORD_AUTH_ENABLED = SECRET_KEY != _INSECURE_SECRET_KEY
+PASSWORD_RESET_TIMEOUT = 3600  # seconds a reset link stays valid
+# Sender for verification / reset emails. With Resend's shared onboarding@ sender
+# only the Resend account owner's address can receive mail: verify a domain
+# there and set this (e.g. "washnlaundry <no-reply@washnlaundry.com>").
+AUTH_EMAIL_FROM = os.environ.get('AUTH_EMAIL_FROM', LEAD_EMAIL_FROM)
+# Front-end origins the verify / reset links in emails may point at.
+APP_ORIGINS = [
+    o.strip() for o in os.environ.get(
+        'APP_ORIGINS',
+        'https://app.washnlaundry.com,https://customer.washnlaundry.com',
+    ).split(',') if o.strip()
+]

@@ -39,7 +39,7 @@ void main() {
   // Mid-month so that subtracting a few days cannot slip into last month and
   // make the "this month" assertions flaky.
   final thisMonth = DateTime(now.year, now.month, 15);
-  final lastMonth = DateTime(now.year, now.month, 15).subtract(const Duration(days: 45));
+  final lastMonth = DateTime(now.year, now.month - 1, 15);
 
   final ledger = [
     ExpenseModel(

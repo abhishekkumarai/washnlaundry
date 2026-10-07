@@ -9,14 +9,14 @@ import io
 from datetime import date, time, timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem,
     Staff, Expense, Credit, CreditCategory, DEFAULT_CREDIT_CATEGORIES, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
-    OrderStatus, PaymentStatus, DeliveryType, PricingUnit,
+    EmailLinkRequest, OrderStatus, PaymentStatus, DeliveryType, PricingUnit,
 )
 
 
@@ -2240,3 +2240,196 @@ class PublicPickupFormTests(APITestCase):
         with mock.patch('api.services.email_service.requests.post', return_value=self._resp(500)):
             self.assertEqual(self._post().status_code, 201)
         self.assertEqual(Lead.objects.get().email_status, Lead.PENDING)
+
+
+class CustomerPortalTests(TestCase):
+    """/api/customer/*: Google-token-scoped, minimal, own-orders-only."""
+
+    def setUp(self):
+        from unittest import mock
+        self.alice = Customer.objects.create(name='Alice', phone='111', email='Alice@Example.com')
+        self.bob = Customer.objects.create(name='Bob', phone='222', email='bob@example.com')
+        self.order = Order.objects.create(
+            order_number='WL-1', customer=self.alice, customer_name='Alice', notes='staff only')
+        Order.objects.create(order_number='WL-2', customer=self.bob, customer_name='Bob')
+        patcher = mock.patch('api.customer_views.id_token.verify_oauth2_token')
+        self.verify = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.verify.return_value = {'email': 'alice@example.com', 'email_verified': True}
+        override = override_settings(GOOGLE_CLIENT_ID='test-client')
+        override.enable()
+        self.addCleanup(override.disable)
+        self.auth = {'HTTP_AUTHORIZATION': 'Bearer tok'}
+
+    def test_requires_token(self):
+        self.assertEqual(self.client.get('/api/customer/orders/').status_code, 401)
+
+    def test_invalid_token_is_401(self):
+        self.verify.side_effect = ValueError('bad')
+        self.assertEqual(self.client.get('/api/customer/me/', **self.auth).status_code, 401)
+
+    def test_unverified_email_is_401(self):
+        self.verify.return_value = {'email': 'alice@example.com', 'email_verified': False}
+        self.assertEqual(self.client.get('/api/customer/me/', **self.auth).status_code, 401)
+
+    def test_unknown_email_is_404(self):
+        self.verify.return_value = {'email': 'nobody@example.com', 'email_verified': True}
+        self.assertEqual(self.client.get('/api/customer/me/', **self.auth).status_code, 404)
+
+    def test_lists_only_own_orders_without_staff_fields(self):
+        res = self.client.get('/api/customer/orders/', **self.auth)
+        self.assertEqual(res.status_code, 200)
+        orders = res.json()['orders']
+        self.assertEqual([o['order_number'] for o in orders], ['WL-1'])
+        self.assertNotIn('notes', orders[0])
+
+    def test_other_customers_order_is_404(self):
+        self.assertEqual(self.client.get('/api/customer/orders/WL-2/', **self.auth).status_code, 404)
+        self.assertEqual(self.client.get('/api/customer/orders/WL-1/', **self.auth).status_code, 200)
+
+    def test_signup_creates_customer(self):
+        self.verify.return_value = {'email': 'new@example.com', 'email_verified': True}
+        res = self.client.post('/api/customer/me/', {'name': 'New', 'phone': '98765 43210'},
+                               content_type='application/json', **self.auth)
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(Customer.objects.get(email='new@example.com').phone, '9876543210')
+
+    def test_signup_refuses_existing_phone_and_bad_input(self):
+        self.verify.return_value = {'email': 'new@example.com', 'email_verified': True}
+        post = lambda body: self.client.post('/api/customer/me/', body,
+                                             content_type='application/json', **self.auth)
+        self.assertEqual(post({'name': 'New', 'phone': '111'}).status_code, 400)
+        Customer.objects.filter(pk=self.bob.pk).update(phone='9876543210')
+        # Existing phone (any formatting) -> queued for staff approval, not linked.
+        res = post({'name': 'New', 'phone': '+919876543210'})
+        self.assertEqual(res.status_code, 202)
+        self.assertTrue(res.json()['pending'])
+        self.assertFalse(Customer.objects.filter(email='new@example.com').exists())
+        self.assertEqual(EmailLinkRequest.objects.filter(customer=self.bob).count(), 1)
+        post({'name': 'New', 'phone': '9876543210'})  # idempotent
+        self.assertEqual(EmailLinkRequest.objects.filter(customer=self.bob).count(), 1)
+
+    def test_signup_existing_account_is_409(self):
+        res = self.client.post('/api/customer/me/', {'name': 'A', 'phone': '9999999999'},
+                               content_type='application/json', **self.auth)
+        self.assertEqual(res.status_code, 409)
+
+    def test_signup_post_works_without_a_csrf_token(self):
+        from django.test import Client
+        self.verify.return_value = {'email': 'csrf@example.com', 'email_verified': True}
+        res = Client(enforce_csrf_checks=True).post(
+            '/api/customer/me/', {'name': 'C', 'phone': '9876500001'},
+            content_type='application/json', **self.auth)
+        self.assertEqual(res.status_code, 201)
+
+    def test_rate_card_is_public(self):
+        self.assertEqual(self.client.get('/api/customer/rate-card/').status_code, 200)
+
+
+class RoleAuthTests(APITestCase):
+    """api/auth.py: Google token -> staff / customer / unlinked, and enforcement."""
+
+    def setUp(self):
+        from unittest import mock
+        self.alice = Customer.objects.create(name='Alice', phone='9111111111', email='Alice@Example.com')
+        self.bob = Customer.objects.create(name='Bob', phone='9222222222')
+        Order.objects.create(order_number='WL-1', customer=self.alice, customer_name='Alice')
+        Staff.objects.create(name='Sam', phone='9333333333', email='sam@shop.com',
+                             has_app_login=True, status='ACTIVE')
+        Staff.objects.create(name='NoLogin', phone='9444444444', email='nologin@shop.com')
+        patcher = mock.patch('api.auth.id_token.verify_oauth2_token')
+        self.verify = patcher.start()
+        self.addCleanup(patcher.stop)
+        for o in (override_settings(GOOGLE_CLIENT_ID='c', API_AUTH_ENFORCED=True,
+                                    STAFF_EMAILS=['owner@shop.com']),):
+            o.enable()
+            self.addCleanup(o.disable)
+        self.auth = {'HTTP_AUTHORIZATION': 'Bearer tok'}
+
+    def as_(self, email):
+        self.verify.return_value = {'email': email, 'email_verified': True}
+
+    def test_api_requires_a_token_when_enforced(self):
+        self.assertEqual(self.client.get('/api/orders/').status_code, 401)
+
+    def test_bad_token_is_401(self):
+        self.verify.side_effect = ValueError('bad')
+        self.assertEqual(self.client.get('/api/orders/', **self.auth).status_code, 401)
+
+    def test_staff_row_and_allow_list_can_work_orders(self):
+        for email in ('sam@shop.com', 'OWNER@shop.com'):
+            self.as_(email)
+            self.assertEqual(self.client.get('/api/orders/', **self.auth).status_code, 200)
+            self.assertEqual(self.client.get('/api/customers/', **self.auth).status_code, 200)
+
+    def test_staff_is_kept_out_of_owner_only_endpoints(self):
+        owner_only = ('/api/dashboard/stats/', '/api/reports/', '/api/payroll/', '/api/expenses/',
+                      '/api/credits/', '/api/staff/', '/api/attendance/', '/api/salary-payments/',
+                      '/api/link-requests/')
+        self.as_('sam@shop.com')
+        for path in owner_only:
+            self.assertEqual(self.client.get(path, **self.auth).status_code, 403, path)
+        self.as_('owner@shop.com')
+        for path in owner_only:
+            self.assertEqual(self.client.get(path, **self.auth).status_code, 200, path)
+
+    def test_staff_reads_but_cannot_change_the_catalogue_and_shop(self):
+        self.as_('sam@shop.com')
+        self.assertEqual(self.client.get('/api/categories/', **self.auth).status_code, 200)
+        self.assertEqual(self.client.get('/api/shops/', **self.auth).status_code, 200)
+        res = self.client.post('/api/categories/', {'name': 'X'}, format='json', **self.auth)
+        self.assertEqual(res.status_code, 403)
+
+    def test_manager_job_title_counts_as_owner(self):
+        Staff.objects.create(name='Mo', phone='9555555555', email='mo@shop.com', role='Manager',
+                             has_app_login=True, status='ACTIVE')
+        self.as_('mo@shop.com')
+        self.assertEqual(self.client.get('/api/me/', **self.auth).json()['role'], 'owner')
+
+    def test_staff_without_app_login_is_not_staff(self):
+        self.as_('nologin@shop.com')
+        self.assertEqual(self.client.get('/api/orders/', **self.auth).status_code, 403)
+
+    def test_customer_cannot_use_the_crm_api_but_sees_own_orders(self):
+        self.as_('alice@example.com')
+        for path in ('/api/orders/', '/api/customers/', '/api/dashboard/stats/', '/api/staff/'):
+            self.assertEqual(self.client.get(path, **self.auth).status_code, 403, path)
+        res = self.client.get('/api/customer/orders/', **self.auth)
+        self.assertEqual([o['order_number'] for o in res.json()['orders']], ['WL-1'])
+
+    def test_me_reports_role(self):
+        self.as_('sam@shop.com')
+        self.assertEqual(self.client.get('/api/me/', **self.auth).json()['role'], 'staff')
+        self.as_('owner@shop.com')
+        self.assertEqual(self.client.get('/api/me/', **self.auth).json()['role'], 'owner')
+        self.as_('alice@example.com')
+        body = self.client.get('/api/me/', **self.auth).json()
+        self.assertEqual(body['role'], 'customer')
+        self.assertEqual(body['customer']['name'], 'Alice')
+        self.as_('stranger@example.com')
+        self.assertEqual(self.client.get('/api/me/', **self.auth).json()['role'], 'unlinked')
+        self.assertEqual(self.client.get('/api/me/').status_code, 401)
+
+    def test_public_endpoints_stay_public(self):
+        self.assertEqual(self.client.get('/api/customer/rate-card/').status_code, 200)
+
+    def test_not_enforced_leaves_api_open(self):
+        with override_settings(API_AUTH_ENFORCED=False):
+            self.assertEqual(self.client.get('/api/orders/').status_code, 200)
+
+    def test_link_request_approval_flow(self):
+        link = EmailLinkRequest.objects.create(customer=self.bob, email='bob@example.com')
+        self.as_('alice@example.com')
+        self.assertEqual(self.client.get('/api/link-requests/', **self.auth).status_code, 403)
+        self.as_('owner@shop.com')
+        self.assertEqual(len(self.client.get('/api/link-requests/', **self.auth).json()['requests']), 1)
+        self.assertEqual(self.client.post(f'/api/link-requests/{link.id}/approve/', **self.auth).status_code, 200)
+        self.bob.refresh_from_db()
+        self.assertEqual(self.bob.email, 'bob@example.com')
+        self.assertEqual(self.client.post(f'/api/link-requests/{link.id}/approve/', **self.auth).status_code, 409)
+        self.as_('bob@example.com')
+        self.assertEqual(self.client.get('/api/me/', **self.auth).json()['role'], 'customer')
+
+    def test_approve_refuses_to_overwrite_a_different_email(self):
+        link = EmailLinkRequest.objects.create(customer=self.alice, email='other@example.com')
+        self.assertFalse(link.approve())

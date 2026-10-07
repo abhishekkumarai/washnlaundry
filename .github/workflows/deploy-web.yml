@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths-ignore:
       - "crm/**"
+      - "customer-web/**"
+      - ".github/workflows/deploy-customer.yml"
       - ".github/workflows/deploy-crm.yml"
       - "**/*.md"
   workflow_dispatch:
@@ -27,6 +29,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run cf:build
+        env:
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
       - run: pnpm exec opennextjs-cloudflare deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
