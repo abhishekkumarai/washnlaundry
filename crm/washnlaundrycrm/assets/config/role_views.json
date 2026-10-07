@@ -1,0 +1,17 @@
+{
+  "customer": {
+    "hiddenViews": [
+      "Dashboard",
+      "Customers",
+      "Services",
+      "Staff",
+      "Attendance",
+      "Payroll",
+      "Expenses",
+      "Credits",
+      "Reports",
+      "Scan",
+      "Settings"
+    ]
+  }
+}

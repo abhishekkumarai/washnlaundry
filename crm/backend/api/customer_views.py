@@ -46,10 +46,16 @@ def _iso(value):
 
 def _order_json(order):
     data = {
+        'id': str(order.id),
         'order_number': order.order_number,
+        'customer': str(order.customer_id or ''),
+        'customer_name': order.customer_name,
+        'customer_phone': order.customer_phone,
         'status': order.status,
         'payment_status': order.payment_status,
+        'payment_method': order.payment_method,
         'delivery_type': order.delivery_type,
+        'source': order.source,
         'express': order.express,
         'subtotal': order.subtotal,
         'delivery_charge': order.delivery_charge,
@@ -64,6 +70,7 @@ def _order_json(order):
         'created_at': _iso(order.created_at),
         'items': [
             {
+                'item_title': i.item_title,
                 'title': i.item_title,
                 'service_type': i.service_type,
                 'quantity': i.quantity,

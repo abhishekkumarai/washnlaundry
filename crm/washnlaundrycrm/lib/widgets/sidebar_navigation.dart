@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/navigation.dart';
+import '../utils/role_views.dart';
 import 'panel_card.dart';
 
 /// Left navigation rail.
@@ -120,22 +121,10 @@ class SidebarNavigation extends StatefulWidget {
       'disabled': false
     },
     {
-      'label': 'Apps',
-      'icon': Icons.apps_rounded,
-      'index': 10,
-      'disabled': true
-    },
-    {
       'label': 'Scan',
       'icon': Icons.qr_code_scanner_rounded,
       'index': 11,
       'disabled': false
-    },
-    {
-      'label': 'Subscription',
-      'icon': Icons.workspace_premium_outlined,
-      'index': 12,
-      'disabled': true
     },
     {
       'label': 'Settings',
@@ -311,9 +300,14 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     // Staff (non-owner) only get the day-to-day screens; see `staffRoutes` in
     // router.dart and IsOwner in the backend's api/auth.py.
     const staffNav = {1, 2, 3, 11};
-    final items = provider.role == 'staff'
+    var items = provider.role == 'staff'
         ? _navItems.where((i) => staffNav.contains(i['index'])).toList()
         : _navItems;
+    // Views hidden for the signed-in role in assets/config/role_views.json.
+    final authRole = context.watch<AuthProvider>().role;
+    items = items
+        .where((i) => !RoleViews.isLabelHidden(authRole, i['label'] as String))
+        .toList();
     // Scrollbar so it's discoverable that the rail scrolls when 14 items don't
     // fit a short window.
     return Scrollbar(
@@ -481,19 +475,28 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
       context.read<AuthProvider>().signOut();
     }
 
-    // The shop from `/api/shops/`. These used to be the literals 'AK' and
-    // 'washing' — which happen to match the seed, which is exactly why nobody
-    // noticed they were literals.
+    // The shop from `/api/shops/` or customer session from AuthProvider.
+    final auth = context.watch<AuthProvider>();
+    final isCustomer = context.watch<AppProvider>().role == 'customer';
     final shop = context.watch<AppProvider>().shop;
     final shopName = (shop?['name'] as String?)?.trim() ?? '';
     final ownerName = (shop?['owner_name'] as String?)?.trim() ?? '';
-    final title = shopName.isEmpty ? 'Your shop' : shopName;
+
+    final title = isCustomer
+        ? (auth.userName?.isNotEmpty == true
+            ? auth.userName!
+            : (auth.me?['customer']?['name'] as String?) ?? 'Customer')
+        : (shopName.isEmpty ? 'Your shop' : shopName);
+    final subtitle = isCustomer
+        ? (auth.userEmail ?? 'Customer')
+        : (ownerName.isEmpty ? 'Admin' : ownerName);
+    final avatarSource = isCustomer ? title : (ownerName.isEmpty ? shopName : ownerName);
 
     final avatar = CircleAvatar(
       radius: 18,
       backgroundColor: const Color(0xFFEEF2FF),
       child: Text(
-        initialsFor(ownerName.isEmpty ? shopName : ownerName),
+        initialsFor(avatarSource),
         style: const TextStyle(
             fontSize: 11, fontWeight: FontWeight.bold, color: _brandBlue),
       ),
@@ -523,7 +526,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                             color: _ink),
                       ),
                       Text(
-                        ownerName.isEmpty ? 'Admin' : ownerName,
+                        subtitle,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 11, color: _muted),
                       ),
@@ -543,7 +546,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
           : Column(
               children: [
                 Tooltip(
-                  message: ownerName.isEmpty ? title : '$title · $ownerName',
+                  message: subtitle.isEmpty ? title : '$title · $subtitle',
                   child: avatar,
                 ),
                 IconButton(

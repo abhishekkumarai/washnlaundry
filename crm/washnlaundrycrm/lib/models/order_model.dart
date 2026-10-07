@@ -130,7 +130,7 @@ class OrderItemModel {
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
     return OrderItemModel(
-      itemTitle: json['item_title'] ?? 'Garment Item',
+      itemTitle: json['item_title'] ?? json['title'] ?? 'Garment Item',
       serviceType: json['service_type'] ?? '',
       status: json['status'] ?? OrderStatus.placed,
       quantity: json['quantity'] ?? 1,
@@ -307,9 +307,11 @@ class OrderModel {
       if (parsed != null) stamps[status] = parsed;
     });
 
+    final idVal = json['id']?.toString() ?? '';
+    final orderNum = json['order_number'] ?? '';
     return OrderModel(
-      id: json['id']?.toString() ?? '',
-      orderNumber: json['order_number'] ?? '',
+      id: idVal.isNotEmpty ? idVal : orderNum,
+      orderNumber: orderNum,
       customerId: json['customer']?.toString() ?? '',
       customerName: json['customer_name'] ?? 'Customer',
       customerPhone: json['customer_phone'] ?? '',

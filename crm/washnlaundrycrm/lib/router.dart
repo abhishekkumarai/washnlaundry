@@ -24,6 +24,7 @@ import 'screens/scan_screen.dart';
 import 'screens/services_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/staff_screen.dart';
+import 'utils/role_views.dart';
 import 'widgets/app_shell.dart';
 
 /// Updates `AppProvider.currentNavIndex` to match the matched route.
@@ -59,6 +60,55 @@ Widget _ordersFrame(Widget body) => Scaffold(
       body: AppShell(body: body),
     );
 
+Widget _buildOrderDetail(BuildContext c, String id, {required String backTo}) {
+  // `watch`, not `read`: `loadDataFromBackend()` is async, so a fresh
+  // deep link can arrive before `AppProvider.orders` is populated.
+  // Watching means the notifyListeners() it fires on arrival re-runs
+  // this builder, turning the spinner into the real order without
+  // any extra navigation call.
+  final provider = c.watch<AppProvider>();
+  _deferSetNavIndex(c, 2);
+  OrderModel? match;
+  for (final o in provider.orders) {
+    if (o.id == id || o.orderNumber == id) {
+      match = o;
+      break;
+    }
+  }
+  if (match != null) {
+    return OrderDetailScreen(
+      order: match,
+      onBack: () => c.go(backTo),
+    );
+  }
+  if (provider.isLoading) {
+    return _ordersFrame(
+      const Center(child: CircularProgressIndicator()),
+    );
+  }
+  // Only reachable once loading has genuinely finished without this
+  // order showing up — a legitimate direct link to a real order
+  // (confirmed live against the real app's own `/orders/:id`) never
+  // hits this, since it always resolves once orders finish loading.
+  return _ordersFrame(
+    Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Order not found',
+              style:
+                  TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: () => c.go(backTo),
+            child: const Text('Back to Orders'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 /// The section routes, keyed the same way [AppProvider.routePaths] already
 /// is. go_router owns the URL; `_section` keeps `currentNavIndex` in sync so
 /// every existing read of "which section is active" (chiefly the sidebar's
@@ -77,16 +127,8 @@ List<RouteBase> appRoutes() => [
         builder: (_, s) =>
             ResetPasswordScreen(token: s.uri.queryParameters['token']),
       ),
-      // Customer-only view. `authRedirect` keeps customers on these and staff off.
+      // Sign-up for a Google account with no staff or customer record yet.
       GoRoute(path: '/my/start', builder: (_, __) => const CustomerStartScreen()),
-      GoRoute(path: '/my/orders', builder: (_, __) => const MyOrdersScreen()),
-      GoRoute(
-        path: '/my/orders/:number',
-        builder: (_, s) =>
-            MyOrderDetailScreen(orderNumber: s.pathParameters['number']!),
-      ),
-      GoRoute(path: '/my/rate-card', builder: (_, __) => const RateCardScreen()),
-      GoRoute(path: '/my/book', builder: (_, __) => const BookPickupScreen()),
       GoRoute(
         path: '/dashboard',
         builder: (c, s) => _section(c, 0, const DashboardScreen()),
@@ -101,55 +143,8 @@ List<RouteBase> appRoutes() => [
       ),
       GoRoute(
         path: '/orders/:id',
-        builder: (c, s) {
-          // `watch`, not `read`: `loadDataFromBackend()` is async, so a fresh
-          // deep link can arrive before `AppProvider.orders` is populated.
-          // Watching means the notifyListeners() it fires on arrival re-runs
-          // this builder, turning the spinner into the real order without
-          // any extra navigation call.
-          final provider = c.watch<AppProvider>();
-          _deferSetNavIndex(c, 2);
-          final id = s.pathParameters['id']!;
-          OrderModel? match;
-          for (final o in provider.orders) {
-            if (o.id == id) {
-              match = o;
-              break;
-            }
-          }
-          if (match != null) {
-            return OrderDetailScreen(
-              order: match,
-              onBack: () => c.go('/orders'),
-            );
-          }
-          if (provider.isLoading) {
-            return _ordersFrame(
-              const Center(child: CircularProgressIndicator()),
-            );
-          }
-          // Only reachable once loading has genuinely finished without this
-          // order showing up — a legitimate direct link to a real order
-          // (confirmed live against the real app's own `/orders/:id`) never
-          // hits this, since it always resolves once orders finish loading.
-          return _ordersFrame(
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Order not found',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: () => c.go('/orders'),
-                    child: const Text('Back to Orders'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+        builder: (c, s) =>
+            _buildOrderDetail(c, s.pathParameters['id']!, backTo: '/orders'),
       ),
       GoRoute(
         path: '/customers',
@@ -209,7 +204,7 @@ List<RouteBase> appRoutes() => [
 
 /// Where each role lands after sign-in.
 String homeFor(String? role) => switch (role) {
-      'customer' => '/my/orders',
+      'customer' => '/orders',
       'unlinked' => '/my/start',
       'staff' => '/orders',
       _ => '/dashboard',
@@ -243,12 +238,13 @@ String? authRedirectFor(AuthProvider auth, String loc) {
   final home = homeFor(role);
   if (loggingIn || loc == '/') return home;
   final inMy = loc.startsWith('/my/');
-  if (role == 'owner') return inMy ? home : null;
+  // Customers get the owner's CRM screens minus the views listed for them in
+  // assets/config/role_views.json (see RoleViews).
+  if (role == 'customer' && RoleViews.isPathHidden(role, loc)) return home;
+  if (role == 'owner' || role == 'customer') return inMy ? home : null;
   if (role == 'staff') return inMy || !_staffMayOpen(loc) ? home : null;
-  // customer / unlinked: only their own area.
-  if (!inMy) return home;
-  if (role == 'unlinked' && loc != '/my/start') return home;
-  if (role == 'customer' && loc == '/my/start') return home;
+  // unlinked: only the sign-up step.
+  if (loc != '/my/start') return home;
   return null;
 }
 

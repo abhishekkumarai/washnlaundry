@@ -59,7 +59,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final order = _orderFrom(context.watch<AppProvider>());
+    final provider = context.watch<AppProvider>();
+    final order = _orderFrom(provider);
+    final isCustomer = provider.role == 'customer';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -70,7 +72,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
-                return narrow ? _narrowHeader(order) : _header(order);
+                return narrow
+                    ? _narrowHeader(order, isCustomer: isCustomer)
+                    : _header(order, isCustomer: isCustomer);
               },
             ),
             Expanded(
@@ -101,7 +105,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             const SizedBox(height: 20),
                             _fulfilmentCard(order),
                             const SizedBox(height: 20),
-                            _paymentCard(order),
+                            _paymentCard(order, isCustomer: isCustomer),
                           ],
                         );
                         if (stacked) {
@@ -121,8 +125,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         );
                       },
                     ),
-                    const SizedBox(height: 20),
-                    _tagsCard(order),
+                    if (!isCustomer) ...[
+                      const SizedBox(height: 20),
+                      _tagsCard(order),
+                    ],
                   ],
                 ),
               ),
@@ -135,7 +141,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   // ── Header ─────────────────────────────────────────────────────────────────
 
-  Widget _header(OrderModel order) {
+  Widget _header(OrderModel order, {required bool isCustomer}) {
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -155,31 +161,35 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          const Text('Orders / ',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+          Text(isCustomer ? 'My Orders / ' : 'Orders / ',
+              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
           Text('#${order.orderNumber}',
               style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF0F172A))),
           const Spacer(),
-          _headerButton('Edit', Icons.edit_outlined, const Color(0xFF475569),
-              _canEditOrder(order) ? _showEditOrder : null),
-          const SizedBox(width: 8),
+          if (!isCustomer) ...[
+            _headerButton('Edit', Icons.edit_outlined, const Color(0xFF475569),
+                _canEditOrder(order) ? _showEditOrder : null),
+            const SizedBox(width: 8),
+          ],
           _headerButton('Print Receipt', Icons.print_outlined,
               const Color(0xFF475569), () => _toast('Sent to the printer.')),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: _canUpdateStatus(order) ? _showUpdateStatus : null,
-            icon: const Icon(Icons.autorenew_rounded, size: 16),
-            label: const Text('Update Status'),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF1A4FD6),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          if (!isCustomer) ...[
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: _canUpdateStatus(order) ? _showUpdateStatus : null,
+              icon: const Icon(Icons.autorenew_rounded, size: 16),
+              label: const Text('Update Status'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF1A4FD6),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -189,7 +199,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   /// arrow already says the same thing) and collapses Edit/Print
   /// Receipt — all secondary to Update Status — into one overflow menu, so
   /// everything fits in a single 64px row instead of overflowing.
-  Widget _narrowHeader(OrderModel order) {
+  Widget _narrowHeader(OrderModel order, {required bool isCustomer}) {
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -218,36 +228,45 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     color: Color(0xFF0F172A))),
           ),
           const SizedBox(width: 4),
-          IconButton(
-            tooltip: 'Update Status',
-            onPressed: _canUpdateStatus(order) ? _showUpdateStatus : null,
-            icon: const Icon(Icons.autorenew_rounded, size: 18),
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0xFF1A4FD6),
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: const Color(0xFFCBD5E1),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+          if (!isCustomer) ...[
+            IconButton(
+              tooltip: 'Update Status',
+              onPressed: _canUpdateStatus(order) ? _showUpdateStatus : null,
+              icon: const Icon(Icons.autorenew_rounded, size: 18),
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xFF1A4FD6),
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFFCBD5E1),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
             ),
-          ),
-          const SizedBox(width: 4),
-          PopupMenuButton<VoidCallback>(
-            tooltip: 'More actions',
-            icon: const Icon(Icons.more_vert_rounded,
-                size: 20, color: Color(0xFF475569)),
-            onSelected: (action) => action(),
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: _showEditOrder,
-                enabled: _canEditOrder(order),
-                child: const Text('Edit'),
-              ),
-              PopupMenuItem(
-                value: () => _toast('Sent to the printer.'),
-                child: const Text('Print Receipt'),
-              ),
-            ],
-          ),
+            const SizedBox(width: 4),
+            PopupMenuButton<VoidCallback>(
+              tooltip: 'More actions',
+              icon: const Icon(Icons.more_vert_rounded,
+                  size: 20, color: Color(0xFF475569)),
+              onSelected: (action) => action(),
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: _showEditOrder,
+                  enabled: _canEditOrder(order),
+                  child: const Text('Edit'),
+                ),
+                PopupMenuItem(
+                  value: () => _toast('Sent to the printer.'),
+                  child: const Text('Print Receipt'),
+                ),
+              ],
+            ),
+          ] else ...[
+            IconButton(
+              tooltip: 'Print Receipt',
+              icon: const Icon(Icons.print_outlined,
+                  size: 20, color: Color(0xFF475569)),
+              onPressed: () => _toast('Sent to the printer.'),
+            ),
+          ],
         ],
       ),
     );
@@ -856,13 +875,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _paymentCard(OrderModel order) {
+  Widget _paymentCard(OrderModel order, {required bool isCustomer}) {
     final isPaid = order.paymentStatus == PaymentStatus.paid;
     final isDelivered = order.status == OrderStatus.delivered;
     // Collect Payment is how an order now reaches Delivered, so it stays
     // visible until there's genuinely nothing left to do: the order is
     // already delivered and fully settled (or cancelled).
-    final hasAction = !order.isCancelled && !(isDelivered && order.dueAmount <= 0);
+    // Customers cannot collect payments.
+    final hasAction = !isCustomer &&
+        !order.isCancelled &&
+        !(isDelivered && order.dueAmount <= 0);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _panel,

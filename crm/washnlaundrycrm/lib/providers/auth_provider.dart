@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
+import '../utils/role_views.dart';
 
 /// Google Sign-In state for the `/login` screen, plus the server-verified role.
 ///
@@ -95,7 +96,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _me = await ApiService.fetchMe();
-      _role = _me!['role'] as String?;
+      _role = RoleViews.effectiveRole(_me!['role'] as String?);
     } on ApiException catch (e) {
       _role = null;
       _roleError = e.message;
