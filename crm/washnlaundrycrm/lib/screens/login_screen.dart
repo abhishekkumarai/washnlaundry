@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -24,6 +25,17 @@ import '../utils/google_signin_button.dart';
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
+  /// Demo Mode (a one-tap owner session with no checks) is part of the product
+  /// and stays on in every build, except on the public customer site
+  /// (customer.*), where customers must never see it. A build can also hide it
+  /// everywhere with --dart-define=ALLOW_DEMO=false.
+  static const _allowDemo =
+      bool.fromEnvironment('ALLOW_DEMO', defaultValue: true);
+
+  @visibleForTesting
+  static bool showDemoOn(String host) =>
+      _allowDemo && !host.toLowerCase().startsWith('customer.');
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -43,11 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _formError;
   String? _formNotice;
 
-  /// Demo Mode (a one-tap owner session with no checks) is part of the product
-  /// and stays on in every build. A build can hide it with
-  /// --dart-define=ALLOW_DEMO=false.
-  static const _allowDemo = bool.fromEnvironment('ALLOW_DEMO', defaultValue: true);
-  static bool get _showDemo => _allowDemo;
+  static bool get _showDemo => LoginScreen.showDemoOn(Uri.base.host);
 
   @override
   void dispose() {

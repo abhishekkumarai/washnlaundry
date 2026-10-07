@@ -43,7 +43,7 @@ cd washnlaundrycrm && flutter run -d chrome
 
 | Target | Source | Ships via |
 |---|---|---|
-| CRM `app.washnlaundry.com` / `washnlaundrycrm.pages.dev` (Pages) | `washnlaundrycrm/` | build + `node scripts/deploy_cloudflare_pages.js` |
+| CRM `app.washnlaundry.com` + `customer.washnlaundry.com` / `washnlaundrycrm.pages.dev` (Pages) | `washnlaundrycrm/` | build + `node scripts/deploy_cloudflare_pages.js` |
 | Worker `washnlaundry-crm-rag` | `cloudflare/rag-engine/` | `npx wrangler deploy` there |
 | Worker `washnlaundry-crm-api` | `cloudflare/api-proxy/` | `npx wrangler deploy` there |
 | Django backend `washnlaundry-backend.onrender.com` | `crm/backend/` | Render auto-deploys on push to `main` (runs migrations) |
@@ -125,7 +125,7 @@ One Google login for everyone; the backend (`backend/api/auth.py`) verifies the 
 - `API_AUTH_ENFORCED` (default False) turns enforcement on in `IsStaff`/`IsOwner`/`IsOwnerOrStaffReadOnly`. Ship the Flutter app first, then flip it on Render. Set `STAFF_EMAILS` before flipping or nobody can get in.
 - A customer typing a phone number the store already has creates an `EmailLinkRequest` (no OTP, so no auto-link); the owner approves in Django admin or `POST /api/link-requests/<id>/approve/`.
 - Flutter: `AuthProvider.role` drives `router.dart`'s `authRedirect`; `ApiService.tokenProvider` attaches the token and refreshes once on 401. Staff form has a "Sign-in email" field (it sets `has_app_login`). Demo Mode is always `owner` and only works while enforcement is off.
-- The same Flutter build is meant to serve customer.washnlaundry.com (role decides the view); the old Next.js `customer-web/` is kept until that cutover is verified.
+- The same Flutter build serves both app.washnlaundry.com and customer.washnlaundry.com (role decides the view; Demo Mode is hidden on `customer.*`). The old Next.js portal was removed 2026-10-07.
 
 ### Email + password sign-in (added 2026-10-07)
 
