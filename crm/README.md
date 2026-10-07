@@ -13,7 +13,7 @@ Deploy the CRM:
 
 ```bash
 cd washnlaundrycrm
-flutter build web --release --dart-define=API_BASE_URL=https://laundrybill-backend.onrender.com/api
+flutter build web --release --dart-define=API_BASE_URL=https://washnlaundry-backend.onrender.com/api
 CLOUDFLARE_API_TOKEN=... node ../scripts/deploy_cloudflare_pages.js
 ```
 

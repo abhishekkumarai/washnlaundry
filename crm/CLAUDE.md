@@ -46,12 +46,12 @@ cd washnlaundrycrm && flutter run -d chrome
 | CRM `app.washnlaundry.com` / `washnlaundrycrm.pages.dev` (Pages) | `washnlaundrycrm/` | build + `node scripts/deploy_cloudflare_pages.js` |
 | Worker `washnlaundry-crm-rag` | `cloudflare/rag-engine/` | `npx wrangler deploy` there |
 | Worker `washnlaundry-crm-api` | `cloudflare/api-proxy/` | `npx wrangler deploy` there |
-| Django backend `laundrybill-backend.onrender.com` | `backend/` | Render auto-deploys on push to `main` (runs migrations) |
+| Django backend `washnlaundry-backend.onrender.com` | `crm/backend/` | Render auto-deploys on push to `main` (runs migrations) |
 | Marketing `www.washnlaundry.com` | **separate repo** `abhishekkumarai/washnlaundry` | `pnpm cf:deploy` there |
 
 ```bash
 cd washnlaundrycrm
-flutter build web --release --dart-define=API_BASE_URL=https://laundrybill-backend.onrender.com/api
+flutter build web --release --dart-define=API_BASE_URL=https://washnlaundry-backend.onrender.com/api
 node ../scripts/deploy_cloudflare_pages.js   # needs CLOUDFLARE_API_TOKEN
 ```
 

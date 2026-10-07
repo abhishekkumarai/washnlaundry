@@ -11,7 +11,7 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
   if (!ALLOWED.some((re) => re.test(path))) {
     return Response.json({ detail: 'Not found.' }, { status: 404 });
   }
-  const backend = process.env.BACKEND_ORIGIN ?? 'https://laundrybill-backend.onrender.com';
+  const backend = process.env.BACKEND_ORIGIN ?? 'https://washnlaundry-backend.onrender.com';
   // The backend's public-lead endpoint checks Origin; a Worker-to-Render call has none.
   const headers: Record<string, string> = { Origin: SELF_ORIGIN };
   const auth = req.headers.get('authorization');
