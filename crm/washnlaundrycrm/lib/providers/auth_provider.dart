@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
+import '../utils/fresh_login.dart';
 import '../utils/role_views.dart';
 
 /// Google Sign-In state for the `/login` screen, plus the server-verified role.
@@ -117,6 +118,21 @@ class AuthProvider extends ChangeNotifier {
       // regardless of `isConfigured` — a Demo Mode sign-in must survive a
       // page reload even when there's no Google client ID to restore via.
       final prefs = await SharedPreferences.getInstance();
+      // Opened from the marketing site's "Log in" link (`/?fresh=1`): show the
+      // login screen rather than quietly signing back in to whatever session
+      // this browser still has stored.
+      final fresh = consumeFreshLoginRequest();
+      if (fresh) {
+        for (final key in const [
+          'is_signed_in',
+          'is_demo',
+          'app_token',
+          'user_email',
+          'user_name',
+        ]) {
+          await prefs.remove(key);
+        }
+      }
       _isPersistedSignedIn = prefs.getBool('is_signed_in') ?? false;
       _persistedEmail = prefs.getString('user_email');
       _persistedName = prefs.getString('user_name');
@@ -130,10 +146,16 @@ class AuthProvider extends ChangeNotifier {
           _error = _messageFor(e);
           notifyListeners();
         });
-        // Silently restores a still-live Google session — the equivalent of
-        // the real app's `onAuthStateChanged` firing on a page reload, rather
-        // than forcing every reload back through the sign-in button.
-        await _googleSignIn.attemptLightweightAuthentication();
+        if (fresh) {
+          // Also drop Google's own session, or the silent restore below would
+          // sign straight back in.
+          await _googleSignIn.signOut();
+        } else {
+          // Silently restores a still-live Google session — the equivalent of
+          // the real app's `onAuthStateChanged` firing on a page reload, rather
+          // than forcing every reload back through the sign-in button.
+          await _googleSignIn.attemptLightweightAuthentication();
+        }
       }
       // A persisted Google session with no live account has no ID token to
       // send, so the API would reject everything: make the user sign in again.
