@@ -54,10 +54,14 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      # ALLOW_DEMO keeps the Demo Mode button while the live CRM has no working
+      # sign-in (no GOOGLE_CLIENT_ID var, no SECRET_KEY on Render for password
+      # sign-in). Remove this flag once either is set up, or anyone can click in.
       - run: >
           flutter build web --release
           --dart-define=API_BASE_URL=https://laundrybill-backend.onrender.com/api
           --dart-define=GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
+          --dart-define=ALLOW_DEMO=true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
