@@ -224,13 +224,19 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
         child: Column(
           children: [
             mark,
-            if (canExpand)
+            // Wide enough: expand the rail in place. Between the rail and
+            // expanded breakpoints the rail is locked to icons, so the same
+            // button opens the full menu as a drawer instead (the one the
+            // narrow top bar opens) — otherwise nothing could expand it.
+            if (!widget.inDrawer)
               IconButton(
-                tooltip: 'Expand sidebar',
+                tooltip: canExpand ? 'Expand sidebar' : 'Open menu',
                 iconSize: 16,
                 padding: const EdgeInsets.only(top: 8),
                 constraints: const BoxConstraints(),
-                onPressed: () => context.read<AppProvider>().toggleSidebar(),
+                onPressed: canExpand
+                    ? () => context.read<AppProvider>().toggleSidebar()
+                    : () => Scaffold.maybeOf(context)?.openDrawer(),
                 icon: const Icon(Icons.menu_rounded, color: Color(0xFF64748B)),
               ),
           ],

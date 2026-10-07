@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 import 'package:washnlaundrycrm/providers/app_provider.dart';
 import 'package:washnlaundrycrm/widgets/sidebar_navigation.dart';
 
@@ -144,10 +145,41 @@ void main() {
       expect(provider.currentNavIndex, 11);
     });
 
-    testWidgets('the toggle is not offered below the breakpoint', (tester) async {
-      // The rail is already forced collapsed, so a collapse control would lie.
+    testWidgets('below the expand breakpoint the toggle opens the menu drawer',
+        (tester) async {
+      // The rail is locked to icons here, so it cannot expand in place — but
+      // with no control at all there was no way to see the labels. The same
+      // hamburger opens the full menu as a drawer instead.
       await pumpAtWidth(tester, 900);
-      expect(find.byIcon(Icons.menu_rounded), findsNothing);
+      expect(find.byIcon(Icons.menu_rounded), findsOneWidget);
+      expect(find.byTooltip('Open menu'), findsOneWidget);
+      expect(find.byTooltip('Collapse sidebar'), findsNothing);
+
+      final view = tester.view;
+      view.physicalSize = const Size(900, 1400);
+      view.devicePixelRatio = 1.0;
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: AppProvider(autoLoad: false),
+          child: MaterialApp(
+            home: Scaffold(
+              drawer: const Drawer(child: Text('DRAWER OPEN')),
+              body: const Row(children: [SidebarNavigation()]),
+            ),
+          ),
+        ),
+      );
+      expect(find.text('DRAWER OPEN'), findsNothing);
+      await tester.tap(find.byIcon(Icons.menu_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('DRAWER OPEN'), findsOneWidget);
+    });
+
+    testWidgets('at desktop width the toggle expands and collapses in place',
+        (tester) async {
+      await pumpAtWidth(tester, 1400);
+      expect(find.byTooltip('Collapse sidebar'), findsOneWidget);
+      expect(find.byTooltip('Open menu'), findsNothing);
     });
   });
 
