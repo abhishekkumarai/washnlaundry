@@ -156,10 +156,19 @@ PASSWORD_RESET_TIMEOUT = 3600  # seconds a reset link stays valid
 # only the Resend account owner's address can receive mail: verify a domain
 # there and set this (e.g. "washnlaundry <no-reply@washnlaundry.com>").
 AUTH_EMAIL_FROM = os.environ.get('AUTH_EMAIL_FROM', LEAD_EMAIL_FROM)
-# Front-end origins the verify / reset links in emails may point at.
+# Front-end origins the verify / reset links in emails may point at. A link goes
+# back to the origin the request came from (so a customer who signs up on
+# customer.washnlaundry.com gets a customer.washnlaundry.com link), provided it
+# is listed here; http://localhost:<port> is also accepted when DEBUG is on.
 APP_ORIGINS = [
     o.strip() for o in os.environ.get(
         'APP_ORIGINS',
         'https://app.washnlaundry.com,https://customer.washnlaundry.com',
     ).split(',') if o.strip()
 ]
+# Used when the request carries no allowed origin (curl, a server-to-server
+# call). Unset: localhost while DEBUG is on, otherwise the first APP_ORIGINS
+# entry. Set it explicitly in each environment.
+APP_BASE_URL = os.environ.get('APP_BASE_URL') or (
+    'http://localhost:5055' if DEBUG else (APP_ORIGINS[0] if APP_ORIGINS else '')
+)

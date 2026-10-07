@@ -93,11 +93,12 @@ def _record_failure(key, window=900):
 
 
 def _origin(body, request):
-    """Where the emailed link should land: the caller's own app, if it's one of ours."""
+    """Where the emailed link should land: the caller's own app if it is an allowed
+    origin, else settings.APP_BASE_URL."""
     asked = str(body.get('return_to') or request.headers.get('Origin') or '').rstrip('/')
     if asked in settings.APP_ORIGINS or (settings.DEBUG and LOCAL_ORIGIN.match(asked)):
         return asked
-    return settings.APP_ORIGINS[0] if settings.APP_ORIGINS else ''
+    return settings.APP_BASE_URL.rstrip('/')
 
 
 def _send(email, subject, text):

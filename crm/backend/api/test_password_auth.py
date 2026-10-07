@@ -10,7 +10,8 @@ from .models import Customer
 
 @override_settings(PASSWORD_AUTH_ENABLED=True, GOOGLE_CLIENT_ID='c', API_AUTH_ENFORCED=True,
                    STAFF_EMAILS=['owner@shop.com'],
-                   APP_ORIGINS=['https://customer.washnlaundry.com'])
+                   APP_ORIGINS=['https://customer.washnlaundry.com'],
+                   APP_BASE_URL='https://customer.washnlaundry.com')
 class PasswordAuthTests(APITestCase):
     """Email + password sign-in: verification, login, reset, rate limits, roles."""
 
@@ -139,6 +140,30 @@ class PasswordAuthTests(APITestCase):
                                                'return_to': 'https://evil.example'}, format='json')
         self.assertIn('https://customer.washnlaundry.com/verify', self.sent[-1][2])
         self.assertNotIn('evil.example', self.sent[-1][2])
+
+    def test_link_goes_back_to_the_callers_own_site(self):
+        with override_settings(APP_ORIGINS=['https://app.washnlaundry.com',
+                                            'https://customer.washnlaundry.com']):
+            self.client.post('/api/auth/signup/', {'email': 'a@b.com', 'password': 'long enough pw'},
+                             format='json', HTTP_ORIGIN='https://app.washnlaundry.com')
+            self.assertIn('https://app.washnlaundry.com/verify?token=', self.sent[-1][2])
+
+    def test_link_falls_back_to_app_base_url_without_an_allowed_origin(self):
+        with override_settings(APP_BASE_URL='https://customer.washnlaundry.com/'):
+            self.client.post('/api/auth/signup/', {'email': 'a@b.com', 'password': 'long enough pw'},
+                             format='json')
+            self.assertIn('https://customer.washnlaundry.com/verify?token=', self.sent[-1][2])
+            self.assertNotIn('.com//verify', self.sent[-1][2])
+
+    @override_settings(DEBUG=True)
+    def test_localhost_origin_is_accepted_only_in_debug(self):
+        self.client.post('/api/auth/signup/', {'email': 'a@b.com', 'password': 'long enough pw'},
+                         format='json', HTTP_ORIGIN='http://localhost:5055')
+        self.assertIn('http://localhost:5055/verify?token=', self.sent[-1][2])
+        with override_settings(DEBUG=False):
+            self.client.post('/api/auth/signup/', {'email': 'c@d.com', 'password': 'long enough pw'},
+                             format='json', HTTP_ORIGIN='http://localhost:5055')
+            self.assertNotIn('localhost', self.sent[-1][2])
 
     def test_works_without_a_csrf_token(self):
         res = Client(enforce_csrf_checks=True).post(
