@@ -170,6 +170,13 @@ class ApiService {
   static Future<Map<String, dynamic>> fetchMe() async =>
       Map<String, dynamic>.from(await _send('GET', '/me/') as Map);
 
+  /// PATCH `/customer/me/` - the customer's own editable details
+  /// (name, address, area, landmark, preference). Phone and email can't change.
+  static Future<Map<String, dynamic>> updateMyProfile(
+          Map<String, String> fields) async =>
+      Map<String, dynamic>.from(
+          await _send('PATCH', '/customer/me/', body: fields) as Map);
+
   static Future<List<Map<String, dynamic>>> fetchMyOrders() async {
     final data = await _send('GET', '/customer/orders/') as Map;
     return (data['orders'] as List)

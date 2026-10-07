@@ -271,6 +271,21 @@ class AuthProvider extends ChangeNotifier {
       _guard(() =>
           ApiService.signUp(email.trim(), password, name.trim(), phone.trim()));
 
+  /// Saves the signed-in customer's profile; null on success, else the error.
+  Future<String?> saveCustomerProfile(Map<String, String> fields) async {
+    try {
+      final updated = await ApiService.updateMyProfile(fields);
+      _me = {
+        ...?_me,
+        'customer': {...?(_me?['customer'] as Map?)?.cast<String, dynamic>(), ...updated},
+      };
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
   Future<String?> confirmEmail(String token) => _guard(() async =>
       _startPasswordSession(await ApiService.verifyEmail(token)));
 

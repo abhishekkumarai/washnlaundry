@@ -20,6 +20,7 @@ import 'screens/order_detail_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/payroll_screen.dart';
 import 'screens/reports_screen.dart';
+import 'screens/profile_screen.dart';
 import 'screens/scan_screen.dart';
 import 'screens/services_screen.dart';
 import 'screens/settings_screen.dart';
@@ -130,6 +131,10 @@ List<RouteBase> appRoutes() => [
       // Sign-up for a Google account with no staff or customer record yet.
       GoRoute(path: '/my/start', builder: (_, __) => const CustomerStartScreen()),
       GoRoute(
+        path: '/profile',
+        builder: (c, _) => _section(c, 99, const ProfileScreen()),
+      ),
+      GoRoute(
         path: '/dashboard',
         builder: (c, s) => _section(c, 0, const DashboardScreen()),
       ),
@@ -212,7 +217,7 @@ String homeFor(String? role) => switch (role) {
 
 /// The routes a `staff` (non-owner) user may open; everything else is
 /// owner-only. Mirrors the API's IsOwner permissions in api/auth.py.
-const staffRoutes = ['/new-order', '/orders', '/customers', '/scan'];
+const staffRoutes = ['/new-order', '/orders', '/customers', '/scan', '/profile'];
 
 bool _staffMayOpen(String loc) =>
     staffRoutes.any((r) => loc == r || loc.startsWith('$r/'));

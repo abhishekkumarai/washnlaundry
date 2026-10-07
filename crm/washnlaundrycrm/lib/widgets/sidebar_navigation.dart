@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
@@ -477,7 +478,8 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
 
     // The shop from `/api/shops/` or customer session from AuthProvider.
     final auth = context.watch<AuthProvider>();
-    final isCustomer = context.watch<AppProvider>().role == 'customer';
+    // The signed-in role (AppProvider.role is "owner" for customers).
+    final isCustomer = auth.role == 'customer';
     final shop = context.watch<AppProvider>().shop;
     final shopName = (shop?['name'] as String?)?.trim() ?? '';
     final ownerName = (shop?['owner_name'] as String?)?.trim() ?? '';
@@ -491,6 +493,8 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
         ? (auth.userEmail ?? 'Customer')
         : (ownerName.isEmpty ? 'Admin' : ownerName);
     final avatarSource = isCustomer ? title : (ownerName.isEmpty ? shopName : ownerName);
+
+    void openProfile() => context.go('/profile');
 
     final avatar = CircleAvatar(
       radius: 18,
@@ -511,9 +515,15 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
       child: expanded
           ? Row(
               children: [
-                avatar,
-                const SizedBox(width: 10),
                 Expanded(
+                  child: InkWell(
+                    onTap: openProfile,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Row(
+                      children: [
+                        avatar,
+                        const SizedBox(width: 10),
+                        Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -533,6 +543,10 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                     ],
                   ),
                 ),
+                      ],
+                    ),
+                  ),
+                ),
                 IconButton(
                   tooltip: 'Sign out',
                   icon: const Icon(Icons.logout_rounded,
@@ -547,7 +561,11 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
               children: [
                 Tooltip(
                   message: subtitle.isEmpty ? title : '$title · $subtitle',
-                  child: avatar,
+                  child: InkWell(
+                    onTap: openProfile,
+                    customBorder: const CircleBorder(),
+                    child: avatar,
+                  ),
                 ),
                 IconButton(
                   tooltip: 'Sign out',

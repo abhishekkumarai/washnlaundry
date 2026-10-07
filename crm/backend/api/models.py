@@ -142,6 +142,8 @@ class Customer(models.Model):
     email = models.EmailField(blank=True, null=True, db_index=True)
     address = models.TextField(blank=True, null=True)
     area = models.CharField(max_length=120, blank=True, default='')
+    landmark = models.CharField(max_length=255, blank=True, default='')
+    preference = models.TextField(blank=True, default='')
     total_orders = models.IntegerField(default=0)
     total_spent = models.FloatField(default=0.0)
     due_amount = models.FloatField(default=0.0)
