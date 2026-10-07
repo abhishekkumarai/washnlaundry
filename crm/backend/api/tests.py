@@ -2314,6 +2314,14 @@ class CustomerPortalTests(TestCase):
                                content_type='application/json', **self.auth)
         self.assertEqual(res.status_code, 409)
 
+    def test_signup_post_works_without_a_csrf_token(self):
+        from django.test import Client
+        self.verify.return_value = {'email': 'csrf@example.com', 'email_verified': True}
+        res = Client(enforce_csrf_checks=True).post(
+            '/api/customer/me/', {'name': 'C', 'phone': '9876500001'},
+            content_type='application/json', **self.auth)
+        self.assertEqual(res.status_code, 201)
+
     def test_rate_card_is_public(self):
         self.assertEqual(self.client.get('/api/customer/rate-card/').status_code, 200)
 

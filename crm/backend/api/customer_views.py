@@ -11,6 +11,7 @@ import re
 
 from django.conf import settings
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
 from google.oauth2 import id_token  # noqa: F401  (tests patch api.customer_views.id_token)
@@ -88,6 +89,9 @@ def _me_json(customer):
     }
 
 
+# csrf_exempt: auth is a Bearer token, never a cookie, so there is nothing for
+# CSRF to protect (and a browser client has no CSRF cookie to send).
+@csrf_exempt
 @require_http_methods(['GET', 'POST'])
 def customer_me(request):
     """GET: the signed-in customer. POST {name, phone}: first-time signup.

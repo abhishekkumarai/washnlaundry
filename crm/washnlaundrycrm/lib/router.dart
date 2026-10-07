@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -214,9 +215,13 @@ bool _staffMayOpen(String loc) =>
 /// get its day-to-day screens ([staffRoutes]) and customers are kept on `/my/*` (an unlinked Google account on `/my/start`).
 /// While the role is still loading nothing redirects: `main.dart` overlays a
 /// spinner (or a retry screen if `/api/me/` failed) in the meantime.
-String? authRedirect(AuthProvider auth, GoRouterState state) {
+String? authRedirect(AuthProvider auth, GoRouterState state) =>
+    authRedirectFor(auth, state.matchedLocation);
+
+/// [authRedirect] on a plain location, so it can be tested without a router.
+@visibleForTesting
+String? authRedirectFor(AuthProvider auth, String loc) {
   if (auth.initializing) return null;
-  final loc = state.matchedLocation;
   final loggingIn = loc == '/login';
   if (!auth.isSignedIn) return loggingIn ? null : '/login';
   final role = auth.role;

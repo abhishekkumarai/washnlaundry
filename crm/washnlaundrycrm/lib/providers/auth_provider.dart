@@ -68,6 +68,14 @@ class AuthProvider extends ChangeNotifier {
     return _account != null;
   }
 
+  @visibleForTesting
+  void setSessionForTest({required bool signedIn, String? role}) {
+    _initializing = false;
+    _isPersistedSignedIn = signedIn;
+    _role = role;
+    notifyListeners();
+  }
+
   /// Fetches `/api/me/` and stores the role. Safe to call again to retry.
   Future<void> refreshRole() async {
     if (_isDemo) {
