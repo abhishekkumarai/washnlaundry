@@ -47,3 +47,14 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# old customer portal leftovers (removed 2026-10-07): installs and build output
+customer-web/node_modules/
+customer-web/.next/
+customer-web/.open-next/
+customer-web/.wrangler/
+customer-web/tsconfig.tsbuildinfo
+customer-web/next-env.d.ts
+
+# local notes
+/projects.md
