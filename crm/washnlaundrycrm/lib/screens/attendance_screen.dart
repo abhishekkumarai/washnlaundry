@@ -407,7 +407,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         padding:
             EdgeInsets.symmetric(horizontal: isNarrow ? 8 : 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF2563EB) : Colors.transparent,
+          color: isSelected ? const Color(0xFF182C4F) : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
@@ -426,17 +426,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return OutlinedButton.icon(
       onPressed: _saving ? null : () => _markAllPresent(provider),
       icon: const Icon(Icons.how_to_reg_outlined,
-          size: 16, color: Color(0xFF2563EB)),
+          size: 16, color: Color(0xFF182C4F)),
       label: Text(
         isCompact ? 'Mark All' : 'Mark all present',
         style: const TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF2563EB),
+          color: Color(0xFF182C4F),
         ),
       ),
       style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Color(0xFF2563EB)),
+        side: const BorderSide(color: Color(0xFF182C4F)),
         backgroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -781,7 +781,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     s.name.isEmpty ? '?' : s.name[0].toUpperCase(),
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF2563EB),
+                      color: Color(0xFF182C4F),
                       fontSize: 13,
                     ),
                   ),
@@ -866,6 +866,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
           // Action Menu Column
           PopupMenuButton<String>(
+            tooltip: 'Attendance options',
             icon:
                 const Icon(Icons.more_vert, size: 18, color: Color(0xFF64748B)),
             onSelected: (val) {
@@ -878,7 +879,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 value: 'check_in',
                 child: Row(
                   children: [
-                    Icon(Icons.schedule, size: 16, color: Color(0xFF2563EB)),
+                    Icon(Icons.schedule, size: 16, color: Color(0xFF182C4F)),
                     SizedBox(width: 8),
                     Text('Check-in time', style: TextStyle(fontSize: 13)),
                   ],
@@ -908,7 +909,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 child: Text(
                   s.name.isEmpty ? '?' : s.name[0].toUpperCase(),
                   style: const TextStyle(
-                      fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                      fontWeight: FontWeight.bold, color: Color(0xFF182C4F)),
                 ),
               ),
               const SizedBox(width: 10),
@@ -1208,7 +1209,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             height: 22,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: isToday ? const Color(0xFF2563EB) : Colors.transparent,
+              color: isToday ? const Color(0xFF182C4F) : Colors.transparent,
               shape: BoxShape.circle,
             ),
             child: Text(
@@ -1280,7 +1281,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF2563EB)),
+                      color: Color(0xFF182C4F)),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1684,7 +1685,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             label: const Text('All Team',
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
             selected: _selectedHabitStaffId == null,
-            selectedColor: const Color(0xFF2563EB),
+            selectedColor: const Color(0xFF182C4F),
             backgroundColor: const Color(0xFFF1EFEA),
             labelStyle: TextStyle(
               color: _selectedHabitStaffId == null
@@ -1704,7 +1705,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     style: const TextStyle(
                         fontSize: 11, fontWeight: FontWeight.bold)),
                 selected: isSel,
-                selectedColor: const Color(0xFF2563EB),
+                selectedColor: const Color(0xFF182C4F),
                 backgroundColor: const Color(0xFFF1EFEA),
                 labelStyle: TextStyle(
                   color: isSel ? Colors.white : const Color(0xFF475569),
@@ -1759,7 +1760,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       ),
       _habitKpiMetric(
         icon: Icons.pie_chart_outline_rounded,
-        iconColor: const Color(0xFF2563EB),
+        iconColor: const Color(0xFF182C4F),
         bgColor: const Color(0xFFEFF6FF),
         label: 'Monthly Consistency',
         value: '${(monthRate * 100).toStringAsFixed(0)}%',
@@ -2093,7 +2094,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 color: bgColor,
                 borderRadius: BorderRadius.circular(6),
                 border: isToday
-                    ? Border.all(color: const Color(0xFF2563EB), width: 1.5)
+                    ? Border.all(color: const Color(0xFF182C4F), width: 1.5)
                     : Border.all(color: const Color(0xFFE4E0D8)),
               ),
               child: Column(

@@ -126,8 +126,9 @@ class _ServicesScreenState extends State<ServicesScreen> {
     final query = _searchQuery.toLowerCase();
 
     _currentItems = provider.garments
+        // Inactive items stay listed (shown as off) so they can be switched
+        // back on here; only New Order limits itself to active ones.
         .where((g) => g.categoryName == categoryName)
-        .where((g) => g.isActive)
         .where((g) => query.isEmpty || g.name.toLowerCase().contains(query))
         .map((g) => <String, dynamic>{
               'id': g.id,
@@ -343,7 +344,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   Widget _buildTab(int index, IconData icon, String label) {
     final sel = _selectedTopTab == index;
-    return GestureDetector(
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
       onTap: () => setState(() => _selectedTopTab = index),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -419,7 +421,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
               itemBuilder: (ctx, i) {
                 final c = _categories[i];
                 final sel = _selectedCategoryIndex == i;
-                return GestureDetector(
+                return InkWell(
+      borderRadius: BorderRadius.circular(8),
                   onTap: () => setState(() => _selectedCategoryIndex = i),
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 6),
@@ -483,7 +486,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
           const Divider(height: 1, color: Color(0xFFE4E0D8)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: GestureDetector(
+            child: InkWell(
+      borderRadius: BorderRadius.circular(8),
               onTap: () => _showAddCategoryModal(context),
               child: const Row(
                 children: [
@@ -552,12 +556,21 @@ class _ServicesScreenState extends State<ServicesScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Items (${items.length})',
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF141A24))),
-              GestureDetector(
+              Flexible(
+                child: Text(
+                    items.every((i) => i['active'] as bool)
+                        ? 'Items (${items.length})'
+                        : 'Items (${items.length}) · '
+                            '${items.where((i) => !(i['active'] as bool)).length} inactive',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF141A24))),
+              ),
+              InkWell(
+      borderRadius: BorderRadius.circular(8),
                 onTap: () => _showAddItemModal(context),
                 child: const Row(
                   children: [
@@ -716,12 +729,36 @@ class _ServicesScreenState extends State<ServicesScreen> {
           const SizedBox(width: 12),
           Expanded(
             flex: 3,
-            child: Text(item['name'] as String,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF141A24))),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(item['name'] as String,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: active
+                              ? const Color(0xFF141A24)
+                              : const Color(0xFF94A3B8))),
+                ),
+                if (!active) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1EFEA),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('Off',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B))),
+                  ),
+                ],
+              ],
+            ),
           ),
           Expanded(
             flex: 2,
@@ -750,7 +787,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
             width: 60,
             child: Switch(
               value: active,
-              activeColor: const Color(0xFF182C4F),
               onChanged: (v) => context
                   .read<AppProvider>()
                   .updateGarmentItem(item['id'] as String, {'is_active': v}),
@@ -761,22 +797,30 @@ class _ServicesScreenState extends State<ServicesScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                GestureDetector(
-                  onTap: () => _showEditItemModal(context, item),
-                  child: const SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: Icon(Icons.edit_outlined,
-                        size: 16, color: Color(0xFF64748B)),
+                Tooltip(
+                  message: 'Edit item',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => _showEditItemModal(context, item),
+                    child: const SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: Icon(Icons.edit_outlined,
+                          size: 16, color: Color(0xFF64748B)),
+                    ),
                   ),
                 ),
-                GestureDetector(
-                  onTap: () => _showDeleteItemConfirm(context, item),
-                  child: const SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: Icon(Icons.delete_outline_rounded,
-                        size: 16, color: Color(0xFFDC2626)),
+                Tooltip(
+                  message: 'Delete item',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => _showDeleteItemConfirm(context, item),
+                    child: const SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: Icon(Icons.delete_outline_rounded,
+                          size: 16, color: Color(0xFFDC2626)),
+                    ),
                   ),
                 ),
               ],
@@ -1058,7 +1102,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      GestureDetector(
+                      InkWell(
+      borderRadius: BorderRadius.circular(8),
                         onTap: () => _showEditItemModal(context, item),
                         child: Container(
                           width: 28,
@@ -1188,7 +1233,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
   }
 
   Widget _buildAddNewItemCard() {
-    return GestureDetector(
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
       onTap: () => _showAddItemModal(context),
       child: Container(
         decoration: BoxDecoration(
@@ -1734,7 +1780,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                           children: [
                             Switch(
                               value: slot.isActive,
-                              activeColor: const Color(0xFF182C4F),
                               onChanged: (v) => _setSlotActive(slot, v),
                             ),
                             const SizedBox(width: 6),
@@ -1781,7 +1826,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       children: [
                         Switch(
                           value: slot.isActive,
-                          activeColor: const Color(0xFF182C4F),
                           onChanged: (v) => _setSlotActive(slot, v),
                         ),
                         const SizedBox(width: 10),
@@ -2235,7 +2279,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
-                    activeColor: const Color(0xFF182C4F),
                     title: const Text('Active',
                         style: TextStyle(
                             fontSize: 13,
@@ -2373,7 +2416,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
-                    activeColor: const Color(0xFF182C4F),
                     title: const Text('Active',
                         style: TextStyle(
                             fontSize: 13,
@@ -2690,7 +2732,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       dense: true,
-                      activeColor: const Color(0xFF182C4F),
                       title: Text(isActive ? 'Active' : 'Inactive',
                           style: const TextStyle(
                               fontSize: 13, fontWeight: FontWeight.w600)),

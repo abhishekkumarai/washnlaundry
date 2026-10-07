@@ -45,7 +45,8 @@ class RecentActivityCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          GestureDetector(
+          InkWell(
+            borderRadius: BorderRadius.circular(6),
             onTap: () => context.goSection(2),
             child: const Text(
               'View all',

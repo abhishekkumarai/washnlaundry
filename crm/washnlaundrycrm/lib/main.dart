@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
 import 'router.dart';
+import 'theme/app_theme.dart';
 import 'utils/role_views.dart';
 
 /// Flutter web excludes the mouse from [dragDevices], so any list that needs
@@ -79,24 +80,8 @@ class WashNLaundryCrmApp extends StatelessWidget {
         Locale('en', 'US'),
         Locale('zh', 'CN'),
       ],
-      theme: ThemeData(
-        useMaterial3: true,
-        // Same tokens as the marketing site (src/app/globals.css): warm paper
-        // background, near-black ink, navy primary, hairline warm borders.
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF182C4F),
-          primary: const Color(0xFF182C4F),
-          onPrimary: const Color(0xFFFAF9F6),
-          secondary: const Color(0xFF2563EB),
-          surface: const Color(0xFFF8F7F5),
-          onSurface: const Color(0xFF141A24),
-          outline: const Color(0xFFE4E0D8),
-          outlineVariant: const Color(0xFFECE9E2),
-        ),
-        textTheme: GoogleFonts.ibmPlexSansTextTheme(
-          Theme.of(context).textTheme,
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF8F7F5),
+      theme: buildAppTheme(
+        GoogleFonts.ibmPlexSansTextTheme(Theme.of(context).textTheme),
       ),
       routerConfig: router,
       // Overlays a spinner in place of whatever route matched underneath

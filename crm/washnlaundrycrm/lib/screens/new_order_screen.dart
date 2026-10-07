@@ -236,10 +236,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     final ordered = <String>[
       for (final c in provider.categories) c.name,
     ];
-    final categoryNames = <String>{
+    final allCategoryNames = <String>{
       ...ordered.where((n) => garments.any((g) => g.categoryName == n)),
       ...garments.map((g) => g.categoryName),
-    }.toList();
+    };
 
     // A category's own `isActive` is a separate flag from each item's —
     // GarmentItemModel doesn't carry a reference to it, so it's looked up
@@ -257,9 +257,21 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     // `garments` list, not this one) — only the browsing grid hides them,
     // matching Services' Items list, which now always hides inactive items
     // too rather than offering a toggle to reveal them.
+    // Only categories you can actually order from get a chip: active, and with
+    // at least one active item. (Services still lists the rest, shown as off.)
+    final categoryNames = allCategoryNames
+        .where((n) =>
+            !inactiveCategoryNames.contains(n) &&
+            garments.any((g) => g.categoryName == n && g.isActive))
+        .toList();
+    // A chip that has just disappeared (its category was switched off) must not
+    // leave the grid filtered to nothing with no chip highlighted.
+    final selectedCategory =
+        categoryNames.contains(_selectedCategory) ? _selectedCategory : '';
+
     final filteredItems = garments.where((item) {
       final matchesCategory =
-          _selectedCategory.isEmpty || item.categoryName == _selectedCategory;
+          selectedCategory.isEmpty || item.categoryName == selectedCategory;
       final matchesSearch = _searchQuery.isEmpty ||
           item.name.toLowerCase().contains(_searchQuery.toLowerCase());
       final categoryIsActive =
@@ -358,7 +370,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                       itemBuilder: (context, idx) {
                         final label = idx == 0 ? 'All' : categoryNames[idx - 1];
                         final value = idx == 0 ? '' : categoryNames[idx - 1];
-                        final isSel = value == _selectedCategory;
+                        final isSel = value == selectedCategory;
                         return ChoiceChip(
                           label: Text(label,
                               style: TextStyle(
@@ -2208,7 +2220,8 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
   }
 
   Widget _tab(String label, bool selected, VoidCallback onTap) {
-    return GestureDetector(
+    return InkWell(
+      borderRadius: BorderRadius.circular(6),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),

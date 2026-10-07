@@ -29,6 +29,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
   String _searchQuery = '';
   CustomerModel? _selected;
 
+  /// The list renders this many customers at a time, with a "Show more"
+  /// button, so a shop with thousands of customers doesn't build every row at
+  /// once. It resets to one page whenever the search or the tab filter changes.
+  static const _pageSize = 50;
+  int _visibleCount = _pageSize;
+
   /// Which KPI card is acting as the active filter tab. 'all' means no
   /// extra filter beyond the search box.
   String _kpiFilter = 'all';
@@ -163,7 +169,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
-                      onChanged: (v) => setState(() => _searchQuery = v),
+                      onChanged: (v) => setState(() {
+                        _searchQuery = v;
+                        _visibleCount = _pageSize;
+                      }),
                       style: const TextStyle(fontSize: 13),
                       textAlign: TextAlign.center,
                       decoration: const InputDecoration(
@@ -290,7 +299,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
-                      onChanged: (v) => setState(() => _searchQuery = v),
+                      onChanged: (v) => setState(() {
+                        _searchQuery = v;
+                        _visibleCount = _pageSize;
+                      }),
                       style: const TextStyle(fontSize: 13),
                       textAlign: TextAlign.center,
                       decoration: const InputDecoration(
@@ -389,7 +401,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
       String tabKey, String label, String value, IconData icon, Color color) {
     final isSel = _kpiFilter == tabKey;
     return InkWell(
-      onTap: () => setState(() => _kpiFilter = tabKey),
+      onTap: () => setState(() {
+        _kpiFilter = tabKey;
+        _visibleCount = _pageSize;
+      }),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -437,6 +452,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
     AppProvider provider,
     bool narrow,
   ) {
+    final total = customers.length;
+    if (total > _visibleCount) customers = customers.sublist(0, _visibleCount);
     return Container(
       decoration: _panel,
       child: Column(
@@ -506,6 +523,34 @@ class _CustomersScreenState extends State<CustomersScreen> {
             ),
             for (final c in customers) _row(c, _lastOrderFor(c, lastOrders)),
           ],
+          if (total > customers.length) _showMoreBar(customers.length, total),
+        ],
+      ),
+    );
+  }
+
+  /// Footer under a windowed list: how many are showing, and a button for
+  /// the next page.
+  Widget _showMoreBar(int shown, int total) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFE4E0D8))),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          Text('Showing $shown of $total',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          OutlinedButton(
+            onPressed: () => setState(() => _visibleCount += _pageSize),
+            child: Text(
+                'Show ${total - shown < _pageSize ? total - shown : _pageSize} more'),
+          ),
         ],
       ),
     );

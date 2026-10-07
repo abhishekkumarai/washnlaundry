@@ -205,7 +205,8 @@ class _ScanScreenState extends State<ScanScreen>
                 child: Row(
                   children: [
                     Expanded(
-                      child: GestureDetector(
+                      child: InkWell(
+      borderRadius: BorderRadius.circular(8),
                         onTap: () => setState(() => _selectedMode = 0),
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -250,7 +251,8 @@ class _ScanScreenState extends State<ScanScreen>
                       ),
                     ),
                     Expanded(
-                      child: GestureDetector(
+                      child: InkWell(
+      borderRadius: BorderRadius.circular(8),
                         onTap: () => setState(() => _selectedMode = 1),
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),

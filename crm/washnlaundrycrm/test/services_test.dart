@@ -104,17 +104,37 @@ void main() {
       // The card used to hardcode "/ pc" and "Per piece" for every row.
       expect(find.text(' / pc'), findsWidgets);
       expect(find.text(' / kg'), findsOneWidget);
-      expect(find.text(' / set'), findsOneWidget);
+      // Two SET items: Sofa Cover, and the inactive Retired Item (still listed).
+      expect(find.text(' / set'), findsNWidgets(2));
       expect(find.text('Per kg'), findsOneWidget);
     });
 
-    testWidgets('inactive items are always hidden from the Items list',
+    testWidgets('inactive items stay listed, marked off, so they can be re-enabled',
         (tester) async {
+      // Hiding them made a switched-off item vanish from the only screen that
+      // can switch it back on.
       await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
       await tester.pump();
 
-      expect(find.text('Retired Item'), findsNothing);
-      expect(find.text('Inactive'), findsNothing);
+      expect(find.text('Retired Item'), findsOneWidget);
+      expect(find.text('Items (4) · 1 inactive'), findsOneWidget);
+      expect(find.text('Off'), findsOneWidget);
+      // One switch per item, and exactly the retired one is off.
+      final switches =
+          tester.widgetList<Switch>(find.byType(Switch)).map((s) => s.value);
+      expect(switches.where((on) => !on).length, 1);
+      expect(switches.where((on) => on).length, 3);
+    });
+
+    testWidgets('with every item active the header shows no inactive note',
+        (tester) async {
+      final active = _catalogue.where((g) => g.isActive).toList();
+      await tester.pumpWidget(
+          host(_seeded(garments: active), const ServicesScreen()));
+      await tester.pump();
+
+      expect(find.text('Items (3)'), findsOneWidget);
+      expect(find.text('Off'), findsNothing);
     });
 
     testWidgets('an inactive category reads Inactive, not a hardcoded Active',

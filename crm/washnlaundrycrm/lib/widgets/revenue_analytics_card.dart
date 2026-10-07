@@ -109,7 +109,8 @@ class RevenueAnalyticsCard extends StatelessWidget {
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerRight,
-            child: GestureDetector(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(6),
               onTap: () => context.goSection(9),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,

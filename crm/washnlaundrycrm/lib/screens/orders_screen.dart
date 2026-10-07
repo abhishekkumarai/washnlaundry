@@ -1448,7 +1448,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
     required bool selected,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -1486,7 +1487,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Widget _statusRadio(String label, bool selected, VoidCallback onTap) {
-    return GestureDetector(
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

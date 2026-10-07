@@ -106,13 +106,11 @@ class _PanelCardState extends State<PanelCard> {
     );
 
     if (widget.collapsible) {
-      header = MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: _toggle,
-          child: header,
-        ),
+      // InkWell brings the click cursor, hover/focus and button semantics.
+      header = InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: _toggle,
+        child: header,
       );
     }
 

@@ -130,6 +130,47 @@ void main() {
       expect(find.text('Old Service Item'), findsNothing);
     });
 
+    testWidgets(
+        'categories you cannot order from get no filter chip (inactive, or all items off)',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(
+          garments: const [
+            GarmentItemModel(
+                id: '1',
+                categoryId: 'c1',
+                categoryName: 'Ironing',
+                name: 'Shirt',
+                price: 15),
+            GarmentItemModel(
+                id: '2',
+                categoryId: 'c2',
+                categoryName: 'Retired Category',
+                name: 'Old Service Item',
+                price: 40),
+            GarmentItemModel(
+                id: '3',
+                categoryId: 'c3',
+                categoryName: 'Emptied Category',
+                name: 'Switched Off Item',
+                price: 25,
+                isActive: false),
+          ],
+          categories: const [
+            GarmentCategoryModel(id: 'c1', name: 'Ironing'),
+            GarmentCategoryModel(
+                id: 'c2', name: 'Retired Category', isActive: false),
+            GarmentCategoryModel(id: 'c3', name: 'Emptied Category'),
+          ],
+        );
+      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pump();
+
+      expect(find.text('Ironing'), findsWidgets);
+      expect(find.text('Retired Category'), findsNothing);
+      expect(find.text('Emptied Category'), findsNothing);
+    });
+
     testWidgets('items are not hidden when categories were never seeded',
         (tester) async {
       // A category name absent from provider.categories entirely (not

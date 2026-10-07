@@ -276,6 +276,71 @@ void main() {
     });
   });
 
+  group('CustomersScreen paging', () {
+    List<CustomerModel> many(int n) => [
+          for (var i = 1; i <= n; i++)
+            CustomerModel(
+              id: 'c$i',
+              name: 'Customer ${i.toString().padLeft(3, '0')}',
+              phone: '9${i.toString().padLeft(9, '0')}',
+              email: 'c$i@example.com',
+              area: 'Area',
+            ),
+        ];
+
+    testWidgets('shows 50 at a time and loads more on request', (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(customers: many(120));
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      expect(find.text('Showing 50 of 120'), findsOneWidget);
+      expect(find.text('Customer 050'), findsOneWidget);
+      expect(find.text('Customer 051'), findsNothing);
+
+      await tester.ensureVisible(find.text('Show 50 more'));
+      await tester.tap(find.text('Show 50 more'));
+      await tester.pump();
+      expect(find.text('Showing 100 of 120'), findsOneWidget);
+      expect(find.text('Customer 100'), findsOneWidget);
+
+      // The last page is only the remainder, and then the bar goes away.
+      await tester.ensureVisible(find.text('Show 20 more'));
+      await tester.tap(find.text('Show 20 more'));
+      await tester.pump();
+      expect(find.textContaining('Showing'), findsNothing);
+      expect(find.text('Customer 120'), findsOneWidget);
+    });
+
+    testWidgets('a short list has no paging bar', (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(customers: many(50));
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      expect(find.textContaining('Showing'), findsNothing);
+      expect(find.textContaining('more'), findsNothing);
+    });
+
+    testWidgets('searching starts again from the first page', (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(customers: many(120));
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      await tester.ensureVisible(find.text('Show 50 more'));
+      await tester.tap(find.text('Show 50 more'));
+      await tester.pump();
+      expect(find.text('Showing 100 of 120'), findsOneWidget);
+
+      // "Customer 1" matches 001-019 and 100-120: 40 customers, one page.
+      await tester.enterText(find.byType(TextField).first, 'Customer 1');
+      await tester.pump();
+      expect(find.textContaining('Showing'), findsNothing);
+      expect(find.text('Customer 119'), findsOneWidget);
+    });
+  });
+
   group('CustomersScreen responsive layout', () {
     Future<void> pumpAt(WidgetTester tester, double width) async {
       tester.view

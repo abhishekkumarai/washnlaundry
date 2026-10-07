@@ -1184,8 +1184,10 @@ class _StaffScreenState extends State<StaffScreen> {
                 value: isActive,
                 activeThumbColor: Colors.white,
                 activeTrackColor: const Color(0xFF10B981),
-                inactiveThumbColor: Colors.white,
-                inactiveTrackColor: const Color(0xFFD9D5CB),
+                // Off is faded (same as the app theme's switches).
+                inactiveThumbColor: Colors.white.withValues(alpha: 0.7),
+                inactiveTrackColor:
+                    const Color(0xFFD9D5CB).withValues(alpha: 0.6),
                 trackOutlineColor:
                     WidgetStateProperty.all(Colors.transparent),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,

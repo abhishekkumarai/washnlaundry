@@ -116,7 +116,8 @@ class StoreHealthCard extends StatelessWidget {
                 style:
                     const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
               ),
-              GestureDetector(
+              InkWell(
+                borderRadius: BorderRadius.circular(6),
                 onTap: () => context.goSection(9),
                 child: const Row(
                   children: [
