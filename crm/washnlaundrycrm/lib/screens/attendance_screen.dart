@@ -203,12 +203,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: const AppDrawer(),
       body: AppShell(
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            final narrow =
-                constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
-            return _body(provider, roster, formattedDate, narrow);
-          },
+        body: Column(
+          children: [
+            _topBar(),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final narrow = constraints.maxWidth <
+                      SidebarNavigation.contentWideBreakpoint;
+                  return _body(provider, roster, formattedDate, narrow);
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -222,16 +229,26 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         : base;
   }
 
-  static const _pageTitle = Text(
-    'Attendance',
-    style: TextStyle(
-      fontSize: 24,
-      fontWeight: FontWeight.bold,
-      color: Color(0xFF0F172A),
-    ),
-  );
+  /// The page header bar the other pages have: white, 64px, bottom border.
+  Widget _topBar() => Container(
+        height: 64,
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        ),
+        child: const Text(
+          'Attendance',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+      );
 
-  /// Live layout: title, then the date button and ‹ › beside it on the left;
+  /// Live layout: the date button and ‹ › on the left;
   /// the view toggle and "Mark all present" on the right.
   Widget _wideHeader() {
     final provider = context.read<AppProvider>();
@@ -249,8 +266,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _pageTitle,
-              const SizedBox(width: 14),
               _dateNavigationControls(_dateButtonLabel),
             ],
           ),
@@ -272,8 +287,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _pageTitle,
-        const SizedBox(height: 10),
         _dateNavigationControls(_dateButtonLabel, isNarrow: true),
         const SizedBox(height: 8),
         SizedBox(
