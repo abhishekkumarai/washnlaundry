@@ -18,7 +18,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from . import customer_import
-from .auth import IsOwner, IsOwnerOrStaffReadOnly
+from .auth import CUSTOMER, IsOwner, IsOwnerOrStaffReadOnly, normalize_phone
 from .services.rag_service import RagService, RagServiceError
 from .services.email_service import EmailService
 from .models import (
@@ -198,6 +198,14 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Order.objects.prefetch_related('items').all().order_by('-created_at')
+        # A signed-in customer only ever sees orders whose phone matches theirs
+        # (last 10 digits, so +91 / spaces / dashes don't matter).
+        user = self.request.user
+        if getattr(user, 'role', None) == CUSTOMER and user.customer:
+            mine = normalize_phone(user.customer.phone)
+            ids = [pk for pk, phone in Order.objects.values_list('id', 'customer_phone')
+                   if mine and normalize_phone(phone) == mine]
+            qs = qs.filter(id__in=ids)
         status_filter = (self.request.query_params.get('status') or '').upper()
         today = timezone.localdate()
 

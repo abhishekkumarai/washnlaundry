@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../providers/auth_provider.dart';
 import '../models/order_model.dart';
 import '../utils/csv.dart';
 import '../utils/csv_download.dart';
@@ -799,8 +800,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          _filtersButton(),
+          if (!_isCustomerView) ...[
+            const SizedBox(width: 8),
+            _filtersButton(),
+          ],
           const SizedBox(width: 8),
           _exportButton(filteredOrders),
           const SizedBox(width: 8),
@@ -886,8 +889,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   const SizedBox(width: 8),
                   _calendarHeatmapButton(provider),
                 ],
-                const SizedBox(width: 8),
-                _filtersButton(),
+                if (!_isCustomerView) ...[
+                  const SizedBox(width: 8),
+                  _filtersButton(),
+                ],
                 const SizedBox(width: 8),
                 _exportButton(filteredOrders),
               ],
@@ -977,6 +982,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
       ),
     );
   }
+
+  /// The signed-in role (customers load the owner's data, so AppProvider.role
+  /// can't tell).
+  bool get _isCustomerView =>
+      Provider.of<AuthProvider>(context, listen: false).role == 'customer';
 
   Widget _filtersButton() {
     return OutlinedButton.icon(

@@ -2397,6 +2397,35 @@ class RoleAuthTests(APITestCase):
         res = self.client.get('/api/customer/orders/', **self.auth)
         self.assertEqual([o['order_number'] for o in res.json()['orders']], ['WL-1'])
 
+    def test_customer_orders_list_is_limited_to_their_phone(self):
+        alices = Order.objects.get(customer=self.alice)
+        bobs = Order.objects.create(customer=self.bob, customer_name='Bob')
+        Order.objects.filter(pk=alices.pk).update(customer_phone='+91 91111-11111')
+        Order.objects.filter(pk=bobs.pk).update(customer_phone='9222222222')
+        self.as_('alice@example.com')
+        res = self.client.get('/api/orders/', **self.auth)
+        self.assertEqual([o['id'] for o in res.json()], [str(alices.pk)])
+        # Someone else's order is a plain 404, not readable by id either.
+        self.assertEqual(self.client.get(f'/api/orders/{bobs.pk}/', **self.auth).status_code, 404)
+        self.as_('owner@shop.com')
+        self.assertEqual(len(self.client.get('/api/orders/', **self.auth).json()), 2)
+
+    def test_customer_order_has_no_delivery_charge_or_discount(self):
+        self.as_('alice@example.com')
+        body = {
+            'customer': str(self.bob.pk), 'customer_name': 'Bob', 'customer_phone': '9222222222',
+            'delivery_type': 'HOME_PICKUP', 'delivery_charge': 50, 'discount_amount': 5,
+            'subtotal': 1, 'total_amount': 1, 'paid_amount': 999,
+            'items': [{'item_title': 'Shirt', 'service_type': 'IRON', 'quantity': 2, 'unit_price': 15, 'total_price': 30}],
+        }
+        res = self.client.post('/api/orders/', body, format='json', **self.auth)
+        self.assertEqual(res.status_code, 201, res.content)
+        data = res.json()
+        self.assertEqual(data['customer'], str(self.alice.pk))
+        self.assertEqual(data['customer_phone'], '9111111111')
+        self.assertEqual((data['delivery_charge'], data['discount_amount']), (0, 0))
+        self.assertEqual((data['subtotal'], data['total_amount'], data['paid_amount']), (30, 30, 0))
+
     def test_me_reports_role(self):
         self.as_('sam@shop.com')
         self.assertEqual(self.client.get('/api/me/', **self.auth).json()['role'], 'staff')

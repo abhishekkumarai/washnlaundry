@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
 import '../providers/app_provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
@@ -61,7 +62,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
     final order = _orderFrom(provider);
-    final isCustomer = provider.role == 'customer';
+    // The signed-in role, not AppProvider.role (customers load the owner's data).
+    final isCustomer = context.watch<AuthProvider>().role == 'customer';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -174,9 +176,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 _canEditOrder(order) ? _showEditOrder : null),
             const SizedBox(width: 8),
           ],
-          _headerButton('Print Receipt', Icons.print_outlined,
-              const Color(0xFF475569), () => _toast('Sent to the printer.')),
           if (!isCustomer) ...[
+            _headerButton('Print Receipt', Icons.print_outlined,
+                const Color(0xFF475569), () => _toast('Sent to the printer.')),
             const SizedBox(width: 8),
             FilledButton.icon(
               onPressed: _canUpdateStatus(order) ? _showUpdateStatus : null,
@@ -258,13 +260,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: const Text('Print Receipt'),
                 ),
               ],
-            ),
-          ] else ...[
-            IconButton(
-              tooltip: 'Print Receipt',
-              icon: const Icon(Icons.print_outlined,
-                  size: 20, color: Color(0xFF475569)),
-              onPressed: () => _toast('Sent to the printer.'),
             ),
           ],
         ],

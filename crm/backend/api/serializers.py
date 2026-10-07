@@ -72,6 +72,15 @@ class OrderSerializer(serializers.ModelSerializer):
         from django.utils import timezone
 
         items_data = validated_data.pop('items', [])
+        user = getattr(self.context.get('request'), 'user', None)
+        if getattr(user, 'role', None) == 'customer' and getattr(user, 'customer', None):
+            # A customer orders for themselves: no delivery charge, no discount,
+            # nothing prepaid, and totals come from the items, not the client.
+            c = user.customer
+            validated_data.update(
+                customer=c, customer_name=c.name, customer_phone=c.phone,
+                delivery_charge=0.0, discount_amount=0.0, paid_amount=0.0,
+                subtotal=0.0, total_amount=0.0)
         order = Order(**validated_data)
         if not order.placed_at:
             order.placed_at = timezone.now()

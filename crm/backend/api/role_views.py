@@ -22,7 +22,8 @@ def me(request):
     if user.role == CUSTOMER:
         c = user.customer
         data['customer'] = {
-            'name': c.name, 'email': c.email, 'phone': c.phone,
+            'id': str(c.id), 'name': c.name, 'email': c.email, 'phone': c.phone,
+            'address': c.address, 'area': c.area,
             'total_orders': c.total_orders, 'total_spent': c.total_spent,
             'due_amount': c.due_amount,
         }
