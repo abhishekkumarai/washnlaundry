@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/role_views.dart';
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
 import '../widgets/app_date_picker.dart';
@@ -166,9 +167,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   /// A signed-in customer places orders for themselves: their own name and
   /// number instead of the walk-in placeholder, and no picker.
   CustomerModel? _signedInCustomer() {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    if (auth.role != 'customer') return null;
-    final me = auth.me?['customer'];
+    final auth = context.read<AuthProvider?>();
+    if (auth?.role != 'customer') return null;
+    final me = auth?.me?['customer'];
     if (me is! Map || '${me['id'] ?? ''}'.isEmpty) return null;
     return CustomerModel(
       id: '${me['id']}',
@@ -187,7 +188,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       : DeliveryType.storePickup;
 
   bool get _isSelfCustomer =>
-      Provider.of<AuthProvider>(context, listen: false).role == 'customer' &&
+      context.signedInRoleOnce == 'customer' &&
       _customer != null;
 
   static const _walkInName = 'Walk-in customer';

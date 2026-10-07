@@ -305,7 +305,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
         ? _navItems.where((i) => staffNav.contains(i['index'])).toList()
         : _navItems;
     // Views hidden for the signed-in role in assets/config/role_views.json.
-    final authRole = context.watch<AuthProvider>().role;
+    final authRole = context.signedInRole;
     items = items
         .where((i) => !RoleViews.isLabelHidden(authRole, i['label'] as String))
         .toList();
@@ -473,24 +473,24 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     // sends the app back to /login — true for a real Google session or a
     // Demo Mode one, since AuthProvider.signOut() clears either.
     void signOut() {
-      context.read<AuthProvider>().signOut();
+      context.read<AuthProvider?>()?.signOut();
     }
 
     // The shop from `/api/shops/` or customer session from AuthProvider.
-    final auth = context.watch<AuthProvider>();
+    final auth = context.watch<AuthProvider?>();
     // The signed-in role (AppProvider.role is "owner" for customers).
-    final isCustomer = auth.role == 'customer';
+    final isCustomer = auth?.role == 'customer';
     final shop = context.watch<AppProvider>().shop;
     final shopName = (shop?['name'] as String?)?.trim() ?? '';
     final ownerName = (shop?['owner_name'] as String?)?.trim() ?? '';
 
     final title = isCustomer
-        ? (auth.userName?.isNotEmpty == true
-            ? auth.userName!
-            : (auth.me?['customer']?['name'] as String?) ?? 'Customer')
+        ? (auth?.userName?.isNotEmpty == true
+            ? auth!.userName!
+            : (auth?.me?['customer']?['name'] as String?) ?? 'Customer')
         : (shopName.isEmpty ? 'Your shop' : shopName);
     final subtitle = isCustomer
-        ? (auth.userEmail ?? 'Customer')
+        ? (auth?.userEmail ?? 'Customer')
         : (ownerName.isEmpty ? 'Admin' : ownerName);
     final avatarSource = isCustomer ? title : (ownerName.isEmpty ? shopName : ownerName);
 
@@ -638,7 +638,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
             _helpContactRow(
               icon: Icons.email_outlined,
               label: 'Email Support',
-              value: 'support@laundrybill.com',
+              value: 'support@washnlaundry.com',
             ),
             const SizedBox(height: 10),
             _helpContactRow(

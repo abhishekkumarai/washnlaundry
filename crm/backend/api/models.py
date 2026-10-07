@@ -6,8 +6,8 @@ import uuid
 
 
 # ── Canonical vocabularies ────────────────────────────────────────────────────
-# These mirror app.laundrybill.com. Do not invent new values in seeds, views or
-# the Flutter client — import/refer to these instead.
+# Do not invent new values in seeds, views or the Flutter client —
+# import/refer to these instead.
 
 class OrderStatus(models.TextChoices):
     PLACED = 'PLACED', 'Placed'
@@ -74,7 +74,7 @@ class ExpenseCategory(models.TextChoices):
 # ── Shop ──────────────────────────────────────────────────────────────────────
 
 class Shop(models.Model):
-    name = models.CharField(max_length=255, default='LaundryBill Express')
+    name = models.CharField(max_length=255, default='WashNLaundry Express')
     owner_name = models.CharField(max_length=255, default='Aditya Sharma')
     phone = models.CharField(max_length=50, default='+91 98765 43210')
     whatsapp = models.CharField(max_length=50, blank=True, default='')

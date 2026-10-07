@@ -50,7 +50,7 @@ void main() {
       await auth.signInAsDemo();
 
       expect(auth.isSignedIn, isTrue);
-      expect(auth.userEmail, 'demo@laundrybill.com');
+      expect(auth.userEmail, 'demo@washnlaundry.com');
       expect(auth.userName, 'Demo Owner');
       expect(auth.error, isNull);
 
@@ -60,7 +60,7 @@ void main() {
       final restored = AuthProvider();
       await Future<void>.delayed(Duration.zero);
       expect(restored.isSignedIn, isTrue);
-      expect(restored.userEmail, 'demo@laundrybill.com');
+      expect(restored.userEmail, 'demo@washnlaundry.com');
     });
 
     test('signOut clears both the in-memory and persisted session', () async {

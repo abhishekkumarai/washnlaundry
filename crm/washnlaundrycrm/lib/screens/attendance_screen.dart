@@ -12,7 +12,7 @@ import '../widgets/sidebar_navigation.dart';
 
 enum AttendanceViewMode { day, month, habits }
 
-/// `/attendance` screen replicating the live app at https://app.laundrybill.com/attendance
+/// `/attendance` screen.
 /// Includes:
 /// 1. Header with date picker, prev/next day steppers, Day/Month view toggles,
 ///    and "Mark all present" button.

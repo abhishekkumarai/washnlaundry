@@ -5,6 +5,7 @@ import '../models/garment_model.dart';
 import '../models/order_model.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/role_views.dart';
 import '../services/api_service.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
@@ -63,7 +64,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final provider = context.watch<AppProvider>();
     final order = _orderFrom(provider);
     // The signed-in role, not AppProvider.role (customers load the owner's data).
-    final isCustomer = context.watch<AuthProvider>().role == 'customer';
+    final isCustomer = context.signedInRole == 'customer';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),

@@ -300,12 +300,12 @@ class AuthProvider extends ChangeNotifier {
     _isDemo = true;
     _role = 'owner';
     _isPersistedSignedIn = true;
-    _persistedEmail = 'demo@laundrybill.com';
+    _persistedEmail = 'demo@washnlaundry.com';
     _persistedName = 'Demo Owner';
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('is_signed_in', true);
     await prefs.setBool('is_demo', true);
-    await prefs.setString('user_email', 'demo@laundrybill.com');
+    await prefs.setString('user_email', 'demo@washnlaundry.com');
     await prefs.setString('user_name', 'Demo Owner');
     _error = null;
     notifyListeners();

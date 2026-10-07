@@ -1,4 +1,4 @@
-"""Tests for the LaundryBill CRM API.
+"""Tests for the WashNLaundry CRM API.
 
 Focus is on the things that were previously broken or unmodelled: the status
 vocabulary, order numbering, the timeline stamps, delivery charges, derived

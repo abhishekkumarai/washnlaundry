@@ -1,7 +1,7 @@
-"""Seed the database with data mirroring the live app.laundrybill.com account.
+"""Seed the database with demo data.
 
-The 79-item catalogue below was captured from the live app on 2026-07-30; the
-per-category counts and price ranges match it exactly.
+The 79-item catalogue below was captured on 2026-07-30; the per-category
+counts and price ranges match it exactly.
 
 WARNING: this wipes every table before seeding.
 """

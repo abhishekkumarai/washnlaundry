@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/role_views.dart';
 import '../models/order_model.dart';
 import '../utils/csv.dart';
 import '../utils/csv_download.dart';
@@ -986,7 +987,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   /// The signed-in role (customers load the owner's data, so AppProvider.role
   /// can't tell).
   bool get _isCustomerView =>
-      Provider.of<AuthProvider>(context, listen: false).role == 'customer';
+      context.signedInRoleOnce == 'customer';
 
   Widget _filtersButton() {
     return OutlinedButton.icon(
@@ -1136,8 +1137,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  /// Matches the real app's own "Filter Orders" dialog section-for-section
-  /// (compared side by side against `app.laundrybill.com/orders`): Attention
+  /// The "Filter Orders" dialog: Attention
   /// Needed, Order Source, Order Type, Service type, Status. Edits a scratch
   /// copy of everything — including Status, which otherwise writes straight
   /// into [_selectedTab] — so Cancel truly cancels.

@@ -224,7 +224,7 @@ void main() {
     // Dialog is displayed
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('Help & Support'), findsOneWidget);
-    expect(find.text('support@laundrybill.com'), findsOneWidget);
+    expect(find.text('support@washnlaundry.com'), findsOneWidget);
 
     // selected nav index does not change
     expect(provider.currentNavIndex, 0);

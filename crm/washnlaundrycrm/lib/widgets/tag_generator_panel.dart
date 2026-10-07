@@ -611,7 +611,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
                 style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
           const SizedBox(height: 6),
           QrImageView(
-            data: 'https://app.laundrybill.com/track/${_order.orderNumber}',
+            data: 'https://app.washnlaundry.com/track/${_order.orderNumber}',
             version: QrVersions.auto,
             size: 100,
           ),

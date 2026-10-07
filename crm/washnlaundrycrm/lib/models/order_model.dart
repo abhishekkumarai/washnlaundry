@@ -1,8 +1,8 @@
 import 'garment_model.dart';
 
-/// Canonical order statuses. Mirrors `OrderStatus` in the backend, which in
-/// turn mirrors app.laundrybill.com. Never compare against ad-hoc strings —
-/// use these constants so the three layers can't drift apart again.
+/// Canonical order statuses. Mirrors `OrderStatus` in the backend. Never
+/// compare against ad-hoc strings — use these constants so the layers can't
+/// drift apart again.
 class OrderStatus {
   static const placed = 'PLACED';
   static const processing = 'PROCESSING';
