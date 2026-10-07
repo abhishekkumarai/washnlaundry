@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:washnlaundrycrm/models/garment_model.dart';
 import 'package:washnlaundrycrm/models/order_model.dart';
@@ -423,6 +424,22 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Pickup slot'), findsNothing);
       expect(find.text('Delivery address'), findsOneWidget);
+    });
+
+    testWidgets('Home pickup: delivery date is always after the pickup date',
+        (tester) async {
+      await pumpWithItemInCart(tester);
+      await tester.tap(find.text('Checkout • ₹15'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Home pickup'));
+      await tester.pumpAndSettle();
+
+      final today = DateUtils.dateOnly(DateTime.now());
+      final fmt = DateFormat('EEE d MMM');
+      // Pickup defaults to today, delivery to tomorrow - never the same day.
+      expect(find.text(fmt.format(today)), findsOneWidget);
+      expect(find.text(fmt.format(today.add(const Duration(days: 1)))),
+          findsOneWidget);
     });
 
     testWidgets("slots come from the shop's own configured time slots",

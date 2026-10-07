@@ -995,16 +995,20 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   /// A bordered date row: calendar icon, small label over the date, chevron.
   Widget _dateField(
-      String label, DateTime date, ValueChanged<DateTime> onPicked) {
+      String label, DateTime date, ValueChanged<DateTime> onPicked,
+      {DateTime? minDate}) {
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: () async {
         final today = DateUtils.dateOnly(DateTime.now());
+        // `minDate` lets a field start later than today (Delivery date can't
+        // be on or before the Pickup date).
+        final first = minDate == null || minDate.isBefore(today) ? today : minDate;
         final picked = await AppDatePicker.pickDate(
           context: context,
-          initialDate: date.isBefore(today) ? today : date,
-          firstDate: today,
-          lastDate: today.add(const Duration(days: 60)),
+          initialDate: date.isBefore(first) ? first : date,
+          firstDate: first,
+          lastDate: first.add(const Duration(days: 60)),
         );
         if (picked != null) setState(() => onPicked(DateUtils.dateOnly(picked)));
       },
@@ -1132,6 +1136,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                           _isWindowPast(d, _pickupWindow!)) {
                         _pickupWindow = null;
                       }
+                      // Delivery is always after pickup: push it out if the
+                      // new pickup date caught up with it.
+                      if (!_readyBy!.isAfter(d)) {
+                        _readyBy = d.add(const Duration(days: 1));
+                        _deliveryWindow = null;
+                      }
                     }),
                     _fieldLabel('Pickup slot'),
                     _slotPicker(
@@ -1148,7 +1158,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                         _isWindowPast(d, _deliveryWindow!)) {
                       _deliveryWindow = null;
                     }
-                  }),
+                  },
+                      minDate: isPickup
+                          ? _pickupDate!.add(const Duration(days: 1))
+                          : null),
                   _fieldLabel('Delivery slot'),
                   _slotPicker(
                     windows: _windowsFor(provider, TimeSlotModel.delivery),
@@ -1977,6 +1990,19 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     if (missingSlot != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(missingSlot, style: const TextStyle(fontSize: 13))),
+      );
+      return;
+    }
+    // The delivery date must be after the pickup date (the pickers already
+    // enforce it; this guards any other path to checkout).
+    if (_deliveryType == DeliveryType.homePickup &&
+        _pickupDate != null &&
+        _readyBy != null &&
+        !_readyBy!.isAfter(_pickupDate!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Delivery date must be after the pickup date',
+                style: TextStyle(fontSize: 13))),
       );
       return;
     }
