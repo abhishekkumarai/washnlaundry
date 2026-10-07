@@ -9,7 +9,7 @@ import io
 from datetime import date, time, timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -2240,3 +2240,73 @@ class PublicPickupFormTests(APITestCase):
         with mock.patch('api.services.email_service.requests.post', return_value=self._resp(500)):
             self.assertEqual(self._post().status_code, 201)
         self.assertEqual(Lead.objects.get().email_status, Lead.PENDING)
+
+
+class CustomerPortalTests(TestCase):
+    """/api/customer/*: Google-token-scoped, minimal, own-orders-only."""
+
+    def setUp(self):
+        from unittest import mock
+        self.alice = Customer.objects.create(name='Alice', phone='111', email='Alice@Example.com')
+        self.bob = Customer.objects.create(name='Bob', phone='222', email='bob@example.com')
+        self.order = Order.objects.create(
+            order_number='WL-1', customer=self.alice, customer_name='Alice', notes='staff only')
+        Order.objects.create(order_number='WL-2', customer=self.bob, customer_name='Bob')
+        patcher = mock.patch('api.customer_views.id_token.verify_oauth2_token')
+        self.verify = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.verify.return_value = {'email': 'alice@example.com', 'email_verified': True}
+        override = override_settings(GOOGLE_CLIENT_ID='test-client')
+        override.enable()
+        self.addCleanup(override.disable)
+        self.auth = {'HTTP_AUTHORIZATION': 'Bearer tok'}
+
+    def test_requires_token(self):
+        self.assertEqual(self.client.get('/api/customer/orders/').status_code, 401)
+
+    def test_invalid_token_is_401(self):
+        self.verify.side_effect = ValueError('bad')
+        self.assertEqual(self.client.get('/api/customer/me/', **self.auth).status_code, 401)
+
+    def test_unverified_email_is_401(self):
+        self.verify.return_value = {'email': 'alice@example.com', 'email_verified': False}
+        self.assertEqual(self.client.get('/api/customer/me/', **self.auth).status_code, 401)
+
+    def test_unknown_email_is_404(self):
+        self.verify.return_value = {'email': 'nobody@example.com', 'email_verified': True}
+        self.assertEqual(self.client.get('/api/customer/me/', **self.auth).status_code, 404)
+
+    def test_lists_only_own_orders_without_staff_fields(self):
+        res = self.client.get('/api/customer/orders/', **self.auth)
+        self.assertEqual(res.status_code, 200)
+        orders = res.json()['orders']
+        self.assertEqual([o['order_number'] for o in orders], ['WL-1'])
+        self.assertNotIn('notes', orders[0])
+
+    def test_other_customers_order_is_404(self):
+        self.assertEqual(self.client.get('/api/customer/orders/WL-2/', **self.auth).status_code, 404)
+        self.assertEqual(self.client.get('/api/customer/orders/WL-1/', **self.auth).status_code, 200)
+
+    def test_signup_creates_customer(self):
+        self.verify.return_value = {'email': 'new@example.com', 'email_verified': True}
+        res = self.client.post('/api/customer/me/', {'name': 'New', 'phone': '98765 43210'},
+                               content_type='application/json', **self.auth)
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(Customer.objects.get(email='new@example.com').phone, '9876543210')
+
+    def test_signup_refuses_existing_phone_and_bad_input(self):
+        self.verify.return_value = {'email': 'new@example.com', 'email_verified': True}
+        post = lambda body: self.client.post('/api/customer/me/', body,
+                                             content_type='application/json', **self.auth)
+        self.assertEqual(post({'name': 'New', 'phone': '111'}).status_code, 400)
+        Customer.objects.filter(pk=self.bob.pk).update(phone='9876543210')
+        self.assertEqual(post({'name': 'New', 'phone': '9876543210'}).status_code, 409)
+        self.assertFalse(Customer.objects.filter(email='new@example.com').exists())
+
+    def test_signup_existing_account_is_409(self):
+        res = self.client.post('/api/customer/me/', {'name': 'A', 'phone': '9999999999'},
+                               content_type='application/json', **self.auth)
+        self.assertEqual(res.status_code, 409)
+
+    def test_rate_card_is_public(self):
+        self.assertEqual(self.client.get('/api/customer/rate-card/').status_code, 200)

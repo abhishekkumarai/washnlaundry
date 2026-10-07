@@ -9,6 +9,9 @@ from .views import (
     reports, meta,
     rag_chat, create_lead, public_lead, process_leads,
 )
+from .customer_views import (
+    customer_me, customer_orders, customer_order_detail, customer_rate_card,
+)
 
 router = DefaultRouter()
 router.register(r'shops', ShopViewSet)
@@ -36,5 +39,9 @@ urlpatterns = [
     path('leads/process/', process_leads, name='process-leads'),
     path('reports/', reports, name='reports'),
     path('meta/', meta, name='meta'),
+    path('customer/me/', customer_me, name='customer-me'),
+    path('customer/orders/', customer_orders, name='customer-orders'),
+    path('customer/orders/<str:order_number>/', customer_order_detail, name='customer-order-detail'),
+    path('customer/rate-card/', customer_rate_card, name='customer-rate-card'),
 ]
 

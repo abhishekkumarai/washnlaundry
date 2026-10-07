@@ -37,8 +37,7 @@
     "**/*.mts"
   ],
   "exclude": [
-    "crm",
-    "customer-web",
+    "vendor",
     "node_modules"
   ]
 }

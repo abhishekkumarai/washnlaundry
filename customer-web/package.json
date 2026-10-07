@@ -1,0 +1,38 @@
+{
+  "name": "washnlaundry-customer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3100",
+    "build": "next build",
+    "cf:next-build": "cross-env OPENNEXT_BUILD=1 next build",
+    "cf:build": "pnpm run cf:next-build && opennextjs-cloudflare build --skipNextBuild",
+    "cf:preview": "opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+  },
+  "dependencies": {
+    "next": "16.3.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.6",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "wrangler": "^4.143.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "sharp": "link:./vendor/sharp-stub"
+    },
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd"
+    ]
+  }
+}

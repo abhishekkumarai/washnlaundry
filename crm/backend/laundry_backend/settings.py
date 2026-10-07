@@ -122,8 +122,11 @@ PUBLIC_LEAD_ORIGINS = [
     o.strip() for o in os.environ.get(
         'PUBLIC_LEAD_ORIGINS',
         'https://washnlaundry-web.abhishekkumarai.workers.dev,'
-        'https://washnlaundry.com,https://www.washnlaundry.com',
+        'https://washnlaundry.com,https://www.washnlaundry.com,'
+        'https://customer.washnlaundry.com',
     ).split(',') if o.strip()
 ]
+# Google OAuth web client ID the customer portal's ID tokens are verified against.
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 PUBLIC_LEAD_RATE_PER_HOUR = int(os.environ.get('PUBLIC_LEAD_RATE_PER_HOUR', '5'))
 

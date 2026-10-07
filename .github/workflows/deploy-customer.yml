@@ -1,19 +1,20 @@
-name: Deploy marketing site
+name: Deploy customer portal
 
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "crm/**"
+    paths:
       - "customer-web/**"
       - ".github/workflows/deploy-customer.yml"
-      - ".github/workflows/deploy-crm.yml"
-      - "**/*.md"
   workflow_dispatch:
 
 concurrency:
-  group: deploy-web
+  group: deploy-customer
   cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: customer-web
 
 jobs:
   deploy:
@@ -27,7 +28,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: customer-web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
       - run: pnpm run cf:build
         env:
           NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
