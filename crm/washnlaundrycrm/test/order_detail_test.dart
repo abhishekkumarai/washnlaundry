@@ -371,27 +371,21 @@ void main() {
   });
 
   group('Edit dialog', () {
-    testWidgets('opens prefilled from the order', (tester) async {
+    testWidgets('edits the fulfillment type and date, not the customer',
+        (tester) async {
       await pump(tester, order());
 
       await tester.tap(find.widgetWithText(OutlinedButton, 'Edit'));
       await tester.pumpAndSettle();
 
       expect(find.text('Edit Order'), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Me'), findsOneWidget);
-      expect(find.widgetWithText(TextField, '+914277905904'), findsOneWidget);
-    });
-
-    testWidgets('rejects an empty customer name', (tester) async {
-      await pump(tester, order());
-
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Edit'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, 'Me'), '');
-      await tester.tap(find.widgetWithText(FilledButton, 'Save Changes'));
-      await tester.pump();
-
-      expect(find.text('Give the order a customer name.'), findsOneWidget);
+      expect(find.text('Fulfillment type'), findsOneWidget);
+      expect(find.text('Shop pickup'), findsOneWidget);
+      expect(find.text('Home pickup'), findsOneWidget);
+      // Customer name and phone are not editable here.
+      expect(find.text('Customer Name'), findsNothing);
+      expect(find.text('Phone'), findsNothing);
+      expect(find.byType(TextField), findsNothing);
     });
   });
 

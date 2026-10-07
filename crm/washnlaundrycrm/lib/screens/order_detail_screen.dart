@@ -9,6 +9,7 @@ import '../utils/role_views.dart';
 import '../services/api_service.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/fulfillment_type_selector.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
 import '../widgets/tag_generator_panel.dart';
@@ -833,7 +834,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   color: Color(0xFF64748B))),
           const SizedBox(height: 12),
           _railRow(
-            collected ? 'Expected Ready' : 'Expected Delivery',
+            DeliveryType.expectedDateLabel(order.deliveryType),
             order.scheduledDate == null
                 ? 'Not scheduled'
                 : DateFormat('MMM d, yyyy').format(order.scheduledDate!) +
@@ -1410,8 +1411,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Future<void> _showEditOrder() async {
     final provider = context.read<AppProvider>();
     final order = _orderFrom(provider);
-    final nameController = TextEditingController(text: order.customerName);
-    final phoneController = TextEditingController(text: order.customerPhone);
 
     final saved = await showDialog<bool>(
       context: context,
@@ -1437,41 +1436,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _editLabel('Customer Name'),
-                    TextField(
-                      controller: nameController,
-                      style: const TextStyle(fontSize: 13),
-                      decoration: _editDecoration('Walk-in customer'),
+                    _editLabel('Fulfillment type'),
+                    FulfillmentTypeSelector(
+                      value: deliveryType,
+                      onChanged: (t) =>
+                          setDialogState(() => deliveryType = t),
                     ),
                     const SizedBox(height: 14),
-                    _editLabel('Phone'),
-                    TextField(
-                      controller: phoneController,
-                      keyboardType: TextInputType.phone,
-                      style: const TextStyle(fontSize: 13),
-                      decoration: _editDecoration('+919876543210'),
-                    ),
-                    const SizedBox(height: 14),
-                    _editLabel('Fulfilment'),
-                    DropdownButtonFormField<String>(
-                      initialValue: deliveryType,
-                      isDense: true,
-                      style: const TextStyle(
-                          fontSize: 13, color: Color(0xFF0F172A)),
-                      decoration: _editDecoration(''),
-                      items: [
-                        for (final t in DeliveryType.labels.keys)
-                          DropdownMenuItem(
-                              value: t, child: Text(DeliveryType.label(t))),
-                      ],
-                      onChanged: (v) => setDialogState(
-                          () => deliveryType = v ?? deliveryType),
-                    ),
-                    const SizedBox(height: 14),
-                    _editLabel(deliveryType == DeliveryType.storePickup ||
-                            deliveryType == DeliveryType.homePickup
-                        ? 'Expected Ready'
-                        : 'Expected Delivery'),
+                    _editLabel(DeliveryType.expectedDateLabel(deliveryType)),
                     AppDateButton(
                       label: scheduled == null
                           ? 'Not scheduled'
@@ -1510,18 +1482,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 onPressed: saving
                     ? null
                     : () async {
-                        if (nameController.text.trim().isEmpty) {
-                          setDialogState(
-                              () => error = 'Give the order a customer name.');
-                          return;
-                        }
                         setDialogState(() {
                           saving = true;
                           error = null;
                         });
                         final updated = await provider.updateOrder(order.id, {
-                          'customer_name': nameController.text.trim(),
-                          'customer_phone': phoneController.text.trim(),
                           'delivery_type': deliveryType,
                           'scheduled_date': scheduled == null
                               ? null
@@ -1562,14 +1527,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF475569))),
-      );
-
-  InputDecoration _editDecoration(String hint) => InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
       );
 
   Widget _tagsCard(OrderModel order) {

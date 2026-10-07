@@ -324,16 +324,16 @@ void main() {
     testWidgets('Checkout opens the review step, Back to items returns',
         (tester) async {
       // The real app doesn't submit straight from the cart — Checkout opens
-      // a second "Review order" step (Customer / Order type / Notes) before
+      // a second "Review order" step (Customer / Fulfillment type / Notes) before
       // there's an actual Place order button.
       await pumpWithItemInCart(tester);
 
-      expect(find.text('Order type'), findsNothing);
+      expect(find.text('Fulfillment type'), findsNothing);
       await tester.tap(find.text('Checkout • ₹15'));
       await tester.pumpAndSettle();
 
       expect(find.text('Review order'), findsOneWidget);
-      expect(find.text('Order type'), findsOneWidget);
+      expect(find.text('Fulfillment type'), findsOneWidget);
       expect(find.text('Notes for this order (optional)'), findsOneWidget);
       expect(find.text('Place order · ₹15'), findsOneWidget);
       expect(find.text('Search items or scan a tag...'), findsNothing);
@@ -341,7 +341,7 @@ void main() {
       await tester.tap(find.byTooltip('Back to items'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Order type'), findsNothing);
+      expect(find.text('Fulfillment type'), findsNothing);
       expect(find.text('Checkout • ₹15'), findsOneWidget);
     });
 
@@ -357,7 +357,7 @@ void main() {
       // Shop pickup: just Notes and Discount.
       expect(find.byType(TextField), findsNWidgets(2));
 
-      for (final type in ['Home pickup', 'Home delivery']) {
+      for (final type in ['Home pickup']) {
         await tester.tap(find.text(type));
         await tester.pumpAndSettle();
 
@@ -420,10 +420,8 @@ void main() {
       expect(find.text('Pickup address'), findsOneWidget);
       expect(find.text('Expected ready'), findsNothing);
 
-      await tester.tap(find.text('Home delivery'));
-      await tester.pumpAndSettle();
-      expect(find.text('Pickup slot'), findsNothing);
-      expect(find.text('Delivery address'), findsOneWidget);
+      // Home delivery is no longer offered for new orders.
+      expect(find.text('Home delivery'), findsNothing);
     });
 
     testWidgets('Home pickup: delivery date is always after the pickup date',

@@ -46,6 +46,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   static Color _colorAt(int index) => _palette[index % _palette.length];
 
+  /// By-status dots mean something (red = cancelled / overdue, green = done),
+  /// so they are keyed on the status rather than on row position.
+  static Color _statusColor(String key, int index) {
+    switch (key.toUpperCase()) {
+      case 'DELIVERED':
+        return const Color(0xFF10B981);
+      case 'CANCELLED':
+      case 'OVERDUE':
+        return const Color(0xFFEF4444);
+      case 'READY':
+        return const Color(0xFF1A4FD6);
+      case 'PENDING':
+        return const Color(0xFFF59E0B);
+      default:
+        return _colorAt(index);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -406,14 +424,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
         : '${r.collectedPercent!.round()}% of billed';
     final marginSub = r.margin == null ? '—' : '${r.margin!.round()}% margin';
 
+    final revenueDown = (r.revenueChange ?? 0) < 0;
+    final expensesDown = (r.expensesChange ?? 0) < 0;
+
     final cards = [
       _buildMetricCard(
           'Revenue',
           _money(r.revenue),
           ReportsModel.changeLabel(r.revenueChange) ?? 'no prior period',
-          Icons.trending_up_rounded,
-          const Color(0xFF1A4FD6),
-          const Color(0xFFEEF2FF)),
+          revenueDown ? Icons.trending_down_rounded : Icons.trending_up_rounded,
+          revenueDown ? const Color(0xFFEF4444) : const Color(0xFF1A4FD6),
+          revenueDown ? const Color(0xFFFEF2F2) : const Color(0xFFEEF2FF)),
       _buildMetricCard('Collected', _money(r.collected), collectedSub,
           Icons.payments_outlined, const Color(0xFF10B981),
           const Color(0xFFECFDF5)),
@@ -425,8 +446,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
           _money(r.expenses),
           ReportsModel.changeLabel(r.expensesChange) ?? 'no prior period',
           Icons.receipt_long_outlined,
-          const Color(0xFFEF4444),
-          const Color(0xFFFEF2F2)),
+          // Spending less is good news: only a rise reads red.
+          expensesDown ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+          expensesDown ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2)),
       _buildMetricCard(
           'Net Profit',
           _money(r.netProfit),
@@ -646,9 +668,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             'no prior period',
                         style: TextStyle(
                           fontSize: 11,
-                          color: (r.netProfitChange ?? 0) >= 0
-                              ? const Color(0xFF10B981)
-                              : const Color(0xFFEF4444),
+                          color: r.netProfitChange == null
+                              ? const Color(0xFF94A3B8)
+                              : r.netProfitChange! >= 0
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFFEF4444),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -733,7 +757,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
               // Below this, 3 breakdown columns squeeze too tight to read —
               // stack them instead, one below the other.
               final stackedColumns = constraints.maxWidth < 500;
-              final status = _breakdownColumn('BY STATUS', r.byStatus);
+              final status = _breakdownColumn('BY STATUS', r.byStatus,
+                  colorFor: (row, i) => _statusColor(row.key, i));
               final type = _breakdownColumn('BY TYPE', r.byType);
               final service = _breakdownColumn('BY SERVICE', r.byService);
               if (stackedColumns) {
@@ -844,7 +869,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _breakdownColumn(String title, List<ReportBreakdownModel> rows) {
+  Widget _breakdownColumn(String title, List<ReportBreakdownModel> rows,
+      {Color Function(ReportBreakdownModel row, int index)? colorFor}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -859,7 +885,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
               style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)))
         else
           for (var i = 0; i < rows.length; i++)
-            _buildStatusRow(rows[i].label, '${rows[i].count}', _colorAt(i)),
+            _buildStatusRow(rows[i].label, '${rows[i].count}',
+                colorFor?.call(rows[i], i) ?? _colorAt(i)),
       ],
     );
   }
@@ -944,21 +971,30 @@ class _ReportsScreenState extends State<ReportsScreen> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Container(
-              width: 12,
-              height: height(month.revenue),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1A4FD6),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+            Tooltip(
+              message: '${month.label} · Revenue ${_money(month.revenue)}',
+              triggerMode: TooltipTriggerMode.tap,
+              child: Container(
+                width: 12,
+                // Min height keeps a zero-value bar hoverable.
+                height: height(month.revenue).clamp(3.0, double.infinity),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF1A4FD6),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+                ),
               ),
             ),
             const SizedBox(width: 4),
-            Container(
-              width: 12,
-              height: height(month.expenses),
-              decoration: const BoxDecoration(
-                color: Color(0xFFF59E0B),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+            Tooltip(
+              message: '${month.label} · Expenses ${_money(month.expenses)}',
+              triggerMode: TooltipTriggerMode.tap,
+              child: Container(
+                width: 12,
+                height: height(month.expenses).clamp(3.0, double.infinity),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF59E0B),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+                ),
               ),
             ),
           ],

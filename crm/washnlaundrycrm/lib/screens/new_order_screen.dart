@@ -11,6 +11,7 @@ import '../models/garment_model.dart';
 import '../models/order_model.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/fulfillment_type_selector.dart';
 import '../widgets/receipt_dialog.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../utils/money.dart';
@@ -79,7 +80,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   /// Both Home pickup and Home delivery carry the order one way or the
   /// other, and the live app bills its ₹50 Delivery line on either.
-  bool get _isCarriedDelivery => _deliveryType != DeliveryType.storePickup;
+  bool get _isCarriedDelivery => DeliveryType.isCarried(_deliveryType);
 
   static const _slotStartHour = 9; // 9 AM
   static const _slotEndHour = 22; // 10 PM — last fallback slot is 9–10 PM
@@ -951,48 +952,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     );
   }
 
-  static const _orderTypes = [
-    (DeliveryType.storePickup, 'Shop pickup', "You'll pick up",
-        Icons.storefront_outlined),
-    (DeliveryType.homePickup, 'Home pickup', "We'll pick up",
-        Icons.local_shipping_outlined),
-    (DeliveryType.homeDelivery, 'Home delivery', "We'll deliver",
-        Icons.home_outlined),
-  ];
-
-  Widget _orderTypeOption(
-      String type, String label, String subtitle, IconData icon) {
-    final isSel = _deliveryType == type;
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () => setState(() => _selectDeliveryType(type)),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isSel ? _brand : _line, width: isSel ? 1.5 : 1),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 22, color: isSel ? _brand : _muted),
-            const SizedBox(height: 8),
-            Text(label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: isSel ? _brand : _ink)),
-            const SizedBox(height: 2),
-            Text(subtitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: _muted)),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// A bordered date row: calendar icon, small label over the date, chevron.
   Widget _dateField(
       String label, DateTime date, ValueChanged<DateTime> onPicked,
@@ -1094,7 +1053,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       );
 
   /// The Checkout review — the real app's second step before an order is
-  /// actually placed: Customer, then Order type with whatever dates, slots
+  /// actually placed: Customer, then Fulfillment type with whatever dates, slots
   /// and address that type needs, then Notes. `_readyBy` is guaranteed
   /// non-null by the time this builds (Checkout calls [_selectDeliveryType]
   /// before flipping `_showCheckoutReview`).
@@ -1108,21 +1067,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           _reviewCustomerCard(),
           const SizedBox(height: 16),
           _reviewCard(
-            title: 'Order type',
+            title: 'Fulfillment type',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final (i, t) in _orderTypes
-                        .where((t) =>
-                            !_isSelfCustomer || t.$1 == DeliveryType.homePickup)
-                        .indexed) ...[
-                      if (i > 0) const SizedBox(width: 12),
-                      Expanded(child: _orderTypeOption(t.$1, t.$2, t.$3, t.$4)),
-                    ],
-                  ],
+                FulfillmentTypeSelector(
+                  value: _deliveryType,
+                  only: _isSelfCustomer ? {DeliveryType.homePickup} : null,
+                  onChanged: (t) => setState(() => _selectDeliveryType(t)),
                 ),
                 const SizedBox(height: 16),
                 if (!_isCarriedDelivery)

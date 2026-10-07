@@ -69,6 +69,26 @@ class DeliveryType {
   };
 
   static String label(String type) => labels[type] ?? type;
+
+  /// Every type that exists, selectable or not. Old orders can carry any of
+  /// them, so reads (labels, filters, reports) must keep handling all four.
+  static const all = [storePickup, homePickup, homeDelivery, online];
+
+  /// The types staff can pick for a new or edited order. Home delivery is
+  /// hidden on purpose; to bring it back, add [homeDelivery] here (and a tile
+  /// for it in `FulfillmentTypeSelector`).
+  static const selectable = [storePickup, homePickup];
+
+  /// Whether the shop carries the order (picks up from and/or delivers to the
+  /// customer) rather than the customer walking it in and out. This is the one
+  /// rule behind the ₹50 delivery line, the address and slot fields, and the
+  /// Fulfilment card — everything that follows from the fulfillment type.
+  static bool isCarried(String type) => type != storePickup;
+
+  /// What the order's date is called: a walk-in waits for "Expected Ready", a
+  /// carried order for "Expected Delivery".
+  static String expectedDateLabel(String type) =>
+      isCarried(type) ? 'Expected Delivery' : 'Expected Ready';
 }
 
 class OrderSource {
@@ -231,9 +251,7 @@ class OrderModel {
 
   /// True when nobody delivers this order — the customer collects it.
   /// Drives the step-bar wording and which fulfilment panel is shown.
-  bool get isCollectedInStore =>
-      deliveryType == DeliveryType.storePickup ||
-      deliveryType == DeliveryType.homePickup;
+  bool get isCollectedInStore => !DeliveryType.isCarried(deliveryType);
 
   /// The four stages the live step bar shows, in order. `Out for Delivery` is
   /// deliberately absent: the real app collapses it into the Timeline, and a

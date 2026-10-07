@@ -53,9 +53,15 @@ class RevenueChartCard extends StatelessWidget {
           Text(
             provider.revenueTodayChange == null
                 ? '— vs prior'
-                : '${formatPercent(provider.revenueTodayChange!.abs())} vs prior',
-            style:
-                const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                : '${provider.revenueTodayChange! >= 0 ? '▲' : '▼'} '
+                    '${formatPercent(provider.revenueTodayChange!.abs())} vs prior',
+            style: TextStyle(
+                fontSize: 11,
+                color: provider.revenueTodayChange == null
+                    ? const Color(0xFF94A3B8)
+                    : provider.revenueTodayChange! >= 0
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFDC2626)),
           ),
         ],
       ),
@@ -172,6 +178,10 @@ class RevenueChartCard extends StatelessWidget {
     return BarTouchData(
       enabled: true,
       touchTooltipData: BarTouchTooltipData(
+        // The chart sits inside a ClipRect, so a tooltip drawn above the
+        // tallest bar (or past the first/last one) would be cut off.
+        fitInsideVertically: true,
+        fitInsideHorizontally: true,
         getTooltipItem: (group, groupIndex, rod, rodIndex) {
           final point =
               group.x >= 0 && group.x < series.length ? series[group.x] : null;
