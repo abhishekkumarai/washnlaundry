@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
+import '../utils/role_views.dart';
 
 /// Google Sign-In state for the `/login` screen, plus the server-verified role.
 ///
@@ -95,7 +96,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _me = await ApiService.fetchMe();
-      _role = _me!['role'] as String?;
+      _role = RoleViews.effectiveRole(_me!['role'] as String?);
     } on ApiException catch (e) {
       _role = null;
       _roleError = e.message;
@@ -270,6 +271,21 @@ class AuthProvider extends ChangeNotifier {
       _guard(() =>
           ApiService.signUp(email.trim(), password, name.trim(), phone.trim()));
 
+  /// Saves the signed-in customer's profile; null on success, else the error.
+  Future<String?> saveCustomerProfile(Map<String, String> fields) async {
+    try {
+      final updated = await ApiService.updateMyProfile(fields);
+      _me = {
+        ...?_me,
+        'customer': {...?(_me?['customer'] as Map?)?.cast<String, dynamic>(), ...updated},
+      };
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
   Future<String?> confirmEmail(String token) => _guard(() async =>
       _startPasswordSession(await ApiService.verifyEmail(token)));
 
@@ -284,12 +300,12 @@ class AuthProvider extends ChangeNotifier {
     _isDemo = true;
     _role = 'owner';
     _isPersistedSignedIn = true;
-    _persistedEmail = 'demo@laundrybill.com';
+    _persistedEmail = 'demo@washnlaundry.com';
     _persistedName = 'Demo Owner';
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('is_signed_in', true);
     await prefs.setBool('is_demo', true);
-    await prefs.setString('user_email', 'demo@laundrybill.com');
+    await prefs.setString('user_email', 'demo@washnlaundry.com');
     await prefs.setString('user_name', 'Demo Owner');
     _error = null;
     notifyListeners();

@@ -16,8 +16,7 @@ import '../utils/google_signin_button.dart';
 /// restores a still-live Google session so a page reload doesn't force
 /// today's-already-signed-in owner back through the button.
 ///
-/// Card layout below mirrors the real `app.laundrybill.com/login`, minus its
-/// "Continue with Apple" button. Email / Password and the Sign In / Create
+/// Card layout below: Email / Password and the Sign In / Create
 /// Account tabs are real (api/password_auth.py): creating an account emails a
 /// confirmation link, and "Forgot password?" emails a reset link. Google
 /// sign-in works alongside. "Sign in with mobile number instead" is layout

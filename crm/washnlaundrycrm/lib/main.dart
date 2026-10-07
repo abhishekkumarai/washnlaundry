@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
 import 'router.dart';
+import 'utils/role_views.dart';
 
 /// Flutter web excludes the mouse from [dragDevices], so any list that needs
 /// dragging — the nav rail on a short window, the horizontal activity table —
@@ -24,8 +25,9 @@ class AppScrollBehavior extends MaterialScrollBehavior {
       };
 }
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await RoleViews.load();
   usePathUrlStrategy();
   final authProvider = AuthProvider();
   final appProvider = AppProvider(autoLoad: false);
@@ -35,10 +37,12 @@ void main() {
   var loadedFor = false;
   authProvider.addListener(() {
     final role = authProvider.role;
-    final internal = role == 'owner' || role == 'staff';
-    if (internal) appProvider.role = role!;
-    if (internal && !loadedFor) appProvider.loadDataFromBackend();
-    loadedFor = internal;
+    final validRole = role == 'owner' || role == 'staff' || role == 'customer';
+    // Customers get the owner's CRM data and layout (minus their hidden
+    // views, see RoleViews).
+    if (validRole) appProvider.role = role == 'customer' ? 'owner' : role!;
+    if (validRole && !loadedFor) appProvider.loadDataFromBackend();
+    loadedFor = validRole;
   });
   final router = buildRouter(authProvider);
   runApp(

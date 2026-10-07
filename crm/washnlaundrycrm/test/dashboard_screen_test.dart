@@ -6,7 +6,7 @@ import 'package:washnlaundrycrm/providers/app_provider.dart';
 import 'package:washnlaundrycrm/screens/dashboard_screen.dart';
 
 /// Until this file, `DashboardScreen` and every side panel it composes
-/// (`QuickScanCard`, `NeedsAttentionCard`, `OrderChannelsCard`,
+/// (`NeedsAttentionCard`, `OrderChannelsCard`,
 /// `StaffAttendanceCard`, `StoreHealthCard`, `RevenueAnalyticsCard`) were
 /// never pumped by any test — real code with zero automated coverage,
 /// verified only by hand against the live app per `wip.md`.
@@ -116,7 +116,7 @@ void main() {
       await tester.pumpWidget(host(provider));
       await tester.pump();
 
-      expect(find.text('Quick Scan & Search'), findsOneWidget);
+      expect(find.text('Quick Scan & Search'), findsNothing);
       expect(find.text('Needs attention'), findsOneWidget);
       expect(find.text('Order channels'), findsOneWidget);
       expect(find.text('Staff attendance'), findsOneWidget);

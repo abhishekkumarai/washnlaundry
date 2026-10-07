@@ -326,7 +326,8 @@ class AppProvider extends ChangeNotifier {
       if (query.isEmpty) return true;
       return o.orderNumber.toLowerCase().contains(query) ||
           o.customerName.toLowerCase().contains(query) ||
-          o.customerPhone.contains(query);
+          o.customerPhone.contains(query) ||
+          o.items.any((i) => i.itemTitle.toLowerCase().contains(query));
     }).toList();
   }
 
@@ -482,10 +483,54 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  /// The customer version of [loadDataFromBackend]: scoped orders, rate card, shop info.
+  Future<void> _loadForCustomer() async {
+    try {
+      final results = await Future.wait([
+        ApiService.fetchMyOrders(),
+        ApiService.fetchRateCard(),
+      ]);
+      final rawOrders = results[0] as List<Map<String, dynamic>>;
+      _orders = rawOrders.map(OrderModel.fromJson).toList();
+      _categories = (results[1] as List<Map<String, dynamic>>).map((c) {
+        return GarmentCategoryModel(
+          id: c['name'] ?? '',
+          name: c['name'] ?? '',
+          items: ((c['items'] as List?) ?? const []).map((i) {
+            return GarmentItemModel(
+              id: i['name'] ?? '',
+              name: i['name'] ?? '',
+              categoryId: c['name'] ?? '',
+              categoryName: c['name'] ?? '',
+              price: (i['price'] ?? 0).toDouble(),
+              unit: i['unit'] ?? 'PIECE',
+            );
+          }).toList(),
+        );
+      }).toList();
+      try {
+        final shop = await ApiService.fetchShop();
+        _shop = shop;
+        _applyShopFormatting();
+      } catch (_) {}
+    } on ApiException catch (e) {
+      _error = e.message;
+    } catch (e) {
+      _error = 'Something went wrong loading your orders: $e';
+    }
+  }
+
   Future<void> loadDataFromBackend() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
+
+    if (role == 'customer') {
+      await _loadForCustomer();
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
 
     if (role == 'staff') {
       await _loadForStaff();

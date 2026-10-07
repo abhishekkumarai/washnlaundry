@@ -46,10 +46,16 @@ def _iso(value):
 
 def _order_json(order):
     data = {
+        'id': str(order.id),
         'order_number': order.order_number,
+        'customer': str(order.customer_id or ''),
+        'customer_name': order.customer_name,
+        'customer_phone': order.customer_phone,
         'status': order.status,
         'payment_status': order.payment_status,
+        'payment_method': order.payment_method,
         'delivery_type': order.delivery_type,
+        'source': order.source,
         'express': order.express,
         'subtotal': order.subtotal,
         'delivery_charge': order.delivery_charge,
@@ -64,6 +70,7 @@ def _order_json(order):
         'created_at': _iso(order.created_at),
         'items': [
             {
+                'item_title': i.item_title,
                 'title': i.item_title,
                 'service_type': i.service_type,
                 'quantity': i.quantity,
@@ -79,10 +86,23 @@ def _order_json(order):
     return data
 
 
-def _me_json(customer):
+def profile_json(customer):
+    """The customer's own details, as /api/me/ and /api/customer/me/ report them."""
     return {
+        'id': str(customer.id),
         'name': customer.name,
         'email': customer.email,
+        'phone': customer.phone,
+        'address': customer.address or '',
+        'area': customer.area,
+        'landmark': customer.landmark,
+        'preference': customer.preference,
+    }
+
+
+def _me_json(customer):
+    return {
+        **profile_json(customer),
         'total_orders': customer.total_orders,
         'total_spent': customer.total_spent,
         'due_amount': customer.due_amount,
@@ -106,10 +126,39 @@ def register_customer(email, name, phone):
     return Customer.objects.create(name=name, phone=phone, email=email), False
 
 
+# Fields a customer may edit about themselves, with their max lengths. Phone and
+# email are deliberately not here: orders and the sign-in are matched on them.
+_PROFILE_FIELDS = {'name': 255, 'address': 1000, 'area': 120, 'landmark': 255,
+                   'preference': 1000}
+
+
+def _update_profile(request):
+    customer, err = _customer_for(request)
+    if err:
+        return err
+    try:
+        body = json.loads(request.body or b'{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'detail': 'Invalid JSON body.'}, status=400)
+    if not isinstance(body, dict):
+        return JsonResponse({'detail': 'Invalid JSON body.'}, status=400)
+    changed = []
+    for field, limit in _PROFILE_FIELDS.items():
+        if field in body:
+            value = str(body[field] or '').strip()[:limit]
+            if field == 'name' and not value:
+                return JsonResponse({'detail': 'Name cannot be empty.'}, status=400)
+            setattr(customer, field, value)
+            changed.append(field)
+    if changed:
+        customer.save(update_fields=changed)
+    return JsonResponse(_me_json(customer))
+
+
 # csrf_exempt: auth is a Bearer token, never a cookie, so there is nothing for
 # CSRF to protect (and a browser client has no CSRF cookie to send).
 @csrf_exempt
-@require_http_methods(['GET', 'POST'])
+@require_http_methods(['GET', 'POST', 'PATCH'])
 def customer_me(request):
     """GET: the signed-in customer. POST {name, phone}: first-time signup.
 
@@ -121,6 +170,9 @@ def customer_me(request):
     if request.method == 'GET':
         customer, err = _customer_for(request)
         return err or JsonResponse(_me_json(customer))
+
+    if request.method == 'PATCH':
+        return _update_profile(request)
 
     email = verified_email(request)
     if not email:

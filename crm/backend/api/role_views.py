@@ -5,6 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from .auth import CUSTOMER, IsOwner, IsSignedIn, Principal
+from .customer_views import profile_json
 from .models import EmailLinkRequest
 
 
@@ -22,7 +23,7 @@ def me(request):
     if user.role == CUSTOMER:
         c = user.customer
         data['customer'] = {
-            'name': c.name, 'email': c.email, 'phone': c.phone,
+            **profile_json(c),
             'total_orders': c.total_orders, 'total_spent': c.total_spent,
             'due_amount': c.due_amount,
         }

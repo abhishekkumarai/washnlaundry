@@ -6,8 +6,8 @@ import uuid
 
 
 # ── Canonical vocabularies ────────────────────────────────────────────────────
-# These mirror app.laundrybill.com. Do not invent new values in seeds, views or
-# the Flutter client — import/refer to these instead.
+# Do not invent new values in seeds, views or the Flutter client —
+# import/refer to these instead.
 
 class OrderStatus(models.TextChoices):
     PLACED = 'PLACED', 'Placed'
@@ -74,7 +74,7 @@ class ExpenseCategory(models.TextChoices):
 # ── Shop ──────────────────────────────────────────────────────────────────────
 
 class Shop(models.Model):
-    name = models.CharField(max_length=255, default='LaundryBill Express')
+    name = models.CharField(max_length=255, default='WashNLaundry Express')
     owner_name = models.CharField(max_length=255, default='Aditya Sharma')
     phone = models.CharField(max_length=50, default='+91 98765 43210')
     whatsapp = models.CharField(max_length=50, blank=True, default='')
@@ -142,6 +142,8 @@ class Customer(models.Model):
     email = models.EmailField(blank=True, null=True, db_index=True)
     address = models.TextField(blank=True, null=True)
     area = models.CharField(max_length=120, blank=True, default='')
+    landmark = models.CharField(max_length=255, blank=True, default='')
+    preference = models.TextField(blank=True, default='')
     total_orders = models.IntegerField(default=0)
     total_spent = models.FloatField(default=0.0)
     due_amount = models.FloatField(default=0.0)

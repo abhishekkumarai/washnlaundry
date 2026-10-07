@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../providers/auth_provider.dart';
+import '../utils/role_views.dart';
 import '../models/order_model.dart';
 import '../utils/csv.dart';
 import '../utils/csv_download.dart';
@@ -296,8 +298,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             bottom: BorderSide(color: Color(0xFFE2E8F0))),
                       ),
                       child: Row(
-                        children: const [
-                          Expanded(
+                        children: [
+                          const Expanded(
                               flex: 2,
                               child: Text('ORDER',
                                   style: TextStyle(
@@ -306,40 +308,41 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                       color: Color(0xFF94A3B8)))),
                           Expanded(
                               flex: 2,
-                              child: Text('CUSTOMER',
-                                  style: TextStyle(
+                              child: Text(
+                                  provider.role == 'customer' ? 'ITEMS' : 'CUSTOMER',
+                                  style: const TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF94A3B8)))),
-                          Expanded(
+                          const Expanded(
                               flex: 2,
                               child: Text('TYPE',
                                   style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF94A3B8)))),
-                          Expanded(
+                          const Expanded(
                               flex: 2,
                               child: Text('STATUS',
                                   style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF94A3B8)))),
-                          Expanded(
+                          const Expanded(
                               flex: 2,
                               child: Text('PAYMENT',
                                   style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF94A3B8)))),
-                          Expanded(
+                          const Expanded(
                               flex: 1,
                               child: Text('TOTAL',
                                   style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF94A3B8)))),
-                          Expanded(
+                          const Expanded(
                               flex: 1,
                               child: Text('UPDATED',
                                   style: TextStyle(
@@ -369,10 +372,24 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                   _hasActiveFilter
                                       ? 'No orders match "$_selectedTab"'
                                           '${_timeFilter == OrderDateRange.allTime && _customRange == null ? '' : ' in $_dateFilterLabel'}.'
-                                      : 'Create a new order to get started.',
+                                      : provider.role == 'customer'
+                                          ? 'Book a pickup to get started with WashNLaundry.'
+                                          : 'Create a new order to get started.',
                                   style: const TextStyle(
                                       fontSize: 11, color: Color(0xFF94A3B8)),
                                 ),
+                                if (provider.role == 'customer' && !_hasActiveFilter) ...[
+                                  const SizedBox(height: 16),
+                                  FilledButton.icon(
+                                    onPressed: () => context.go('/my/book'),
+                                    icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                                    label: const Text('Book a pickup'),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFF1A4FD6),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           )
@@ -386,13 +403,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 : const Divider(height: 1),
                             itemBuilder: (context, idx) {
                               final order = filteredOrders[idx];
-                              if (narrow) return _orderCard(order);
+                              final isCustomer = provider.role == 'customer';
+                              if (narrow) return _orderCard(order, isCustomer: isCustomer);
+                              final targetPath = isCustomer
+                                  ? '/my/orders/${order.orderNumber.isNotEmpty ? order.orderNumber : order.id}'
+                                  : '/orders/${order.id}';
                               return InkWell(
-                                onTap: () => context.go('/orders/${order.id}'),
+                                onTap: () => context.go(targetPath),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 20, vertical: 14),
-                                  child: _orderRow(order),
+                                  child: _orderRow(order, isCustomer: isCustomer),
                                 ),
                               );
                             },
@@ -434,7 +455,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   /// The wide-mode table row's content (7 flex-matched columns) — unchanged
   /// from before the phone layout existed.
-  Widget _orderRow(OrderModel order) {
+  Widget _orderRow(OrderModel order, {bool isCustomer = false}) {
     final initial =
         order.customerName.isEmpty ? '?' : order.customerName[0].toUpperCase();
     return Row(
@@ -449,7 +470,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   color: Color(0xFF1A4FD6))),
         ),
 
-        // CUSTOMER
+        // CUSTOMER / ITEMS
         Expanded(
           flex: 2,
           child: Row(
@@ -457,11 +478,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
               CircleAvatar(
                 radius: 14,
                 backgroundColor: const Color(0xFFEEF2FF),
-                child: Text(initial,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A4FD6))),
+                child: isCustomer
+                    ? const Icon(Icons.dry_cleaning_rounded, size: 14, color: Color(0xFF1A4FD6))
+                    : Text(initial,
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A4FD6))),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -469,14 +492,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      order.customerName,
+                      isCustomer
+                          ? (order.items.isNotEmpty
+                              ? order.items.map((i) => '${i.quantity} × ${i.itemTitle}').join(', ')
+                              : 'Laundry order')
+                          : order.customerName,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF0F172A)),
                     ),
-                    Text('${order.items.length} items',
+                    Text('${order.items.length} item${order.items.length == 1 ? '' : 's'}',
                         style: const TextStyle(
                             fontSize: 10, color: Color(0xFF94A3B8))),
                   ],
@@ -585,12 +612,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   /// The narrow-mode card replacing one table row — order # + status pill,
   /// customer, delivery type/schedule, payment + total, updated time.
-  Widget _orderCard(OrderModel order) {
+  Widget _orderCard(OrderModel order, {bool isCustomer = false}) {
     final initial =
         order.customerName.isEmpty ? '?' : order.customerName[0].toUpperCase();
+    final targetPath = isCustomer
+        ? '/my/orders/${order.orderNumber.isNotEmpty ? order.orderNumber : order.id}'
+        : '/orders/${order.id}';
     return InkWell(
       borderRadius: BorderRadius.circular(14),
-      onTap: () => context.go('/orders/${order.id}'),
+      onTap: () => context.go(targetPath),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -618,15 +648,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 CircleAvatar(
                   radius: 13,
                   backgroundColor: const Color(0xFFEEF2FF),
-                  child: Text(initial,
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A4FD6))),
+                  child: isCustomer
+                      ? const Icon(Icons.dry_cleaning_rounded, size: 13, color: Color(0xFF1A4FD6))
+                      : Text(initial,
+                          style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1A4FD6))),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(order.customerName,
+                  child: Text(
+                      isCustomer
+                          ? (order.items.isNotEmpty
+                              ? order.items.map((i) => '${i.quantity} × ${i.itemTitle}').join(', ')
+                              : 'Laundry order')
+                          : order.customerName,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 13,
@@ -701,6 +738,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   /// Filters, Export, New Order — all in one unwrapped Row. Unchanged from
   /// before the phone layout existed.
   Widget _wideHeaderBar(AppProvider provider, List<OrderModel> filteredOrders) {
+    final isCustomer = provider.role == 'customer';
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -718,15 +756,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF0F172A))),
               const SizedBox(width: 8),
-              Text('${provider.orders.length} Total',
+              Text('${filteredOrders.length} Total',
                   style:
                       const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
             ],
           ),
           const Spacer(),
           _dateDropdown(),
-          const SizedBox(width: 8),
-          _calendarHeatmapButton(provider),
+          if (!isCustomer) ...[
+            const SizedBox(width: 8),
+            _calendarHeatmapButton(provider),
+          ],
           const SizedBox(width: 8),
 
           // Search Input Box
@@ -747,10 +787,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   child: TextField(
                     onChanged: (val) => setState(() => _searchQuery = val),
                     textAlign: TextAlign.center,
-                    decoration: const InputDecoration(
-                      hintText: 'Search by order ID, phone, or name...',
+                    decoration: InputDecoration(
+                      hintText: isCustomer
+                          ? 'Search by order ID or item...'
+                          : 'Search by order ID, phone, or name...',
                       hintStyle:
-                          TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                          const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                       border: InputBorder.none,
                       isDense: true,
                     ),
@@ -759,12 +801,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          _filtersButton(),
+          if (!_isCustomerView) ...[
+            const SizedBox(width: 8),
+            _filtersButton(),
+          ],
           const SizedBox(width: 8),
           _exportButton(filteredOrders),
           const SizedBox(width: 8),
-          _newOrderButton(iconOnly: false),
+          _newOrderButton(iconOnly: false, isCustomer: isCustomer),
         ],
       ),
     );
@@ -775,6 +819,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   /// the date/Filters/Export controls in their own horizontal scroll (same
   /// pattern the status tabs below already use).
   Widget _narrowHeaderBar(AppProvider provider, List<OrderModel> filteredOrders) {
+    final isCustomer = provider.role == 'customer';
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: const BoxDecoration(
@@ -795,12 +840,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF0F172A))),
                   const SizedBox(width: 8),
-                  Text('${provider.orders.length} Total',
+                  Text('${filteredOrders.length} Total',
                       style: const TextStyle(
                           fontSize: 12, color: Color(0xFF94A3B8))),
                 ],
               ),
-              _newOrderButton(iconOnly: true),
+              _newOrderButton(iconOnly: true, isCustomer: isCustomer),
             ],
           ),
           const SizedBox(height: 12),
@@ -820,10 +865,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   child: TextField(
                     onChanged: (val) => setState(() => _searchQuery = val),
                     textAlign: TextAlign.center,
-                    decoration: const InputDecoration(
-                      hintText: 'Search by order ID, phone, or name...',
+                    decoration: InputDecoration(
+                      hintText: isCustomer
+                          ? 'Search by order ID or item...'
+                          : 'Search by order ID, phone, or name...',
                       hintStyle:
-                          TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                          const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                       border: InputBorder.none,
                       isDense: true,
                     ),
@@ -839,10 +886,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
               scrollDirection: Axis.horizontal,
               children: [
                 _dateDropdown(),
-                const SizedBox(width: 8),
-                _calendarHeatmapButton(provider),
-                const SizedBox(width: 8),
-                _filtersButton(),
+                if (!isCustomer) ...[
+                  const SizedBox(width: 8),
+                  _calendarHeatmapButton(provider),
+                ],
+                if (!_isCustomerView) ...[
+                  const SizedBox(width: 8),
+                  _filtersButton(),
+                ],
                 const SizedBox(width: 8),
                 _exportButton(filteredOrders),
               ],
@@ -932,6 +983,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
       ),
     );
   }
+
+  /// The signed-in role (customers load the owner's data, so AppProvider.role
+  /// can't tell).
+  bool get _isCustomerView =>
+      context.signedInRoleOnce == 'customer';
 
   Widget _filtersButton() {
     return OutlinedButton.icon(
@@ -1044,28 +1100,34 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   /// `iconOnly` drops the label for the narrow header, matching the same
   /// icon-plus treatment New Order's phone header already uses.
-  Widget _newOrderButton({required bool iconOnly}) {
+  Widget _newOrderButton({required bool iconOnly, bool isCustomer = false}) {
+    final label = isCustomer ? 'Book Pickup' : 'New Order';
+    final icon = isCustomer ? Icons.calendar_today_outlined : Icons.add;
+    final VoidCallback onTap = isCustomer
+        ? () => context.go('/my/book')
+        : () => context.goSection(1);
+
     if (iconOnly) {
       return SizedBox(
         width: 38,
         height: 38,
         child: ElevatedButton(
-          onPressed: () => context.goSection(1),
+          onPressed: onTap,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF1A4FD6),
             padding: EdgeInsets.zero,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          child: const Icon(Icons.add, size: 18, color: Colors.white),
+          child: Icon(icon, size: 18, color: Colors.white),
         ),
       );
     }
     return ElevatedButton.icon(
-      onPressed: () => context.goSection(1),
-      icon: const Icon(Icons.add, size: 16, color: Colors.white),
-      label: const Text('New Order',
-          style: TextStyle(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16, color: Colors.white),
+      label: Text(label,
+          style: const TextStyle(
               fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFF1A4FD6),
@@ -1075,8 +1137,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  /// Matches the real app's own "Filter Orders" dialog section-for-section
-  /// (compared side by side against `app.laundrybill.com/orders`): Attention
+  /// The "Filter Orders" dialog: Attention
   /// Needed, Order Source, Order Type, Service type, Status. Edits a scratch
   /// copy of everything — including Status, which otherwise writes straight
   /// into [_selectedTab] — so Cancel truly cancels.

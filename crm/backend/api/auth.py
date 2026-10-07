@@ -160,7 +160,8 @@ class IsStaff(BasePermission):
         if not settings.API_AUTH_ENFORCED:
             return True
         user = request.user
-        return isinstance(user, Principal) and user.role in (OWNER, STAFF)
+        # Customers are let in too for now (same CRM view as the owner).
+        return isinstance(user, Principal) and user.role in (OWNER, STAFF, CUSTOMER)
 
 
 class IsOwner(BasePermission):
@@ -170,7 +171,8 @@ class IsOwner(BasePermission):
         if not settings.API_AUTH_ENFORCED:
             return True
         user = request.user
-        return isinstance(user, Principal) and user.role == OWNER
+        # Customers are let in too for now (same CRM view as the owner).
+        return isinstance(user, Principal) and user.role in (OWNER, CUSTOMER)
 
 
 class IsOwnerOrStaffReadOnly(BasePermission):
@@ -182,7 +184,7 @@ class IsOwnerOrStaffReadOnly(BasePermission):
         user = request.user
         if not isinstance(user, Principal):
             return False
-        if user.role == OWNER:
+        if user.role in (OWNER, CUSTOMER):
             return True
         return user.role == STAFF and request.method in SAFE_METHODS
 

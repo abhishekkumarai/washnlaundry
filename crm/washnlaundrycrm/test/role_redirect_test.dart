@@ -1,3 +1,4 @@
+import 'package:washnlaundrycrm/utils/role_views.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:washnlaundrycrm/providers/auth_provider.dart';
@@ -59,14 +60,27 @@ void main() {
     expect(authRedirectFor(auth, '/login'), '/orders');
   });
 
-  test('customer is kept inside /my/*', () async {
+  test('customer gets the CRM screens minus the views hidden in role_views.json', () async {
+    RoleViews.setHidden({
+      'customer': ['Dashboard', 'Customers', 'Payroll', 'Settings'],
+    });
+    addTearDown(() => RoleViews.setHidden({}));
     final auth = await session(signedIn: true, role: 'customer');
-    for (final p in ['/my/orders', '/my/orders/WL-1', '/my/rate-card', '/my/book']) {
+    for (final p in ['/orders', '/orders/abc', '/new-order', '/chat']) {
       expect(authRedirectFor(auth, p), isNull, reason: p);
     }
-    for (final p in ['/dashboard', '/orders', '/customers', '/my/start', '/login']) {
-      expect(authRedirectFor(auth, p), '/my/orders', reason: p);
+    for (final p in ['/dashboard', '/customers', '/payroll', '/settings', '/my/start', '/login']) {
+      expect(authRedirectFor(auth, p), '/orders', reason: p);
     }
+  });
+
+  test('signing in on customer.* makes owner and staff see the customer view', () {
+    for (final r in ['owner', 'staff', 'customer']) {
+      expect(RoleViews.effectiveRole(r, host: 'customer.washnlaundry.com'), 'customer');
+    }
+    expect(RoleViews.effectiveRole('unlinked', host: 'customer.washnlaundry.com'), 'unlinked');
+    expect(RoleViews.effectiveRole('owner', host: 'app.washnlaundry.com'), 'owner');
+    expect(RoleViews.effectiveRole('staff', host: 'app.washnlaundry.com'), 'staff');
   });
 
   test('unlinked Google account only sees /my/start', () async {

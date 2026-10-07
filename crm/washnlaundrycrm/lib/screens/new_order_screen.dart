@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../providers/auth_provider.dart';
+import '../utils/role_views.dart';
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
 import '../widgets/app_date_picker.dart';
@@ -115,7 +117,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   void _selectDeliveryType(String type) {
     final today = DateUtils.dateOnly(DateTime.now());
     _deliveryType = type;
-    _deliveryCharge = _isCarriedDelivery ? _deliveryFee : 0;
+    // No delivery charge for a signed-in customer (the backend zeroes it too).
+    _deliveryCharge = _isCarriedDelivery && !_isSelfCustomer ? _deliveryFee : 0;
     _deliveryChargeController.text = _deliveryCharge.toStringAsFixed(0);
     _readyBy = today.add(const Duration(days: 1));
     _deliveryWindow = null;
@@ -135,7 +138,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   @override
   void initState() {
     super.initState();
-    _customer = widget.initialCustomer;
+    _customer = widget.initialCustomer ?? _signedInCustomer();
+    _deliveryType = _defaultDeliveryType;
     _notesController = TextEditingController();
     _discountController = TextEditingController();
     _addressController = TextEditingController();
@@ -147,7 +151,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   void didUpdateWidget(covariant NewOrderScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialCustomer != oldWidget.initialCustomer) {
-      _customer = widget.initialCustomer;
+      _customer = widget.initialCustomer ?? _signedInCustomer();
     }
   }
 
@@ -159,6 +163,33 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     _deliveryChargeController.dispose();
     super.dispose();
   }
+
+  /// A signed-in customer places orders for themselves: their own name and
+  /// number instead of the walk-in placeholder, and no picker.
+  CustomerModel? _signedInCustomer() {
+    final auth = context.read<AuthProvider?>();
+    if (auth?.role != 'customer') return null;
+    final me = auth?.me?['customer'];
+    if (me is! Map || '${me['id'] ?? ''}'.isEmpty) return null;
+    return CustomerModel(
+      id: '${me['id']}',
+      name: '${me['name'] ?? ''}',
+      phone: '${me['phone'] ?? ''}',
+      email: '${me['email'] ?? ''}',
+      address: '${me['address'] ?? ''}',
+      area: '${me['area'] ?? ''}',
+    );
+  }
+
+  /// A signed-in customer always books a Home pickup (the other two order
+  /// types are hidden for them); everyone else starts on Shop pickup.
+  String get _defaultDeliveryType => _isSelfCustomer
+      ? DeliveryType.homePickup
+      : DeliveryType.storePickup;
+
+  bool get _isSelfCustomer =>
+      context.signedInRoleOnce == 'customer' &&
+      _customer != null;
 
   static const _walkInName = 'Walk-in customer';
   static const _walkInPhone = '';
@@ -730,6 +761,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               ],
             ),
           ),
+          if (!_isSelfCustomer)
           TextButton(
             onPressed: _pickCustomer,
             child: Text(
@@ -900,6 +932,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               ],
             ),
           ),
+          if (!_isSelfCustomer)
           OutlinedButton(
             onPressed: _pickCustomer,
             style: OutlinedButton.styleFrom(
@@ -962,16 +995,20 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   /// A bordered date row: calendar icon, small label over the date, chevron.
   Widget _dateField(
-      String label, DateTime date, ValueChanged<DateTime> onPicked) {
+      String label, DateTime date, ValueChanged<DateTime> onPicked,
+      {DateTime? minDate}) {
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: () async {
         final today = DateUtils.dateOnly(DateTime.now());
+        // `minDate` lets a field start later than today (Delivery date can't
+        // be on or before the Pickup date).
+        final first = minDate == null || minDate.isBefore(today) ? today : minDate;
         final picked = await AppDatePicker.pickDate(
           context: context,
-          initialDate: date.isBefore(today) ? today : date,
-          firstDate: today,
-          lastDate: today.add(const Duration(days: 60)),
+          initialDate: date.isBefore(first) ? first : date,
+          firstDate: first,
+          lastDate: first.add(const Duration(days: 60)),
         );
         if (picked != null) setState(() => onPicked(DateUtils.dateOnly(picked)));
       },
@@ -1078,7 +1115,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    for (final (i, t) in _orderTypes.indexed) ...[
+                    for (final (i, t) in _orderTypes
+                        .where((t) =>
+                            !_isSelfCustomer || t.$1 == DeliveryType.homePickup)
+                        .indexed) ...[
                       if (i > 0) const SizedBox(width: 12),
                       Expanded(child: _orderTypeOption(t.$1, t.$2, t.$3, t.$4)),
                     ],
@@ -1096,6 +1136,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                           _isWindowPast(d, _pickupWindow!)) {
                         _pickupWindow = null;
                       }
+                      // Delivery is always after pickup: push it out if the
+                      // new pickup date caught up with it.
+                      if (!_readyBy!.isAfter(d)) {
+                        _readyBy = d.add(const Duration(days: 1));
+                        _deliveryWindow = null;
+                      }
                     }),
                     _fieldLabel('Pickup slot'),
                     _slotPicker(
@@ -1112,7 +1158,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                         _isWindowPast(d, _deliveryWindow!)) {
                       _deliveryWindow = null;
                     }
-                  }),
+                  },
+                      minDate: isPickup
+                          ? _pickupDate!.add(const Duration(days: 1))
+                          : null),
                   _fieldLabel('Delivery slot'),
                   _slotPicker(
                     windows: _windowsFor(provider, TimeSlotModel.delivery),
@@ -1296,6 +1345,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           ),
           child: Column(
             children: [
+              // A signed-in customer sees neither the Discount field nor the
+              // Delivery line.
+              if (!_isSelfCustomer) ...[
               Row(
                 children: [
                   const Text('Discount',
@@ -1332,11 +1384,12 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 ],
               ),
               const Divider(height: 28),
+              ],
               summaryLine(
                   'Subtotal',
                   Text('${Money.symbol}${subtotal.toInt()}',
                       style: const TextStyle(fontSize: 14, color: _ink))),
-              if (_isCarriedDelivery)
+              if (_isCarriedDelivery && !_isSelfCustomer)
                 summaryLine(
                   'Delivery',
                   SizedBox(
@@ -1363,7 +1416,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     ),
                   ),
                 ),
-              if (discount > 0)
+              if (discount > 0 && !_isSelfCustomer)
                 summaryLine(
                     'Discount',
                     Text('−${Money.symbol}${discount.toInt()}',
@@ -1940,6 +1993,19 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       );
       return;
     }
+    // The delivery date must be after the pickup date (the pickers already
+    // enforce it; this guards any other path to checkout).
+    if (_deliveryType == DeliveryType.homePickup &&
+        _pickupDate != null &&
+        _readyBy != null &&
+        !_readyBy!.isAfter(_pickupDate!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Delivery date must be after the pickup date',
+                style: TextStyle(fontSize: 13))),
+      );
+      return;
+    }
 
     // Matches the backend's own formula (serializers.py: subtotal + delivery
     // - discount) so the payload and what the server computes agree.
@@ -2009,10 +2075,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       return;
     }
 
-    final shop = provider.shop;
     setState(() {
       _cartQuantities.clear();
-      _customer = null;
+      _customer = _signedInCustomer();
       _showCheckoutReview = false;
       _readyBy = null;
       _deliveryWindow = null;
@@ -2020,7 +2085,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       _pickupWindow = null;
       _discountValue = 0;
       _discountIsPercent = true;
-      _deliveryType = DeliveryType.storePickup;
+      _deliveryType = _defaultDeliveryType;
       _deliveryCharge = 0;
       _notesController.clear();
       _addressController.clear();
@@ -2029,12 +2094,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     });
 
     if (!mounted) return;
-    // Read off the *saved* order, so the number and totals on it are the
-    // ones actually in the database.
-    showDialog(
-      context: context,
-      builder: (_) => _OrderPlacedDialog(order: created, shop: shop),
-    );
+    // Go straight to the new order's details page instead of a popup.
+    context.go('/orders/${created.id.isNotEmpty ? created.id : created.orderNumber}');
   }
 
   /// Stand-in for the live app's product photography. Known garments get a

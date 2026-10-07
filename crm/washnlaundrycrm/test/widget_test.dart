@@ -191,16 +191,13 @@ void main() {
     });
   });
 
-  testWidgets('disabled items are inert and marked Soon', (tester) async {
+  testWidgets('Apps and Subscription are not in the sidebar', (tester) async {
     final provider = AppProvider(autoLoad: false);
     await tester.pumpWidget(wrap(provider, const SidebarNavigation()));
 
-    expect(find.text('Soon'), findsWidgets);
-
-    await tester.tap(find.text('Apps'));
-    await tester.pump();
-
-    expect(provider.currentNavIndex, 0);
+    expect(find.text('Apps'), findsNothing);
+    expect(find.text('Subscription'), findsNothing);
+    expect(find.text('Soon'), findsNothing);
   });
 
   testWidgets(
@@ -227,7 +224,7 @@ void main() {
     // Dialog is displayed
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('Help & Support'), findsOneWidget);
-    expect(find.text('support@laundrybill.com'), findsOneWidget);
+    expect(find.text('support@washnlaundry.com'), findsOneWidget);
 
     // selected nav index does not change
     expect(provider.currentNavIndex, 0);

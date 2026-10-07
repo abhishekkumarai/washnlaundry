@@ -20,7 +20,7 @@ class _ReceiptDialogState extends State<ReceiptDialog> {
   String get _shopName =>
       (widget.shop?['name'] as String?)?.trim().isNotEmpty == true
           ? widget.shop!['name'] as String
-          : 'LaundryBill';
+          : 'WashNLaundry';
 
   String get _shopSubtitle {
     final address = (widget.shop?['address'] as String?)?.trim() ?? '';
@@ -206,7 +206,7 @@ class _ReceiptDialogState extends State<ReceiptDialog> {
 
             // QR Code for Tracking
             QrImageView(
-              data: 'https://app.laundrybill.com/track/${order.orderNumber}',
+              data: 'https://app.washnlaundry.com/track/${order.orderNumber}',
               version: QrVersions.auto,
               size: 100.0,
             ),

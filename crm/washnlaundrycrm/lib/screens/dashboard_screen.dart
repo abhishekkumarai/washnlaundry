@@ -9,7 +9,6 @@ import '../widgets/kpi_cards_row.dart';
 import '../widgets/load_state.dart';
 import '../widgets/order_pipeline_card.dart';
 import '../widgets/panel_card.dart';
-import '../widgets/quick_scan_card.dart';
 import '../widgets/recent_activity_card.dart';
 import '../widgets/revenue_analytics_card.dart';
 import '../widgets/revenue_chart_card.dart';
@@ -106,8 +105,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  QuickScanCard(collapsible: isCollapsible),
-                  const SizedBox(height: 20),
                   if (isWide)
                     const KpiCardsRow()
                   else

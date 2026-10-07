@@ -1,5 +1,5 @@
 name: washnlaundrycrm
-description: "Wash & Laundry CRM - Full Laundry Management POS System replicating app.laundrybill.com"
+description: "Wash & Laundry CRM - Full Laundry Management POS System for WashNLaundry shops"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -38,3 +38,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/config/role_views.json
