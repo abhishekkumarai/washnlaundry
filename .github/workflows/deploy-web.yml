@@ -5,8 +5,6 @@ on:
     branches: [main]
     paths-ignore:
       - "crm/**"
-      - "customer-web/**"
-      - ".github/workflows/deploy-customer.yml"
       - ".github/workflows/deploy-crm.yml"
       - "**/*.md"
   workflow_dispatch:

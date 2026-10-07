@@ -123,5 +123,13 @@ void main() {
       expect(find.text('Enter your email and password.'), findsOneWidget);
       expect(auth.isSignedIn, isFalse);
     });
+
+    test('Demo Mode is hidden on the customer site only', () {
+      expect(LoginScreen.showDemoOn('app.washnlaundry.com'), isTrue);
+      expect(LoginScreen.showDemoOn('localhost'), isTrue);
+      expect(LoginScreen.showDemoOn(''), isTrue);
+      expect(LoginScreen.showDemoOn('customer.washnlaundry.com'), isFalse);
+      expect(LoginScreen.showDemoOn('Customer.WashNLaundry.com'), isFalse);
+    });
   });
 }
