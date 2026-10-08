@@ -61,7 +61,10 @@ void main() {
       await pumpAtWidth(tester, 1400, wrap(AppProvider(autoLoad: false)));
 
       expect(persistentRail(), findsOneWidget);
-      expect(find.byIcon(Icons.menu_rounded), findsNothing);
+      // No top bar with a drawer hamburger ('Menu')... the rail's own
+      // collapse toggle is a hamburger icon too, but it is a different control.
+      expect(find.byTooltip('Menu'), findsNothing);
+      expect(find.byTooltip('Collapse sidebar'), findsOneWidget);
     });
   });
 

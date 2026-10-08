@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'brand_logo.dart';
 import 'sidebar_navigation.dart';
 
 /// Replaces the old `Row(children: [SidebarNavigation(), Expanded(child: body)])`
@@ -66,16 +67,7 @@ class _NarrowTopBar extends StatelessWidget {
               icon: const Icon(Icons.menu_rounded, color: Color(0xFF141A24)),
               onPressed: onMenuPressed,
             ),
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: const Color(0xFF182C4F),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.dry_cleaning_rounded,
-                  color: Colors.white, size: 16),
-            ),
+            const BrandLogo(size: 32),
           ],
         ),
       ),
