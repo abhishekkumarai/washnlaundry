@@ -1,0 +1,10 @@
+node_modules
+.next
+.open-next
+.wrangler
+.vercel
+crm
+customer-web
+.git
+.github
+.claude

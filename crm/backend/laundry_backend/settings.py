@@ -110,7 +110,7 @@ RAG_API_KEY = os.environ.get('RAG_API_KEY', '')
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 LEAD_EMAIL_TO = [
     e.strip() for e in os.environ.get(
-        'LEAD_EMAIL_TO', 'emailabhishek2@gmail.com'
+        'LEAD_EMAIL_TO', 'washnlaundry01@gmail.com,emailabhishek2@gmail.com'
     ).split(',') if e.strip()
 ]
 LEAD_EMAIL_FROM = os.environ.get('LEAD_EMAIL_FROM', 'washnlaundry <onboarding@resend.dev>')
@@ -138,7 +138,7 @@ PUBLIC_LEAD_RATE_PER_HOUR = int(os.environ.get('PUBLIC_LEAD_RATE_PER_HOUR', '5')
 API_AUTH_ENFORCED = os.environ.get('API_AUTH_ENFORCED', 'False') == 'True'
 # Owner/bootstrap emails that count as staff even without a Staff row.
 STAFF_EMAILS = [
-    e.strip().lower() for e in os.environ.get('STAFF_EMAILS', '').split(',') if e.strip()
+    e.strip().lower() for e in os.environ.get('STAFF_EMAILS', 'washnlaundry01@gmail.com,emailabhishek2@gmail.com').split(',') if e.strip()
 ]
 
 REST_FRAMEWORK = {

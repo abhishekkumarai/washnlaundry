@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: ./crm/backend
+      dockerfile: Dockerfile
+    container_name: washnlaundry-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./crm/backend:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEBUG=True
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-laundrybill-crm-secret-key-super-secure}
+      - RAG_API_KEY=${RAG_API_KEY:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - CORS_ALLOW_ALL_ORIGINS=True
+
+  frontend:
+    build:
+      context: ./crm/washnlaundrycrm
+      dockerfile: Dockerfile
+      args:
+        GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    container_name: washnlaundry-crm
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: washnlaundry-marketing
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
