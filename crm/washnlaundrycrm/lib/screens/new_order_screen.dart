@@ -27,6 +27,11 @@ class NewOrderScreen extends StatefulWidget {
 class _NewOrderScreenState extends State<NewOrderScreen> {
   /// Empty means "All". Matches on [GarmentItemModel.categoryName].
   String _selectedCategory = '';
+
+  /// Phone width only: the cart panel is slid up over the item list. (Below
+  /// the wide breakpoint the cart no longer sits at the very bottom of the
+  /// page; a bar pinned to the bottom opens it.)
+  bool _cartOpen = false;
   String _searchQuery = '';
 
   /// Null until a customer is picked or passed via initialCustomer.
@@ -519,6 +524,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                                   _selectDeliveryType(_deliveryType);
                                 }
                                 _showCheckoutReview = true;
+                                _cartOpen = false;
                               });
                             },
                       style: ElevatedButton.styleFrom(
@@ -586,6 +592,85 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             // other. Instead the whole thing is one scroll view, and each
             // section shrink-wraps its own inner list rather than trying to
             // fill a fixed share of the height.
+            // Browsing step on a phone: the items get the whole screen, a bar
+            // pinned to the bottom shows what is in the cart, and tapping it
+            // slides the cart up over the list. The review step (after
+            // Checkout) keeps the stacked layout below, since its form and
+            // Order Summary need the room.
+            if (!_showCheckoutReview) {
+              final hasItems = _cartQuantities.isNotEmpty;
+              final panelOpen = _cartOpen;
+              return Stack(
+                children: [
+                  SingleChildScrollView(
+                    padding: EdgeInsets.only(bottom: hasItems ? 88 : 0),
+                    child: buildMain(narrow: true),
+                  ),
+                  if (hasItems && !panelOpen)
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 12,
+                      child: _cartBar(subtotal),
+                    ),
+                  if (panelOpen) ...[
+                    Positioned.fill(
+                      child: Material(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        child: InkWell(
+                          key: const Key('cartScrim'),
+                          onTap: () => setState(() => _cartOpen = false),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: constraints.maxHeight * 0.88,
+                      child: Material(
+                        key: const Key('cartPanel'),
+                        color: Colors.white,
+                        elevation: 8,
+                        clipBehavior: Clip.antiAlias,
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(18)),
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 8, 4, 0),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 36,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFD9D5CB),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  IconButton(
+                                    tooltip: 'Close',
+                                    icon: const Icon(Icons.close_rounded,
+                                        color: Color(0xFF64748B)),
+                                    onPressed: () =>
+                                        setState(() => _cartOpen = false),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(child: buildCart(narrow: false)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            }
+
             return SingleChildScrollView(
               child: Column(
                 children: [
@@ -605,6 +690,67 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  /// Phone-width bar pinned to the bottom while the cart has items: how many,
+  /// the running total, and a tap target that slides the cart up.
+  Widget _cartBar(double subtotal) {
+    final n = _totalItems;
+    return Material(
+      key: const Key('cartBar'),
+      color: const Color(0xFF182C4F),
+      borderRadius: BorderRadius.circular(14),
+      elevation: 4,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => setState(() => _cartOpen = true),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              const Icon(Icons.shopping_bag_outlined,
+                  color: Color(0xFFFAF9F6), size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                          text: '$n ${n == 1 ? 'item' : 'items'}',
+                          style: const TextStyle(
+                              color: Color(0xFFFAF9F6),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                      const TextSpan(
+                          text: '  ·  ',
+                          style: TextStyle(
+                              color: Color(0xFF94A3B8), fontSize: 14)),
+                      TextSpan(
+                          text: '${Money.symbol}${subtotal.toInt()}',
+                          style: const TextStyle(
+                              color: Color(0xFFFAF9F6),
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text('View order',
+                  style: TextStyle(
+                      color: Color(0xFFFAF9F6),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(width: 2),
+              const Icon(Icons.keyboard_arrow_up_rounded,
+                  color: Color(0xFFFAF9F6), size: 20),
+            ],
+          ),
         ),
       ),
     );
@@ -1496,19 +1642,25 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         return GridView.builder(
           shrinkWrap: shrinkWrap,
           physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            // 0.76 holds up down to 2 columns (a card is still narrow enough
-            // there to need the height). At 1 column the card gets nearly
-            // the full screen width, so the same ratio makes it needlessly
-            // tall (~420dp+) relative to a phone's viewport — widen it.
-            childAspectRatio: columns == 1 ? 1.3 : 0.76,
-          ),
+          padding: EdgeInsets.symmetric(
+              horizontal: columns == 1 ? 14 : 20, vertical: 8),
+          gridDelegate: columns == 1
+              // Compact rows: a fixed row height instead of an aspect ratio.
+              ? const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 1,
+                  mainAxisSpacing: 8,
+                  mainAxisExtent: 72,
+                )
+              : SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.76,
+                ),
           itemCount: items.length,
-          itemBuilder: (context, idx) => _itemCard(items[idx]),
+          itemBuilder: (context, idx) => columns == 1
+              ? _itemRowCompact(items[idx])
+              : _itemCard(items[idx]),
         );
       },
     );
@@ -1635,8 +1787,10 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   /// beside it (wide) or below it (narrow, see [SidebarNavigation.contentWideBreakpoint]) is what
   /// made that width small.
   static int _gridColumnsFor(double width) {
-    if (width < 380) return 1;
-    if (width < 620) return 2;
+    // Phones get one column of compact rows (see _itemRowCompact), not big
+    // cards: a card is ~270dp tall there and shows two or three items per
+    // screen.
+    if (width < 620) return 1;
     if (width < 900) return 3;
     return 4;
   }
@@ -1673,6 +1827,79 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             ),
           ),
           if (action != null) ...[const SizedBox(height: 8), action],
+        ],
+      ),
+    );
+  }
+
+  /// Phone-width item: photo, name + price, and the Add button on one short
+  /// row. Same cart control and in-cart highlight as [_itemCard], at a
+  /// fraction of the height.
+  Widget _itemRowCompact(GarmentItemModel item) {
+    final qty = _cartQuantities[item.id] ?? 0;
+    final art = _artFor(item.name);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: qty > 0 ? const Color(0xFF182C4F) : const Color(0xFFE4E0D8)),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: 48,
+              height: 48,
+              color: const Color(0xFFF8F7F5),
+              child: item.imageUrl.isNotEmpty
+                  ? Image.network(
+                      item.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          Icon(art.icon, size: 24, color: art.color),
+                    )
+                  : Icon(art.icon, size: 24, color: art.color),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF141A24))),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Text('${Money.symbol}${item.price.toInt()}',
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF182C4F))),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(item.unitLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF94A3B8))),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _addToCartControl(item, width: 112),
         ],
       ),
     );

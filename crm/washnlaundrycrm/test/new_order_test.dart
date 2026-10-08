@@ -560,8 +560,10 @@ void main() {
     testWidgets('Home pickup review fits a phone-width screen', (tester) async {
       tester.view.physicalSize = const Size(380, 900);
       await pumpWithItemInCart(tester);
+      // On a phone the cart is a panel slid up from the bar at the bottom.
+      await tester.tap(find.byKey(const Key('cartBar')));
+      await tester.pumpAndSettle();
       final checkout = find.text('Checkout • ₹15');
-      await tester.ensureVisible(checkout);
       await tester.tap(checkout);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Home pickup'));
@@ -900,14 +902,93 @@ void main() {
       expect(find.byKey(const Key('itemsTable')), findsNothing);
     });
 
-    testWidgets('cart stacks below the grid at phone width', (tester) async {
+    testWidgets('phone: a bar pinned to the bottom opens the cart as a panel',
+        (tester) async {
+      // The cart used to sit under the whole item list, so you scrolled past
+      // every item to find it.
       await pumpAt(tester, 390);
+      expect(find.byKey(const Key('cartBar')), findsNothing,
+          reason: 'no bar while the cart is empty');
+      expect(find.text('Current order'), findsNothing);
 
-      final gridBottom = tester.getBottomLeft(find.byType(GridView)).dy;
-      final cartTop = tester.getTopLeft(find.text('Current order')).dy;
+      await tester.tap(find.text('+ Add to Cart').first);
+      await tester.pump();
+      expect(find.byKey(const Key('cartBar')), findsOneWidget);
+      expect(find.textContaining('1 item'), findsOneWidget);
+      // Pinned: it sits at the bottom of the screen, not after the list.
+      expect(tester.getBottomLeft(find.byKey(const Key('cartBar'))).dy,
+          greaterThan(700));
 
-      // Stacked: the cart section starts at or after where the grid ends.
-      expect(cartTop, greaterThanOrEqualTo(gridBottom));
+      await tester.tap(find.byKey(const Key('cartBar')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('cartPanel')), findsOneWidget);
+      expect(find.text('Current order'), findsOneWidget);
+      expect(find.textContaining('Checkout'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('cartPanel')), findsNothing);
+      expect(find.byKey(const Key('cartBar')), findsOneWidget);
+    });
+
+    testWidgets('tapping outside the panel closes it', (tester) async {
+      await pumpAt(tester, 390);
+      await tester.tap(find.text('+ Add to Cart').first);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('cartBar')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('cartPanel')), findsOneWidget);
+
+      // Above the panel: the dimmed list behind it (below the 44dp top bar).
+      await tester.tapAt(const Offset(195, 120));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('cartPanel')), findsNothing);
+    });
+
+    testWidgets('the bar shows a running count and total', (tester) async {
+      await pumpAt(tester, 390);
+      final adds = find.text('+ Add to Cart');
+      await tester.tap(adds.first);
+      await tester.pump();
+      expect(find.textContaining('1 item'), findsOneWidget);
+      expect(find.textContaining('₹15'), findsWidgets);
+    });
+
+    testWidgets('wide width keeps the cart beside the items, with no bar',
+        (tester) async {
+      await pumpAt(tester, 1400);
+      expect(find.byKey(const Key('cartBar')), findsNothing);
+      expect(find.text('Current order'), findsOneWidget);
+    });
+
+    testWidgets('phone width lists items as compact rows, tablet as cards',
+        (tester) async {
+      // A phone card was ~270dp tall (two or three items per screen); a row is
+      // a fixed 72dp.
+      await pumpAt(tester, 390);
+      final phone = tester.widget<GridView>(find.byType(GridView)).gridDelegate
+          as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(phone.crossAxisCount, 1);
+      expect(phone.mainAxisExtent, 72);
+
+      await pumpAt(tester, 700);
+      final tablet = tester.widget<GridView>(find.byType(GridView)).gridDelegate
+          as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(tablet.crossAxisCount, greaterThan(1));
+      expect(tablet.mainAxisExtent, isNull);
+    });
+
+    testWidgets('a compact row still adds to the cart', (tester) async {
+      await pumpAt(tester, 390);
+      expect(find.text('+ Add to Cart'), findsWidgets);
+
+      await tester.tap(find.text('+ Add to Cart').first);
+      await tester.pump();
+
+      // The item is in the cart: the bar at the bottom shows it.
+      expect(find.byKey(const Key('cartBar')), findsOneWidget);
+      expect(find.text('+ Add to Cart').evaluate().length,
+          lessThan(_catalogue.length));
     });
 
     int columnsAt(WidgetTester tester) {
