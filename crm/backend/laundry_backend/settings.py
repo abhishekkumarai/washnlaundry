@@ -113,7 +113,7 @@ LEAD_EMAIL_TO = [
         'LEAD_EMAIL_TO', 'washnlaundry01@gmail.com,emailabhishek2@gmail.com'
     ).split(',') if e.strip()
 ]
-LEAD_EMAIL_FROM = os.environ.get('LEAD_EMAIL_FROM', 'washnlaundry <onboarding@resend.dev>')
+LEAD_EMAIL_FROM = os.environ.get('LEAD_EMAIL_FROM', 'WashNLaundry <noreply@washnlaundry.com>')
 
 # Browser origins allowed to call the public (no-secret) pickup-form endpoint
 # /api/leads/public/, and how many submissions one IP may make per hour.
