@@ -92,18 +92,18 @@ void main() {
       expect(initialsFor('   '), '?');
     });
 
-    test('a single short word stays as-is, upper-cased', () {
+    test('names up to 5 characters stay in full long form, upper-cased', () {
       expect(initialsFor('AK'), 'AK');
       expect(initialsFor('a'), 'A');
+      expect(initialsFor('demo'), 'DEMO');
+      expect(initialsFor('admin'), 'ADMIN');
+      expect(initialsFor('staff'), 'STAFF');
     });
 
-    test('a single long word is truncated to two letters', () {
-      expect(initialsFor('washing'), 'WA');
-    });
-
-    test('multiple words take the first letter of the first two', () {
-      expect(initialsFor('Ramesh Kumar'), 'RK');
-      expect(initialsFor('  Ramesh   Kumar  '), 'RK');
+    test('names longer than 5 characters are truncated to first 5 letters', () {
+      expect(initialsFor('washing'), 'WASHI');
+      expect(initialsFor('john_doe'), 'JOHN_');
+      expect(initialsFor('abhishekkumar'), 'ABHIS');
     });
   });
 }

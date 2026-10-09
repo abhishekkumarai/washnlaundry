@@ -41,6 +41,104 @@ class ShopViewSet(viewsets.ModelViewSet):
     queryset = Shop.objects.all()
     serializer_class = ShopSerializer
 
+    def get_queryset(self):
+        shop = getattr(self.request, 'shop', None)
+        has_explicit_tenant = (
+            self.request.headers.get('X-Tenant-ID') or
+            self.request.META.get('HTTP_X_TENANT_ID') or
+            self.request.query_params.get('shop')
+        )
+        if has_explicit_tenant and shop:
+            return Shop.objects.filter(id=shop.id)
+        return Shop.objects.all()
+
+    @action(detail=False, methods=['post'], url_path='provision', permission_classes=[])
+    def provision(self, request):
+        """POST /api/shops/provision/
+        Self-service tenant provisioning. Creates a new Shop, initializes its
+        order sequence, seeds default service categories and credit categories,
+        and assigns the caller as OWNER.
+        """
+        from .models import ShopRole, ShopMembership, ShopOrderSequence, CreditCategory, DEFAULT_CREDIT_CATEGORIES
+        from django.db import transaction
+
+        data = request.data
+        name = str(data.get('name') or '').strip()
+        if not name:
+            return Response({'detail': 'Shop name is required.'}, status=400)
+
+        slug = str(data.get('slug') or '').strip() or None
+        phone = str(data.get('phone') or '').strip() or '+91 98765 43210'
+        owner_name = str(data.get('owner_name') or '').strip() or 'Owner'
+        order_prefix = str(data.get('order_prefix') or '').strip() or None
+
+        with transaction.atomic():
+            shop = Shop(
+                name=name,
+                owner_name=owner_name,
+                phone=phone,
+                order_prefix=order_prefix or Shop.derive_prefix(name),
+                status='ACTIVE',
+            )
+            if slug:
+                shop.slug = slug
+            if data.get('tax_rate') is not None:
+                try:
+                    shop.tax_rate = float(data.get('tax_rate'))
+                except (ValueError, TypeError):
+                    pass
+            if data.get('address'):
+                shop.address = str(data.get('address')).strip()
+            if data.get('city'):
+                shop.city = str(data.get('city')).strip()
+            if data.get('state'):
+                shop.state = str(data.get('state')).strip()
+            if data.get('pin_code'):
+                shop.pin_code = str(data.get('pin_code')).strip()
+            if data.get('currency_symbol'):
+                shop.currency_symbol = str(data.get('currency_symbol')).strip()
+
+            shop.save()
+
+            # Initialize order sequence
+            ShopOrderSequence.objects.get_or_create(shop=shop, defaults={'last_number': 0})
+
+            # Seed default credit categories
+            for order_idx, cat_name in enumerate(DEFAULT_CREDIT_CATEGORIES):
+                CreditCategory.objects.get_or_create(shop=shop, name=cat_name, defaults={'display_order': order_idx})
+
+            # Seed default Garment Categories and Items
+            default_categories = [
+                ('Wash & Fold', 'Shirt', [('Shirt', 20.0, 'PC'), ('T-Shirt', 20.0, 'PC'), ('Trousers', 25.0, 'PC'), ('Bed Sheet', 40.0, 'PC')]),
+                ('Wash & Iron', 'Shirt', [('Shirt', 30.0, 'PC'), ('T-Shirt', 30.0, 'PC'), ('Trousers', 35.0, 'PC'), ('Kurta', 40.0, 'PC')]),
+                ('Steam Iron', 'Shirt', [('Shirt', 15.0, 'PC'), ('Trousers', 15.0, 'PC'), ('Saree', 30.0, 'PC'), ('Suit', 60.0, 'PC')]),
+                ('Dry Clean', 'Shirt', [('Suit (2 Pc)', 180.0, 'SET'), ('Blazer / Coat', 120.0, 'PC'), ('Saree (Silk)', 150.0, 'PC'), ('Blanket (Dbl)', 250.0, 'PC')]),
+            ]
+            for cat_order, (cat_name, icon, items) in enumerate(default_categories):
+                cat, _ = GarmentCategory.objects.get_or_create(
+                    shop=shop, name=cat_name, defaults={'icon': icon, 'display_order': cat_order}
+                )
+                for item_order, (item_name, item_price, item_unit) in enumerate(items):
+                    GarmentItem.objects.get_or_create(
+                        shop=shop, category=cat, name=item_name,
+                        defaults={'price': item_price, 'unit': item_unit, 'display_order': item_order}
+                    )
+
+            # Assign membership if caller is authenticated
+            user = getattr(request, 'user', None)
+            django_user = getattr(user, 'user', None)
+            if django_user:
+                ShopMembership.objects.create(
+                    user=django_user,
+                    shop=shop,
+                    role=ShopRole.OWNER,
+                    is_default=not django_user.shop_memberships.filter(is_active=True).exists(),
+                    is_active=True,
+                )
+
+        serializer = self.get_serializer(shop)
+        return Response(serializer.data, status=201)
+
 
 class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all().order_by('-created_at')

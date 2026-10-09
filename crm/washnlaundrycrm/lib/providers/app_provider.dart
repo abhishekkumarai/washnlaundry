@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
@@ -173,6 +174,35 @@ class AppProvider extends ChangeNotifier {
 
   Map<String, dynamic>? _shop;
   Map<String, dynamic>? get shop => _shop;
+
+  String? _activeTenantId;
+  String? get activeTenantId => _activeTenantId;
+
+  List<Map<String, dynamic>> _availableShops = [];
+  List<Map<String, dynamic>> get availableShops => _availableShops;
+
+  void setAvailableShops(List<Map<String, dynamic>> shops) {
+    _availableShops = shops;
+    notifyListeners();
+  }
+
+  void setActiveTenant(String? tenantId) {
+    _activeTenantId = tenantId;
+    if (tenantId != null) {
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('active_tenant_id', tenantId);
+      });
+    }
+    notifyListeners();
+  }
+
+  Future<void> switchShop(String tenantSlugOrId) async {
+    _activeTenantId = tenantSlugOrId;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('active_tenant_id', tenantSlugOrId);
+    notifyListeners();
+    await loadDataFromBackend();
+  }
 
   /// Single writer for [Money]'s statics — call this wherever `_shop` is set.
   void _applyShopFormatting() {

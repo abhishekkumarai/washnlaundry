@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../providers/app_provider.dart';
 import 'sidebar_navigation.dart';
 
 class TopHeader extends StatelessWidget {
@@ -41,18 +43,62 @@ class TopHeader extends StatelessWidget {
       child: LayoutBuilder(builder: (context, constraints) {
         final narrow =
             constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
+        AppProvider? appProvider;
+        try {
+          appProvider = Provider.of<AppProvider?>(context);
+        } catch (_) {
+          appProvider = null;
+        }
+        final shopName = (appProvider?.shop?['name'] as String?)?.trim() ?? '';
+
         return Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(
-              child: Text(
-                title,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF141A24),
-                ),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      title,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF141A24),
+                      ),
+                    ),
+                  ),
+                  if (shopName.isNotEmpty) ...[
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1EFEA),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE4E0D8)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.storefront_rounded, size: 14, color: Color(0xFF64748B)),
+                          const SizedBox(width: 6),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 180),
+                            child: Text(
+                              shopName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF182C4F),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             if (onActionPressed != null)

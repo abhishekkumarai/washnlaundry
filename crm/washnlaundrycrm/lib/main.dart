@@ -7,9 +7,11 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
 import 'router.dart';
+import 'services/api_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/role_views.dart';
 
@@ -32,13 +34,63 @@ Future<void> main() async {
   usePathUrlStrategy();
   final authProvider = AuthProvider();
   final appProvider = AppProvider(autoLoad: false);
+  ApiService.tenantIdProvider = () => appProvider.activeTenantId;
+
   // The shop data is for owner/staff only and the API rejects it without a
   // matching token, so load it once the backend has confirmed the role rather
   // than at startup.
   var loadedFor = false;
-  authProvider.addListener(() {
+  authProvider.addListener(() async {
     final role = authProvider.role;
     final validRole = role == 'owner' || role == 'staff' || role == 'customer';
+    if (authProvider.me != null) {
+      final me = authProvider.me!;
+      final rawShops = me['shops'] as List?;
+      if (rawShops != null) {
+        appProvider.setAvailableShops(
+          rawShops.map((s) => Map<String, dynamic>.from(s as Map)).toList(),
+        );
+      }
+      final prefs = await SharedPreferences.getInstance();
+      final savedTenant = prefs.getString('active_tenant_id');
+      final availableSlugs = appProvider.availableShops
+          .map((s) => s['slug'] as String? ?? s['id']?.toString())
+          .toSet();
+
+      if (savedTenant != null && (availableSlugs.isEmpty || availableSlugs.contains(savedTenant))) {
+        appProvider.setActiveTenant(savedTenant);
+      } else {
+        final shopData = me['shop'] as Map<String, dynamic>?;
+        if (shopData != null && appProvider.activeTenantId == null) {
+          appProvider.setActiveTenant(shopData['slug'] as String? ?? shopData['id']?.toString());
+        }
+      }
+    } else if (authProvider.isDemo) {
+      if (appProvider.availableShops.isEmpty) {
+        try {
+          final allShops = await ApiService.fetchShops();
+          if (allShops.isNotEmpty) {
+            final activeShops = allShops
+                .where((s) => s['status'] == null || s['status'] == 'ACTIVE')
+                .take(6)
+                .toList();
+            appProvider.setAvailableShops(activeShops);
+          }
+        } catch (_) {}
+      }
+      final prefs = await SharedPreferences.getInstance();
+      final savedTenant = prefs.getString('active_tenant_id');
+      final availableSlugs = appProvider.availableShops
+          .map((s) => s['slug'] as String? ?? s['id']?.toString())
+          .toSet();
+      if (savedTenant != null && (availableSlugs.isEmpty || availableSlugs.contains(savedTenant))) {
+        appProvider.setActiveTenant(savedTenant);
+      } else if (appProvider.activeTenantId == null && appProvider.availableShops.isNotEmpty) {
+        final firstSlug = appProvider.availableShops.first['slug'] as String? ??
+            appProvider.availableShops.first['id']?.toString();
+        if (firstSlug != null) appProvider.setActiveTenant(firstSlug);
+      }
+    }
     // Customers get the owner's CRM data and layout (minus their hidden
     // views, see RoleViews).
     if (validRole) appProvider.role = role == 'customer' ? 'owner' : role!;

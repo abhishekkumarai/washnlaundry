@@ -30,7 +30,10 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from .auth import customer_for_email, is_owner_email, is_staff_email, mint_session_token
+from .auth import (
+    customer_for_email, is_owner_email, is_staff_email,
+    mint_session_token, sync_user_groups,
+)
 from .customer_views import clean_phone, register_customer
 from .services.email_service import EmailService
 
@@ -197,6 +200,7 @@ def verify_email(request):
     if (phone and not is_owner_email(user.email) and not is_staff_email(user.email)
             and not customer_for_email(user.email)):
         register_customer(user.email, user.first_name or user.email.split('@')[0], phone)
+    sync_user_groups(user)
     return _session(user)
 
 
@@ -232,6 +236,7 @@ def login(request):
     if not user.is_active:
         return _err('Confirm your email first: check your inbox for the link.', 403)
     cache.delete(email_key)
+    sync_user_groups(user)
     return _session(user)
 
 

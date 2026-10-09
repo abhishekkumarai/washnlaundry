@@ -150,18 +150,13 @@ String formatRupees(dynamic value) => Money.grouped(value as num?);
 /// "Ramesh Kumar", "?" when the shop hasn't loaded yet. Shared so the sidebar,
 /// the header and Settings can't drift apart.
 String initialsFor(String? name) {
-  final parts = (name ?? '')
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((p) => p.isNotEmpty)
-      .toList();
-  if (parts.isEmpty) return '?';
-  if (parts.length == 1) {
-    final word = parts.first;
-    // A single word gives up to two letters: "AK" stays "AK".
-    return word.substring(0, word.length >= 2 ? 2 : 1).toUpperCase();
+  final cleaned = (name ?? '').trim();
+  if (cleaned.isEmpty) return '?';
+  // Long form: return up to 5 uppercase characters
+  if (cleaned.length <= 5) {
+    return cleaned.toUpperCase();
   }
-  return (parts.first[0] + parts[1][0]).toUpperCase();
+  return cleaned.substring(0, 5).toUpperCase();
 }
 
 /// A small labelled statistic used across the side panels.

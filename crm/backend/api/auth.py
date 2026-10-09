@@ -103,39 +103,238 @@ def customer_for_email(email):
 OWNER_JOB_TITLES = ('owner', 'manager')
 
 
-def _active_staff(email):
-    return Staff.objects.filter(email__iexact=email, has_app_login=True, status='ACTIVE')
+def _active_staff(email, shop=None):
+    qs = Staff.objects.filter(email__iexact=email, has_app_login=True, status='ACTIVE')
+    if shop:
+        qs = qs.filter(shop=shop)
+    return qs
 
 
-def is_owner_email(email):
+def is_owner_email(email, shop=None):
     if email in settings.STAFF_EMAILS:
         return True
     return any(
-        s.role.strip().lower() in OWNER_JOB_TITLES for s in _active_staff(email))
+        s.role.strip().lower() in OWNER_JOB_TITLES for s in _active_staff(email, shop=shop))
 
 
-def is_staff_email(email):
-    return _active_staff(email).exists()
+def is_staff_email(email, shop=None):
+    return _active_staff(email, shop=shop).exists()
+
+
+ROLE_HIERARCHY = {
+    OWNER: 3,
+    STAFF: 2,
+    CUSTOMER: 1,
+    UNLINKED: 0,
+}
 
 
 @dataclass
 class Principal:
-    """What `request.user` is for a verified Google caller (not a Django User)."""
+    """What `request.user` is for a verified caller."""
     email: str
     role: str
     customer: Optional[Customer] = None
     is_authenticated: bool = True
+    user: Optional[object] = None
+    shop: Optional[object] = None
+
+    def has_role(self, min_role):
+        """Hierarchical check: Owner > Staff > Customer > Unlinked."""
+        return ROLE_HIERARCHY.get(self.role, 0) >= ROLE_HIERARCHY.get(min_role, 0)
+
+    def has_perm(self, perm, obj=None):
+        if self.user and hasattr(self.user, 'has_perm'):
+            return self.user.has_perm(perm, obj)
+        return self.role == OWNER
+
+    def in_group(self, group_name):
+        """Hierarchical group check:
+        Owner is in Owner, Staff, and Customers.
+        Staff is in Staff and Customers.
+        Customer is in Customers.
+        """
+        g = (group_name or '').strip().lower()
+        if g in ('customer', 'customers'):
+            return self.has_role(CUSTOMER)
+        if g == 'staff':
+            return self.has_role(STAFF)
+        if g == 'owner':
+            return self.has_role(OWNER)
+        if self.user and hasattr(self.user, 'groups'):
+            return self.user.groups.filter(name__iexact=group_name).exists()
+        return False
 
 
-def resolve_principal(email):
-    if is_owner_email(email):
-        return Principal(email, OWNER)
+def sync_staff_user(staff):
+    """Sync a Staff record with an underlying Django auth.User, Groups, and ShopMembership."""
+    if not staff or not staff.email:
+        return None
+    from django.contrib.auth import get_user_model
+    from .models import ShopMembership, ShopRole
+    User = get_user_model()
+    email = staff.email.strip().lower()
+
+    if not staff.has_app_login:
+        # If staff does not have app login, they should not have active staff membership or staff group
+        user = User.objects.filter(username=email).first()
+        if user:
+            if staff.shop:
+                ShopMembership.objects.filter(user=user, shop=staff.shop).delete()
+            sync_user_groups(user)
+        return None
+
+    user, _ = User.objects.get_or_create(username=email, defaults={'email': email, 'is_active': True})
+
+    # Also synchronize tenant-specific ShopMembership
+    if staff.shop:
+        is_owner = staff.role.strip().lower() in OWNER_JOB_TITLES
+        target_role = ShopRole.OWNER if is_owner else ShopRole.STAFF
+        ShopMembership.objects.update_or_create(
+            user=user,
+            shop=staff.shop,
+            defaults={
+                'role': target_role,
+                'is_active': staff.status == 'ACTIVE',
+            }
+        )
+
+    return sync_user_groups(user)
+
+
+def sync_user_groups(user):
+    """Ensure a Django User's Group memberships match their hierarchical role.
+    
+    Hierarchy:
+    Owner >= Staff >= Customer
+    """
+    if user is None:
+        return None
+    from django.contrib.auth.models import Group
+    owner_group = Group.objects.filter(name='Owner').first()
+    staff_group = Group.objects.filter(name='Staff').first()
+    customers_group = Group.objects.filter(name='Customers').first()
+
+    email = (user.email or user.username or '').strip().lower()
+
+    # 1. Check if Owner
+    if user.is_superuser or is_owner_email(email):
+        if owner_group:
+            user.groups.add(owner_group)
+        if staff_group:
+            user.groups.remove(staff_group)
+        if customers_group:
+            user.groups.remove(customers_group)
+        if not user.is_staff:
+            user.is_staff = True
+            user.save(update_fields=['is_staff'])
+        return OWNER
+
+    # 2. Check if Staff
     if is_staff_email(email):
-        return Principal(email, STAFF)
+        if staff_group:
+            user.groups.add(staff_group)
+        if owner_group:
+            user.groups.remove(owner_group)
+        if customers_group:
+            user.groups.remove(customers_group)
+        if not user.is_staff:
+            user.is_staff = True
+            user.save(update_fields=['is_staff'])
+        return STAFF
+
+    # 3. Customer (non-staff regular user)
+    if not user.is_staff and not user.is_superuser:
+        if customers_group:
+            user.groups.add(customers_group)
+        if owner_group:
+            user.groups.remove(owner_group)
+        if staff_group:
+            user.groups.remove(staff_group)
+        return CUSTOMER
+
+    return None
+
+
+def resolve_principal(email, shop=None):
+    """Resolve the authenticated caller's identity and effective role.
+
+    If a tenant `shop` is active (or passed explicitly), role resolution checks:
+    1. Superusers and global settings.STAFF_EMAILS -> OWNER
+    2. ShopMembership for (user, shop) -> mapped to OWNER, STAFF, or CUSTOMER
+    3. Shop-specific Staff or Customer records
+    4. Fallback to global user groups / global records
+    """
+    email = (email or '').strip().lower()
+    from django.contrib.auth import get_user_model
+    from .models import ShopMembership, ShopRole
+    from .tenancy import get_current_tenant
+
+    if shop is None:
+        shop = get_current_tenant()
+
+    User = get_user_model()
+    user = User.objects.filter(username__iexact=email).first()
+
+    # Superusers and allowlisted staff emails are always global OWNER
+    if (user and user.is_superuser) or email in settings.STAFF_EMAILS:
+        return Principal(email, OWNER, user=user, shop=shop)
+
+    # 1. Check shop-specific ShopMembership if a tenant context exists
+    if shop and user:
+        membership = ShopMembership.objects.filter(user=user, shop=shop, is_active=True).first()
+        if membership:
+            if membership.role == ShopRole.OWNER:
+                return Principal(email, OWNER, user=user, shop=shop)
+            elif membership.role == ShopRole.STAFF:
+                return Principal(email, STAFF, user=user, shop=shop)
+            elif membership.role == ShopRole.CUSTOMER:
+                c = Customer.objects.filter(email__iexact=email, shop=shop).order_by('created_at').first()
+                if not c:
+                    c = customer_for_email(email)
+                return Principal(email, CUSTOMER, customer=c, user=user, shop=shop)
+
+    # 2. Check shop-specific Staff or Customer rows if shop context is active
+    if shop:
+        if is_owner_email(email, shop=shop):
+            return Principal(email, OWNER, user=user, shop=shop)
+        if is_staff_email(email, shop=shop):
+            return Principal(email, STAFF, user=user, shop=shop)
+        shop_cust = Customer.objects.filter(email__iexact=email, shop=shop).order_by('created_at').first()
+        if shop_cust:
+            return Principal(email, CUSTOMER, customer=shop_cust, user=user, shop=shop)
+
+    # 3. Global group checks / fallback (when user is found)
+    if user:
+        group_names = set(user.groups.values_list('name', flat=True))
+        if 'Owner' in group_names:
+            return Principal(email, OWNER, user=user, shop=shop)
+        if 'Staff' in group_names:
+            return Principal(email, STAFF, user=user, shop=shop)
+        if 'Customers' in group_names or 'Customer' in group_names:
+            c = customer_for_email(email)
+            return Principal(email, CUSTOMER, customer=c, user=user, shop=shop)
+
+        # Fallback to sync from settings / staff records
+        synced_role = sync_user_groups(user)
+        if synced_role == OWNER:
+            return Principal(email, OWNER, user=user, shop=shop)
+        if synced_role == STAFF:
+            return Principal(email, STAFF, user=user, shop=shop)
+        if synced_role == CUSTOMER:
+            c = customer_for_email(email)
+            return Principal(email, CUSTOMER, customer=c, user=user, shop=shop)
+    else:
+        # Fallback for Google tokens before local User creation
+        if is_owner_email(email, shop=shop):
+            return Principal(email, OWNER, shop=shop)
+        if is_staff_email(email, shop=shop):
+            return Principal(email, STAFF, shop=shop)
+
     customer = customer_for_email(email)
     if customer:
-        return Principal(email, CUSTOMER, customer=customer)
-    return Principal(email, UNLINKED)
+        return Principal(email, CUSTOMER, customer=customer, user=user, shop=shop)
+    return Principal(email, UNLINKED, user=user, shop=shop)
 
 
 class GoogleTokenAuthentication(BaseAuthentication):
@@ -147,21 +346,23 @@ class GoogleTokenAuthentication(BaseAuthentication):
             if settings.API_AUTH_ENFORCED:
                 raise AuthenticationFailed('Invalid or expired Google sign-in.')
             return None
-        return resolve_principal(email), None
+        shop = getattr(request, 'shop', None)
+        return resolve_principal(email, shop=shop), None
 
     def authenticate_header(self, request):
         return 'Bearer'
 
 
 class IsStaff(BasePermission):
-    """Day-to-day CRM access for owner and staff. Open when enforcement is off."""
+    """Staff access: orders, customers, items. Owner also allowed via hierarchy."""
 
     def has_permission(self, request, view):
         if not settings.API_AUTH_ENFORCED:
             return True
         user = request.user
-        # Customers are let in too for now (same CRM view as the owner).
-        return isinstance(user, Principal) and user.role in (OWNER, STAFF, CUSTOMER)
+        if not isinstance(user, Principal):
+            return False
+        return user.has_role(STAFF)
 
 
 class IsOwner(BasePermission):
@@ -171,8 +372,9 @@ class IsOwner(BasePermission):
         if not settings.API_AUTH_ENFORCED:
             return True
         user = request.user
-        # Customers are let in too for now (same CRM view as the owner).
-        return isinstance(user, Principal) and user.role in (OWNER, CUSTOMER)
+        if not isinstance(user, Principal):
+            return False
+        return user.role == OWNER
 
 
 class IsOwnerOrStaffReadOnly(BasePermission):
@@ -184,13 +386,27 @@ class IsOwnerOrStaffReadOnly(BasePermission):
         user = request.user
         if not isinstance(user, Principal):
             return False
-        if user.role in (OWNER, CUSTOMER):
+        if user.role == OWNER:
             return True
-        return user.role == STAFF and request.method in SAFE_METHODS
+        if user.has_role(STAFF):
+            return request.method in SAFE_METHODS
+        return False
+
+
+class IsCustomer(BasePermission):
+    """Customer self-service access: Customer, Staff, and Owner."""
+
+    def has_permission(self, request, view):
+        if not settings.API_AUTH_ENFORCED:
+            return True
+        user = request.user
+        if not isinstance(user, Principal):
+            return False
+        return user.has_role(CUSTOMER) or user.in_group('Customers')
 
 
 class IsSignedIn(BasePermission):
-    """Any verified Google caller, whatever their role."""
+    """Any verified caller, whatever their role."""
 
     def has_permission(self, request, view):
         return isinstance(request.user, Principal)

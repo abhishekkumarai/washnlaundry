@@ -7,6 +7,7 @@ import '../utils/navigation.dart';
 import '../utils/role_views.dart';
 import 'brand_logo.dart';
 import 'panel_card.dart';
+import 'shop_switch_modal.dart';
 
 /// Left navigation rail.
 ///
@@ -220,9 +221,28 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     );
   }
 
+  static String _formatShopName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed.toLowerCase() == 'washnlaundry') {
+      return 'WashNLaundry';
+    }
+    if (trimmed == trimmed.toLowerCase()) {
+      return trimmed.split(' ').map((w) {
+        if (w.isEmpty) return w;
+        return '${w[0].toUpperCase()}${w.substring(1)}';
+      }).join(' ');
+    }
+    return trimmed;
+  }
+
   Widget _brand(BuildContext context,
       {required bool expanded, required bool canExpand}) {
     const mark = BrandLogo(size: 40);
+
+    // Show the active shop name in place of the app name. Fall back to
+    // 'WashNLaundry' while the shop data is still loading.
+    final rawShopName = context.watch<AppProvider>().shop?['name'] as String? ?? 'WashNLaundry';
+    final shopName = _formatShopName(rawShopName);
 
     if (!expanded) {
       return Padding(
@@ -260,27 +280,16 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: RichText(
-                text: const TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'WashN',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: _ink,
-                          letterSpacing: -0.5),
-                    ),
-                    TextSpan(
-                      text: 'Laundry',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: _brandBlue,
-                          letterSpacing: -0.5),
-                    ),
-                  ],
+              child: Text(
+                shopName,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: _brandBlue,
+                  letterSpacing: -0.5,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
           ),
@@ -486,25 +495,61 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     final shopName = (shop?['name'] as String?)?.trim() ?? '';
     final ownerName = (shop?['owner_name'] as String?)?.trim() ?? '';
 
+    // Derive username from email (the part before '@')
+    final userEmail = auth?.userEmail?.trim() ?? '';
+    final usernameFromEmail = userEmail.contains('@')
+        ? userEmail.split('@').first.trim()
+        : userEmail;
+    final displayName = usernameFromEmail.isNotEmpty
+        ? usernameFromEmail
+        : (auth?.userName?.trim().isNotEmpty == true
+            ? auth!.userName!.trim()
+            : (ownerName.isNotEmpty ? ownerName : 'User'));
+
+    // Title: Display User / Account name
+    // Subtitle: Display Shop Name (Store) or role
     final title = isCustomer
         ? (auth?.userName?.isNotEmpty == true
             ? auth!.userName!
             : (auth?.me?['customer']?['name'] as String?) ?? 'Customer')
-        : (shopName.isEmpty ? 'Your shop' : shopName);
+        : displayName;
     final subtitle = isCustomer
         ? (auth?.userEmail ?? 'Customer')
-        : (ownerName.isEmpty ? 'Admin' : ownerName);
-    final avatarSource = isCustomer ? title : (ownerName.isEmpty ? shopName : ownerName);
+        : (shopName.isNotEmpty ? shopName : (ownerName.isEmpty ? 'Your shop' : ownerName));
+
+    final avatarSource = isCustomer
+        ? (title.isNotEmpty ? title : displayName)
+        : (displayName.isNotEmpty ? displayName : (shopName.isNotEmpty ? shopName : 'Owner'));
+
+    final appProvider = context.watch<AppProvider>();
+    final canSwitchShop = !isCustomer && appProvider.availableShops.length > 1;
 
     void openProfile() => context.go('/profile');
+    void switchShop() =>
+        showShopSwitchModalSheet(context, width: widget.inDrawer ? 280.0 : expandedWidth);
 
-    final avatar = CircleAvatar(
-      radius: 18,
-      backgroundColor: const Color(0xFFEFF6FF),
-      child: Text(
-        initialsFor(avatarSource),
-        style: const TextStyle(
-            fontSize: 11, fontWeight: FontWeight.bold, color: _brandBlue),
+    final avatarText = initialsFor(avatarSource);
+    final avatarTooltip = avatarSource.isNotEmpty
+        ? avatarSource
+        : (subtitle.isNotEmpty ? subtitle : title);
+
+    final avatar = Tooltip(
+      message: isCustomer ? avatarTooltip : '$avatarTooltip (Tap to switch account)',
+      waitDuration: const Duration(milliseconds: 300),
+      child: CircleAvatar(
+        radius: 18,
+        backgroundColor: const Color(0xFFEFF6FF),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              avatarText,
+              style: const TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.bold, color: _brandBlue),
+            ),
+          ),
+        ),
       ),
     );
 
@@ -519,32 +564,32 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
               children: [
                 Expanded(
                   child: InkWell(
-                    onTap: openProfile,
+                    onTap: isCustomer ? openProfile : switchShop,
                     borderRadius: BorderRadius.circular(10),
                     child: Row(
                       children: [
                         avatar,
                         const SizedBox(width: 10),
                         Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: _ink),
-                      ),
-                      Text(
-                        subtitle,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11, color: _muted),
-                      ),
-                    ],
-                  ),
-                ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: _ink),
+                              ),
+                              Text(
+                                subtitle,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 11, color: _muted),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -562,9 +607,11 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
           : Column(
               children: [
                 Tooltip(
-                  message: subtitle.isEmpty ? title : '$title · $subtitle',
+                  message: subtitle.isEmpty
+                      ? title
+                      : '$title · $subtitle (Tap to switch account)',
                   child: InkWell(
-                    onTap: openProfile,
+                    onTap: isCustomer ? openProfile : switchShop,
                     customBorder: const CircleBorder(),
                     child: avatar,
                   ),

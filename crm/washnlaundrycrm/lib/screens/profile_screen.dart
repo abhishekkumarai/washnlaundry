@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/panel_card.dart';
+import '../widgets/shop_switch_modal.dart';
 
 /// The page behind the avatar at the bottom of the sidebar.
 ///
@@ -136,22 +138,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
   Widget _avatarHeader(String name, String email) {
-    final initials = name.trim().isEmpty
-        ? '?'
-        : name
-            .trim()
-            .split(RegExp(r'\s+'))
-            .take(2)
-            .map((w) => w[0].toUpperCase())
-            .join();
+    final avatarText = initialsFor(name);
     return Row(
       children: [
         CircleAvatar(
           radius: 28,
           backgroundColor: const Color(0xFFEFF6FF),
-          child: Text(initials,
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.bold, color: _brand)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(avatarText,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold, color: _brand)),
+            ),
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -335,9 +336,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _accountCard(AuthProvider auth) {
     final shop = context.watch<AppProvider>().shop;
     final shopName = (shop?['name'] as String?)?.trim() ?? '';
+    final userEmail = auth.userEmail?.trim() ?? '';
+    final usernameFromEmail = userEmail.contains('@')
+        ? userEmail.split('@').first.trim()
+        : userEmail;
     final ownerName = (shop?['owner_name'] as String?)?.trim() ?? '';
-    final name =
-        ownerName.isNotEmpty ? ownerName : (auth.userName ?? 'Account');
+    final name = usernameFromEmail.isNotEmpty
+        ? usernameFromEmail
+        : (auth.userName?.trim().isNotEmpty == true
+            ? auth.userName!.trim()
+            : (ownerName.isNotEmpty ? ownerName : 'Account'));
     final role = switch (auth.role) {
       'owner' => 'Owner',
       'staff' => 'Staff',
@@ -353,6 +361,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (shopName.isNotEmpty) ...[
             const SizedBox(height: 16),
             _readOnly('Shop', shopName, Icons.storefront_outlined),
+          ],
+          if (context.watch<AppProvider>().availableShops.length > 1) ...[
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: () => showShopSwitchModalSheet(context),
+              icon: const Icon(Icons.swap_horiz_rounded, size: 18, color: _brand),
+              label: const Text(
+                'Switch Store / Branch',
+                style: TextStyle(color: _brand, fontWeight: FontWeight.w600),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: _line),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
           ],
         ],
       ),

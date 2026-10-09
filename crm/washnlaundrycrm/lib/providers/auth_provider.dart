@@ -45,11 +45,13 @@ class AuthProvider extends ChangeNotifier {
   String? get role => _role;
   Map<String, dynamic>? _me;
   Map<String, dynamic>? get me => _me;
+  bool get needsShopOnboarding => _me?['needs_shop_onboarding'] == true;
   bool _roleLoading = false;
   bool get roleLoading => _roleLoading;
   String? _roleError;
   String? get roleError => _roleError;
   bool _isDemo = false;
+  bool get isDemo => _isDemo;
 
   /// Session token from email/password sign-in (`Bearer app.…`), if that's how
   /// the user signed in. Google sign-in uses the Google ID token instead.
