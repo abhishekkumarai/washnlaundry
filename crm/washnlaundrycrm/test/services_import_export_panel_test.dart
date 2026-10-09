@@ -19,10 +19,9 @@ void main() {
 
     expect(find.text('Services export/import'), findsWidgets);
     expect(find.byType(ServicesImportExportPanel), findsOneWidget);
-    expect(find.text('Export Services Catalogue'), findsOneWidget);
-    expect(find.text('Import Services Catalogue'), findsOneWidget);
-    expect(find.text('Export as CSV'), findsOneWidget);
-    expect(find.text('Export as JSON'), findsOneWidget);
-    expect(find.text('Import Services File'), findsOneWidget);
+    expect(find.text('Export Services to Excel (.xlsx)'), findsOneWidget);
+    expect(find.text('Import Services from Excel (.xlsx)'), findsOneWidget);
+    expect(find.text('Export Excel Workbook (.xlsx)'), findsOneWidget);
+    expect(find.text('Import Excel File (.xlsx)'), findsOneWidget);
   });
 }

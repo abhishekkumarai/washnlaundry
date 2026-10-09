@@ -1,4 +1,5 @@
 import 'dart:js_interop';
+import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
@@ -13,6 +14,24 @@ bool downloadCsv(String filename, String csvContent) =>
 bool downloadString(String filename, String content, {String mimeType = 'text/plain;charset=utf-8;'}) {
   final blob = web.Blob(
     [content.toJS].toJS,
+    web.BlobPropertyBag(type: mimeType),
+  );
+  final url = web.URL.createObjectURL(blob);
+  final anchor = web.HTMLAnchorElement()
+    ..href = url
+    ..download = filename
+    ..style.display = 'none';
+  web.document.body?.append(anchor);
+  anchor.click();
+  anchor.remove();
+  web.URL.revokeObjectURL(url);
+  return true;
+}
+
+bool downloadBytes(String filename, List<int> bytes, {String mimeType = 'application/octet-stream'}) {
+  final uint8List = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
+  final blob = web.Blob(
+    [uint8List.toJS].toJS,
     web.BlobPropertyBag(type: mimeType),
   );
   final url = web.URL.createObjectURL(blob);

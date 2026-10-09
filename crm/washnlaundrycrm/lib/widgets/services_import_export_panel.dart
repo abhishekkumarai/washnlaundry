@@ -21,8 +21,7 @@ class ServicesImportExportPanel extends StatefulWidget {
 }
 
 class _ServicesImportExportPanelState extends State<ServicesImportExportPanel> {
-  bool _exportingCsv = false;
-  bool _exportingJson = false;
+  bool _exportingExcel = false;
 
   void _toast(String message, {bool error = false}) {
     if (!mounted) return;
@@ -34,46 +33,28 @@ class _ServicesImportExportPanelState extends State<ServicesImportExportPanel> {
     );
   }
 
-  Future<void> _exportCsv() async {
-    setState(() => _exportingCsv = true);
+  Future<void> _exportExcel() async {
+    setState(() => _exportingExcel = true);
     try {
-      final csvData = await ApiService.exportServicesCsv();
+      final bytes = await ApiService.exportServicesXlsx();
       final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final filename = 'services_catalogue_$timestamp.csv';
-      final ok = downloadString(filename, csvData, mimeType: 'text/csv;charset=utf-8;');
+      final filename = 'services_catalogue_$timestamp.xlsx';
+      final ok = downloadBytes(
+        filename,
+        bytes,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
       if (!ok) {
-        _toast('CSV export is only available in the web browser.', error: true);
+        _toast('Excel export is only available in the web browser.', error: true);
       } else {
-        _toast('Services CSV exported successfully.');
+        _toast('Services Excel workbook (.xlsx) exported successfully.');
       }
     } on ApiException catch (e) {
       _toast(e.message, error: true);
     } catch (e) {
-      _toast('Failed to export CSV: $e', error: true);
+      _toast('Failed to export Excel: $e', error: true);
     } finally {
-      if (mounted) setState(() => _exportingCsv = false);
-    }
-  }
-
-  Future<void> _exportJson() async {
-    setState(() => _exportingJson = true);
-    try {
-      final jsonData = await ApiService.exportServicesJson();
-      final jsonString = const JsonEncoder.withIndent('  ').convert(jsonData);
-      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final filename = 'services_catalogue_$timestamp.json';
-      final ok = downloadString(filename, jsonString, mimeType: 'application/json;charset=utf-8;');
-      if (!ok) {
-        _toast('JSON export is only available in the web browser.', error: true);
-      } else {
-        _toast('Services JSON exported successfully.');
-      }
-    } on ApiException catch (e) {
-      _toast(e.message, error: true);
-    } catch (e) {
-      _toast('Failed to export JSON: $e', error: true);
-    } finally {
-      if (mounted) setState(() => _exportingJson = false);
+      if (mounted) setState(() => _exportingExcel = false);
     }
   }
 
@@ -108,7 +89,7 @@ class _ServicesImportExportPanelState extends State<ServicesImportExportPanel> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Export your complete services and garment pricing catalogue, or import new categories and items in bulk from CSV or Excel files.',
+          'Export your complete services and garment pricing catalogue as an Excel (.xlsx) workbook where each service is its own tab, or import multi-tab Excel files to configure services in bulk.',
           style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
         ),
         const SizedBox(height: 24),
@@ -131,7 +112,7 @@ class _ServicesImportExportPanelState extends State<ServicesImportExportPanel> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
-                  Icons.dry_cleaning_rounded,
+                  Icons.table_chart_rounded,
                   color: Color(0xFF1E3A8A),
                   size: 24,
                 ),
@@ -151,7 +132,7 @@ class _ServicesImportExportPanelState extends State<ServicesImportExportPanel> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '$categoriesCount categories · $garmentsCount garment items registered',
+                      '$categoriesCount categories (tabs) · $garmentsCount garment items registered',
                       style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                     ),
                   ],
@@ -162,9 +143,9 @@ class _ServicesImportExportPanelState extends State<ServicesImportExportPanel> {
         ),
         const SizedBox(height: 28),
 
-        // Section 1: Export Services
+        // Section 1: Export Services as Excel
         const Text(
-          'Export Services Catalogue',
+          'Export Services to Excel (.xlsx)',
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.bold,
@@ -173,51 +154,27 @@ class _ServicesImportExportPanelState extends State<ServicesImportExportPanel> {
         ),
         const SizedBox(height: 6),
         const Text(
-          'Download your price list and service structure to backup, modify in a spreadsheet, or transfer to another shop.',
+          'Generates a formatted Excel workbook with separate tabs for every service category (e.g. Dry Cleaning, Ironing, Shoe Laundry), containing each item name, price, unit, and details in clean spreadsheet tables.',
           style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
         ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 10,
-          children: [
-            OutlinedButton.icon(
-              onPressed: _exportingCsv ? null : _exportCsv,
-              icon: _exportingCsv
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.table_chart_outlined, size: 16),
-              label: Text(_exportingCsv ? 'Exporting CSV…' : 'Export as CSV'),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
+        const SizedBox(height: 14),
+        OutlinedButton.icon(
+          onPressed: _exportingExcel ? null : _exportExcel,
+          icon: _exportingExcel
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.download_rounded, size: 18),
+          label: Text(_exportingExcel ? 'Generating Excel Workbook…' : 'Export Excel Workbook (.xlsx)'),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Color(0xFFCBD5E1)),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
             ),
-            OutlinedButton.icon(
-              onPressed: _exportingJson ? null : _exportJson,
-              icon: _exportingJson
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.code_rounded, size: 16),
-              label: Text(_exportingJson ? 'Exporting JSON…' : 'Export as JSON'),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
 
         const Padding(
@@ -225,9 +182,9 @@ class _ServicesImportExportPanelState extends State<ServicesImportExportPanel> {
           child: Divider(color: Color(0xFFE4E0D8)),
         ),
 
-        // Section 2: Import Services
+        // Section 2: Import Services from Excel
         const Text(
-          'Import Services Catalogue',
+          'Import Services from Excel (.xlsx)',
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.bold,
@@ -236,14 +193,14 @@ class _ServicesImportExportPanelState extends State<ServicesImportExportPanel> {
         ),
         const SizedBox(height: 6),
         const Text(
-          'Upload a CSV or Excel (.xlsx) file with your service list. The system automatically maps your columns, creates any missing categories, and updates existing item prices.',
+          'Upload an Excel (.xlsx) file where each sheet tab represents a service name, or a sheet with item tables. Missing categories are created automatically and existing prices are updated.',
           style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
         ),
         const SizedBox(height: 14),
         FilledButton.icon(
           onPressed: _showImportDialog,
           icon: const Icon(Icons.upload_file_rounded, size: 18),
-          label: const Text('Import Services File'),
+          label: const Text('Import Excel File (.xlsx)'),
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFF182C4F),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -296,7 +253,7 @@ class _ImportServicesDialogState extends State<_ImportServicesDialog> {
     setState(() => _error = null);
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['csv', 'xlsx'],
+      allowedExtensions: ['xlsx'],
       withData: true,
     );
     final file = picked?.files.single;
@@ -413,15 +370,16 @@ class _ImportServicesDialogState extends State<_ImportServicesDialog> {
       mainAxisSize: MainAxisSize.min,
       children: [
         const Text(
-          'Upload a CSV or Excel (.xlsx) file containing your services. '
-          'Category, Item Name, and Price columns are required.',
+          'Upload an Excel (.xlsx) file containing your services. '
+          'Each worksheet tab can represent a Service Category with an item table, '
+          'or include a Category column.',
           style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
         ),
         const SizedBox(height: 16),
         OutlinedButton.icon(
           onPressed: _loading ? null : _pickFile,
           icon: const Icon(Icons.upload_file_rounded, size: 16),
-          label: Text(_loading ? 'Reading file…' : 'Choose File (.csv, .xlsx)'),
+          label: Text(_loading ? 'Reading file…' : 'Choose Excel File (.xlsx)'),
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: Color(0xFFE4E0D8)),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

@@ -462,8 +462,21 @@ class ServicesImportExportTests(APITestCase):
     def _csv_file(self, text, name='services.csv'):
         return SimpleUploadedFile(name, text.encode('utf-8'), content_type='text/csv')
 
-    def test_export_services_csv(self):
+    def test_export_services_xlsx_default(self):
         response = self.client.get('/api/categories/export/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        openpyxl = __import__('openpyxl')
+        wb = openpyxl.load_workbook(io.BytesIO(response.content))
+        self.assertIn('Ironing', wb.sheetnames)
+        self.assertIn('Dry Cleaning', wb.sheetnames)
+        ironing_ws = wb['Ironing']
+        self.assertEqual(ironing_ws.cell(row=1, column=1).value, 'Item Name')
+        self.assertEqual(ironing_ws.cell(row=2, column=1).value, 'Shirt')
+        self.assertEqual(float(ironing_ws.cell(row=2, column=2).value), 15.0)
+
+    def test_export_services_csv(self):
+        response = self.client.get('/api/categories/export/?format=csv')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'text/csv; charset=utf-8')
         content = response.content.decode('utf-8')
@@ -472,7 +485,7 @@ class ServicesImportExportTests(APITestCase):
         self.assertIn('Dry Cleaning,Sparkles,Suit,250.00,per set', content)
 
     def test_export_services_csv_filtered_by_category(self):
-        response = self.client.get(f'/api/categories/export/?category={self.ironing.id}')
+        response = self.client.get(f'/api/categories/export/?format=csv&category={self.ironing.id}')
         self.assertEqual(response.status_code, 200)
         content = response.content.decode('utf-8')
         self.assertIn('Shirt', content)
@@ -567,6 +580,47 @@ class ServicesImportExportTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['items_created'], 1)
         self.assertTrue(GarmentItem.objects.filter(name='Silk Saree', price=180.0).exists())
+
+    def test_import_commit_multitab_xlsx(self):
+        openpyxl = __import__('openpyxl')
+        workbook = openpyxl.Workbook()
+        ws_shoes = workbook.active
+        ws_shoes.title = 'Shoe Laundry'
+        ws_shoes.append(['Item Name', 'Price', 'Unit'])
+        ws_shoes.append(['Sneakers', 299, 'per pair'])
+
+        ws_curtains = workbook.create_sheet(title='Curtain Wash')
+        ws_curtains.append(['Item Name', 'Price', 'Unit'])
+        ws_curtains.append(['Window Curtain', 150, 'per pc'])
+
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        raw_bytes = buffer.getvalue()
+
+        # In preview, Category is synthesized from sheet tabs
+        upload_preview = SimpleUploadedFile(
+            'services_multitab.xlsx', raw_bytes,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        preview_res = self.client.post('/api/categories/import/preview/', {'file': upload_preview})
+        self.assertEqual(preview_res.status_code, 200)
+        self.assertEqual(preview_res.data['columns'][0], 'Category')
+
+        upload_commit = SimpleUploadedFile(
+            'services_multitab.xlsx', raw_bytes,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response = self.client.post('/api/categories/import/commit/', {
+            'file': upload_commit,
+            'mapping': '{"category": "Category", "name": "Item Name", "price": "Price", "unit": "Unit"}',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['categories_created'], 2)
+        self.assertEqual(response.data['items_created'], 2)
+        self.assertTrue(GarmentCategory.objects.filter(name='Shoe Laundry').exists())
+        self.assertTrue(GarmentItem.objects.filter(name='Sneakers', price=299.0).exists())
+        self.assertTrue(GarmentCategory.objects.filter(name='Curtain Wash').exists())
+        self.assertTrue(GarmentItem.objects.filter(name='Window Curtain', price=150.0).exists())
 
 
 class ServicesImportHelperTests(TestCase):

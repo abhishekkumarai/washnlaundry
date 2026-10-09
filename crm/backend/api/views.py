@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 from rest_framework import viewsets
 from rest_framework.decorators import api_view, action, permission_classes
 from rest_framework.parsers import MultiPartParser
+from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 
 from . import customer_import, services_import_export
@@ -266,17 +267,43 @@ class CustomerViewSet(viewsets.ModelViewSet):
         })
 
 
+class ExcelRenderer(BaseRenderer):
+    media_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    format = 'xlsx'
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
+
+
+class CsvRenderer(BaseRenderer):
+    media_type = 'text/csv'
+    format = 'csv'
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
+
+
 class GarmentCategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsOwnerOrStaffReadOnly]
     queryset = GarmentCategory.objects.all().order_by('display_order')
     serializer_class = GarmentCategorySerializer
 
-    @action(detail=False, methods=['get'], url_path='export')
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path='export',
+        renderer_classes=[ExcelRenderer, CsvRenderer, JSONRenderer],
+    )
     def export_services(self, request):
-        """GET /api/categories/export/?format=csv|json&category=1,2
-        Exports the entire services catalogue or filtered categories.
+        """GET /api/categories/export/?export_format=xlsx|csv|json&category=1,2
+        Exports the services catalogue as an Excel (.xlsx) workbook with a tab per service,
+        or optionally as CSV or JSON. Default is xlsx.
         """
-        export_format = (request.query_params.get('format') or 'csv').lower()
+        export_format = (
+            request.query_params.get('export_format')
+            or request.query_params.get('format')
+            or 'xlsx'
+        ).lower()
         raw_cats = request.query_params.get('category')
         category_ids = [int(c.strip()) for c in raw_cats.split(',') if c.strip().isdigit()] if raw_cats else None
 
@@ -284,9 +311,19 @@ class GarmentCategoryViewSet(viewsets.ModelViewSet):
             data = services_import_export.export_services_json(category_ids)
             return Response(data)
 
-        csv_content = services_import_export.export_services_csv(category_ids)
-        response = HttpResponse(csv_content, content_type='text/csv; charset=utf-8')
-        response['Content-Disposition'] = 'attachment; filename="services_catalogue.csv"'
+        if export_format == 'csv':
+            csv_content = services_import_export.export_services_csv(category_ids)
+            response = HttpResponse(csv_content, content_type='text/csv; charset=utf-8')
+            response['Content-Disposition'] = 'attachment; filename="services_catalogue.csv"'
+            return response
+
+        # Default: multi-tab Excel workbook (.xlsx)
+        xlsx_bytes = services_import_export.export_services_xlsx(category_ids)
+        response = HttpResponse(
+            xlsx_bytes,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = 'attachment; filename="services_catalogue.xlsx"'
         return response
 
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser], url_path='import/preview')
@@ -1361,26 +1398,32 @@ class MetaMessageViewSet(viewsets.ModelViewSet):
         data = request.data
         conv_id = data.get('conversation_id') or 'conv_default'
         platform = data.get('platform') or MetaPlatform.INSTAGRAM
-        sender_name = data.get('sender_name') or 'Customer'
+        sender_type = data.get('sender_type') or (MetaMessage.SENDER_STAFF if data.get('is_staff') else MetaMessage.SENDER_USER)
+        default_name = 'Staff Support' if sender_type == MetaMessage.SENDER_STAFF else 'Customer'
+        sender_name = data.get('sender_name') or default_name
         user_text = data.get('text', '').strip()
         use_ai = bool(data.get('use_ai', False))
 
         if not user_text and not use_ai:
             return Response({'detail': 'text is required.'}, status=400)
 
-        # 1. If sending a user incoming message
+        # 1. Record incoming user or outgoing staff message
         user_msg = None
         if user_text:
             user_msg = MetaMessage.objects.create(
                 conversation_id=conv_id,
                 platform=platform,
-                sender_type=MetaMessage.SENDER_USER,
+                sender_type=sender_type,
                 sender_name=sender_name,
                 text=user_text,
             )
 
         ai_msg = None
-        if use_ai or MetaSocialService.get_settings().auto_reply_enabled:
+        # Auto-reply activates if explicitly requested via use_ai OR incoming customer message with auto_reply on
+        should_trigger_ai = use_ai or (
+            sender_type == MetaMessage.SENDER_USER and MetaSocialService.get_settings().auto_reply_enabled
+        )
+        if should_trigger_ai:
             # Build conversation history
             recent_msgs = list(MetaMessage.objects.filter(conversation_id=conv_id).order_by('-created_at')[:5])
             recent_msgs.reverse()
@@ -1400,6 +1443,40 @@ class MetaMessageViewSet(viewsets.ModelViewSet):
         return Response({
             'user_message': MetaMessageSerializer(user_msg).data if user_msg else None,
             'ai_message': MetaMessageSerializer(ai_msg).data if ai_msg else None,
+        })
+
+    @action(detail=False, methods=['post'], url_path='send-whatsapp')
+    def send_whatsapp(self, request):
+        """
+        POST /api/meta-messages/send-whatsapp/
+        Sends WhatsApp message to a new or existing contact phone number.
+        Body: {phone, text, recipient_name?}
+        """
+        phone = (request.data.get('phone') or '').strip()
+        text = (request.data.get('text') or '').strip()
+        recipient_name = (request.data.get('recipient_name') or '').strip()
+
+        if not phone:
+            return Response({'error': 'Phone number is required.'}, status=400)
+        if not text:
+            return Response({'error': 'Message text is required.'}, status=400)
+
+        shop = getattr(request, 'tenant', None)
+        result = MetaSocialService.send_whatsapp_message(
+            to_number=phone,
+            text=text,
+            shop=shop,
+            recipient_name=recipient_name
+        )
+
+        serialized_msg = MetaMessageSerializer(result['message']).data if result.get('message') else None
+        return Response({
+            'success': result.get('success', False),
+            'message_id': result.get('message_id'),
+            'simulated': result.get('simulated', False),
+            'note': result.get('note'),
+            'message': serialized_msg,
+            'conversation_id': serialized_msg['conversation_id'] if serialized_msg else f"wa_{phone}"
         })
 
 
@@ -1438,31 +1515,17 @@ class MetaLeadViewSet(viewsets.ModelViewSet):
 @api_view(['GET'])
 @permission_classes([IsOwnerOrStaffReadOnly])
 def meta_social_analytics(request):
-    """GET /api/meta-social/analytics/ — Summary of reach, followers, posts & leads."""
-    total_posts = MetaPost.objects.count()
-    published_posts = MetaPost.objects.filter(status=MetaPost.STATUS_PUBLISHED).count()
-    total_likes = MetaPost.objects.aggregate(s=Sum('likes_count'))['s'] or 0
-    total_leads = MetaLead.objects.count()
-    converted_leads = MetaLead.objects.filter(status=MetaLead.STATUS_CONVERTED).count()
-    total_dms = MetaMessage.objects.count()
+    """GET /api/meta-social/analytics/ — Summary of live reach, followers, posts & leads from Meta."""
+    shop = getattr(request, 'tenant', None)
+    data = MetaSocialService.get_analytics_summary(shop=shop)
+    return Response(data)
 
-    return Response({
-        'overview': {
-            'total_reach': 1420 + (total_likes * 12),
-            'followers_instagram': 3420,
-            'followers_facebook': 1850,
-            'engagement_rate': 4.8,
-            'total_posts': total_posts,
-            'published_posts': published_posts,
-            'total_leads': total_leads,
-            'converted_leads': converted_leads,
-            'lead_conversion_rate': round((converted_leads / total_leads * 100), 1) if total_leads else 0.0,
-            'total_dms': total_dms,
-            'ai_replies_sent': MetaMessage.objects.filter(sender_type=MetaMessage.SENDER_AI).count(),
-        },
-        'channels': [
-            {'platform': 'Instagram', 'handle': '@washnlaundry', 'followers': 3420, 'leads': MetaLead.objects.filter(platform=MetaPlatform.INSTAGRAM).count()},
-            {'platform': 'Facebook', 'handle': 'WashNLaundry Official', 'followers': 1850, 'leads': MetaLead.objects.filter(platform=MetaPlatform.FACEBOOK).count()},
-        ]
-    })
+
+@api_view(['POST'])
+@permission_classes([IsOwnerOrStaffReadOnly])
+def meta_social_sync(request):
+    """POST /api/meta-social/sync/ — Triggers live synchronization of media, reels, and followers from Meta Graph API."""
+    shop = getattr(request, 'tenant', None)
+    result = MetaSocialService.sync_live_data(shop=shop)
+    return Response(result)
 

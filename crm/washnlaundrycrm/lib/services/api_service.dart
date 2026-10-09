@@ -822,6 +822,19 @@ class ApiService {
     return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
   }
 
+  static Future<Map<String, dynamic>> sendWhatsAppMessage({
+    required String phone,
+    required String text,
+    String? recipientName,
+  }) async {
+    final res = await _send('POST', '/meta-messages/send-whatsapp/', body: {
+      'phone': phone,
+      'text': text,
+      if (recipientName != null && recipientName.isNotEmpty) 'recipient_name': recipientName,
+    });
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
+
   static Future<List<dynamic>> fetchMetaLeads() async {
     final res = await _send('GET', '/meta-leads/');
     return res is List ? res : [];
@@ -857,12 +870,36 @@ class ApiService {
     return Map<String, dynamic>.from(res as Map);
   }
 
-  // ── Services Import & Export (KAN-138 / KAN-144) ──────────────────────────
+  // ── Services Import & Export (KAN-138 / KAN-144 / KAN-145) ─────────────
+
+  /// Fetches services export as multi-tab Excel (.xlsx) workbook bytes.
+  static Future<Uint8List> exportServicesXlsx({List<int>? categoryIds}) async {
+    final query = <String, String>{
+      'export_format': 'xlsx',
+      if (categoryIds != null && categoryIds.isNotEmpty)
+        'category': categoryIds.join(','),
+    };
+    final uri = _uri('/categories/export/', query);
+    final token = await tokenProvider?.call();
+    final tenantId = tenantIdProvider?.call();
+    final headers = <String, String>{
+      if (token != null) 'Authorization': 'Bearer $token',
+      if (tenantId != null && tenantId.isNotEmpty) 'X-Tenant-ID': tenantId,
+    };
+    final response = await http.get(uri, headers: headers).timeout(_timeout);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.bodyBytes;
+    }
+    throw ApiException(
+      describeError(response.body, '/categories/export/'),
+      statusCode: response.statusCode,
+    );
+  }
 
   /// Fetches services export as raw CSV text string.
   static Future<String> exportServicesCsv({List<int>? categoryIds}) async {
     final query = <String, String>{
-      'format': 'csv',
+      'export_format': 'csv',
       if (categoryIds != null && categoryIds.isNotEmpty)
         'category': categoryIds.join(','),
     };
@@ -886,7 +923,7 @@ class ApiService {
   /// Fetches services export as structured JSON catalog.
   static Future<dynamic> exportServicesJson({List<int>? categoryIds}) async {
     final query = <String, String>{
-      'format': 'json',
+      'export_format': 'json',
       if (categoryIds != null && categoryIds.isNotEmpty)
         'category': categoryIds.join(','),
     };

@@ -5,3 +5,4 @@
 /// doing nothing.
 bool downloadCsv(String filename, String csvContent) => false;
 bool downloadString(String filename, String content, {String mimeType = 'text/plain;charset=utf-8;'}) => false;
+bool downloadBytes(String filename, List<int> bytes, {String mimeType = 'application/octet-stream'}) => false;
