@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
@@ -165,14 +166,26 @@ class _ShopOnboardingDialogState extends State<ShopOnboardingDialog> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Store Contact Phone (Optional)',
+                  'Store Contact Phone (Optional - 10 digits only)',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _ink),
                 ),
                 const SizedBox(height: 6),
                 TextFormField(
                   controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  validator: (val) {
+                    final trimmed = (val ?? '').trim();
+                    if (trimmed.isNotEmpty && !RegExp(r'^[6-9]\d{9}$').hasMatch(trimmed)) {
+                      return 'Must be a 10-digit mobile number starting with 6-9 (no ISD code).';
+                    }
+                    return null;
+                  },
                   decoration: InputDecoration(
-                    hintText: '+91 98765 43210',
+                    hintText: 'e.g. 9876543210',
                     hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

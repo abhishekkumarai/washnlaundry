@@ -764,12 +764,21 @@ class MetaSettings(models.Model):
     """Stores local Meta Graph API Access Tokens, connected Facebook Page and Instagram details."""
     shop = models.OneToOneField(Shop, on_delete=models.CASCADE, related_name='meta_settings', null=True, blank=True)
     page_access_token = models.CharField(max_length=512, blank=True, default='')
+    user_access_token = models.CharField(max_length=512, blank=True, default='')
     app_id = models.CharField(max_length=120, blank=True, default='')
     app_secret = models.CharField(max_length=120, blank=True, default='')
+    business_id = models.CharField(max_length=120, blank=True, default='')
     facebook_page_id = models.CharField(max_length=120, blank=True, default='')
     facebook_page_name = models.CharField(max_length=255, blank=True, default='WashNLaundry Official')
+    facebook_followers = models.IntegerField(default=0)
     instagram_account_id = models.CharField(max_length=120, blank=True, default='')
     instagram_username = models.CharField(max_length=120, blank=True, default='washnlaundry')
+    instagram_followers = models.IntegerField(default=0)
+    instagram_media_count = models.IntegerField(default=0)
+    profile_picture_url = models.TextField(blank=True, default='')
+    whatsapp_phone_number_id = models.CharField(max_length=120, blank=True, default='')
+    whatsapp_business_account_id = models.CharField(max_length=120, blank=True, default='')
+    whatsapp_phone_number = models.CharField(max_length=30, blank=True, default='')
     auto_reply_enabled = models.BooleanField(default=True)
     is_connected = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
@@ -781,6 +790,7 @@ class MetaSettings(models.Model):
 class MetaPlatform(models.TextChoices):
     FACEBOOK = 'FACEBOOK', 'Facebook'
     INSTAGRAM = 'INSTAGRAM', 'Instagram'
+    WHATSAPP = 'WHATSAPP', 'WhatsApp'
     BOTH = 'BOTH', 'Facebook & Instagram'
 
 
@@ -800,7 +810,9 @@ class MetaPost(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='meta_posts', null=True, blank=True)
     platform = models.CharField(max_length=20, choices=MetaPlatform.choices, default=MetaPlatform.BOTH)
     content = models.TextField()
-    image_url = models.URLField(max_length=1000, blank=True, default='')
+    image_url = models.TextField(blank=True, default='')
+    permalink = models.URLField(max_length=500, blank=True, default='')
+    media_type = models.CharField(max_length=30, blank=True, default='')
     scheduled_for = models.DateTimeField(null=True, blank=True)
     published_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)

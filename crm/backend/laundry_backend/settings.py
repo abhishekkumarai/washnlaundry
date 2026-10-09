@@ -3,6 +3,14 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+try:
+    from dotenv import load_dotenv
+    for p in [BASE_DIR.parent / '.env', BASE_DIR.parent.parent / '.env', BASE_DIR / '.env']:
+        if p.exists():
+            load_dotenv(p)
+except ImportError:
+    pass
+
 _INSECURE_SECRET_KEY = 'django-insecure-laundrybill-crm-secret-key-super-secure'
 SECRET_KEY = os.environ.get('SECRET_KEY', _INSECURE_SECRET_KEY)
 
@@ -184,3 +192,15 @@ APP_ORIGINS = [
 APP_BASE_URL = os.environ.get('APP_BASE_URL') or (
     'http://localhost:5055' if DEBUG else (APP_ORIGINS[0] if APP_ORIGINS else '')
 )
+
+# ── Meta / Instagram Graph API (KAN-142) ────────────────────────────────────
+META_APP_ID = os.environ.get('META_APP_ID', '')
+META_APP_SECRET = os.environ.get('META_APP_SECRET', '')
+META_USER_ACCESS_TOKEN = os.environ.get('META_USER_ACCESS_TOKEN', '')
+META_PAGE_ACCESS_TOKEN = os.environ.get('META_PAGE_ACCESS_TOKEN', '')
+META_FACEBOOK_PAGE_ID = os.environ.get('META_FACEBOOK_PAGE_ID', '')
+META_FACEBOOK_PAGE_NAME = os.environ.get('META_FACEBOOK_PAGE_NAME', 'Washnlaundry')
+META_INSTAGRAM_ACCOUNT_ID = os.environ.get('META_INSTAGRAM_ACCOUNT_ID', '')
+META_INSTAGRAM_USERNAME = os.environ.get('META_INSTAGRAM_USERNAME', 'washnlaundrydotcom')
+META_BUSINESS_ID = os.environ.get('META_BUSINESS_ID', '')
+META_GRAPH_ACCESS_TOKEN = META_PAGE_ACCESS_TOKEN or META_USER_ACCESS_TOKEN

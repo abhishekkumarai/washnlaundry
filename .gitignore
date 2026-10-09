@@ -58,3 +58,8 @@ customer-web/next-env.d.ts
 
 # local notes
 /projects.md
+
+# sqlite & local backups
+*.sqlite3*
+crm/backend/backups/
+crm/backend/*.sqlite3*

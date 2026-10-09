@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +13,6 @@ import '../models/order_model.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/fulfillment_type_selector.dart';
-import '../widgets/receipt_dialog.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../utils/money.dart';
 
@@ -2424,6 +2424,11 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
       setState(() => _error = 'Name and phone are both required.');
       return;
     }
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(phone)) {
+      setState(() => _error =
+          'Mobile number must be exactly 10 digits starting with 6-9 (no ISD / country code or leading 0).');
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -2477,6 +2482,7 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
     TextEditingController controller,
     String hint, {
     TextInputType? keyboard,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -2492,6 +2498,7 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
           TextField(
             controller: controller,
             keyboardType: keyboard,
+            inputFormatters: inputFormatters,
             style: const TextStyle(fontSize: 13),
             decoration: InputDecoration(
               hintText: hint,
@@ -2569,8 +2576,15 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                       _newCustomerField(
                           'Full Name', _nameController, 'e.g. Ramesh Kumar'),
                       _newCustomerField(
-                          'Phone Number', _phoneController, '+919876543210',
-                          keyboard: TextInputType.phone),
+                        'Phone Number (10 digits only, no ISD code)',
+                        _phoneController,
+                        '9876543210',
+                        keyboard: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                      ),
                       _newCustomerField(
                           'Email', _emailController, 'name@example.com',
                           keyboard: TextInputType.emailAddress),
@@ -2705,218 +2719,4 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
   }
 }
 
-/// The real app's post-checkout confirmation — a compact summary and real
-/// next actions, shown once the order is actually saved. Distinct from
-/// [ReceiptDialog] (still reachable via "View Receipt"): that one is the
-/// itemized, printable bill; this one is just "did it work,
-/// and what next."
-class _OrderPlacedDialog extends StatelessWidget {
-  final OrderModel order;
-  final Map<String, dynamic>? shop;
 
-  const _OrderPlacedDialog({required this.order, required this.shop});
-
-  @override
-  Widget build(BuildContext context) {
-    final isPaid = order.dueAmount <= 0;
-
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        width: math.min(380.0, MediaQuery.sizeOf(context).width - 48),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                  color: Color(0xFFDCFCE7), shape: BoxShape.circle),
-              child: const Icon(Icons.check_rounded,
-                  color: Color(0xFF16A34A), size: 32),
-            ),
-            const SizedBox(height: 16),
-            const Text('Order Placed!',
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF141A24))),
-            const SizedBox(height: 4),
-            const Text('Your order has been created successfully',
-                style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                  color: const Color(0xFFF1EFEA),
-                  borderRadius: BorderRadius.circular(8)),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Order ID',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                  const SizedBox(width: 8),
-                  Text('#${order.orderNumber}',
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF141A24))),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-            _summaryRow('Customer', order.customerName),
-            _summaryRow('Items', '${order.items.length}'),
-            _summaryRow('Order Type', DeliveryType.label(order.deliveryType)),
-            _summaryRow(
-              'Payment',
-              isPaid
-                  ? 'Paid'
-                  : 'Balance Due: ${Money.symbol}${order.dueAmount.toInt()}',
-              valueColor:
-                  isPaid ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
-            ),
-            if (order.scheduledDate != null)
-              _summaryRow(
-                'Ready by',
-                DateFormat('MMM d, yyyy').format(order.scheduledDate!) +
-                    (order.scheduledTime.isEmpty
-                        ? ''
-                        : ', ${TimeSlotModel.formatTime(order.scheduledTime)}'),
-              ),
-            const SizedBox(height: 8),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Total',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF141A24))),
-                Text('${Money.symbol}${order.totalAmount.toInt()}',
-                    style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF182C4F))),
-              ],
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                // Cart/review state was already reset before this dialog was
-                // shown, so this just needs to close itself.
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.add_rounded,
-                    size: 18, color: Colors.white),
-                label: const Text('New Order',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF182C4F),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              // A real route, not another `showDialog` stacked on this one —
-              // the real app's own "Print Tags" opens a Generate Tags modal
-              // on top of this same confirmation, then a Tag Preview modal on
-              // top of *that*; captured live and deliberately built as a
-              // Scan screen tab instead (one sidebar destination for both
-              // scanning and generating tags). Closes this dialog first, the
-              // same way "Order Details" below already does.
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.go('/scan?order=${order.id}');
-                },
-                icon: const Icon(Icons.qr_code_rounded, size: 16),
-                label: const Text('Print Tags',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  side: const BorderSide(color: Color(0xFFE4E0D8)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => showDialog(
-                      context: context,
-                      builder: (_) => ReceiptDialog(order: order, shop: shop),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      side: const BorderSide(color: Color(0xFFE4E0D8)),
-                    ),
-                    child: const Text('View Receipt',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF334155))),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      context.go('/orders/${order.id}');
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      side: const BorderSide(color: Color(0xFFE4E0D8)),
-                    ),
-                    child: const Text('Order Details',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF334155))),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _summaryRow(String label, String value, {Color? valueColor}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: valueColor ?? const Color(0xFF141A24))),
-        ],
-      ),
-    );
-  }
-}

@@ -20,6 +20,7 @@ from rest_framework.response import Response
 
 from . import customer_import, services_import_export
 from .auth import CUSTOMER, IsOwner, IsOwnerOrStaffReadOnly, normalize_phone
+from .validators import clean_mobile_10_digit
 from .services.rag_service import RagService, RagServiceError
 from .services.email_service import EmailService
 from .models import (
@@ -225,10 +226,12 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
         for record in records:
             name = (record.get('name') or '').strip()
-            phone = customer_import.normalize_phone(record.get('phone'))
+            raw_phone = customer_import.normalize_phone(record.get('phone'))
+            phone = clean_mobile_10_digit(raw_phone)
             if not name or not phone:
                 skipped_missing += 1
                 continue
+
 
             fields = {
                 'name': name,
@@ -1189,13 +1192,10 @@ def rag_chat(request):
 
 
 def _normalize_indian_mobile(raw):
-    """Return the 10-digit mobile for an Indian number typed any usual way, else None."""
-    digits = re.sub(r'\D', '', str(raw or ''))
-    if len(digits) == 12 and digits.startswith('91'):
-        digits = digits[2:]
-    elif len(digits) == 11 and digits.startswith('0'):
-        digits = digits[1:]
-    return digits if re.fullmatch(r'[6-9]\d{9}', digits) else None
+    """Return the 10-digit mobile if strictly 10 digits starting with 6-9 (no ISD / country code), else None."""
+    cleaned = str(raw or '').strip()
+    return cleaned if re.fullmatch(r'^[6-9]\d{9}$', cleaned) else None
+
 
 
 def _has_valid_rag_key(request):
@@ -1458,6 +1458,8 @@ class MetaMessageViewSet(viewsets.ModelViewSet):
 
         if not phone:
             return Response({'error': 'Phone number is required.'}, status=400)
+        if not re.fullmatch(r'^[6-9]\d{9}$', phone):
+            return Response({'error': 'Mobile number must be exactly 10 digits starting with 6-9 (no ISD / country code or leading 0).'}, status=400)
         if not text:
             return Response({'error': 'Message text is required.'}, status=400)
 

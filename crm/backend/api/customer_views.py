@@ -110,9 +110,9 @@ def _me_json(customer):
 
 
 def clean_phone(raw):
-    """The phone with spaces/dashes removed if it looks valid (10-15 digits, optional +), else None."""
-    phone = re.sub(r'[\s-]', '', str(raw or ''))
-    return phone if re.fullmatch(r'\+?\d{10,15}', phone) else None
+    """The phone with spaces/dashes removed if it is strictly 10 digits (starting 6-9, no ISD code), else None."""
+    digits = re.sub(r'\D', '', str(raw or ''))
+    return digits if re.fullmatch(r'[6-9]\d{9}', digits) else None
 
 
 def register_customer(email, name, phone):

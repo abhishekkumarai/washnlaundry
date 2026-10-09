@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
@@ -260,7 +261,7 @@ class _StaffScreenState extends State<StaffScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Text('Phone Number *',
+                  const Text('Phone Number (10 digits only, no ISD code) *',
                       style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -269,8 +270,12 @@ class _StaffScreenState extends State<StaffScreen> {
                   TextField(
                     controller: phoneCtrl,
                     keyboardType: TextInputType.phone,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
                     decoration: InputDecoration(
-                      hintText: '+91 98765 43210',
+                      hintText: '9876543210',
                       hintStyle: const TextStyle(
                           fontSize: 13, color: Color(0xFF94A3B8)),
                       contentPadding: const EdgeInsets.symmetric(
@@ -532,6 +537,16 @@ class _StaffScreenState extends State<StaffScreen> {
               final name = nameCtrl.text.trim();
               if (name.isEmpty) return;
 
+              final phone = phoneCtrl.text.trim();
+              if (!RegExp(r'^[6-9]\d{9}$').hasMatch(phone)) {
+                await showErrorDialog(
+                  ctx,
+                  title: 'Invalid Mobile Number',
+                  message: 'Mobile number must be exactly 10 digits starting with 6-9 (no ISD / country code or leading 0).',
+                );
+                return;
+              }
+
               final messenger = ScaffoldMessenger.of(context);
               final provider = context.read<AppProvider>();
               final payload = {
@@ -539,7 +554,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 'role': roleCtrl.text.trim().isEmpty
                     ? defaultRole
                     : roleCtrl.text.trim(),
-                'phone': phoneCtrl.text.trim(),
+                'phone': phone,
                 'email': emailCtrl.text.trim().toLowerCase(),
                 // A sign-in email is what grants CRM access (api/auth.py).
                 'has_app_login': emailCtrl.text.trim().isNotEmpty,

@@ -2288,9 +2288,10 @@ class GarmentItemImageTests(APITestCase):
 
 class LeadEmailTests(APITestCase):
     PAYLOAD = {
-        'name': 'Asha', 'phone': '+91 98765 43210',
+        'name': 'Asha', 'phone': '9876543210',
         'address': 'Boring Road, Patna', 'requirements': 'Wash & iron, 10 pieces',
     }
+
 
     def setUp(self):
         from django.test import override_settings

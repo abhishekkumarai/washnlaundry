@@ -104,3 +104,84 @@ class MetaSocialTests(TestCase):
         self.assertIn('overview', data)
         self.assertIn('channels', data)
         self.assertGreaterEqual(data['overview']['total_posts'], 1)
+
+    def test_meta_social_sync(self):
+        with mock.patch('requests.get') as mock_get:
+            def side_effect(url, **kwargs):
+                resp = mock.MagicMock()
+                resp.status_code = 200
+                if '/media' in url:
+                    resp.json.return_value = {
+                        'data': [
+                            {
+                                'id': 'ig_media_999',
+                                'caption': 'Synced Reel Caption',
+                                'media_type': 'VIDEO',
+                                'media_url': 'https://example.com/reel.mp4',
+                                'permalink': 'https://instagram.com/reel/123/',
+                                'timestamp': '2026-10-09T10:37:58+0000',
+                                'like_count': 10,
+                                'comments_count': 2,
+                            }
+                        ]
+                    }
+                elif '/feed' in url:
+                    resp.json.return_value = {'data': []}
+                else:
+                    resp.json.return_value = {
+                        'id': '17841422947561202',
+                        'username': 'washnlaundrydotcom',
+                        'followers_count': 120,
+                        'media_count': 5,
+                        'profile_picture_url': 'https://example.com/pic.jpg',
+                    }
+                return resp
+
+            mock_get.side_effect = side_effect
+            res = self.client.post('/api/meta-social/sync/')
+            self.assertEqual(res.status_code, 200)
+            data = res.json()
+            self.assertTrue(data['success'])
+            self.assertEqual(data['synced_posts_count'], 1)
+            self.assertTrue(MetaPost.objects.filter(meta_post_id='ig_media_999').exists())
+
+    def test_send_whatsapp_simulated(self):
+        """When phone_number_id is pending, send_whatsapp should gracefully simulate and store in MetaMessage."""
+        res = self.client.post('/api/meta-messages/send-whatsapp/', {
+            'phone': '+919876543210',
+            'text': 'Hello, your laundry is scheduled for tomorrow at 10 AM.',
+            'recipient_name': 'Aarav Sharma'
+        }, format='json')
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data['success'])
+        self.assertTrue(data['simulated'])
+        self.assertEqual(data['conversation_id'], 'wa_919876543210')
+        self.assertTrue(MetaMessage.objects.filter(conversation_id='wa_919876543210', platform='WHATSAPP').exists())
+
+    @mock.patch('requests.post')
+    def test_send_whatsapp_live(self, mock_post):
+        """When phone_number_id is configured, call Meta Cloud API."""
+        self.settings.whatsapp_phone_number_id = 'wa_phone_id_12345'
+        self.settings.save()
+
+        mock_resp = mock.MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            'messaging_product': 'whatsapp',
+            'contacts': [{'input': '919876543210', 'wa_id': '919876543210'}],
+            'messages': [{'id': 'wamid.HBgLMTIzNDU='}]
+        }
+        mock_post.return_value = mock_resp
+
+        res = self.client.post('/api/meta-messages/send-whatsapp/', {
+            'phone': '919876543210',
+            'text': 'Your clothes are dry cleaned and ready!',
+        }, format='json')
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data['success'])
+        self.assertFalse(data['simulated'])
+        self.assertEqual(data['message_id'], 'wamid.HBgLMTIzNDU=')
+        self.assertTrue(MetaMessage.objects.filter(conversation_id='wa_919876543210', platform='WHATSAPP').exists())
+

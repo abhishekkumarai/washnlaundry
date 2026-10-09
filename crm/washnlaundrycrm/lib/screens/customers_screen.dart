@@ -1,8 +1,8 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
@@ -1033,8 +1033,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _field('Full Name', nameController, 'e.g. Ramesh Kumar'),
-                  _field('Phone Number', phoneController, '+919876543210',
-                      keyboard: TextInputType.phone),
+                  _field(
+                    'Phone Number (10 digits, no ISD code)',
+                    phoneController,
+                    '9876543210',
+                    keyboard: TextInputType.phone,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                  ),
                   _field('Email', emailController, 'name@example.com',
                       keyboard: TextInputType.emailAddress),
                   _field('Area / Locality', areaController,
@@ -1063,6 +1071,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         if (name.isEmpty || phone.isEmpty) {
                           setDialogState(() =>
                               error = 'Name and phone are both required.');
+                          return;
+                        }
+                        if (!RegExp(r'^[6-9]\d{9}$').hasMatch(phone)) {
+                          setDialogState(() =>
+                              error = 'Mobile number must be exactly 10 digits starting with 6-9 (no ISD / country code or leading 0).');
                           return;
                         }
                         setDialogState(() {
@@ -1167,6 +1180,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     TextEditingController controller,
     String hint, {
     TextInputType? keyboard,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1182,6 +1196,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           TextField(
             controller: controller,
             keyboardType: keyboard,
+            inputFormatters: inputFormatters,
             style: const TextStyle(fontSize: 13),
             decoration: InputDecoration(
               hintText: hint,

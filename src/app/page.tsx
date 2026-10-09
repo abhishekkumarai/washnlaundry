@@ -188,6 +188,13 @@ export default function LandingPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (submitting) return;
+
+    const phoneCleaned = formData.phone.trim();
+    if (!/^[6-9]\d{9}$/.test(phoneCleaned)) {
+      setSubmitError("Please enter a valid 10-digit mobile number (starting with 6-9, no ISD/country code).");
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError("");
     try {
@@ -614,13 +621,18 @@ export default function LandingPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number (10 digits only)</label>
                     <input
                       required
                       type="tel"
-                      placeholder="e.g. 08407 000 048"
+                      maxLength={10}
+                      pattern="^[6-9]\d{9}$"
+                      placeholder="e.g. 9876543210 (no +91 or 0)"
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      onChange={(e) => {
+                        const cleaned = e.target.value.replace(/\D/g, "").slice(0, 10);
+                        setFormData({ ...formData, phone: cleaned });
+                      }}
                       className="field"
                     />
                   </div>

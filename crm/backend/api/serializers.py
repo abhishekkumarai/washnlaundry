@@ -8,6 +8,7 @@ from .models import (
     OrderStatus, Expense, Credit, CreditCategory, Staff, Attendance, SalaryPayment, SalaryAdvance,
     ServiceArea, TimeSlot, MetaSettings, MetaPost, MetaMessage, MetaLead,
 )
+from .validators import validate_mobile_10_digit
 
 
 class TenantModelSerializer(serializers.ModelSerializer):
@@ -32,6 +33,9 @@ class CustomerSerializer(TenantModelSerializer):
     class Meta:
         model = Customer
         fields = '__all__'
+
+    def validate_phone(self, value):
+        return validate_mobile_10_digit(value)
 
 
 class GarmentItemSerializer(TenantModelSerializer):
@@ -76,6 +80,11 @@ class OrderSerializer(TenantModelSerializer):
         model = Order
         fields = '__all__'
         read_only_fields = ['order_number', 'shop']
+
+    def validate_customer_phone(self, value):
+        if value:
+            return validate_mobile_10_digit(value)
+        return value
 
     def create(self, validated_data):
         """Accept nested items on POST, and log the opening audit entry."""
@@ -173,6 +182,9 @@ class StaffSerializer(TenantModelSerializer):
     class Meta:
         model = Staff
         fields = '__all__'
+
+    def validate_phone(self, value):
+        return validate_mobile_10_digit(value)
 
     def validate_start_date(self, value):
         # Only matters on an edit (self.instance exists) — a brand-new Staff
@@ -289,9 +301,11 @@ class MetaSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = MetaSettings
         fields = [
-            'id', 'shop', 'page_access_token', 'app_id', 'app_secret',
-            'facebook_page_id', 'facebook_page_name', 'instagram_account_id',
-            'instagram_username', 'auto_reply_enabled', 'is_connected', 'updated_at'
+            'id', 'shop', 'page_access_token', 'user_access_token', 'app_id', 'app_secret', 'business_id',
+            'facebook_page_id', 'facebook_page_name', 'facebook_followers',
+            'instagram_account_id', 'instagram_username', 'instagram_followers', 'instagram_media_count',
+            'whatsapp_phone_number_id', 'whatsapp_business_account_id', 'whatsapp_phone_number',
+            'profile_picture_url', 'auto_reply_enabled', 'is_connected', 'updated_at'
         ]
 
 
@@ -313,4 +327,9 @@ class MetaLeadSerializer(serializers.ModelSerializer):
     class Meta:
         model = MetaLead
         fields = '__all__'
+
+    def validate_customer_phone(self, value):
+        if value:
+            return validate_mobile_10_digit(value)
+        return value
 

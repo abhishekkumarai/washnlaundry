@@ -9,7 +9,7 @@ from .views import (
     reports, meta,
     rag_chat, create_lead, public_lead, process_leads,
     MetaSettingsViewSet, MetaPostViewSet, MetaMessageViewSet, MetaLeadViewSet,
-    meta_social_analytics,
+    meta_social_analytics, meta_social_sync,
 )
 from .password_auth import signup, verify_email, login, forgot_password, reset_password
 from .role_views import me, link_requests, link_request_approve, link_request_reject
@@ -48,6 +48,7 @@ urlpatterns = [
     path('reports/', reports, name='reports'),
     path('meta/', meta, name='meta'),
     path('meta-social/analytics/', meta_social_analytics, name='meta-social-analytics'),
+    path('meta-social/sync/', meta_social_sync, name='meta-social-sync'),
     path('me/', me, name='me'),
     path('auth/signup/', signup, name='auth-signup'),
     path('auth/verify-email/', verify_email, name='auth-verify-email'),
