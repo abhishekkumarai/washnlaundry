@@ -118,6 +118,14 @@ def is_staff_email(email):
     return _active_staff(email).exists()
 
 
+ROLE_HIERARCHY = {
+    OWNER: 3,
+    STAFF: 2,
+    CUSTOMER: 1,
+    UNLINKED: 0,
+}
+
+
 @dataclass
 class Principal:
     """What `request.user` is for a verified caller."""
@@ -127,18 +135,30 @@ class Principal:
     is_authenticated: bool = True
     user: Optional[object] = None
 
+    def has_role(self, min_role):
+        """Hierarchical check: Owner > Staff > Customer > Unlinked."""
+        return ROLE_HIERARCHY.get(self.role, 0) >= ROLE_HIERARCHY.get(min_role, 0)
+
     def has_perm(self, perm, obj=None):
         if self.user and hasattr(self.user, 'has_perm'):
             return self.user.has_perm(perm, obj)
         return self.role == OWNER
 
     def in_group(self, group_name):
+        """Hierarchical group check:
+        Owner is in Owner, Staff, and Customers.
+        Staff is in Staff and Customers.
+        Customer is in Customers.
+        """
+        g = (group_name or '').strip().lower()
+        if g in ('customer', 'customers'):
+            return self.has_role(CUSTOMER)
+        if g == 'staff':
+            return self.has_role(STAFF)
+        if g == 'owner':
+            return self.has_role(OWNER)
         if self.user and hasattr(self.user, 'groups'):
-            return self.user.groups.filter(name=group_name).exists()
-        if group_name.lower() == 'owner':
-            return self.role == OWNER
-        if group_name.lower() == 'staff':
-            return self.role in (OWNER, STAFF)
+            return self.user.groups.filter(name__iexact=group_name).exists()
         return False
 
 
@@ -154,37 +174,55 @@ def sync_staff_user(staff):
 
 
 def sync_user_groups(user):
-    """Ensure a Django User's Group memberships match their role.
+    """Ensure a Django User's Group memberships match their hierarchical role.
     
-    Groups: 'Owner', 'Staff'.
+    Hierarchy:
+    Owner >= Staff >= Customer
     """
     if user is None:
         return None
     from django.contrib.auth.models import Group
     owner_group = Group.objects.filter(name='Owner').first()
     staff_group = Group.objects.filter(name='Staff').first()
-    if not owner_group or not staff_group:
-        return None
+    customers_group = Group.objects.filter(name='Customers').first()
 
     email = (user.email or user.username or '').strip().lower()
 
-    # Check if Owner
+    # 1. Check if Owner
     if user.is_superuser or is_owner_email(email):
-        user.groups.add(owner_group)
-        user.groups.remove(staff_group)
+        if owner_group:
+            user.groups.add(owner_group)
+        if staff_group:
+            user.groups.remove(staff_group)
+        if customers_group:
+            user.groups.remove(customers_group)
         if not user.is_staff:
             user.is_staff = True
             user.save(update_fields=['is_staff'])
         return OWNER
 
-    # Check if Staff
+    # 2. Check if Staff
     if is_staff_email(email):
-        user.groups.add(staff_group)
-        user.groups.remove(owner_group)
+        if staff_group:
+            user.groups.add(staff_group)
+        if owner_group:
+            user.groups.remove(owner_group)
+        if customers_group:
+            user.groups.remove(customers_group)
         if not user.is_staff:
             user.is_staff = True
             user.save(update_fields=['is_staff'])
         return STAFF
+
+    # 3. Customer (non-staff regular user)
+    if not user.is_staff and not user.is_superuser:
+        if customers_group:
+            user.groups.add(customers_group)
+        if owner_group:
+            user.groups.remove(owner_group)
+        if staff_group:
+            user.groups.remove(staff_group)
+        return CUSTOMER
 
     return None
 
@@ -201,6 +239,9 @@ def resolve_principal(email):
             return Principal(email, OWNER, user=user)
         if 'Staff' in group_names:
             return Principal(email, STAFF, user=user)
+        if 'Customers' in group_names or 'Customer' in group_names:
+            c = customer_for_email(email)
+            return Principal(email, CUSTOMER, customer=c, user=user)
 
         # Fallback to sync from settings / staff records
         synced_role = sync_user_groups(user)
@@ -208,6 +249,9 @@ def resolve_principal(email):
             return Principal(email, OWNER, user=user)
         if synced_role == STAFF:
             return Principal(email, STAFF, user=user)
+        if synced_role == CUSTOMER:
+            c = customer_for_email(email)
+            return Principal(email, CUSTOMER, customer=c, user=user)
     else:
         # Fallback for Google tokens before local User creation
         if is_owner_email(email):

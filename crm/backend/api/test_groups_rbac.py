@@ -129,3 +129,44 @@ class GroupsRBACTests(TestCase):
         self.assertTrue(is_staff.has_permission(MockRequest(staff_principal), None))
         self.assertTrue(read_only.has_permission(MockRequest(staff_principal, 'GET'), None))
         self.assertFalse(read_only.has_permission(MockRequest(staff_principal, 'POST'), None))
+
+    def test_customers_group_and_hierarchy(self):
+        """Verify the exact hierarchy: Owner > Staff > Customer."""
+        owner = Principal(email='owner@test.com', role=OWNER)
+        staff = Principal(email='staff@test.com', role=STAFF)
+        customer = Principal(email='customer@test.com', role=CUSTOMER)
+
+        # Owner hierarchy: Owner > Staff > Customer
+        self.assertTrue(owner.has_role(OWNER))
+        self.assertTrue(owner.has_role(STAFF))
+        self.assertTrue(owner.has_role(CUSTOMER))
+        self.assertTrue(owner.in_group('Owner'))
+        self.assertTrue(owner.in_group('Staff'))
+        self.assertTrue(owner.in_group('Customers'))
+
+        # Staff hierarchy: Staff > Customer
+        self.assertFalse(staff.has_role(OWNER))
+        self.assertTrue(staff.has_role(STAFF))
+        self.assertTrue(staff.has_role(CUSTOMER))
+        self.assertFalse(staff.in_group('Owner'))
+        self.assertTrue(staff.in_group('Staff'))
+        self.assertTrue(staff.in_group('Customers'))
+
+        # Customer hierarchy: Customer only
+        self.assertFalse(customer.has_role(OWNER))
+        self.assertFalse(customer.has_role(STAFF))
+        self.assertTrue(customer.has_role(CUSTOMER))
+        self.assertFalse(customer.in_group('Owner'))
+        self.assertFalse(customer.in_group('Staff'))
+        self.assertTrue(customer.in_group('Customers'))
+
+    def test_customer_user_sync(self):
+        """Regular users are assigned to Customers group by sync_user_groups."""
+        user = User.objects.create_user(username='cust99@test.com', email='cust99@test.com')
+        role = sync_user_groups(user)
+
+        self.assertEqual(role, CUSTOMER)
+        self.assertTrue(user.groups.filter(name='Customers').exists())
+        self.assertFalse(user.groups.filter(name='Staff').exists())
+        self.assertFalse(user.groups.filter(name='Owner').exists())
+        self.assertFalse(user.is_staff)
