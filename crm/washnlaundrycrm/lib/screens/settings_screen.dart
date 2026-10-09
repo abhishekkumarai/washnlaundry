@@ -407,371 +407,325 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  InputDecoration _inputDeco({
+    bool filled = false,
+    Color? fillColor,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      isDense: true,
+      filled: filled,
+      fillColor: fillColor,
+      suffixIcon: suffixIcon,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFFD9D5CB)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFFD9D5CB)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFF182C4F), width: 1.5),
+      ),
+    );
+  }
+
+  static const TextStyle _inputTextStyle = TextStyle(
+    fontSize: 13,
+    color: Color(0xFF141A24),
+  );
+
+  static const TextStyle _labelTextStyle = TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.bold,
+    color: Color(0xFF64748B),
+  );
+
   Widget _businessProfileForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Business profile',
-            style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF141A24))),
-        const Text(
-            'Your shop identity, contact and location.',
-            style: TextStyle(
-                fontSize: 12, color: Color(0xFF94A3B8))),
-        const SizedBox(height: 24),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 680),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Business profile',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF141A24))),
+          const Text(
+              'Your shop identity, contact and location.',
+              style: TextStyle(
+                  fontSize: 12, color: Color(0xFF94A3B8))),
+          const SizedBox(height: 20),
 
-        // Shop Logo & Name Box
-        Row(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: const Color(0xFF182C4F),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(Icons.storefront_rounded,
-                  size: 28, color: Colors.white),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  const Text('Shop Name',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF64748B))),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _shopNameController,
-                    decoration: InputDecoration(
-                      contentPadding:
-                          const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                      border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                              color: Color(0xFFD9D5CB))),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 28),
-        const Divider(height: 1),
-        const SizedBox(height: 24),
-
-        // Contact Information Section Header
-        const Row(
-          children: [
-            Icon(Icons.phone_outlined,
-                size: 18, color: Color(0xFF182C4F)),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text('Contact Information',
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF141A24))),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-
-        // Phone Number
-        const Text('Phone Number',
-            style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF64748B))),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _phoneController,
-          readOnly: true,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: const Color(0xFFF8F7F5),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                    color: Color(0xFFE4E0D8))),
-          ),
-        ),
-        const Text(
-            'Registered phone number cannot be changed',
-            style: TextStyle(
-                fontSize: 11, color: Color(0xFF94A3B8))),
-        const SizedBox(height: 20),
-
-        // WhatsApp Number
-        const Text('WhatsApp Number',
-            style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF64748B))),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _whatsappController,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: const Color(0xFFF8F7F5),
-            suffixIcon: const Icon(Icons.close_rounded,
-                size: 18, color: Color(0xFF94A3B8)),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                    color: Color(0xFFE4E0D8))),
-          ),
-        ),
-        const Text(
-            'Defaults to your registered phone. You can update it anytime.',
-            style: TextStyle(
-                fontSize: 11, color: Color(0xFF94A3B8))),
-        const SizedBox(height: 20),
-
-        // Email
-        const Text('Email',
-            style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF64748B))),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _emailController,
-          readOnly: true,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: const Color(0xFFF8F7F5),
-            suffixIcon: const Icon(Icons.more_horiz_rounded,
-                size: 18, color: Color(0xFF94A3B8)),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                    color: Color(0xFFE4E0D8))),
-          ),
-        ),
-        const Text('Registered email cannot be changed',
-            style: TextStyle(
-                fontSize: 11, color: Color(0xFF94A3B8))),
-        const SizedBox(height: 32),
-        const Divider(height: 1),
-        const SizedBox(height: 24),
-
-        // Location & Map Section
-        const Row(
-          children: [
-            Icon(Icons.location_on_outlined,
-                size: 18, color: Color(0xFF182C4F)),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text('Store Location',
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF141A24))),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Map Box Container
-        Container(
-          height: 180,
-          decoration: BoxDecoration(
-            color: const Color(0xFFE4E0D8),
-            borderRadius: BorderRadius.circular(14),
-            border:
-                Border.all(color: const Color(0xFFD9D5CB)),
-          ),
-          child: Stack(
+          // Shop Logo & Name Box
+          Row(
             children: [
-              Center(
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF182C4F),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.storefront_rounded,
+                    size: 24, color: Colors.white),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
                 child: Column(
-                  mainAxisAlignment:
-                      MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.map_rounded,
-                        size: 44, color: Color(0xFF182C4F)),
-                    SizedBox(height: 8),
-                    Text(
-                        "Tap 'Get Location' or drag the marker to set your shop address.",
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF475569))),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Shop Name', style: _labelTextStyle),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _shopNameController,
+                      style: _inputTextStyle,
+                      decoration: _inputDeco(),
+                    ),
                   ],
                 ),
               ),
-              Positioned(
-                right: 16,
-                bottom: 16,
-                child: ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.near_me_rounded,
-                      size: 16, color: Colors.white),
-                  label: const Text('Get Location',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        const Color(0xFF182C4F),
-                    shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(10)),
+            ],
+          ),
+          const SizedBox(height: 24),
+          const Divider(height: 1),
+          const SizedBox(height: 20),
+
+          // Contact Information Section Header
+          const Row(
+            children: [
+              Icon(Icons.phone_outlined,
+                  size: 16, color: Color(0xFF182C4F)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('Contact Information',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF141A24))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Phone Number
+          const Text('Phone Number', style: _labelTextStyle),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _phoneController,
+            readOnly: true,
+            style: _inputTextStyle,
+            decoration: _inputDeco(
+              filled: true,
+              fillColor: const Color(0xFFF8F7F5),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+              'Registered phone number cannot be changed',
+              style: TextStyle(
+                  fontSize: 11, color: Color(0xFF94A3B8))),
+          const SizedBox(height: 16),
+
+          // WhatsApp Number
+          const Text('WhatsApp Number', style: _labelTextStyle),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _whatsappController,
+            style: _inputTextStyle,
+            decoration: _inputDeco(
+              filled: true,
+              fillColor: const Color(0xFFF8F7F5),
+              suffixIcon: const Icon(Icons.close_rounded,
+                  size: 16, color: Color(0xFF94A3B8)),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+              'Defaults to your registered phone. You can update it anytime.',
+              style: TextStyle(
+                  fontSize: 11, color: Color(0xFF94A3B8))),
+          const SizedBox(height: 16),
+
+          // Email
+          const Text('Email', style: _labelTextStyle),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _emailController,
+            readOnly: true,
+            style: _inputTextStyle,
+            decoration: _inputDeco(
+              filled: true,
+              fillColor: const Color(0xFFF8F7F5),
+              suffixIcon: const Icon(Icons.more_horiz_rounded,
+                  size: 16, color: Color(0xFF94A3B8)),
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text('Registered email cannot be changed',
+              style: TextStyle(
+                  fontSize: 11, color: Color(0xFF94A3B8))),
+          const SizedBox(height: 24),
+          const Divider(height: 1),
+          const SizedBox(height: 20),
+
+          // Location & Map Section
+          const Row(
+            children: [
+              Icon(Icons.location_on_outlined,
+                  size: 16, color: Color(0xFF182C4F)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('Store Location',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF141A24))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Map Box Container
+          Container(
+            height: 160,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE4E0D8),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFD9D5CB)),
+            ),
+            child: Stack(
+              children: [
+                const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.map_rounded,
+                          size: 38, color: Color(0xFF182C4F)),
+                      SizedBox(height: 8),
+                      Text(
+                          "Tap 'Get Location' or drag the marker to set your shop address.",
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF475569))),
+                    ],
                   ),
+                ),
+                Positioned(
+                  right: 14,
+                  bottom: 14,
+                  child: ElevatedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.near_me_rounded,
+                        size: 14, color: Colors.white),
+                    label: const Text('Get Location',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF182C4F),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Address
+          const Text('Address', style: _labelTextStyle),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _addressController,
+            style: _inputTextStyle,
+            decoration: _inputDeco(),
+          ),
+          const SizedBox(height: 14),
+
+          // City & State Row
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('City', style: _labelTextStyle),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _cityController,
+                      style: _inputTextStyle,
+                      decoration: _inputDeco(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('State', style: _labelTextStyle),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _stateController,
+                      style: _inputTextStyle,
+                      decoration: _inputDeco(),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 20),
+          const SizedBox(height: 14),
 
-        // Address
-        const Text('Address',
-            style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF64748B))),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _addressController,
-          decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                    color: Color(0xFFD9D5CB))),
+          // PIN Code
+          const Text('PIN Code', style: _labelTextStyle),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _pincodeController,
+            style: _inputTextStyle,
+            decoration: _inputDeco(),
           ),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 18),
 
-        // City & State Row
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  const Text('City',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF64748B))),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _cityController,
-                    decoration: InputDecoration(
-                      contentPadding:
-                          const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                      border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                              color: Color(0xFFD9D5CB))),
-                    ),
-                  ),
-                ],
-              ),
+          // GPS Location Status Box
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8F7F5),
+              borderRadius: BorderRadius.all(Radius.circular(10)),
+              border: Border.fromBorderSide(
+                  BorderSide(color: Color(0xFFE4E0D8))),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  const Text('State',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF64748B))),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _stateController,
-                    decoration: InputDecoration(
-                      contentPadding:
-                          const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                      border: OutlineInputBorder(
-                          borderRadius:
-                              BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                              color: Color(0xFFD9D5CB))),
-                    ),
-                  ),
-                ],
-              ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('GPS Location',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF141A24))),
+                SizedBox(height: 4),
+                Text('No location captured yet',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF94A3B8))),
+              ],
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // PIN Code
-        const Text('PIN Code',
-            style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF64748B))),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _pincodeController,
-          decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                    color: Color(0xFFD9D5CB))),
           ),
-        ),
-        const SizedBox(height: 20),
-
-        // GPS Location Status Box
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8F7F5),
-            borderRadius: BorderRadius.circular(12),
-            border:
-                Border.all(color: const Color(0xFFE4E0D8)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('GPS Location',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF141A24))),
-              SizedBox(height: 4),
-              Text('No location captured yet',
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF94A3B8))),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

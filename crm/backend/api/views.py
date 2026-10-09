@@ -18,7 +18,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 
-from . import customer_import, services_import_export
+from . import customer_import, services_import_export, default_services
 from .auth import CUSTOMER, IsOwner, IsOwnerOrStaffReadOnly, normalize_phone
 from .pagination import StandardPagination
 from .tenancy import get_current_tenant
@@ -384,6 +384,58 @@ class GarmentCategoryViewSet(viewsets.ModelViewSet):
         records = services_import_export.rows_to_records(headers, rows, mapping)
         summary = services_import_export.import_services_commit(records, overwrite_duplicates=overwrite_duplicates)
         return Response(summary)
+
+    @action(detail=False, methods=['get'], url_path='default-services')
+    def default_services_catalogue(self, request):
+        """GET /api/categories/default-services/
+        Returns the hardcoded canonical laundromat service categories and items.
+        """
+        catalogue_data = []
+        for cat_order, (cat_name, cat_icon, items) in enumerate(default_services.DEFAULT_SERVICE_CATALOGUE):
+            items_list = []
+            for item_order, item_info in enumerate(items):
+                item_name = item_info[0]
+                price = item_info[1]
+                unit = item_info[2]
+                unit_label = dict(PricingUnit.choices).get(unit, unit)
+                icon = item_info[3] if len(item_info) > 3 else 'Shirt'
+                img = default_services.ITEM_IMAGES.get(item_name, '')
+                items_list.append({
+                    'name': item_name,
+                    'price': price,
+                    'unit': unit,
+                    'unit_label': unit_label,
+                    'icon': icon,
+                    'image_url': img,
+                    'display_order': item_order,
+                    'is_active': True,
+                })
+            catalogue_data.append({
+                'name': cat_name,
+                'icon': cat_icon,
+                'display_order': cat_order,
+                'is_active': True,
+                'item_count': len(items_list),
+                'items': items_list,
+            })
+        return Response(catalogue_data)
+
+    @action(detail=False, methods=['post'], url_path='load-defaults')
+    def load_defaults(self, request):
+        """POST /api/categories/load-defaults/
+        Populates default laundromat services into the current tenant shop.
+        """
+        shop = get_current_tenant() or Shop.objects.first()
+        if not shop:
+            return Response({'detail': 'No shop found for this request.'}, status=400)
+
+        overwrite = (request.data.get('overwrite') or False) in (True, 'true', '1')
+        result = default_services.populate_default_services_for_shop(shop, overwrite_existing=overwrite)
+        return Response({
+            'success': True,
+            'message': f"Added {result['categories_created']} categories and {result['items_created']} default items.",
+            **result,
+        })
 
 
 

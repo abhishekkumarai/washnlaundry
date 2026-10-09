@@ -532,8 +532,31 @@ class MetaSocialService:
         # Standardize phone format (strip non-digits, keep last 10 digits)
         digits = "".join(ch for ch in str(to_number) if ch.isdigit())
         ten_digit_phone = digits[-10:] if len(digits) >= 10 else digits
-        conv_id = f"wa_{ten_digit_phone}"
+        conv_id = f"wa_{digits}"
         name = recipient_name or f"WhatsApp Contact ({ten_digit_phone})"
+
+        # Check if Personal WhatsApp via Neonize is connected
+        from .neonize_service import NeonizeService
+        neonize = NeonizeService.get_instance()
+        if neonize.status == NeonizeService.STATUS_CONNECTED:
+            n_res = neonize.send_message(ten_digit_phone, text, shop=config.shop, recipient_name=name)
+            if n_res.get('success'):
+                msg = MetaMessage.objects.create(
+                    shop=config.shop,
+                    platform=MetaPlatform.WHATSAPP,
+                    conversation_id=conv_id,
+                    sender_id='staff_crm',
+                    sender_name='WashNLaundry Staff (Personal WhatsApp)',
+                    sender_type=MetaMessage.SENDER_STAFF,
+                    text=text
+                )
+                return {
+                    'success': True,
+                    'message_id': n_res.get('message_id'),
+                    'simulated': False,
+                    'provider': 'neonize',
+                    'message': msg
+                }
 
         if phone_number_id and token:
             endpoint = f"{GRAPH_API_BASE}/{phone_number_id}/messages"

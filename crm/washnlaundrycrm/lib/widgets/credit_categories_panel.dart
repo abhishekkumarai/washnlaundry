@@ -270,6 +270,11 @@ class _CreditCategoriesPanelState extends State<CreditCategoriesPanel> {
 
   Widget _row(CreditCategoryModel c) {
     final inUse = c.creditCount > 0;
+    final cannotDelete = c.isDefault || inUse;
+    final deleteTooltip = c.isDefault
+        ? 'Default category — turn it off instead'
+        : (inUse ? 'In use — turn it off instead' : 'Delete');
+
     return Padding(
       key: ValueKey('credit-category-${c.id}'),
       padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
@@ -279,14 +284,36 @@ class _CreditCategoriesPanelState extends State<CreditCategoriesPanel> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(c.name,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: c.isActive
-                            ? const Color(0xFF141A24)
-                            : const Color(0xFF94A3B8))),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(c.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: c.isActive
+                                  ? const Color(0xFF141A24)
+                                  : const Color(0xFF94A3B8))),
+                    ),
+                    if (c.isDefault) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('Default',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B))),
+                      ),
+                    ],
+                  ],
+                ),
                 Text(
                   inUse ? _credits(c.creditCount) : 'Not used yet',
                   style:
@@ -312,13 +339,13 @@ class _CreditCategoriesPanelState extends State<CreditCategoriesPanel> {
             onPressed: () => _rename(c),
           ),
           IconButton(
-            tooltip: inUse ? 'In use — turn it off instead' : 'Delete',
+            tooltip: deleteTooltip,
             icon: Icon(Icons.delete_outline,
                 size: 18,
-                color: inUse
+                color: cannotDelete
                     ? const Color(0xFFD9D5CB)
                     : const Color(0xFFDC2626)),
-            onPressed: inUse ? null : () => _delete(c),
+            onPressed: cannotDelete ? null : () => _delete(c),
           ),
         ],
       ),

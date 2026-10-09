@@ -185,7 +185,7 @@ void main() {
 
       expect(find.text('washing'), findsOneWidget);
       expect(find.text('Aditya Kumar'), findsOneWidget);
-      expect(find.text('AK'), findsOneWidget); // the avatar
+      expect(find.text('ADITY'), findsOneWidget); // the avatar long form
     });
 
     testWidgets('shows a placeholder before the shop loads', (tester) async {
@@ -196,7 +196,7 @@ void main() {
       // The literals used to match the seed, which is why nobody noticed them.
       expect(find.text('washing'), findsNothing);
       expect(find.text('Your shop'), findsOneWidget);
-      expect(find.text('?'), findsOneWidget);
+      expect(find.text('USER'), findsOneWidget);
     });
 
     testWidgets('carries no subscription plan badge', (tester) async {

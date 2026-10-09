@@ -765,25 +765,35 @@ class _StaffScreenState extends State<StaffScreen> {
                       fontSize: 12, color: Color(0xFF94A3B8)),
                 ),
               ),
-              SizedBox(
-                width: 38,
-                height: 38,
-                child: ElevatedButton(
-                  onPressed: () => _showStaffModal(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF182C4F),
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    elevation: 0,
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                flex: 70,
+                child: _searchField(),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 30,
+                child: SizedBox(
+                  height: 36,
+                  child: ElevatedButton(
+                    onPressed: () => _showStaffModal(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF182C4F),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    child: const Icon(Icons.add, size: 20, color: Colors.white),
                   ),
-                  child: const Icon(Icons.add, size: 18, color: Colors.white),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          _searchField(),
         ],
       ),
     );

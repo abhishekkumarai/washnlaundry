@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -68,6 +70,11 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
   final TextEditingController _newWaPhoneController = TextEditingController();
   final TextEditingController _newWaMsgController = TextEditingController();
 
+  // Neonize Personal WhatsApp state
+  Map<String, dynamic> _neonizeStatus = {};
+  bool _neonizeLoading = false;
+  Timer? _neonizePollTimer;
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +84,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
 
   @override
   void dispose() {
+    _neonizePollTimer?.cancel();
     _tabController.dispose();
     _msgInputController.dispose();
     _chatScrollController.dispose();
@@ -108,6 +116,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
       final resPosts = await ApiService.fetchMetaPosts();
       final resLeads = await ApiService.fetchMetaLeads();
       final resConvs = await ApiService.fetchMetaConversations();
+      final resNeonize = await ApiService.fetchNeonizeStatus();
 
       setState(() {
         _settings = resSettings;
@@ -115,6 +124,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
         _posts = resPosts;
         _leads = resLeads;
         _conversations = resConvs;
+        _neonizeStatus = resNeonize;
 
         _tokenController.text = (_settings['page_access_token'] != null && (_settings['page_access_token'] as String).isNotEmpty)
             ? _settings['page_access_token']
@@ -147,6 +157,249 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
         _loading = false;
       });
     }
+  }
+
+  Future<void> _startNeonizePairing({bool openDialog = true}) async {
+    setState(() => _neonizeLoading = true);
+    try {
+      final res = await ApiService.connectNeonize();
+      if (mounted) {
+        setState(() {
+          _neonizeStatus = res;
+          _neonizeLoading = false;
+        });
+        if (openDialog) {
+          _showNeonizeQrDialog();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _neonizeLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to initiate pairing: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _disconnectNeonize() async {
+    setState(() => _neonizeLoading = true);
+    try {
+      final res = await ApiService.disconnectNeonize();
+      if (mounted) {
+        setState(() {
+          _neonizeStatus = res;
+          _neonizeLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Personal WhatsApp unlinked successfully.'),
+            backgroundColor: Color(0xFF182C4F),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _neonizeLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to disconnect: $e')),
+        );
+      }
+    }
+  }
+
+  void _startNeonizePolling() {
+    _neonizePollTimer?.cancel();
+    _neonizePollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      final res = await ApiService.fetchNeonizeStatus();
+      if (mounted) {
+        setState(() => _neonizeStatus = res);
+      }
+    });
+  }
+
+  void _stopNeonizePolling() {
+    _neonizePollTimer?.cancel();
+    _neonizePollTimer = null;
+  }
+
+  void _showNeonizeQrDialog() {
+    _startNeonizePolling();
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) {
+          final isConnected = _neonizeStatus['connected'] == true;
+          final qrCodeData = _neonizeStatus['qr_code'] as String?;
+          final phone = _neonizeStatus['phone']?.toString() ?? '';
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF25D366).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.qr_code_2, color: Color(0xFF25D366), size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Link Personal WhatsApp',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Neonize Multi-Device Protocol (No Business API needed)',
+                          style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isConnected) ...[
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF86EFAC)),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.check_circle_rounded,
+                                color: Color(0xFF16A34A), size: 54),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Personal WhatsApp Linked!',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Color(0xFF15803D)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              phone.isNotEmpty ? 'Active Number: +$phone' : 'Status: Ready for CRM messaging',
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF166534)),
+                            ),
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red.shade700,
+                                side: BorderSide(color: Colors.red.shade300),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _disconnectNeonize();
+                              },
+                              icon: const Icon(Icons.link_off, size: 16),
+                              label: const Text('Unlink This Number'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      // QR Code Container
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: qrCodeData != null && qrCodeData.contains(',')
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.memory(
+                                  base64Decode(qrCodeData.split(',').last),
+                                  width: 220,
+                                  height: 220,
+                                  fit: BoxFit.contain,
+                                ),
+                              )
+                            : SizedBox(
+                                width: 220,
+                                height: 220,
+                                child: Center(
+                                  child: _neonizeLoading
+                                      ? const CircularProgressIndicator()
+                                      : const Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.qr_code, size: 48, color: Colors.grey),
+                                            SizedBox(height: 8),
+                                            Text('Initializing pairing...',
+                                                style: TextStyle(color: Colors.grey, fontSize: 13)),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Instruction steps
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('How to link your personal number:',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            SizedBox(height: 6),
+                            Text('1. Open WhatsApp on your personal phone.'),
+                            Text('2. Tap Settings (iOS) or ⋮ Menu (Android) > Linked Devices.'),
+                            Text('3. Tap "Link a Device" and scan the QR code above.'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              if (!isConnected)
+                TextButton.icon(
+                  onPressed: () async {
+                    await _startNeonizePairing(openDialog: false);
+                    setDlgState(() {});
+                  },
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Refresh QR'),
+                ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF182C4F),
+                ),
+                onPressed: () {
+                  _stopNeonizePolling();
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Done', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
+      ),
+    ).then((_) => _stopNeonizePolling());
   }
 
   Future<void> _syncFromMeta() async {
@@ -621,63 +874,71 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
       backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
       body: AppShell(
-        body: Column(
-          children: [
-            TopHeader(
-              title: 'Social Suite',
-              actionLabel: 'New Post',
-              actionIcon: Icons.add,
-              onActionPressed: _showCreatePostDialog,
-            ),
-            Container(
-              color: Colors.white,
-              child: TabBar(
-                controller: _tabController,
-                labelColor: const Color(0xFF182C4F),
-                unselectedLabelColor: const Color(0xFF64748B),
-                indicatorColor: const Color(0xFF182C4F),
-                indicatorWeight: 3,
-                tabs: const [
-                  Tab(icon: Icon(Icons.analytics_outlined), text: 'Analytics'),
-                  Tab(icon: Icon(Icons.forum_outlined), text: 'AI & DMs'),
-                  Tab(icon: Icon(Icons.chat_bubble_outline), text: 'WhatsApp'),
-                  Tab(icon: Icon(Icons.post_add_rounded), text: 'Posts & Feed'),
-                  Tab(icon: Icon(Icons.campaign_outlined), text: 'Ad Leads'),
-                  Tab(icon: Icon(Icons.key_outlined), text: 'API Settings'),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('Error loading Social Suite: $_error',
-                                  style: const TextStyle(color: Colors.red)),
-                              const SizedBox(height: 12),
-                              ElevatedButton(
-                                onPressed: _loadAllData,
-                                child: const Text('Retry'),
-                              )
-                            ],
-                          ),
-                        )
-                      : TabBarView(
-                          controller: _tabController,
-                          children: [
-                            _buildAnalyticsTab(),
-                            _buildChatAndDmsTab(),
-                            _buildWhatsAppTab(),
-                            _buildPostsTab(),
-                            _buildLeadsTab(),
-                            _buildApiSettingsTab(),
-                          ],
-                        ),
-            ),
-          ],
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 768;
+
+            return Column(
+              children: [
+                TopHeader(
+                  title: 'Social Suite',
+                  actionLabel: 'New Post',
+                  actionIcon: Icons.add,
+                  onActionPressed: _showCreatePostDialog,
+                ),
+                Container(
+                  color: Colors.white,
+                  child: TabBar(
+                    controller: _tabController,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    labelColor: const Color(0xFF182C4F),
+                    unselectedLabelColor: const Color(0xFF64748B),
+                    indicatorColor: const Color(0xFF182C4F),
+                    indicatorWeight: 3,
+                    tabs: const [
+                      Tab(icon: Icon(Icons.analytics_outlined), text: 'Analytics'),
+                      Tab(icon: Icon(Icons.forum_outlined), text: 'AI & DMs'),
+                      Tab(icon: Icon(Icons.chat_bubble_outline), text: 'WhatsApp'),
+                      Tab(icon: Icon(Icons.post_add_rounded), text: 'Posts & Feed'),
+                      Tab(icon: Icon(Icons.campaign_outlined), text: 'Ad Leads'),
+                      Tab(icon: Icon(Icons.key_outlined), text: 'API Settings'),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _error != null
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('Error loading Social Suite: $_error',
+                                      style: const TextStyle(color: Colors.red)),
+                                  const SizedBox(height: 12),
+                                  ElevatedButton(
+                                    onPressed: _loadAllData,
+                                    child: const Text('Retry'),
+                                  )
+                                ],
+                              ),
+                            )
+                          : TabBarView(
+                              controller: _tabController,
+                              children: [
+                                _buildAnalyticsTab(narrow),
+                                _buildChatAndDmsTab(narrow),
+                                _buildWhatsAppTab(narrow),
+                                _buildPostsTab(narrow),
+                                _buildLeadsTab(narrow),
+                                _buildApiSettingsTab(narrow),
+                              ],
+                            ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -685,44 +946,109 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
 
   // ── Tab 1: Analytics ─────────────────────────────────────────────────────────
 
-  Widget _buildAnalyticsTab() {
+  Widget _buildAnalyticsTab(bool narrow) {
     final ov = _analytics['overview'] ?? {};
     final channels = (_analytics['channels'] as List?) ?? [];
     final isConnected = ov['is_connected'] == true;
 
+    final statReach = _buildStatCard('Total Reach', '${ov['total_reach'] ?? 0}', Icons.remove_red_eye_outlined, Colors.blue);
+    final statIg = _buildStatCard('Instagram Followers', '${ov['followers_instagram'] ?? 0}', Icons.camera_alt_outlined, Colors.purple);
+    final statFb = _buildStatCard('Facebook Followers', '${ov['followers_facebook'] ?? 0}', Icons.facebook_outlined, Colors.indigo);
+    final statLeads = _buildStatCard('Total Ad Leads', '${ov['total_leads'] ?? 0}', Icons.group_add_outlined, Colors.teal);
+
+    final channelsPanel = PanelCard(
+      title: 'Connected Meta Channels',
+      child: Column(
+        children: channels.map<Widget>((ch) {
+          final hasPic = (ch['profile_picture_url'] != null && (ch['profile_picture_url'] as String).isNotEmpty);
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: CircleAvatar(
+              backgroundColor: ch['platform'] == 'Instagram'
+                  ? Colors.purple.shade50
+                  : Colors.blue.shade50,
+              backgroundImage: hasPic ? NetworkImage(ch['profile_picture_url']) : null,
+              child: !hasPic
+                  ? Icon(
+                      ch['platform'] == 'Instagram' ? Icons.camera_alt : Icons.facebook,
+                      color: ch['platform'] == 'Instagram' ? Colors.purple : Colors.blue,
+                    )
+                  : null,
+            ),
+            title: Text(ch['platform'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text(
+              ch['media_count'] != null
+                  ? '${ch['handle'] ?? ''} • ${ch['media_count']} Media / Reels'
+                  : (ch['handle'] ?? ''),
+            ),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('${ch['followers']} Followers', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text('${ch['leads']} Leads captured', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+
+    final metricsPanel = PanelCard(
+      title: 'Meta AI Support Metrics',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          children: [
+            _metricRow('Total DM Inquiries', '${ov['total_dms'] ?? 0}'),
+            const Divider(),
+            _metricRow('AI Responses Dispatched', '${ov['ai_replies_sent'] ?? 0}'),
+            const Divider(),
+            _metricRow('Engagement Rate', '${ov['engagement_rate'] ?? 0}%'),
+            const Divider(),
+            _metricRow('Lead Conversion Rate', '${ov['lead_conversion_rate'] ?? 0}%'),
+          ],
+        ),
+      ),
+    );
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(narrow ? 16 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isConnected ? const Color(0xFF0F766E) : Colors.grey,
-                    ),
+          if (narrow) ...[
+            Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isConnected ? const Color(0xFF0F766E) : Colors.grey,
                   ),
-                  const SizedBox(width: 8),
-                  Text(
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
                     isConnected ? 'Live Meta Graph API Connected' : 'Meta API Offline / Simulation',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
+                      fontSize: 13,
                       color: isConnected ? const Color(0xFF0F766E) : Colors.grey.shade700,
                     ),
                   ),
-                ],
-              ),
-              OutlinedButton.icon(
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF182C4F),
                   side: const BorderSide(color: Color(0xFF182C4F)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 ),
                 onPressed: _syncingMeta ? null : _syncFromMeta,
                 icon: _syncingMeta
@@ -734,86 +1060,95 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
                     : const Icon(Icons.sync_rounded, size: 18),
                 label: Text(_syncingMeta ? 'Syncing...' : 'Sync Live from Meta'),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildStatCard('Total Reach', '${ov['total_reach'] ?? 0}', Icons.remove_red_eye_outlined, Colors.blue),
-              const SizedBox(width: 16),
-              _buildStatCard('Instagram Followers', '${ov['followers_instagram'] ?? 0}', Icons.camera_alt_outlined, Colors.purple),
-              const SizedBox(width: 16),
-              _buildStatCard('Facebook Followers', '${ov['followers_facebook'] ?? 0}', Icons.facebook_outlined, Colors.indigo),
-              const SizedBox(width: 16),
-              _buildStatCard('Total Ad Leads', '${ov['total_leads'] ?? 0}', Icons.group_add_outlined, Colors.teal),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 3,
-                child: PanelCard(
-                  title: 'Connected Meta Channels',
-                  child: Column(
-                    children: channels.map<Widget>((ch) {
-                      final hasPic = (ch['profile_picture_url'] != null && (ch['profile_picture_url'] as String).isNotEmpty);
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: ch['platform'] == 'Instagram'
-                              ? Colors.purple.shade50
-                              : Colors.blue.shade50,
-                          backgroundImage: hasPic ? NetworkImage(ch['profile_picture_url']) : null,
-                          child: !hasPic
-                              ? Icon(
-                                  ch['platform'] == 'Instagram' ? Icons.camera_alt : Icons.facebook,
-                                  color: ch['platform'] == 'Instagram' ? Colors.purple : Colors.blue,
-                                )
-                              : null,
-                        ),
-                        title: Text(ch['platform'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(
-                          ch['media_count'] != null
-                              ? '${ch['handle'] ?? ''} • ${ch['media_count']} Media / Reels'
-                              : (ch['handle'] ?? ''),
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('${ch['followers']} Followers', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            Text('${ch['leads']} Leads captured', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 24),
-              Expanded(
-                flex: 2,
-                child: PanelCard(
-                  title: 'Meta AI Support Metrics',
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Column(
-                      children: [
-                        _metricRow('Total DM Inquiries', '${ov['total_dms'] ?? 0}'),
-                        const Divider(),
-                        _metricRow('AI Responses Dispatched', '${ov['ai_replies_sent'] ?? 0}'),
-                        const Divider(),
-                        _metricRow('Engagement Rate', '${ov['engagement_rate'] ?? 0}%'),
-                        const Divider(),
-                        _metricRow('Lead Conversion Rate', '${ov['lead_conversion_rate'] ?? 0}%'),
-                      ],
+            ),
+          ] else ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isConnected ? const Color(0xFF0F766E) : Colors.grey,
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isConnected ? 'Live Meta Graph API Connected' : 'Meta API Offline / Simulation',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: isConnected ? const Color(0xFF0F766E) : Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          )
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF182C4F),
+                    side: const BorderSide(color: Color(0xFF182C4F)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onPressed: _syncingMeta ? null : _syncFromMeta,
+                  icon: _syncingMeta
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.sync_rounded, size: 18),
+                  label: Text(_syncingMeta ? 'Syncing...' : 'Sync Live from Meta'),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 16),
+          if (narrow) ...[
+            Row(
+              children: [
+                Expanded(child: statReach),
+                const SizedBox(width: 10),
+                Expanded(child: statIg),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: statFb),
+                const SizedBox(width: 10),
+                Expanded(child: statLeads),
+              ],
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Expanded(child: statReach),
+                const SizedBox(width: 16),
+                Expanded(child: statIg),
+                const SizedBox(width: 16),
+                Expanded(child: statFb),
+                const SizedBox(width: 16),
+                Expanded(child: statLeads),
+              ],
+            ),
+          ],
+          const SizedBox(height: 20),
+          if (narrow) ...[
+            channelsPanel,
+            const SizedBox(height: 16),
+            metricsPanel,
+          ] else ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 3, child: channelsPanel),
+                const SizedBox(width: 24),
+                Expanded(flex: 2, child: metricsPanel),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -833,642 +1168,825 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
   }
 
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE4E0D8)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 28),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE4E0D8)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-            const SizedBox(width: 16),
-            Column(
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13)),
-                const SizedBox(height: 4),
-                Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ],
-            )
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   // ── Tab 2: AI & DMs ─────────────────────────────────────────────────────────
 
-  Widget _buildChatAndDmsTab() {
-    return Row(
-      children: [
-        // Thread list
-        SizedBox(
-          width: 320,
-          child: Container(
-            color: Colors.white,
-            child: Column(
+  Widget _buildChatAndDmsTab(bool narrow) {
+    final threadList = Container(
+      color: Colors.white,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
+            ),
+            child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: Color(0xFFE4E0D8))),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.mark_chat_unread_outlined, size: 20, color: Color(0xFF182C4F)),
-                      const SizedBox(width: 8),
-                      const Text('Conversations', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.add_comment_outlined, size: 20),
-                        tooltip: 'Simulate New DM',
-                        onPressed: () {
-                          _selectedConvId = 'conv_${DateTime.now().millisecondsSinceEpoch}';
-                          _selectedConvSender = 'New Prospect';
-                          _activeMessages = [];
-                          setState(() {});
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: _conversations.isEmpty
-                      ? const Center(child: Text('No DM threads yet'))
-                      : ListView.separated(
-                          itemCount: _conversations.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (ctx, i) {
-                            final conv = _conversations[i];
-                            final isSel = conv['conversation_id'] == _selectedConvId;
-                            return ListTile(
-                              selected: isSel,
-                              selectedTileColor: const Color(0xFFF1F5F9),
-                              leading: CircleAvatar(
-                                backgroundColor: conv['platform'] == 'INSTAGRAM'
-                                    ? Colors.purple.shade50
-                                    : Colors.blue.shade50,
-                                child: Icon(
-                                  conv['platform'] == 'INSTAGRAM' ? Icons.camera_alt : Icons.facebook,
-                                  color: conv['platform'] == 'INSTAGRAM' ? Colors.purple : Colors.blue,
-                                  size: 18,
-                                ),
-                              ),
-                              title: Text(conv['sender_name'] ?? 'Customer',
-                                  style: const TextStyle(fontWeight: FontWeight.w600)),
-                              subtitle: Text(
-                                conv['last_message'] ?? '',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              onTap: () => _selectConversation(
-                                conv['conversation_id'],
-                                conv['platform'],
-                                conv['sender_name'],
-                              ),
-                            );
-                          },
-                        ),
+                const Icon(Icons.mark_chat_unread_outlined, size: 20, color: Color(0xFF182C4F)),
+                const SizedBox(width: 8),
+                const Text('Conversations', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.add_comment_outlined, size: 20),
+                  tooltip: 'Simulate New DM',
+                  onPressed: () {
+                    _selectedConvId = 'conv_${DateTime.now().millisecondsSinceEpoch}';
+                    _selectedConvSender = 'New Prospect';
+                    _activeMessages = [];
+                    setState(() {});
+                  },
                 ),
               ],
             ),
           ),
-        ),
-        const VerticalDivider(width: 1, color: Color(0xFFE4E0D8)),
-        // Conversation panel
-        Expanded(
-          child: Container(
-            color: const Color(0xFFF8F7F5),
-            child: Column(
-              children: [
-                // Active chat header
-                Container(
-                  height: 60,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  color: Colors.white,
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: _selectedConvPlatform == 'INSTAGRAM'
-                            ? Colors.purple.shade100
-                            : Colors.blue.shade100,
-                        child: Text(_selectedConvSender.isNotEmpty ? _selectedConvSender[0] : 'C'),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(_selectedConvSender, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          Text('via $_selectedConvPlatform DM', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                        ],
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE0F2FE),
-                          borderRadius: BorderRadius.circular(20),
+          Expanded(
+            child: _conversations.isEmpty
+                ? const Center(child: Text('No DM threads yet'))
+                : ListView.separated(
+                    itemCount: _conversations.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (ctx, i) {
+                      final conv = _conversations[i];
+                      final isSel = conv['conversation_id'] == _selectedConvId;
+                      return ListTile(
+                        selected: isSel,
+                        selectedTileColor: const Color(0xFFF1F5F9),
+                        leading: CircleAvatar(
+                          backgroundColor: conv['platform'] == 'INSTAGRAM'
+                              ? Colors.purple.shade50
+                              : Colors.blue.shade50,
+                          child: Icon(
+                            conv['platform'] == 'INSTAGRAM' ? Icons.camera_alt : Icons.facebook,
+                            color: conv['platform'] == 'INSTAGRAM' ? Colors.purple : Colors.blue,
+                            size: 18,
+                          ),
                         ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.smart_toy, size: 16, color: Color(0xFF0369A1)),
-                            SizedBox(width: 4),
-                            Text('Meta AI Auto-Reply Active', style: TextStyle(color: Color(0xFF0369A1), fontSize: 12)),
-                          ],
+                        title: Text(conv['sender_name'] ?? 'Customer',
+                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text(
+                          conv['last_message'] ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => _selectConversation(
+                          conv['conversation_id'],
+                          conv['platform'],
+                          conv['sender_name'],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+
+    final chatPane = Container(
+      color: const Color(0xFFF8F7F5),
+      child: Column(
+        children: [
+          // Active chat header
+          Container(
+            height: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            color: Colors.white,
+            child: Row(
+              children: [
+                if (narrow) ...[
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => setState(() => _selectedConvId = null),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                CircleAvatar(
+                  backgroundColor: _selectedConvPlatform == 'INSTAGRAM'
+                      ? Colors.purple.shade100
+                      : Colors.blue.shade100,
+                  child: Text(_selectedConvSender.isNotEmpty ? _selectedConvSender[0] : 'C'),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedConvSender,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      Text(
+                        'via $_selectedConvPlatform DM',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!narrow) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0F2FE),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.smart_toy, size: 16, color: Color(0xFF0369A1)),
+                        SizedBox(width: 4),
+                        Text('Meta AI Active', style: TextStyle(color: Color(0xFF0369A1), fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // Messages body
+          Expanded(
+            child: _messagesLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _activeMessages.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No messages in this conversation.\nType below to simulate an inquiry or reply.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
                         ),
                       )
-                    ],
-                  ),
-                ),
-                // Messages body
-                Expanded(
-                  child: _messagesLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _activeMessages.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'No messages in this conversation.\nType below to simulate an incoming customer inquiry or reply.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.grey),
+                    : ListView.builder(
+                        controller: _chatScrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _activeMessages.length,
+                        itemBuilder: (ctx, i) {
+                          final msg = _activeMessages[i];
+                          final isUser = msg['sender_type'] == 'USER';
+                          final isAi = msg['sender_type'] == 'AI';
+                          return Align(
+                            alignment: isUser ? Alignment.centerLeft : Alignment.centerRight,
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              constraints: BoxConstraints(maxWidth: narrow ? 280 : 480),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isUser
+                                    ? Colors.white
+                                    : isAi
+                                        ? const Color(0xFF182C4F)
+                                        : const Color(0xFF0F766E),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4)
+                                ],
                               ),
-                            )
-                          : ListView.builder(
-                              controller: _chatScrollController,
-                              padding: const EdgeInsets.all(20),
-                              itemCount: _activeMessages.length,
-                              itemBuilder: (ctx, i) {
-                                final msg = _activeMessages[i];
-                                final isUser = msg['sender_type'] == 'USER';
-                                final isAi = msg['sender_type'] == 'AI';
-                                return Align(
-                                  alignment: isUser ? Alignment.centerLeft : Alignment.centerRight,
-                                  child: Container(
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    constraints: const BoxConstraints(maxWidth: 480),
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: isUser
-                                          ? Colors.white
-                                          : isAi
-                                              ? const Color(0xFF182C4F)
-                                              : const Color(0xFF0F766E),
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4)
-                                      ],
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          isUser ? CrossAxisAlignment.start : CrossAxisAlignment.end,
-                                      children: [
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            if (isAi)
-                                              const Padding(
-                                                padding: EdgeInsets.only(right: 6),
-                                                child: Icon(Icons.smart_toy, color: Colors.cyanAccent, size: 14),
-                                              ),
-                                            Text(
-                                              isUser
-                                                  ? msg['sender_name'] ?? 'Customer'
-                                                  : isAi
-                                                      ? 'Meta AI'
-                                                      : 'Staff Support',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: isUser ? Colors.grey.shade700 : Colors.white70,
-                                              ),
-                                            ),
-                                          ],
+                              child: Column(
+                                crossAxisAlignment:
+                                    isUser ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (isAi)
+                                        const Padding(
+                                          padding: EdgeInsets.only(right: 6),
+                                          child: Icon(Icons.smart_toy, color: Colors.cyanAccent, size: 14),
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          msg['text'] ?? '',
-                                          style: TextStyle(
-                                            color: isUser ? Colors.black87 : Colors.white,
-                                            fontSize: 14,
-                                          ),
+                                      Text(
+                                        isUser
+                                            ? msg['sender_name'] ?? 'Customer'
+                                            : isAi
+                                                ? 'Meta AI'
+                                                : 'Staff Support',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: isUser ? Colors.grey.shade700 : Colors.white70,
                                         ),
-                                      ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    msg['text'] ?? '',
+                                    style: TextStyle(
+                                      color: isUser ? Colors.black87 : Colors.white,
+                                      fontSize: 13,
                                     ),
                                   ),
-                                );
-                              },
+                                ],
+                              ),
                             ),
-                ),
-                // Message input
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.white,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _msgInputController,
-                          decoration: const InputDecoration(
-                            hintText: 'Type customer inquiry or support reply...',
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          ),
-                          onSubmitted: (_) => _sendMessage(useAi: false),
-                        ),
+                          );
+                        },
                       ),
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0F766E),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                        ),
-                        onPressed: () => _sendMessage(useAi: true),
-                        icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
-                        label: const Text('Meta AI Reply', style: TextStyle(color: Colors.white)),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        tooltip: 'Send as Staff Support',
-                        icon: const Icon(Icons.send_rounded, color: Color(0xFF182C4F)),
-                        onPressed: () => _sendMessage(useAi: false, isCustomerSimulation: false),
-                      ),
-                      IconButton(
-                        tooltip: 'Simulate Customer Message',
-                        icon: const Icon(Icons.person_add_alt_1_outlined, color: Color(0xFF64748B)),
-                        onPressed: () => _sendMessage(useAi: false, isCustomerSimulation: true),
-                      ),
-                    ],
+          ),
+          // Message input
+          Container(
+            padding: EdgeInsets.all(narrow ? 10 : 16),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _msgInputController,
+                    decoration: InputDecoration(
+                      hintText: narrow ? 'Type reply...' : 'Type customer inquiry or support reply...',
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                    onSubmitted: (_) => _sendMessage(useAi: false),
                   ),
+                ),
+                const SizedBox(width: 8),
+                if (!narrow) ...[
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F766E),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    ),
+                    onPressed: () => _sendMessage(useAi: true),
+                    icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 16),
+                    label: const Text('Meta AI Reply', style: TextStyle(color: Colors.white)),
+                  ),
+                  const SizedBox(width: 6),
+                ] else ...[
+                  IconButton(
+                    tooltip: 'Meta AI Reply',
+                    icon: const Icon(Icons.auto_awesome, color: Color(0xFF0F766E)),
+                    onPressed: () => _sendMessage(useAi: true),
+                  ),
+                ],
+                IconButton(
+                  tooltip: 'Send as Staff Support',
+                  icon: const Icon(Icons.send_rounded, color: Color(0xFF182C4F)),
+                  onPressed: () => _sendMessage(useAi: false, isCustomerSimulation: false),
+                ),
+                IconButton(
+                  tooltip: 'Simulate Customer Message',
+                  icon: const Icon(Icons.person_add_alt_1_outlined, color: Color(0xFF64748B)),
+                  onPressed: () => _sendMessage(useAi: false, isCustomerSimulation: true),
                 ),
               ],
             ),
           ),
-        ),
+        ],
+      ),
+    );
+
+    if (narrow) {
+      // In narrow view: master-detail navigation. If thread is selected, show chat with back arrow; else show threads
+      return _selectedConvId != null ? chatPane : threadList;
+    }
+
+    return Row(
+      children: [
+        SizedBox(width: 320, child: threadList),
+        const VerticalDivider(width: 1, color: Color(0xFFE4E0D8)),
+        Expanded(child: chatPane),
       ],
     );
   }
 
   // ── Tab 3: WhatsApp from Meta ──────────────────────────────────────────────
 
-  Widget _buildWhatsAppTab() {
+  Widget _buildWhatsAppTab(bool narrow) {
     final waThreads = _conversations.where((c) => c['platform'] == 'WHATSAPP').toList();
+
+    final contactsList = Container(
+      color: Colors.white,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF0FDF4),
+              border: Border(bottom: BorderSide(color: Color(0xFFDCFCE7))),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF25D366),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.chat_bubble_outline, size: 18, color: Colors.white),
+                ),
+                const SizedBox(width: 10),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('WhatsApp Chats', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text('Meta Cloud API', style: TextStyle(fontSize: 11, color: Color(0xFF16A34A))),
+                  ],
+                ),
+                const Spacer(),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  icon: const Icon(Icons.person_add, size: 14),
+                  label: const Text('New Contact'),
+                  onPressed: _showNewWhatsAppContactDialog,
+                ),
+              ],
+            ),
+          ),
+          // Personal WhatsApp (Neonize) status bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: _neonizeStatus['connected'] == true
+                  ? const Color(0xFFF0FDF4)
+                  : const Color(0xFFFEF3C7).withValues(alpha: 0.4),
+              border: Border(bottom: BorderSide(
+                color: _neonizeStatus['connected'] == true
+                    ? const Color(0xFFBBF7D0)
+                    : const Color(0xFFFDE68A),
+              )),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _neonizeStatus['connected'] == true
+                      ? Icons.phone_android_rounded
+                      : Icons.qr_code_scanner_rounded,
+                  size: 16,
+                  color: _neonizeStatus['connected'] == true
+                      ? const Color(0xFF16A34A)
+                      : const Color(0xFFD97706),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _neonizeStatus['connected'] == true
+                            ? 'Personal WA: Linked (+${_neonizeStatus['phone'] ?? 'Active'})'
+                            : 'Personal WA (No Biz API)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: _neonizeStatus['connected'] == true
+                              ? const Color(0xFF15803D)
+                              : const Color(0xFF92400E),
+                        ),
+                      ),
+                      Text(
+                        _neonizeStatus['connected'] == true
+                            ? 'Neonize Protocol Active'
+                            : 'Scan QR to link personal number',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: _neonizeStatus['connected'] == true
+                              ? const Color(0xFF166534)
+                              : const Color(0xFFB45309),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    if (_neonizeStatus['connected'] == true) {
+                      _showNeonizeQrDialog();
+                    } else {
+                      _startNeonizePairing(openDialog: true);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: _neonizeStatus['connected'] == true
+                          ? Colors.white
+                          : const Color(0xFF0F766E),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: _neonizeStatus['connected'] == true
+                            ? const Color(0xFF86EFAC)
+                            : const Color(0xFF0F766E),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _neonizeStatus['connected'] == true
+                              ? Icons.info_outline
+                              : Icons.qr_code_2,
+                          size: 12,
+                          color: _neonizeStatus['connected'] == true
+                              ? const Color(0xFF15803D)
+                              : Colors.white,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _neonizeStatus['connected'] == true ? 'Details' : 'Link QR',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: _neonizeStatus['connected'] == true
+                                ? const Color(0xFF15803D)
+                                : Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: waThreads.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.phone_in_talk_outlined, size: 40, color: Colors.grey),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'No WhatsApp chats yet',
+                            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Click "New Contact" above to start a chat with any phone number.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 16),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF25D366),
+                              side: const BorderSide(color: Color(0xFF25D366)),
+                            ),
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Add Contact & Chat'),
+                            onPressed: _showNewWhatsAppContactDialog,
+                          )
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: waThreads.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (ctx, i) {
+                      final conv = waThreads[i];
+                      final isSel = conv['conversation_id'] == _selectedWaConvId;
+                      final phone = (conv['conversation_id'] as String).replaceAll('wa_', '');
+                      return ListTile(
+                        selected: isSel,
+                        selectedTileColor: const Color(0xFFDCFCE7).withValues(alpha: 0.5),
+                        leading: const CircleAvatar(
+                          backgroundColor: Color(0xFFDCFCE7),
+                          child: Icon(Icons.chat, color: Color(0xFF16A34A), size: 18),
+                        ),
+                        title: Text(
+                          conv['sender_name'] ?? 'WhatsApp Contact',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('+$phone', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                            Text(
+                              conv['last_message'] ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                        onTap: () => _selectWhatsAppConversation(
+                          conv['conversation_id'],
+                          conv['sender_name'] ?? 'WhatsApp Contact',
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+
+    final chatPane = Container(
+      color: const Color(0xFFEFEAE2), // Classic WhatsApp wallpaper background tone
+      child: Column(
+        children: [
+          // Chat header
+          Container(
+            height: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            color: Colors.white,
+            child: Row(
+              children: [
+                if (narrow) ...[
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => setState(() => _selectedWaConvId = null),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                CircleAvatar(
+                  backgroundColor: const Color(0xFFDCFCE7),
+                  child: Text(
+                    _selectedWaSender.isNotEmpty ? _selectedWaSender[0] : 'W',
+                    style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedWaSender.isNotEmpty ? _selectedWaSender : 'Select Contact',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      Text(
+                        _selectedWaPhone.isNotEmpty
+                            ? '+${_selectedWaPhone.replaceAll('+', '')} • WhatsApp'
+                            : 'Meta Cloud API',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'New Contact',
+                  icon: const Icon(Icons.person_add_alt_1, size: 20, color: Color(0xFF25D366)),
+                  onPressed: _showNewWhatsAppContactDialog,
+                ),
+              ],
+            ),
+          ),
+          // Chat Messages View
+          Expanded(
+            child: _waMessagesLoading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF25D366)))
+                : _activeWaMessages.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.mark_chat_read_outlined, size: 48, color: Colors.grey),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'No messages yet in this WhatsApp chat.',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Type an update or notice below to send.',
+                              style: TextStyle(fontSize: 13, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366)),
+                              onPressed: _showNewWhatsAppContactDialog,
+                              icon: const Icon(Icons.add, color: Colors.white, size: 16),
+                              label: const Text('Start New Chat', style: TextStyle(color: Colors.white)),
+                            )
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: _waChatScrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _activeWaMessages.length,
+                        itemBuilder: (ctx, i) {
+                          final msg = _activeWaMessages[i];
+                          final isUser = msg['sender_type'] == 'USER';
+                          return Align(
+                            alignment: isUser ? Alignment.centerLeft : Alignment.centerRight,
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              constraints: BoxConstraints(maxWidth: narrow ? 280 : 460),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isUser ? Colors.white : const Color(0xFFDCF8C6), // WhatsApp green
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(12),
+                                  topRight: const Radius.circular(12),
+                                  bottomLeft: Radius.circular(isUser ? 2 : 12),
+                                  bottomRight: Radius.circular(isUser ? 12 : 2),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 3, offset: const Offset(0, 1))
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: isUser ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        isUser
+                                            ? (msg['sender_name'] ?? 'Customer')
+                                            : 'WashNLaundry (Staff)',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: isUser ? Colors.grey.shade700 : const Color(0xFF0F5132),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    msg['text'] ?? '',
+                                    style: const TextStyle(color: Colors.black87, fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+          // WhatsApp Input Row
+          Container(
+            padding: EdgeInsets.all(narrow ? 10 : 16),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _waMsgInputController,
+                    decoration: InputDecoration(
+                      hintText: _selectedWaPhone.isNotEmpty
+                          ? 'Send to ${_selectedWaSender.isNotEmpty ? _selectedWaSender : _selectedWaPhone}...'
+                          : 'Type message...',
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      prefixIcon: const Icon(Icons.chat, color: Color(0xFF25D366), size: 18),
+                    ),
+                    onSubmitted: (_) => _sendWhatsAppReply(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (!narrow) ...[
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF25D366),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                    onPressed: _sendWhatsAppReply,
+                    icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                    label: const Text('Send WhatsApp', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ] else ...[
+                  IconButton(
+                    tooltip: 'Send',
+                    icon: const Icon(Icons.send_rounded, color: Color(0xFF25D366)),
+                    onPressed: _sendWhatsAppReply,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (narrow) {
+      return _selectedWaConvId != null ? chatPane : contactsList;
+    }
 
     return Row(
       children: [
-        // WhatsApp Contacts sidebar
-        SizedBox(
-          width: 330,
-          child: Container(
-            color: Colors.white,
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF0FDF4),
-                    border: Border(bottom: BorderSide(color: Color(0xFFDCFCE7))),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF25D366),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.chat_bubble_outline, size: 18, color: Colors.white),
-                      ),
-                      const SizedBox(width: 10),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('WhatsApp Chats', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                          Text('Meta Cloud API', style: TextStyle(fontSize: 11, color: Color(0xFF16A34A))),
-                        ],
-                      ),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF25D366),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                        icon: const Icon(Icons.person_add, size: 14),
-                        label: const Text('New Contact'),
-                        onPressed: _showNewWhatsAppContactDialog,
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: waThreads.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24.0),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.phone_in_talk_outlined, size: 40, color: Colors.grey),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'No WhatsApp chats yet',
-                                  style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey),
-                                ),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'Click "New Contact" above to start a chat with any phone number.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
-                                const SizedBox(height: 16),
-                                OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFF25D366),
-                                    side: const BorderSide(color: Color(0xFF25D366)),
-                                  ),
-                                  icon: const Icon(Icons.add, size: 16),
-                                  label: const Text('Add Contact & Chat'),
-                                  onPressed: _showNewWhatsAppContactDialog,
-                                )
-                              ],
-                            ),
-                          ),
-                        )
-                      : ListView.separated(
-                          itemCount: waThreads.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (ctx, i) {
-                            final conv = waThreads[i];
-                            final isSel = conv['conversation_id'] == _selectedWaConvId;
-                            final phone = (conv['conversation_id'] as String).replaceAll('wa_', '');
-                            return ListTile(
-                              selected: isSel,
-                              selectedTileColor: const Color(0xFFDCFCE7).withOpacity(0.5),
-                              leading: const CircleAvatar(
-                                backgroundColor: Color(0xFFDCFCE7),
-                                child: Icon(Icons.chat, color: Color(0xFF16A34A), size: 18),
-                              ),
-                              title: Text(
-                                conv['sender_name'] ?? 'WhatsApp Contact',
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('+$phone', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                  Text(
-                                    conv['last_message'] ?? '',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                              onTap: () => _selectWhatsAppConversation(
-                                conv['conversation_id'],
-                                conv['sender_name'] ?? 'WhatsApp Contact',
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        SizedBox(width: 330, child: contactsList),
         const VerticalDivider(width: 1, color: Color(0xFFE4E0D8)),
-        // WhatsApp Chat Pane
-        Expanded(
-          child: Container(
-            color: const Color(0xFFEFEAE2), // Classic WhatsApp wallpaper background tone
-            child: Column(
-              children: [
-                // Chat header
-                Container(
-                  height: 60,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  color: Colors.white,
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: const Color(0xFFDCFCE7),
-                        child: Text(
-                          _selectedWaSender.isNotEmpty ? _selectedWaSender[0] : 'W',
-                          style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _selectedWaSender.isNotEmpty ? _selectedWaSender : 'Select or Add Contact',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            _selectedWaPhone.isNotEmpty
-                                ? '+${_selectedWaPhone.replaceAll('+', '')} • WhatsApp Business'
-                                : 'Meta Cloud API',
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF25D366),
-                          side: const BorderSide(color: Color(0xFF25D366)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                        icon: const Icon(Icons.person_add_alt_1, size: 16),
-                        label: const Text('New Contact'),
-                        onPressed: _showNewWhatsAppContactDialog,
-                      ),
-                    ],
-                  ),
-                ),
-                // Chat Messages View
-                Expanded(
-                  child: _waMessagesLoading
-                      ? const Center(child: CircularProgressIndicator(color: Color(0xFF25D366)))
-                      : _activeWaMessages.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.mark_chat_read_outlined, size: 48, color: Colors.grey),
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    'No messages yet in this WhatsApp chat.',
-                                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  const Text(
-                                    'Type an update, invoice, or status notice below to send.',
-                                    style: TextStyle(fontSize: 13, color: Colors.grey),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366)),
-                                    onPressed: _showNewWhatsAppContactDialog,
-                                    icon: const Icon(Icons.add, color: Colors.white, size: 16),
-                                    label: const Text('Start New Chat', style: TextStyle(color: Colors.white)),
-                                  )
-                                ],
-                              ),
-                            )
-                          : ListView.builder(
-                              controller: _waChatScrollController,
-                              padding: const EdgeInsets.all(20),
-                              itemCount: _activeWaMessages.length,
-                              itemBuilder: (ctx, i) {
-                                final msg = _activeWaMessages[i];
-                                final isUser = msg['sender_type'] == 'USER';
-                                return Align(
-                                  alignment: isUser ? Alignment.centerLeft : Alignment.centerRight,
-                                  child: Container(
-                                    margin: const EdgeInsets.only(bottom: 10),
-                                    constraints: const BoxConstraints(maxWidth: 460),
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: isUser ? Colors.white : const Color(0xFFDCF8C6), // WhatsApp green
-                                      borderRadius: BorderRadius.only(
-                                        topLeft: const Radius.circular(12),
-                                        topRight: const Radius.circular(12),
-                                        bottomLeft: Radius.circular(isUser ? 2 : 12),
-                                        bottomRight: Radius.circular(isUser ? 12 : 2),
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 3, offset: const Offset(0, 1))
-                                      ],
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: isUser ? CrossAxisAlignment.start : CrossAxisAlignment.end,
-                                      children: [
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              isUser
-                                                  ? (msg['sender_name'] ?? 'Customer')
-                                                  : 'WashNLaundry (Staff)',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: isUser ? Colors.grey.shade700 : const Color(0xFF0F5132),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          msg['text'] ?? '',
-                                          style: const TextStyle(color: Colors.black87, fontSize: 14),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                ),
-                // WhatsApp Input Row
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.white,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _waMsgInputController,
-                          decoration: InputDecoration(
-                            hintText: _selectedWaPhone.isNotEmpty
-                                ? 'Send WhatsApp message to ${_selectedWaSender.isNotEmpty ? _selectedWaSender : _selectedWaPhone}...'
-                                : 'Select a conversation or click "New Contact" to message...',
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            prefixIcon: const Icon(Icons.chat, color: Color(0xFF25D366)),
-                          ),
-                          onSubmitted: (_) => _sendWhatsAppReply(),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF25D366),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                        ),
-                        onPressed: _sendWhatsAppReply,
-                        icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
-                        label: const Text('Send WhatsApp', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        Expanded(child: chatPane),
       ],
     );
   }
 
   // ── Tab 4: Posts & Feed ────────────────────────────────────────────────────
 
-  Widget _buildPostsTab() {
+  Widget _buildPostsTab(bool narrow) {
+    final syncBtn = OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: const Color(0xFF182C4F),
+        side: const BorderSide(color: Color(0xFF182C4F)),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      ),
+      onPressed: _syncingMeta ? null : _syncFromMeta,
+      icon: _syncingMeta
+          ? const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.sync_rounded, size: 18),
+      label: Text(_syncingMeta ? 'Syncing...' : 'Sync Live from Meta'),
+    );
+
+    final newPostBtn = ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF182C4F),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      ),
+      onPressed: _showCreatePostDialog,
+      icon: const Icon(Icons.add, color: Colors.white, size: 18),
+      label: const Text('New Post', style: TextStyle(color: Colors.white)),
+    );
+
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(narrow ? 16 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Scheduled & Published Social Posts',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Row(
-                children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF182C4F),
-                      side: const BorderSide(color: Color(0xFF182C4F)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    onPressed: _syncingMeta ? null : _syncFromMeta,
-                    icon: _syncingMeta
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.sync_rounded, size: 18),
-                    label: Text(_syncingMeta ? 'Syncing...' : 'Sync Live from Meta'),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF182C4F),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    onPressed: _showCreatePostDialog,
-                    icon: const Icon(Icons.add, color: Colors.white),
-                    label: const Text('New Post', style: TextStyle(color: Colors.white)),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          if (narrow) ...[
+            const Text(
+              'Scheduled & Published Social Posts',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: syncBtn),
+                const SizedBox(width: 8),
+                Expanded(child: newPostBtn),
+              ],
+            ),
+          ] else ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Scheduled & Published Social Posts',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Row(
+                  children: [
+                    syncBtn,
+                    const SizedBox(width: 12),
+                    newPostBtn,
+                  ],
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           Expanded(
             child: _posts.isEmpty
@@ -1613,16 +2131,16 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
     );
   }
 
-  // ── Tab 4: Ad Leads ────────────────────────────────────────────────────────
+  // ── Tab 5: Ad Leads ────────────────────────────────────────────────────────
 
-  Widget _buildLeadsTab() {
+  Widget _buildLeadsTab(bool narrow) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(narrow ? 16 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Captured Leads from Facebook & Instagram Ads',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text('Captured Leads from Facebook & Instagram Ads',
+              style: TextStyle(fontSize: narrow ? 16 : 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           Expanded(
             child: _leads.isEmpty
@@ -1634,34 +2152,87 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
                       final isConverted = lead['status'] == 'CONVERTED';
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: lead['platform'] == 'INSTAGRAM'
-                                ? Colors.purple.shade50
-                                : Colors.blue.shade50,
-                            child: Icon(
-                              lead['platform'] == 'INSTAGRAM' ? Icons.camera_alt : Icons.facebook,
-                              color: lead['platform'] == 'INSTAGRAM' ? Colors.purple : Colors.blue,
-                            ),
-                          ),
-                          title: Text(lead['customer_name'] ?? 'Lead', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(
-                              'Phone: ${lead['customer_phone'] ?? 'N/A'} • Campaign: ${lead['ad_campaign']}\nNote: ${lead['inquiry_notes'] ?? ''}'),
-                          isThreeLine: true,
-                          trailing: isConverted
-                              ? Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.shade50,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text('Converted (#${lead['converted_order_number'] ?? 'Order'})',
-                                      style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: narrow
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        CircleAvatar(
+                                          backgroundColor: lead['platform'] == 'INSTAGRAM'
+                                              ? Colors.purple.shade50
+                                              : Colors.blue.shade50,
+                                          child: Icon(
+                                            lead['platform'] == 'INSTAGRAM' ? Icons.camera_alt : Icons.facebook,
+                                            color: lead['platform'] == 'INSTAGRAM' ? Colors.purple : Colors.blue,
+                                            size: 18,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(lead['customer_name'] ?? 'Lead',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Phone: ${lead['customer_phone'] ?? 'N/A'} • Campaign: ${lead['ad_campaign']}\nNote: ${lead['inquiry_notes'] ?? ''}',
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    isConverted
+                                        ? Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green.shade50,
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text('Converted (#${lead['converted_order_number'] ?? 'Order'})',
+                                                style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold, fontSize: 12)),
+                                          )
+                                        : SizedBox(
+                                            width: double.infinity,
+                                            child: ElevatedButton(
+                                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E)),
+                                              onPressed: () => _convertLeadToOrder(lead['id']),
+                                              child: const Text('Convert to Order', style: TextStyle(color: Colors.white)),
+                                            ),
+                                          ),
+                                  ],
                                 )
-                              : ElevatedButton(
-                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E)),
-                                  onPressed: () => _convertLeadToOrder(lead['id']),
-                                  child: const Text('Convert to Order', style: TextStyle(color: Colors.white)),
+                              : ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: CircleAvatar(
+                                    backgroundColor: lead['platform'] == 'INSTAGRAM'
+                                        ? Colors.purple.shade50
+                                        : Colors.blue.shade50,
+                                    child: Icon(
+                                      lead['platform'] == 'INSTAGRAM' ? Icons.camera_alt : Icons.facebook,
+                                      color: lead['platform'] == 'INSTAGRAM' ? Colors.purple : Colors.blue,
+                                    ),
+                                  ),
+                                  title: Text(lead['customer_name'] ?? 'Lead', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  subtitle: Text(
+                                      'Phone: ${lead['customer_phone'] ?? 'N/A'} • Campaign: ${lead['ad_campaign']}\nNote: ${lead['inquiry_notes'] ?? ''}'),
+                                  isThreeLine: true,
+                                  trailing: isConverted
+                                      ? Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green.shade50,
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text('Converted (#${lead['converted_order_number'] ?? 'Order'})',
+                                              style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold)),
+                                        )
+                                      : ElevatedButton(
+                                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F766E)),
+                                          onPressed: () => _convertLeadToOrder(lead['id']),
+                                          child: const Text('Convert to Order', style: TextStyle(color: Colors.white)),
+                                        ),
                                 ),
                         ),
                       );
@@ -1673,11 +2244,68 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
     );
   }
 
-  // ── Tab 5: API Settings ────────────────────────────────────────────────────
+  // ── Tab 6: API Settings ────────────────────────────────────────────────────
 
-  Widget _buildApiSettingsTab() {
+  Widget _buildApiSettingsTab(bool narrow) {
+    final fbPageField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Facebook Page Name', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _pageNameController,
+          decoration: const InputDecoration(border: OutlineInputBorder()),
+        ),
+      ],
+    );
+
+    final igUserField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Instagram Username', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _igUserController,
+          decoration: const InputDecoration(
+            prefixText: '@',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
+    );
+
+    final waPhoneIdField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Phone Number ID', style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _waPhoneIdController,
+          decoration: const InputDecoration(
+            hintText: 'e.g. 106540292837461',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
+    );
+
+    final waWabaIdField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('WhatsApp Business Account (WABA) ID', style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _waWabaIdController,
+          decoration: const InputDecoration(
+            hintText: 'e.g. 109876543210987',
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
+    );
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(narrow ? 16 : 24),
       child: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 680),
@@ -1702,80 +2330,35 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
                   ),
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Facebook Page Name', style: TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: _pageNameController,
-                            decoration: const InputDecoration(border: OutlineInputBorder()),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Instagram Username', style: TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: _igUserController,
-                            decoration: const InputDecoration(
-                              prefixText: '@',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                if (narrow) ...[
+                  fbPageField,
+                  const SizedBox(height: 14),
+                  igUserField,
+                ] else ...[
+                  Row(
+                    children: [
+                      Expanded(child: fbPageField),
+                      const SizedBox(width: 16),
+                      Expanded(child: igUserField),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 16),
                 const Text('WhatsApp Cloud API (Meta Business)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Phone Number ID', style: TextStyle(fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: _waPhoneIdController,
-                            decoration: const InputDecoration(
-                              hintText: 'e.g. 106540292837461 (from Meta App WhatsApp dashboard)',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('WhatsApp Business Account (WABA) ID', style: TextStyle(fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: _waWabaIdController,
-                            decoration: const InputDecoration(
-                              hintText: 'e.g. 109876543210987',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                if (narrow) ...[
+                  waPhoneIdField,
+                  const SizedBox(height: 14),
+                  waWabaIdField,
+                ] else ...[
+                  Row(
+                    children: [
+                      Expanded(child: waPhoneIdField),
+                      const SizedBox(width: 16),
+                      Expanded(child: waWabaIdField),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1795,6 +2378,123 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 20),
+                // Personal WhatsApp (Neonize Protocol) Card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF86EFAC)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF25D366),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(Icons.qr_code_scanner, color: Colors.white, size: 16),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Personal WhatsApp (Neonize Protocol)',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                Text('No Meta Business API required. Link your personal phone number via QR code.',
+                                    style: TextStyle(fontSize: 12, color: Color(0xFF166534))),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _neonizeStatus['connected'] == true
+                                  ? const Color(0xFFDCFCE7)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _neonizeStatus['connected'] == true
+                                    ? const Color(0xFF16A34A)
+                                    : Colors.grey.shade400,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _neonizeStatus['connected'] == true
+                                        ? const Color(0xFF16A34A)
+                                        : Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _neonizeStatus['connected'] == true
+                                      ? 'Linked (+${_neonizeStatus['phone'] ?? 'Active'})'
+                                      : 'Not Linked',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: _neonizeStatus['connected'] == true
+                                        ? const Color(0xFF15803D)
+                                        : Colors.grey.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F766E),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            icon: const Icon(Icons.qr_code_2, size: 16),
+                            label: Text(_neonizeStatus['connected'] == true ? 'View Link Details / QR' : 'Scan QR to Link Personal Device'),
+                            onPressed: () {
+                              if (_neonizeStatus['connected'] == true) {
+                                _showNeonizeQrDialog();
+                              } else {
+                                _startNeonizePairing(openDialog: true);
+                              }
+                            },
+                          ),
+                          if (_neonizeStatus['connected'] == true) ...[
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red.shade700,
+                                side: BorderSide(color: Colors.red.shade300),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                textStyle: const TextStyle(fontSize: 12),
+                              ),
+                              icon: const Icon(Icons.link_off, size: 14),
+                              label: const Text('Unlink Number'),
+                              onPressed: _disconnectNeonize,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 20),
                 SwitchListTile(

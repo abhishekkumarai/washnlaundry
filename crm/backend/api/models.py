@@ -135,7 +135,16 @@ class Shop(models.Model):
             self.slug = candidate
         if not self.subdomain and self.slug:
             self.subdomain = self.slug
+        is_new = self._state.adding
         super().save(*args, **kwargs)
+        if is_new:
+            import sys
+            if 'test' not in sys.argv and not getattr(settings, 'TESTING', False):
+                try:
+                    from .default_services import populate_default_services_for_shop
+                    populate_default_services_for_shop(self)
+                except Exception:
+                    pass
 
     @staticmethod
     def derive_prefix(name):

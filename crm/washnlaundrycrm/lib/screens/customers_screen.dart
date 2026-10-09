@@ -267,57 +267,66 @@ class _CustomersScreenState extends State<CustomersScreen> {
               Text('$total Total',
                   style:
                       const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 38,
-                height: 38,
-                child: FilledButton(
-                  onPressed: _showAddCustomer,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF182C4F),
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Icon(Icons.add_rounded, size: 18),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 10),
-          SizedBox(
-            height: 38,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1EFEA),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search_rounded,
-                      size: 18, color: Color(0xFF94A3B8)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      onChanged: (v) => setState(() {
-                        _searchQuery = v;
-                        _visibleCount = _pageSize;
-                      }),
-                      style: const TextStyle(fontSize: 13),
-                      textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        hintText: 'Search by name, phone, or email...',
-                        hintStyle:
-                            TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                        border: InputBorder.none,
-                        isDense: true,
-                      ),
+          Row(
+            children: [
+              Expanded(
+                flex: 70,
+                child: SizedBox(
+                  height: 38,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1EFEA),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.search_rounded,
+                            size: 18, color: Color(0xFF94A3B8)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            onChanged: (v) => setState(() {
+                              _searchQuery = v;
+                              _visibleCount = _pageSize;
+                            }),
+                            style: const TextStyle(fontSize: 13),
+                            textAlign: TextAlign.center,
+                            decoration: const InputDecoration(
+                              hintText: 'Search by name, phone, or email...',
+                              hintStyle:
+                                  TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                              border: InputBorder.none,
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 30,
+                child: SizedBox(
+                  height: 38,
+                  child: FilledButton(
+                    onPressed: _showAddCustomer,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF182C4F),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Icon(Icons.add_rounded, size: 20),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           Row(

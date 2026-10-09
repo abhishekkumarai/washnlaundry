@@ -10,6 +10,7 @@ from .views import (
     rag_chat, create_lead, public_lead, process_leads,
     MetaSettingsViewSet, MetaPostViewSet, MetaMessageViewSet, MetaLeadViewSet,
     meta_social_analytics, meta_social_sync,
+    neonize_status, neonize_connect, neonize_disconnect,
 )
 from .password_auth import signup, verify_email, login, forgot_password, reset_password
 from .role_views import me, link_requests, link_request_approve, link_request_reject
@@ -62,5 +63,8 @@ urlpatterns = [
     path('customer/orders/', customer_orders, name='customer-orders'),
     path('customer/orders/<str:order_number>/', customer_order_detail, name='customer-order-detail'),
     path('customer/rate-card/', customer_rate_card, name='customer-rate-card'),
+    path('whatsapp/neonize/status/', neonize_status, name='neonize-status'),
+    path('whatsapp/neonize/connect/', neonize_connect, name='neonize-connect'),
+    path('whatsapp/neonize/disconnect/', neonize_disconnect, name='neonize-disconnect'),
 ]
 

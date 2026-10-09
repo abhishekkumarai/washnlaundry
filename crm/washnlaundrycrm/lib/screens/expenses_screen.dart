@@ -155,31 +155,50 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          titleBlock,
+          const SizedBox(height: 12),
           Row(
             children: [
-              titleBlock,
-              SizedBox(
-                width: 38,
-                height: 38,
-                child: FilledButton(
-                  onPressed: _showAddExpense,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF182C4F),
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+              Expanded(
+                flex: 60,
+                child: _searchField(),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 20,
+                child: SizedBox(
+                  height: 38,
+                  child: FilledButton(
+                    onPressed: _showAddExpense,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF182C4F),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Icon(Icons.add_rounded, size: 20),
                   ),
-                  child: const Icon(Icons.add_rounded, size: 18),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 20,
+                child: SizedBox(
+                  height: 38,
+                  child: OutlinedButton(
+                    onPressed: () => _exportExpensesCsv(visible),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFE4E0D8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: const Icon(Icons.download_rounded,
+                        size: 18, color: Color(0xFF475569)),
+                  ),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 10),
-          _searchField(),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: _exportButton(visible),
           ),
         ],
       );

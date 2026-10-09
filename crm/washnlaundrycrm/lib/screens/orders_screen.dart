@@ -887,54 +887,66 @@ class _OrdersScreenState extends State<OrdersScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Text('Orders',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF141A24))),
-                  const SizedBox(width: 8),
-                  Text('${filteredOrders.length} Total',
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF94A3B8))),
-                ],
+              const Text('Orders',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF141A24))),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('${filteredOrders.length} Total',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF94A3B8))),
               ),
-              _newOrderButton(iconOnly: true, isCustomer: isCustomer),
             ],
           ),
           const SizedBox(height: 12),
-          Container(
-            height: 38,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1EFEA),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.search_rounded,
-                    size: 18, color: Color(0xFF94A3B8)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    onChanged: (val) => setState(() => _searchQuery = val),
-                    textAlign: TextAlign.center,
-                    decoration: InputDecoration(
-                      hintText: isCustomer
-                          ? 'Search by order ID or item...'
-                          : 'Search by order ID, phone, or name...',
-                      hintStyle:
-                          const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                      border: InputBorder.none,
-                      isDense: true,
-                    ),
+          Row(
+            children: [
+              Expanded(
+                flex: 70,
+                child: Container(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1EFEA),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search_rounded,
+                          size: 18, color: Color(0xFF94A3B8)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          onChanged: (val) => setState(() => _searchQuery = val),
+                          textAlign: TextAlign.center,
+                          decoration: InputDecoration(
+                            hintText: isCustomer
+                                ? 'Search by order ID or item...'
+                                : 'Search by order ID, phone, or name...',
+                            hintStyle:
+                                const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 30,
+                child: SizedBox(
+                  height: 38,
+                  child: _newOrderButton(iconOnly: true, isCustomer: isCustomer),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           SizedBox(

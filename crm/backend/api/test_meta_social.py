@@ -3,6 +3,7 @@ from unittest import mock
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 from api.models import MetaSettings, MetaPost, MetaMessage, MetaLead, Shop, Order
+from api.services.neonize_service import NeonizeService
 
 class MetaSocialTests(TestCase):
     def setUp(self):
@@ -184,4 +185,29 @@ class MetaSocialTests(TestCase):
         self.assertFalse(data['simulated'])
         self.assertEqual(data['message_id'], 'wamid.HBgLMTIzNDU=')
         self.assertTrue(MetaMessage.objects.filter(conversation_id='wa_919876543210', platform='WHATSAPP').exists())
+
+    @mock.patch.object(NeonizeService, '_start_neonize_thread')
+    def test_neonize_status_and_pairing(self, mock_start_thread):
+        """Verify Neonize status, QR pairing generation, and disconnection."""
+        # 1. Check initial status
+        res = self.client.get('/api/whatsapp/neonize/status/')
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data['success'])
+        self.assertIn('status', data)
+
+        # 2. Trigger QR pairing
+        res_connect = self.client.post('/api/whatsapp/neonize/connect/')
+        self.assertEqual(res_connect.status_code, 200)
+        connect_data = res_connect.json()
+        self.assertEqual(connect_data['status'], 'pairing')
+        self.assertTrue(connect_data['has_qr'])
+        self.assertTrue(connect_data['qr_code'].startswith('data:image/png;base64,'))
+
+        # 3. Disconnect
+        res_dc = self.client.post('/api/whatsapp/neonize/disconnect/')
+        self.assertEqual(res_dc.status_code, 200)
+        dc_data = res_dc.json()
+        self.assertEqual(dc_data['status'], 'disconnected')
+
 

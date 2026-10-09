@@ -140,10 +140,15 @@ class ExpenseSerializer(TenantModelSerializer):
 
 class CreditCategorySerializer(TenantModelSerializer):
     credit_count = serializers.IntegerField(source='credits.count', read_only=True)
+    is_default = serializers.SerializerMethodField()
 
     class Meta:
         model = CreditCategory
-        fields = ['id', 'name', 'display_order', 'is_active', 'credit_count']
+        fields = ['id', 'name', 'display_order', 'is_active', 'credit_count', 'is_default']
+
+    def get_is_default(self, obj):
+        from .models import DEFAULT_CREDIT_CATEGORIES
+        return obj.name in DEFAULT_CREDIT_CATEGORIES
 
     def validate_name(self, value):
         value = value.strip()

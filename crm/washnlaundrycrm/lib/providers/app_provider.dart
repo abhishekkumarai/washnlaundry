@@ -573,9 +573,9 @@ class AppProvider extends ChangeNotifier {
         ApiService.fetchMyOrders(),
         ApiService.fetchRateCard(),
       ]);
-      final rawOrders = results[0] as List<Map<String, dynamic>>;
+      final rawOrders = results[0];
       _orders = rawOrders.map(OrderModel.fromJson).toList();
-      _categories = (results[1] as List<Map<String, dynamic>>).map((c) {
+      _categories = results[1].map((c) {
         return GarmentCategoryModel(
           id: c['name'] ?? '',
           name: c['name'] ?? '',
@@ -910,6 +910,21 @@ class AppProvider extends ChangeNotifier {
   Future<bool> deleteCategory(String id) async {
     try {
       await ApiService.deleteCategory(id);
+      await loadDataFromBackend();
+      _error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Populates standard laundromat categories and garment items from the backend defaults.
+  Future<bool> loadDefaultServices({bool overwrite = false}) async {
+    try {
+      await ApiService.loadDefaultServices(overwrite: overwrite);
       await loadDataFromBackend();
       _error = null;
       notifyListeners();

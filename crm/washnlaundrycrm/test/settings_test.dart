@@ -82,6 +82,28 @@ void main() {
       expect(deleteIn('2').onPressed, isNotNull);
     });
 
+    testWidgets('default category displays Default badge and cannot be deleted',
+        (tester) async {
+      setWidth(tester, 1400);
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(creditCategories: const [
+          CreditCategoryModel(id: '1', name: 'Laundry Income', isDefault: true),
+          CreditCategoryModel(id: '2', name: 'Custom Category', isDefault: false),
+        ]);
+      await tester.pumpWidget(host(
+          provider, const SettingsScreen(initialTab: 'credit-categories')));
+      await tester.pump();
+
+      expect(find.text('Default'), findsOneWidget);
+      IconButton deleteIn(String id) => tester.widget<IconButton>(find.descendant(
+          of: find.byKey(ValueKey('credit-category-$id')),
+          matching: find.widgetWithIcon(IconButton, Icons.delete_outline)));
+
+      expect(deleteIn('1').onPressed, isNull);
+      expect(deleteIn('1').tooltip, 'Default category — turn it off instead');
+      expect(deleteIn('2').onPressed, isNotNull);
+    });
+
     testWidgets('initialTab opens straight on Credit categories',
         (tester) async {
       setWidth(tester, 1400);

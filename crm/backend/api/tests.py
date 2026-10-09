@@ -2129,6 +2129,17 @@ class CreditCategoryTests(APITestCase):
         res = self.client.patch(f'/api/credits/{credit.id}/', {'amount': 20, 'category': 'Other'}, format='json')
         self.assertEqual(res.status_code, 200)
 
+    def test_get_credit_categories_auto_seeds_defaults_and_marks_is_default(self):
+        # Create a new shop with no credit categories
+        new_shop = Shop.objects.create(name='Empty Shop', slug='empty-shop')
+        res = self.client.get(f'/api/credit-categories/?shop={new_shop.id}')
+        self.assertEqual(res.status_code, 200)
+        names = [c['name'] for c in res.data]
+        self.assertEqual(names, DEFAULT_CREDIT_CATEGORIES)
+        for c in res.data:
+            self.assertTrue(c['is_default'])
+            self.assertTrue(c['is_active'])
+
 
 class OrderProvenanceTests(APITestCase):
     """The live timeline writes "Created by abhishek kumar" for a counter order

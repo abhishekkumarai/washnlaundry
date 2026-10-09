@@ -110,8 +110,10 @@ def _me_json(customer):
 
 
 def clean_phone(raw):
-    """The phone with spaces/dashes removed if it is strictly 10 digits (starting 6-9, no ISD code), else None."""
+    """The phone with spaces/dashes removed if it is strictly 10 digits (starting 6-9, optional 91 or +91 country code), else None."""
     digits = re.sub(r'\D', '', str(raw or ''))
+    if len(digits) == 12 and digits.startswith('91'):
+        digits = digits[2:]
     return digits if re.fullmatch(r'[6-9]\d{9}', digits) else None
 
 

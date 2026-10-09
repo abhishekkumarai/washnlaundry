@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
+import '../services/api_service.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../utils/money.dart';
@@ -161,10 +162,27 @@ class _ServicesScreenState extends State<ServicesScreen> {
   @override
   Widget build(BuildContext context) {
     _syncFromProvider(context.watch<AppProvider>());
+    final isMobile = MediaQuery.sizeOf(context).width < SidebarNavigation.contentWideBreakpoint;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
+      floatingActionButton: (isMobile && _selectedTopTab == 0 && _categories.isNotEmpty)
+          ? FloatingActionButton.extended(
+              onPressed: () => _showAddItemModal(context),
+              backgroundColor: const Color(0xFF182C4F),
+              elevation: 4,
+              icon: const Icon(Icons.add, color: Colors.white, size: 20),
+              label: const Text(
+                'Add Item',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            )
+          : null,
       body: AppShell(
         body: LayoutBuilder(
           builder: (context, constraints) {
@@ -203,7 +221,19 @@ class _ServicesScreenState extends State<ServicesScreen> {
             style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
           ),
           const Spacer(),
-          if (_selectedTopTab == 0)
+          if (_selectedTopTab == 0) ...[
+            OutlinedButton.icon(
+              onPressed: _showDefaultServicesPreviewModal,
+              icon: const Icon(Icons.auto_awesome_rounded, size: 14, color: Color(0xFF0F766E)),
+              label: const Text('Default Services',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF0F766E)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+            const SizedBox(width: 12),
             Container(
               width: 180,
               height: 36,
@@ -235,6 +265,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 ],
               ),
             ),
+          ],
         ],
       ),
     );
@@ -544,7 +575,12 @@ class _ServicesScreenState extends State<ServicesScreen> {
     );
 
     final itemsGrid = SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.fromLTRB(
+        narrow ? 16 : 24,
+        narrow ? 16 : 24,
+        narrow ? 16 : 24,
+        narrow ? 84 : 24, // Extra bottom padding for mobile floating action button
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -594,7 +630,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
           // tablet widths keep the card grid: a 6-column table has no room
           // to breathe below ~900px, same reasoning as every other screen's
           // table-to-card fallback at contentWideBreakpoint.
-          narrow ? _buildItemsCardGrid(items) : _buildItemsTable(items),
+          narrow ? _buildItemsCardGrid(items, narrow) : _buildItemsTable(items),
         ],
       ),
     );
@@ -620,9 +656,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   /// Card-grid form of the items list — phone/tablet widths, where a table's
   /// fixed columns have no room.
-  Widget _buildItemsCardGrid(List<Map<String, dynamic>> items) {
+  /// On mobile (< 620px), images are hidden to keep cards compact and save space.
+  Widget _buildItemsCardGrid(List<Map<String, dynamic>> items, bool narrow) {
     return LayoutBuilder(
       builder: (context, gridConstraints) {
+        final isMobilePhone = gridConstraints.maxWidth < 620;
         final crossAxisCount = gridConstraints.maxWidth < 380
             ? 1
             : gridConstraints.maxWidth < 620
@@ -630,19 +668,25 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 : gridConstraints.maxWidth < 900
                     ? 3
                     : 4;
+
+        // When mobile (images hidden), we use a wider/flatter aspect ratio to reduce card height
+        final double aspectRatio = isMobilePhone
+            ? (gridConstraints.maxWidth < 380 ? 2.4 : 1.35)
+            : 0.78;
+
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 0.78,
+            crossAxisSpacing: isMobilePhone ? 10 : 16,
+            mainAxisSpacing: isMobilePhone ? 10 : 16,
+            childAspectRatio: aspectRatio,
           ),
-          itemCount: items.length + 1,
+          itemCount: isMobilePhone ? items.length : items.length + 1,
           itemBuilder: (ctx, i) {
             if (i == items.length) return _buildAddNewItemCard();
-            return _buildItemCard(items[i]);
+            return _buildItemCard(items[i], hideImage: isMobilePhone);
           },
         );
       },
@@ -850,21 +894,43 @@ class _ServicesScreenState extends State<ServicesScreen> {
           const Text('Create services to organize your items.',
               style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
           const SizedBox(height: 18),
-          ElevatedButton.icon(
-            onPressed: () => _showAddCategoryModal(context),
-            icon: const Icon(Icons.add, size: 16, color: Colors.white),
-            label: const Text('New service category',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF182C4F),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              elevation: 0,
-            ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            runSpacing: 10,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => _showAddCategoryModal(context),
+                icon: const Icon(Icons.add, size: 16, color: Colors.white),
+                label: const Text('New service category',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF182C4F),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: _showDefaultServicesPreviewModal,
+                icon: const Icon(Icons.auto_awesome_rounded, size: 16, color: Color(0xFF0F766E)),
+                label: const Text('Load Standard Laundromat Services',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F766E))),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF0F766E)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1031,7 +1097,152 @@ class _ServicesScreenState extends State<ServicesScreen> {
         ),
       );
 
-  Widget _buildItemCard(Map<String, dynamic> item) {
+  Widget _buildItemCard(Map<String, dynamic> item, {bool hideImage = false}) {
+    final active = item['active'] as bool;
+    final fg = active ? const Color(0xFF10B981) : const Color(0xFF94A3B8);
+
+    if (hideImage) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE4E0D8)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item['name'] as String,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF141A24),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.more_vert_rounded,
+                      size: 16, color: Color(0xFF64748B)),
+                  tooltip: 'Options',
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  onSelected: (action) {
+                    if (action == 'edit') {
+                      _showEditItemModal(context, item);
+                    } else if (action == 'delete') {
+                      _showDeleteItemConfirm(context, item);
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined,
+                              size: 15, color: Color(0xFF64748B)),
+                          SizedBox(width: 8),
+                          Text('Edit item',
+                              style: TextStyle(fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline_rounded,
+                              size: 15, color: Color(0xFFDC2626)),
+                          SizedBox(width: 8),
+                          Text('Delete item',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFFDC2626))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1EFEA),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    item['unit'] as String,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: active
+                        ? const Color(0xFFECFDF5)
+                        : const Color(0xFFF1EFEA),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.circle, size: 5, color: fg),
+                      const SizedBox(width: 3),
+                      Text(
+                        active ? 'Active' : 'Off',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: fg,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Text(
+                  '${Money.symbol}${(item['price'] as double).toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF141A24),
+                  ),
+                ),
+                Text(
+                  ' / ${item['unitShort']}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1068,7 +1279,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   top: 8,
                   right: 8,
                   child: Builder(builder: (_) {
-                    final active = item['active'] as bool;
                     final fg = active
                         ? const Color(0xFF10B981)
                         : const Color(0xFF94A3B8);
@@ -2883,4 +3093,206 @@ class _ServicesScreenState extends State<ServicesScreen> {
           ],
         ),
       );
+
+  // ─── Default Laundromat Services Preview & Loading Modal ───────────
+
+  void _showDefaultServicesPreviewModal() {
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return FutureBuilder<List<Map<String, dynamic>>>(
+            future: ApiService.fetchDefaultServices(),
+            builder: (ctx, snapshot) {
+              final loading = snapshot.connectionState == ConnectionState.waiting;
+              final catalogue = snapshot.data ?? [];
+              final hasError = snapshot.hasError;
+
+              return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0F2FE),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.auto_awesome_rounded,
+                          size: 20, color: Color(0xFF0284C7)),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Standard Laundromat Services',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF141A24))),
+                          Text('Built-in laundromat price card & garment catalogue',
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF64748B))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                content: SizedBox(
+                  width: 580,
+                  height: 440,
+                  child: loading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Color(0xFF182C4F)),
+                        )
+                      : hasError
+                          ? Center(
+                              child: Text('Failed to load standard services: ${snapshot.error}',
+                                  style: const TextStyle(color: Color(0xFFDC2626))),
+                            )
+                          : ListView.separated(
+                              itemCount: catalogue.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 12),
+                              itemBuilder: (ctx, i) {
+                                final cat = catalogue[i];
+                                final items = (cat['items'] as List?) ?? [];
+                                final iconKey = cat['icon'] as String? ?? 'Shirt';
+                                final style = _categoryStyles[iconKey] ?? _fallbackStyle;
+
+                                return Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8F7F5),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: const Color(0xFFE4E0D8)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: style['bg'] as Color,
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Icon(style['icon'] as IconData,
+                                                size: 16, color: style['color'] as Color),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(
+                                              cat['name'] as String? ?? '',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                  color: Color(0xFF141A24)),
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(
+                                                  color: const Color(0xFFE4E0D8)),
+                                            ),
+                                            child: Text(
+                                              '${items.length} items',
+                                              style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Color(0xFF64748B)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 6,
+                                        children: items.take(8).map((it) {
+                                          final name = it['name'] ?? '';
+                                          final price = it['price'] ?? 0;
+                                          final unit = it['unit_label'] ?? it['unit'] ?? '';
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(
+                                                  color: const Color(0xFFE2E8F0)),
+                                            ),
+                                            child: Text(
+                                              '$name (${Money.format(price)} $unit)',
+                                              style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: Color(0xFF334155)),
+                                            ),
+                                          );
+                                        }).toList()
+                                          ..addAll(items.length > 8
+                                              ? [
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                        horizontal: 8, vertical: 4),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Text(
+                                                      '+${items.length - 8} more',
+                                                      style: const TextStyle(
+                                                          fontSize: 11,
+                                                          color: Color(0xFF94A3B8)),
+                                                    ),
+                                                  )
+                                                ]
+                                              : []),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Close',
+                        style: TextStyle(color: Color(0xFF64748B))),
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F766E),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.download_rounded, size: 16, color: Colors.white),
+                    label: const Text('Import Defaults to Shop',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      final provider = context.read<AppProvider>();
+                      final ok = await provider.loadDefaultServices();
+                      if (ok) {
+                        _showSuccess('Standard laundromat services loaded successfully!');
+                      } else {
+                        _showError(provider.error ?? 'Failed to load default services');
+                      }
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 }

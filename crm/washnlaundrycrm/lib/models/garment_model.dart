@@ -336,12 +336,16 @@ class CreditCategoryModel {
   /// off, not deleted — the backend refuses with a 400.
   final int creditCount;
 
+  /// Whether this is one of the system's hardcoded default categories.
+  final bool isDefault;
+
   const CreditCategoryModel({
     required this.id,
     required this.name,
     this.displayOrder = 0,
     this.isActive = true,
     this.creditCount = 0,
+    this.isDefault = false,
   });
 
   factory CreditCategoryModel.fromJson(Map<String, dynamic> json) =>
@@ -351,6 +355,7 @@ class CreditCategoryModel {
         displayOrder: (json['display_order'] ?? 0) as int,
         isActive: json['is_active'] ?? true,
         creditCount: (json['credit_count'] ?? 0) as int,
+        isDefault: (json['is_default'] ?? false) as bool,
       );
 }
 

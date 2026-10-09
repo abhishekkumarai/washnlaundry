@@ -399,6 +399,18 @@ class ApiService {
     return _asList(data).map(GarmentCategoryModel.fromJson).toList();
   }
 
+  static Future<List<Map<String, dynamic>>> fetchDefaultServices() async {
+    final data = await _send('GET', '/categories/default-services/');
+    return _asList(data).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  static Future<Map<String, dynamic>> loadDefaultServices({bool overwrite = false}) async {
+    final data = await _send('POST', '/categories/load-defaults/', body: {
+      'overwrite': overwrite,
+    });
+    return Map<String, dynamic>.from(data as Map);
+  }
+
   static Future<GarmentItemModel> saveGarmentItem(
     Map<String, dynamic> payload, {
     String? id,
