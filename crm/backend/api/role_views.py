@@ -20,6 +20,31 @@ def me(request):
     """
     user: Principal = request.user
     data = {'role': user.role, 'email': user.email}
+
+    # Include active shop and accessible shops for multitenant frontend context
+    shop = getattr(request, 'shop', None) or getattr(user, 'shop', None)
+    if shop:
+        data['shop'] = {
+            'id': shop.id,
+            'name': shop.name,
+            'slug': shop.slug,
+            'currency_symbol': shop.currency_symbol,
+        }
+
+    django_user = getattr(user, 'user', None)
+    if django_user and hasattr(django_user, 'shop_memberships'):
+        memberships = django_user.shop_memberships.filter(is_active=True).select_related('shop')
+        data['shops'] = [
+            {
+                'id': m.shop.id,
+                'name': m.shop.name,
+                'slug': m.shop.slug,
+                'role': m.role,
+                'is_default': m.is_default,
+            }
+            for m in memberships
+        ]
+
     if user.role == CUSTOMER:
         c = user.customer
         data['customer'] = {
