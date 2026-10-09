@@ -281,7 +281,7 @@ class GoogleTokenAuthentication(BaseAuthentication):
 
 
 class IsStaff(BasePermission):
-    """Day-to-day CRM access for owner and staff. Open when enforcement is off."""
+    """Staff access: orders, customers, items. Owner also allowed via hierarchy."""
 
     def has_permission(self, request, view):
         if not settings.API_AUTH_ENFORCED:
@@ -289,11 +289,7 @@ class IsStaff(BasePermission):
         user = request.user
         if not isinstance(user, Principal):
             return False
-        return (
-            user.role in (OWNER, STAFF, CUSTOMER)
-            or user.in_group('Staff')
-            or user.in_group('Owner')
-        )
+        return user.has_role(STAFF) or user.in_group('Staff')
 
 
 class IsOwner(BasePermission):
@@ -305,10 +301,7 @@ class IsOwner(BasePermission):
         user = request.user
         if not isinstance(user, Principal):
             return False
-        if user.role == OWNER or user.in_group('Owner'):
-            return True
-        # Customers are let in too for now (same CRM view as the owner).
-        return user.role == CUSTOMER
+        return user.role == OWNER or user.in_group('Owner')
 
 
 class IsOwnerOrStaffReadOnly(BasePermission):
@@ -320,13 +313,27 @@ class IsOwnerOrStaffReadOnly(BasePermission):
         user = request.user
         if not isinstance(user, Principal):
             return False
-        if user.role in (OWNER, CUSTOMER) or user.in_group('Owner'):
+        if user.role == OWNER or user.in_group('Owner'):
             return True
-        return (user.role == STAFF or user.in_group('Staff')) and request.method in SAFE_METHODS
+        if user.has_role(STAFF) or user.in_group('Staff'):
+            return request.method in SAFE_METHODS
+        return False
+
+
+class IsCustomer(BasePermission):
+    """Customer self-service access: Customer, Staff, and Owner."""
+
+    def has_permission(self, request, view):
+        if not settings.API_AUTH_ENFORCED:
+            return True
+        user = request.user
+        if not isinstance(user, Principal):
+            return False
+        return user.has_role(CUSTOMER) or user.in_group('Customers')
 
 
 class IsSignedIn(BasePermission):
-    """Any verified Google caller, whatever their role."""
+    """Any verified caller, whatever their role."""
 
     def has_permission(self, request, view):
         return isinstance(request.user, Principal)
