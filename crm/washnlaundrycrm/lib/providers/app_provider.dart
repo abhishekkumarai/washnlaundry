@@ -21,6 +21,7 @@ class AppProvider extends ChangeNotifier {
     13: '/settings',
     15: '/credits',
     16: '/chat',
+    17: '/social',
   };
 
   static int navIndexForPath(String path) {
@@ -73,6 +74,12 @@ class AppProvider extends ChangeNotifier {
       case 'assistant':
       case 'support':
         return 16;
+      case 'social':
+      case 'meta':
+      case 'social-suite':
+      case 'instagram':
+      case 'facebook':
+        return 17;
       case 'dashboard':
       case '':
       default:

@@ -30,6 +30,7 @@ class RoleViews {
     'reports': '/reports',
     'scan': '/scan',
     'settings': '/settings',
+    'social suite': '/social',
   };
 
   /// `--dart-define=FORCE_CUSTOMER_HOST=true` makes a local run behave like

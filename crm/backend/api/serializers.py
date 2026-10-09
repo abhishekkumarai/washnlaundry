@@ -6,7 +6,7 @@ from rest_framework import serializers
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem, OrderAuditLog,
     OrderStatus, Expense, Credit, CreditCategory, Staff, Attendance, SalaryPayment, SalaryAdvance,
-    ServiceArea, TimeSlot,
+    ServiceArea, TimeSlot, MetaSettings, MetaPost, MetaMessage, MetaLead,
 )
 
 
@@ -272,3 +272,36 @@ class TimeSlotSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimeSlot
         fields = '__all__'
+
+
+# ── Meta & Social Suite Serializers ──────────────────────────────────────────
+
+class MetaSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MetaSettings
+        fields = [
+            'id', 'shop', 'page_access_token', 'app_id', 'app_secret',
+            'facebook_page_id', 'facebook_page_name', 'instagram_account_id',
+            'instagram_username', 'auto_reply_enabled', 'is_connected', 'updated_at'
+        ]
+
+
+class MetaPostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MetaPost
+        fields = '__all__'
+
+
+class MetaMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MetaMessage
+        fields = '__all__'
+
+
+class MetaLeadSerializer(serializers.ModelSerializer):
+    converted_order_number = serializers.CharField(source='converted_order.order_number', read_only=True)
+
+    class Meta:
+        model = MetaLead
+        fields = '__all__'
+

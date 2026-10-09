@@ -742,5 +742,86 @@ class ApiService {
       }
     }
   }
+
+  // ── Meta & Social Suite ──────────────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> fetchMetaSettings() async {
+    final res = await _send('GET', '/meta-settings/');
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> updateMetaSettings(Map<String, dynamic> data) async {
+    final settings = await fetchMetaSettings();
+    final id = settings['id'];
+    if (id != null) {
+      final res = await _send('PATCH', '/meta-settings/$id/', body: data);
+      return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+    }
+    final res = await _send('POST', '/meta-settings/', body: data);
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> verifyMetaSettings() async {
+    final res = await _send('POST', '/meta-settings/verify/', body: {});
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
+
+  static Future<List<dynamic>> fetchMetaPosts() async {
+    final res = await _send('GET', '/meta-posts/');
+    return res is List ? res : [];
+  }
+
+  static Future<Map<String, dynamic>> createMetaPost(Map<String, dynamic> data) async {
+    final res = await _send('POST', '/meta-posts/', body: data);
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> publishMetaPost(int postId) async {
+    final res = await _send('POST', '/meta-posts/$postId/publish/', body: {});
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
+
+  static Future<List<dynamic>> fetchMetaConversations() async {
+    final res = await _send('GET', '/meta-messages/conversations/');
+    return res is List ? res : [];
+  }
+
+  static Future<List<dynamic>> fetchMetaMessages(String conversationId) async {
+    final res = await _send('GET', '/meta-messages/', query: {'conversation_id': conversationId});
+    return res is List ? res : [];
+  }
+
+  static Future<Map<String, dynamic>> sendMetaReply({
+    required String conversationId,
+    required String text,
+    String platform = 'INSTAGRAM',
+    String senderName = 'Customer',
+    bool useAi = false,
+  }) async {
+    final res = await _send('POST', '/meta-messages/reply/', body: {
+      'conversation_id': conversationId,
+      'text': text,
+      'platform': platform,
+      'sender_name': senderName,
+      'use_ai': useAi,
+    });
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
+
+  static Future<List<dynamic>> fetchMetaLeads() async {
+    final res = await _send('GET', '/meta-leads/');
+    return res is List ? res : [];
+  }
+
+  static Future<Map<String, dynamic>> convertMetaLead(int leadId) async {
+    final res = await _send('POST', '/meta-leads/$leadId/convert/', body: {});
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> fetchMetaSocialAnalytics() async {
+    final res = await _send('GET', '/meta-social/analytics/');
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
 }
+
 
