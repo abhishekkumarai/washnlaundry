@@ -505,13 +505,28 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
 
     void openProfile() => context.go('/profile');
 
-    final avatar = CircleAvatar(
-      radius: 18,
-      backgroundColor: const Color(0xFFEFF6FF),
-      child: Text(
-        initialsFor(avatarSource),
-        style: const TextStyle(
-            fontSize: 11, fontWeight: FontWeight.bold, color: _brandBlue),
+    final avatarText = initialsFor(avatarSource);
+    final avatarTooltip = avatarSource.isNotEmpty
+        ? avatarSource
+        : (subtitle.isNotEmpty ? subtitle : title);
+
+    final avatar = Tooltip(
+      message: avatarTooltip,
+      waitDuration: const Duration(milliseconds: 300),
+      child: CircleAvatar(
+        radius: 18,
+        backgroundColor: const Color(0xFFEFF6FF),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              avatarText,
+              style: const TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.bold, color: _brandBlue),
+            ),
+          ),
+        ),
       ),
     );
 

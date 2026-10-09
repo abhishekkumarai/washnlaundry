@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/panel_card.dart';
 
 /// The page behind the avatar at the bottom of the sidebar.
 ///
@@ -136,22 +137,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
   Widget _avatarHeader(String name, String email) {
-    final initials = name.trim().isEmpty
-        ? '?'
-        : name
-            .trim()
-            .split(RegExp(r'\s+'))
-            .take(2)
-            .map((w) => w[0].toUpperCase())
-            .join();
+    final avatarText = initialsFor(name);
     return Row(
       children: [
         CircleAvatar(
           radius: 28,
           backgroundColor: const Color(0xFFEFF6FF),
-          child: Text(initials,
-              style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.bold, color: _brand)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(avatarText,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold, color: _brand)),
+            ),
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
