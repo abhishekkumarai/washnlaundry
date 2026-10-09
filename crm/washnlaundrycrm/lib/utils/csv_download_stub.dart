@@ -4,3 +4,4 @@
 /// false so callers can show a "not available" message instead of silently
 /// doing nothing.
 bool downloadCsv(String filename, String csvContent) => false;
+bool downloadString(String filename, String content, {String mimeType = 'text/plain;charset=utf-8;'}) => false;

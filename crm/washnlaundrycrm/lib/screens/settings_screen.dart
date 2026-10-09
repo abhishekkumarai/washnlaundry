@@ -4,6 +4,7 @@ import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/credit_categories_panel.dart';
+import '../widgets/services_import_export_panel.dart';
 import '../widgets/sidebar_navigation.dart';
 
 /// One entry in Settings' vertical tab list.
@@ -32,11 +33,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   static const businessProfile = 'business-profile';
   static const creditCategories = 'credit-categories';
+  static const servicesExportImport = 'services-import-export';
 
-  /// Only [businessProfile] and [creditCategories] are built; the rest are
-  /// listed for parity with the real app and show a "Not available yet" panel.
+  /// Only [businessProfile], [creditCategories], and [servicesExportImport] are built;
+  /// the rest are listed for parity with the real app and show a "Not available yet" panel.
   static const _mainTabs = [
     _SettingsTab(businessProfile, Icons.storefront_outlined, 'Business profile'),
+    _SettingsTab(servicesExportImport, Icons.swap_vert_rounded, 'Services export/import'),
     _SettingsTab('tax-currency', Icons.attach_money_rounded, 'Tax & currency'),
     _SettingsTab('bank-details', Icons.account_balance_outlined, 'Bank details'),
     _SettingsTab('operations', Icons.tune_rounded, 'Operations'),
@@ -365,6 +368,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     switch (_selectedTab) {
       case businessProfile:
         child = _businessProfileForm();
+        break;
+      case servicesExportImport:
+        child = const ServicesImportExportPanel();
         break;
       case creditCategories:
         child = const CreditCategoriesPanel();

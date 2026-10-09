@@ -432,6 +432,12 @@ class ApiService {
   static Future<Map<String, dynamic>> _sendMultipart(
       http.MultipartRequest request) async {
     try {
+      final token = await tokenProvider?.call();
+      final tenantId = tenantIdProvider?.call();
+      if (token != null) request.headers['Authorization'] = 'Bearer $token';
+      if (tenantId != null && tenantId.isNotEmpty) {
+        request.headers['X-Tenant-ID'] = tenantId;
+      }
       final streamed = await request.send().timeout(_timeout);
       final response = await http.Response.fromStream(streamed);
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -801,7 +807,8 @@ class ApiService {
     required String conversationId,
     required String text,
     String platform = 'INSTAGRAM',
-    String senderName = 'Customer',
+    String senderName = 'Staff Support',
+    String senderType = 'STAFF',
     bool useAi = false,
   }) async {
     final res = await _send('POST', '/meta-messages/reply/', body: {
@@ -809,6 +816,7 @@ class ApiService {
       'text': text,
       'platform': platform,
       'sender_name': senderName,
+      'sender_type': senderType,
       'use_ai': useAi,
     });
     return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
@@ -829,6 +837,11 @@ class ApiService {
     return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
   }
 
+  static Future<Map<String, dynamic>> syncMetaSocial() async {
+    final res = await _send('POST', '/meta-social/sync/', body: {});
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
+
   // ── Tenant Shop Provisioning & List ────────────────────────────────────────
 
   static Future<List<Map<String, dynamic>>> fetchShops() async {
@@ -842,6 +855,68 @@ class ApiService {
   static Future<Map<String, dynamic>> provisionShop(Map<String, dynamic> data) async {
     final res = await _send('POST', '/shops/provision/', body: data);
     return Map<String, dynamic>.from(res as Map);
+  }
+
+  // ── Services Import & Export (KAN-138 / KAN-144) ──────────────────────────
+
+  /// Fetches services export as raw CSV text string.
+  static Future<String> exportServicesCsv({List<int>? categoryIds}) async {
+    final query = <String, String>{
+      'format': 'csv',
+      if (categoryIds != null && categoryIds.isNotEmpty)
+        'category': categoryIds.join(','),
+    };
+    final uri = _uri('/categories/export/', query);
+    final token = await tokenProvider?.call();
+    final tenantId = tenantIdProvider?.call();
+    final headers = <String, String>{
+      if (token != null) 'Authorization': 'Bearer $token',
+      if (tenantId != null && tenantId.isNotEmpty) 'X-Tenant-ID': tenantId,
+    };
+    final response = await http.get(uri, headers: headers).timeout(_timeout);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.body;
+    }
+    throw ApiException(
+      describeError(response.body, '/categories/export/'),
+      statusCode: response.statusCode,
+    );
+  }
+
+  /// Fetches services export as structured JSON catalog.
+  static Future<dynamic> exportServicesJson({List<int>? categoryIds}) async {
+    final query = <String, String>{
+      'format': 'json',
+      if (categoryIds != null && categoryIds.isNotEmpty)
+        'category': categoryIds.join(','),
+    };
+    return _send('GET', '/categories/export/', query: query);
+  }
+
+  /// Uploads CSV/XLSX to preview column headers, sample rows, and suggested mappings.
+  static Future<Map<String, dynamic>> importServicesPreview(
+      Uint8List bytes, String filename) async {
+    final request =
+        http.MultipartRequest('POST', _uri('/categories/import/preview/'))
+          ..files
+              .add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    return _sendMultipart(request);
+  }
+
+  /// Commits services import with selected field mapping and duplicate handling.
+  static Future<Map<String, dynamic>> importServicesCommit(
+    Uint8List bytes,
+    String filename,
+    Map<String, String> mapping, {
+    bool overwriteDuplicates = true,
+  }) async {
+    final request =
+        http.MultipartRequest('POST', _uri('/categories/import/commit/'))
+          ..fields['mapping'] = json.encode(mapping)
+          ..fields['overwrite_duplicates'] = overwriteDuplicates.toString()
+          ..files
+              .add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    return _sendMultipart(request);
   }
 }
 
