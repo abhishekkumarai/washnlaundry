@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
@@ -180,11 +181,18 @@ class AppProvider extends ChangeNotifier {
 
   void setActiveTenant(String? tenantId) {
     _activeTenantId = tenantId;
+    if (tenantId != null) {
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString('active_tenant_id', tenantId);
+      });
+    }
     notifyListeners();
   }
 
   Future<void> switchShop(String tenantSlugOrId) async {
     _activeTenantId = tenantSlugOrId;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('active_tenant_id', tenantSlugOrId);
     notifyListeners();
     await loadDataFromBackend();
   }

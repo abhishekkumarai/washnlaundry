@@ -488,7 +488,20 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     final subtitle = isCustomer
         ? (auth?.userEmail ?? 'Customer')
         : (ownerName.isEmpty ? 'Admin' : ownerName);
-    final avatarSource = isCustomer ? title : (ownerName.isEmpty ? shopName : ownerName);
+    // Derive username from email (the part before '@')
+    final userEmail = auth?.userEmail?.trim() ?? '';
+    final usernameFromEmail = userEmail.contains('@')
+        ? userEmail.split('@').first.trim()
+        : userEmail;
+    final displayName = usernameFromEmail.isNotEmpty
+        ? usernameFromEmail
+        : (auth?.userName?.trim().isNotEmpty == true
+            ? auth!.userName!.trim()
+            : (ownerName.isNotEmpty ? ownerName : shopName));
+
+    final avatarSource = isCustomer
+        ? (title.isNotEmpty ? title : displayName)
+        : (displayName.isNotEmpty ? displayName : (shopName.isNotEmpty ? shopName : 'Owner'));
 
     void openProfile() => context.go('/profile');
 

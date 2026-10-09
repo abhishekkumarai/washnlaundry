@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
+import '../providers/auth_provider.dart';
 import '../utils/navigation.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/dashboard_side_panels.dart';
@@ -12,6 +13,7 @@ import '../widgets/panel_card.dart';
 import '../widgets/recent_activity_card.dart';
 import '../widgets/revenue_analytics_card.dart';
 import '../widgets/revenue_chart_card.dart';
+import '../widgets/shop_onboarding_dialog.dart';
 import '../widgets/store_health_card.dart';
 import '../widgets/top_header.dart';
 
@@ -30,11 +32,26 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _showScrollToTop = false;
+  bool _dialogShown = false;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkFirstTimeOnboarding());
+  }
+
+  void _checkFirstTimeOnboarding() {
+    if (!mounted || _dialogShown) return;
+    final auth = context.read<AuthProvider>();
+    if (auth.needsShopOnboarding) {
+      _dialogShown = true;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const ShopOnboardingDialog(),
+      );
+    }
   }
 
   @override

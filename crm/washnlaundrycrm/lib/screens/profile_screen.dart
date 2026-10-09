@@ -335,9 +335,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _accountCard(AuthProvider auth) {
     final shop = context.watch<AppProvider>().shop;
     final shopName = (shop?['name'] as String?)?.trim() ?? '';
+    final userEmail = auth.userEmail?.trim() ?? '';
+    final usernameFromEmail = userEmail.contains('@')
+        ? userEmail.split('@').first.trim()
+        : userEmail;
     final ownerName = (shop?['owner_name'] as String?)?.trim() ?? '';
-    final name =
-        ownerName.isNotEmpty ? ownerName : (auth.userName ?? 'Account');
+    final name = usernameFromEmail.isNotEmpty
+        ? usernameFromEmail
+        : (auth.userName?.trim().isNotEmpty == true
+            ? auth.userName!.trim()
+            : (ownerName.isNotEmpty ? ownerName : 'Account'));
     final role = switch (auth.role) {
       'owner' => 'Owner',
       'staff' => 'Staff',

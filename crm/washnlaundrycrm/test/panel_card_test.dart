@@ -105,5 +105,12 @@ void main() {
       expect(initialsFor('Ramesh Kumar'), 'RK');
       expect(initialsFor('  Ramesh   Kumar  '), 'RK');
     });
+
+    test('extracts clean initials from email-derived username prefixes', () {
+      expect(initialsFor('demo'), 'DE');
+      expect(initialsFor('admin'), 'AD');
+      expect(initialsFor('staff'), 'ST');
+      expect(initialsFor('john_doe'), 'JO');
+    });
   });
 }

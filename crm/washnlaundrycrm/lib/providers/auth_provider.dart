@@ -45,6 +45,7 @@ class AuthProvider extends ChangeNotifier {
   String? get role => _role;
   Map<String, dynamic>? _me;
   Map<String, dynamic>? get me => _me;
+  bool get needsShopOnboarding => _me?['needs_shop_onboarding'] == true;
   bool _roleLoading = false;
   bool get roleLoading => _roleLoading;
   String? _roleError;

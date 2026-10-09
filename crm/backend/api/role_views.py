@@ -45,6 +45,14 @@ def me(request):
             for m in memberships
         ]
 
+    # First-time owner onboarding check:
+    # If the user is an owner and has 0 active owned shop memberships, onboarding is mandatory.
+    if user.role == 'owner':
+        owned_count = 0
+        if django_user and hasattr(django_user, 'shop_memberships'):
+            owned_count = django_user.shop_memberships.filter(is_active=True, role='OWNER').count()
+        data['needs_shop_onboarding'] = (owned_count == 0)
+
     if user.role == CUSTOMER:
         c = user.customer
         data['customer'] = {
