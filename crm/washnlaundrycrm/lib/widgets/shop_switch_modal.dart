@@ -14,9 +14,13 @@ import 'sidebar_navigation.dart';
 void showShopSwitchModalSheet(BuildContext context, {double? width}) {
   final appProvider = Provider.of<AppProvider>(context, listen: false);
   final authProvider = Provider.of<AuthProvider?>(context, listen: false);
-  final shops = appProvider.availableShops;
+  var shops = appProvider.availableShops;
   final activeSlug = appProvider.activeTenantId ?? appProvider.shop?['slug'] as String?;
   final isOwner = authProvider?.role == 'owner';
+
+  if (shops.isEmpty && appProvider.shop != null) {
+    shops = [appProvider.shop!];
+  }
 
   final mediaQuery = MediaQuery.of(context);
   final screenWidth = mediaQuery.size.width;

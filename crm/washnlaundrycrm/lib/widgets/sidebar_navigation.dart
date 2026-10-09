@@ -520,7 +520,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
         : (subtitle.isNotEmpty ? subtitle : title);
 
     final avatar = Tooltip(
-      message: canSwitchShop ? '$avatarTooltip (Tap to switch branch)' : avatarTooltip,
+      message: isCustomer ? avatarTooltip : '$avatarTooltip (Tap to switch account)',
       waitDuration: const Duration(milliseconds: 300),
       child: CircleAvatar(
         radius: 18,
@@ -550,8 +550,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
               children: [
                 Expanded(
                   child: InkWell(
-                    onTap: openProfile,
-                    onLongPress: canSwitchShop ? switchShop : null,
+                    onTap: isCustomer ? openProfile : switchShop,
                     borderRadius: BorderRadius.circular(10),
                     child: Row(
                       children: [
@@ -581,15 +580,6 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                     ),
                   ),
                 ),
-                if (canSwitchShop)
-                  IconButton(
-                    tooltip: 'Switch Branch (or long-press avatar)',
-                    icon: const Icon(Icons.swap_horiz_rounded,
-                        size: 19, color: Color(0xFF182C4F)),
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    constraints: const BoxConstraints(),
-                    onPressed: switchShop,
-                  ),
                 IconButton(
                   tooltip: 'Sign out',
                   icon: const Icon(Icons.logout_rounded,
@@ -602,23 +592,12 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
             )
           : Column(
               children: [
-                if (canSwitchShop) ...[
-                  IconButton(
-                    tooltip: 'Switch Branch (or long-press avatar)',
-                    icon: const Icon(Icons.storefront_outlined,
-                        size: 18, color: Color(0xFF182C4F)),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: switchShop,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  const SizedBox(height: 6),
-                ],
                 Tooltip(
-                  message: subtitle.isEmpty ? title : '$title · $subtitle',
+                  message: subtitle.isEmpty
+                      ? title
+                      : '$title · $subtitle (Tap to switch account)',
                   child: InkWell(
-                    onTap: openProfile,
-                    onLongPress: canSwitchShop ? switchShop : null,
+                    onTap: isCustomer ? openProfile : switchShop,
                     customBorder: const CircleBorder(),
                     child: avatar,
                   ),
