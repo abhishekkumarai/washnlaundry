@@ -271,11 +271,22 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 8, 12),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
       child: Row(
         children: [
+          if (!widget.inDrawer) ...[
+            IconButton(
+              tooltip: 'Collapse sidebar',
+              iconSize: 20,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () => context.read<AppProvider>().toggleSidebar(),
+              icon: const Icon(Icons.menu_rounded, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(width: 12),
+          ],
           mark,
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Flexible(
             child: FittedBox(
               fit: BoxFit.scaleDown,
@@ -293,15 +304,6 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
               ),
             ),
           ),
-          if (!widget.inDrawer)
-            IconButton(
-              tooltip: 'Collapse sidebar',
-              iconSize: 20,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              onPressed: () => context.read<AppProvider>().toggleSidebar(),
-              icon: const Icon(Icons.menu_rounded, color: Color(0xFF64748B)),
-            ),
         ],
       ),
     );
