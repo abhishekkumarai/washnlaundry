@@ -186,7 +186,10 @@ void main() {
       ));
       await tester.pump();
 
-      await tester.tap(find.byIcon(Icons.edit_outlined).first);
+      // Category header edit action via 3-dots menu
+      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit category'));
       await tester.pumpAndSettle();
 
       expect(find.text('Edit Service'), findsOneWidget);
@@ -214,9 +217,8 @@ void main() {
       await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
       await tester.pump();
 
-      // Index 0 is the category header's own edit pencil ("Edit Service");
-      // index 1 is Shirt's, the first item card.
-      await tester.tap(find.byIcon(Icons.edit_outlined).at(1));
+      // Shirt is the first row in the items table
+      await tester.tap(find.byIcon(Icons.edit_outlined).first);
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
@@ -225,6 +227,30 @@ void main() {
       expect(find.widgetWithText(TextButton, 'Delete'), findsOneWidget);
       expect(find.widgetWithText(TextButton, 'Cancel'), findsOneWidget);
       expect(find.widgetWithText(ElevatedButton, 'Save Changes'), findsOneWidget);
+    });
+
+    testWidgets('redundant edit icon is removed from category header and item cards (KAN-154)',
+        (tester) async {
+      await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
+      await tester.pump();
+
+      // Category header has no standalone edit icon tooltip, only 3-dots menu
+      expect(find.byTooltip('Edit Category'), findsNothing);
+      expect(find.byTooltip('More actions'), findsOneWidget);
+
+      // Verify item card in grid view has only 3-dots menu and no redundant edit button
+      tester.view.physicalSize = const Size(800, 1200);
+      await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.more_vert_rounded), findsWidgets);
+      // Tap 3-dots menu on first item card and verify Edit item is available
+      await tester.tap(find.byIcon(Icons.more_vert_rounded).at(1));
+      await tester.pumpAndSettle();
+      expect(find.text('Edit item'), findsOneWidget);
+      await tester.tap(find.text('Edit item'));
+      await tester.pumpAndSettle();
+      expect(find.text('Edit Service / Item'), findsOneWidget);
     });
   });
 

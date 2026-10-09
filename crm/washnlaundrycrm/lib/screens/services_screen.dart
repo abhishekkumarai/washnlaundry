@@ -1005,21 +1005,12 @@ class _ServicesScreenState extends State<ServicesScreen> {
       ],
     );
 
-    final actions = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.edit_outlined,
-              size: 18, color: Color(0xFF64748B)),
-          tooltip: 'Edit Category',
-          onPressed: () => _showEditCategoryModal(context, cat),
-        ),
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert_rounded,
-              size: 18, color: Color(0xFF64748B)),
-          tooltip: 'More actions',
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    final actions = PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert_rounded,
+          size: 18, color: Color(0xFF64748B)),
+      tooltip: 'More actions',
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           onSelected: (action) {
             if (action == 'edit') {
               _showEditCategoryModal(context, cat);
@@ -1053,9 +1044,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
               ),
             ),
           ],
-        ),
-      ],
-    );
+        );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -1305,34 +1294,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
                     );
                   }),
                 ),
-                // Edit & 3-dots button bottom-right
+                // 3-dots options button bottom-right
                 Positioned(
                   bottom: 8,
                   right: 8,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      InkWell(
-      borderRadius: BorderRadius.circular(8),
-                        onTap: () => _showEditItemModal(context, item),
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(6),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 4),
-                            ],
-                          ),
-                          child: const Icon(Icons.edit_outlined,
-                              size: 14, color: Color(0xFF64748B)),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Container(
+                  child: Container(
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
@@ -1388,9 +1354,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                    ),
               ],
             ),
           ),
