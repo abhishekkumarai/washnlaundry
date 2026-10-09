@@ -75,7 +75,7 @@ class CustomerDetailScreen extends StatelessWidget {
                 narrow ? _narrowHeader(context) : _header(context),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
+                    padding: EdgeInsets.all(narrow ? 16 : 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -379,39 +379,47 @@ class CustomerDetailScreen extends StatelessWidget {
   }
 
   Widget _kpiRow(DateTime? lastOrder, double dues) {
-    final cards = [
-      _kpi(
-          'Delivered Dues',
-          '${Money.symbol}${dues.toStringAsFixed(0)}',
-          Icons.receipt_long_rounded,
-          dues > 0 ? const Color(0xFFDC2626) : const Color(0xFF10B981)),
-      _kpi(
-          'Lifetime value',
-          '${Money.symbol}${customer.totalSpent.toStringAsFixed(0)}',
-          Icons.account_balance_wallet_outlined,
-          const Color(0xFF10B981)),
-      _kpi('Total Orders', '${customer.totalOrders}',
-          Icons.shopping_bag_outlined, const Color(0xFF182C4F)),
-      _kpi(
-          'Avg order value',
-          '${Money.symbol}${customer.avgOrderValue.toStringAsFixed(0)}',
-          Icons.trending_up_rounded,
-          const Color(0xFF2563EB)),
-      _kpi('Last order', lastOrder == null ? '—' : relativeTime(lastOrder),
-          Icons.access_time_rounded, const Color(0xFFF59E0B)),
-    ];
-
     return LayoutBuilder(
       builder: (context, constraints) {
-        final perRow = constraints.maxWidth < 640
+        final screenWidth = MediaQuery.sizeOf(context).width;
+        final isMobile = constraints.maxWidth < 640 || screenWidth < 640;
+        final perRow = (constraints.maxWidth < 280 && screenWidth < 340)
             ? 1
             : constraints.maxWidth < 950
                 ? 2
                 : constraints.maxWidth < 1250
                     ? 3
                     : 5;
-        const gap = 16.0;
+        final gap = isMobile ? 12.0 : 16.0;
         final width = (constraints.maxWidth - gap * (perRow - 1)) / perRow;
+
+        final cards = [
+          _kpi(
+              'Delivered Dues',
+              '${Money.symbol}${dues.toStringAsFixed(0)}',
+              Icons.receipt_long_rounded,
+              dues > 0 ? const Color(0xFFDC2626) : const Color(0xFF10B981),
+              isCompact: isMobile),
+          _kpi(
+              'Lifetime value',
+              '${Money.symbol}${customer.totalSpent.toStringAsFixed(0)}',
+              Icons.account_balance_wallet_outlined,
+              const Color(0xFF10B981),
+              isCompact: isMobile),
+          _kpi('Total Orders', '${customer.totalOrders}',
+              Icons.shopping_bag_outlined, const Color(0xFF182C4F),
+              isCompact: isMobile),
+          _kpi(
+              'Avg order value',
+              '${Money.symbol}${customer.avgOrderValue.toStringAsFixed(0)}',
+              Icons.trending_up_rounded,
+              const Color(0xFF2563EB),
+              isCompact: isMobile),
+          _kpi('Last order', lastOrder == null ? '—' : relativeTime(lastOrder),
+              Icons.access_time_rounded, const Color(0xFFF59E0B),
+              isCompact: isMobile),
+        ];
+
         return Wrap(
           spacing: gap,
           runSpacing: gap,
@@ -421,9 +429,10 @@ class CustomerDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _kpi(String label, String value, IconData icon, Color color) {
+  Widget _kpi(String label, String value, IconData icon, Color color,
+      {bool isCompact = false}) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isCompact ? 11 : 16),
       decoration: _panel,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -431,32 +440,34 @@ class CustomerDetailScreen extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(7),
+                padding: EdgeInsets.all(isCompact ? 6 : 7),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, size: 16, color: color),
+                child: Icon(icon, size: isCompact ? 15 : 16, color: color),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   label,
                   overflow: TextOverflow.ellipsis,
-                  style:
-                      const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  style: TextStyle(
+                      fontSize: isCompact ? 11 : 12,
+                      color: const Color(0xFF64748B)),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isCompact ? 8 : 12),
           Text(
             value,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                fontSize: 22,
+            style: TextStyle(
+                fontSize: isCompact ? 19 : 22,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF141A24)),
+                letterSpacing: isCompact ? -0.4 : 0,
+                color: const Color(0xFF141A24)),
           ),
         ],
       ),

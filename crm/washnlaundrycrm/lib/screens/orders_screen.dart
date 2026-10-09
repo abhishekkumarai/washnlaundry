@@ -27,6 +27,8 @@ class OrdersScreen extends StatefulWidget {
 
 class _OrdersScreenState extends State<OrdersScreen> {
   String _selectedTab = 'All';
+  int _currentPage = 1;
+  static const int _pageSize = 15;
   OrderDateRange _timeFilter = OrderDateRange.allTime;
 
   /// Set when the user picks "Custom range..." from the date menu. Takes
@@ -220,6 +222,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _body(
       AppProvider provider, List<OrderModel> filteredOrders, bool narrow) {
+    final totalCount = filteredOrders.length;
+    final totalPages = (totalCount / _pageSize).ceil().clamp(1, 99999);
+    final safePage = _currentPage.clamp(1, totalPages);
+    final startIndex = (safePage - 1) * _pageSize;
+    final pagedOrders = totalCount > 0
+        ? filteredOrders.skip(startIndex).take(_pageSize).toList()
+        : <OrderModel>[];
+
     return Column(
       children: [
         narrow
@@ -261,8 +271,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           : const Color(0xFFE4E0D8)),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20)),
-                  onSelected: (_) =>
-                      setState(() => _selectedTab = tab['label']!),
+                  onSelected: (_) => setState(() {
+                    _selectedTab = tab['label']!;
+                    _currentPage = 1;
+                  }),
                 );
               },
             ),
@@ -397,12 +409,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             padding: narrow
                                 ? const EdgeInsets.only(top: 12, bottom: 4)
                                 : EdgeInsets.zero,
-                            itemCount: filteredOrders.length,
+                            itemCount: pagedOrders.length,
                             separatorBuilder: (_, __) => narrow
                                 ? const SizedBox(height: 12)
                                 : const Divider(height: 1),
                             itemBuilder: (context, idx) {
-                              final order = filteredOrders[idx];
+                              final order = pagedOrders[idx];
                               final isCustomer = provider.role == 'customer';
                               if (narrow) return _orderCard(order, isCustomer: isCustomer);
                               final targetPath = isCustomer
@@ -422,24 +434,69 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
                   // Table Footer
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: narrow ? 12 : 20, vertical: 12),
                     decoration: const BoxDecoration(
                       border: Border(top: BorderSide(color: Color(0xFFE4E0D8))),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          filteredOrders.length == provider.orders.length
-                              ? 'Showing ${filteredOrders.length}'
-                              : 'Showing ${filteredOrders.length} of ${provider.orders.length}',
-                          style: const TextStyle(
-                              fontSize: 11, color: Color(0xFF94A3B8)),
+                        Flexible(
+                          child: Text(
+                            totalCount == 0
+                                ? 'Showing 0 orders'
+                                : 'Showing ${startIndex + 1}–${math.min(startIndex + pagedOrders.length, totalCount)} of $totalCount',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 11, color: Color(0xFF94A3B8)),
+                          ),
                         ),
-                        const Text('No more orders',
-                            style: TextStyle(
-                                fontSize: 11, color: Color(0xFF94A3B8))),
+                        if (totalPages > 1)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.chevron_left_rounded),
+                                iconSize: 20,
+                                splashRadius: 18,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                    minWidth: 32, minHeight: 32),
+                                onPressed: safePage > 1
+                                    ? () => setState(
+                                        () => _currentPage = safePage - 1)
+                                    : null,
+                              ),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 6),
+                                child: Text(
+                                  'Page $safePage of $totalPages',
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF141A24)),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.chevron_right_rounded),
+                                iconSize: 20,
+                                splashRadius: 18,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                    minWidth: 32, minHeight: 32),
+                                onPressed: safePage < totalPages
+                                    ? () => setState(
+                                        () => _currentPage = safePage + 1)
+                                    : null,
+                              ),
+                            ],
+                          )
+                        else
+                          const Text('Page 1 of 1',
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF94A3B8))),
                       ],
                     ),
                   ),

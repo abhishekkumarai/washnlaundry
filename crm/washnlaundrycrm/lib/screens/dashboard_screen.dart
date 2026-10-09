@@ -43,15 +43,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _checkFirstTimeOnboarding() {
     if (!mounted || _dialogShown) return;
-    final auth = context.read<AuthProvider>();
-    if (auth.needsShopOnboarding) {
-      _dialogShown = true;
-      showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (_) => const ShopOnboardingDialog(),
-      );
-    }
+    try {
+      final auth = context.read<AuthProvider?>();
+      if (auth != null && auth.needsShopOnboarding) {
+        _dialogShown = true;
+        showDialog<void>(
+          context: context,
+          barrierDismissible: true,
+          builder: (_) => const ShopOnboardingDialog(),
+        );
+      }
+    } catch (_) {}
   }
 
   @override
@@ -118,7 +120,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             SingleChildScrollView(
               key: const Key('dashboard_scroll_view'),
               controller: _scrollController,
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.all(isWide ? 24 : 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

@@ -21,6 +21,30 @@ class ApiException implements Exception {
       'ApiException${statusCode != null ? ' ($statusCode)' : ''}: $message';
 }
 
+/// Generic container for paginated API responses.
+class PaginatedResult<T> {
+  final int count;
+  final int totalPages;
+  final int currentPage;
+  final int pageSize;
+  final String? next;
+  final String? previous;
+  final List<T> results;
+
+  const PaginatedResult({
+    required this.count,
+    required this.totalPages,
+    required this.currentPage,
+    required this.pageSize,
+    this.next,
+    this.previous,
+    required this.results,
+  });
+
+  bool get hasNext => next != null && currentPage < totalPages;
+  bool get hasPrevious => previous != null && currentPage > 1;
+}
+
 class ApiService {
   /// Override at build time:
   ///   flutter build web --dart-define=API_BASE_URL=https://api.example.com/api
@@ -280,6 +304,41 @@ class ApiService {
     return _asList(data).map(OrderModel.fromJson).toList();
   }
 
+  static Future<PaginatedResult<OrderModel>> fetchOrdersPaged({
+    String? status,
+    String? search,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final data = await _send('GET', '/orders/', query: {
+      'page': '$page',
+      'page_size': '$pageSize',
+      if (status != null && status.isNotEmpty && status != 'ALL')
+        'status': status,
+      if (search != null && search.isNotEmpty) 'search': search,
+    });
+    if (data is Map) {
+      final results = _asList(data).map(OrderModel.fromJson).toList();
+      return PaginatedResult<OrderModel>(
+        count: (data['count'] as num?)?.toInt() ?? results.length,
+        totalPages: (data['total_pages'] as num?)?.toInt() ?? 1,
+        currentPage: (data['current_page'] as num?)?.toInt() ?? page,
+        pageSize: (data['page_size'] as num?)?.toInt() ?? pageSize,
+        next: data['next'] as String?,
+        previous: data['previous'] as String?,
+        results: results,
+      );
+    }
+    final list = _asList(data).map(OrderModel.fromJson).toList();
+    return PaginatedResult<OrderModel>(
+      count: list.length,
+      totalPages: 1,
+      currentPage: 1,
+      pageSize: list.length,
+      results: list,
+    );
+  }
+
   static Future<OrderModel> fetchOrder(String id) async {
     final data = await _send('GET', '/orders/$id/');
     return OrderModel.fromJson((data as Map).cast<String, dynamic>());
@@ -380,6 +439,38 @@ class ApiService {
     return _asList(data).map(CustomerModel.fromJson).toList();
   }
 
+  static Future<PaginatedResult<CustomerModel>> fetchCustomersPaged({
+    String? search,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final data = await _send('GET', '/customers/', query: {
+      'page': '$page',
+      'page_size': '$pageSize',
+      if (search != null && search.isNotEmpty) 'search': search,
+    });
+    if (data is Map) {
+      final results = _asList(data).map(CustomerModel.fromJson).toList();
+      return PaginatedResult<CustomerModel>(
+        count: (data['count'] as num?)?.toInt() ?? results.length,
+        totalPages: (data['total_pages'] as num?)?.toInt() ?? 1,
+        currentPage: (data['current_page'] as num?)?.toInt() ?? page,
+        pageSize: (data['page_size'] as num?)?.toInt() ?? pageSize,
+        next: data['next'] as String?,
+        previous: data['previous'] as String?,
+        results: results,
+      );
+    }
+    final list = _asList(data).map(CustomerModel.fromJson).toList();
+    return PaginatedResult<CustomerModel>(
+      count: list.length,
+      totalPages: 1,
+      currentPage: 1,
+      pageSize: list.length,
+      results: list,
+    );
+  }
+
   static Future<CustomerModel> createCustomer(
       Map<String, dynamic> payload) async {
     final data = await _send('POST', '/customers/', body: payload);
@@ -460,6 +551,36 @@ class ApiService {
   static Future<List<StaffModel>> fetchStaff() async {
     final data = await _send('GET', '/staff/');
     return _asList(data).map(StaffModel.fromJson).toList();
+  }
+
+  static Future<PaginatedResult<StaffModel>> fetchStaffPaged({
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final data = await _send('GET', '/staff/', query: {
+      'page': '$page',
+      'page_size': '$pageSize',
+    });
+    if (data is Map) {
+      final results = _asList(data).map(StaffModel.fromJson).toList();
+      return PaginatedResult<StaffModel>(
+        count: (data['count'] as num?)?.toInt() ?? results.length,
+        totalPages: (data['total_pages'] as num?)?.toInt() ?? 1,
+        currentPage: (data['current_page'] as num?)?.toInt() ?? page,
+        pageSize: (data['page_size'] as num?)?.toInt() ?? pageSize,
+        next: data['next'] as String?,
+        previous: data['previous'] as String?,
+        results: results,
+      );
+    }
+    final list = _asList(data).map(StaffModel.fromJson).toList();
+    return PaginatedResult<StaffModel>(
+      count: list.length,
+      totalPages: 1,
+      currentPage: 1,
+      pageSize: list.length,
+      results: list,
+    );
   }
 
   static Future<StaffModel> createStaff(Map<String, dynamic> payload) async {
@@ -852,6 +973,23 @@ class ApiService {
 
   static Future<Map<String, dynamic>> syncMetaSocial() async {
     final res = await _send('POST', '/meta-social/sync/', body: {});
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
+
+  // ── Personal WhatsApp via Neonize ─────────────────────────────────────────
+
+  static Future<Map<String, dynamic>> fetchNeonizeStatus() async {
+    final res = await _send('GET', '/whatsapp/neonize/status/');
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> connectNeonize() async {
+    final res = await _send('POST', '/whatsapp/neonize/connect/', body: {});
+    return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+  }
+
+  static Future<Map<String, dynamic>> disconnectNeonize() async {
+    final res = await _send('POST', '/whatsapp/neonize/disconnect/', body: {});
     return res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
   }
 

@@ -379,7 +379,11 @@ class _CreditsScreenState extends State<CreditsScreen> {
   Widget _summaryRow(double monthTotal, double allTimeTotal, int count) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final stack = constraints.maxWidth < 640;
+        final screenWidth = MediaQuery.sizeOf(context).width;
+        final isMobile = constraints.maxWidth < 640 || screenWidth < 640;
+        final perRow = (constraints.maxWidth < 280 && screenWidth < 340)
+            ? 1
+            : (isMobile ? 2 : 3);
         final cards = [
           _summaryCard(
             'This Month',
@@ -387,6 +391,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
             'In $_monthLabel',
             const Color(0xFF10B981),
             Icons.trending_up_rounded,
+            isCompact: isMobile,
           ),
           _summaryCard(
             'All Time',
@@ -394,6 +399,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
             'Total credits logged',
             const Color(0xFF182C4F),
             Icons.account_balance_wallet_rounded,
+            isCompact: isMobile,
           ),
           _summaryCard(
             'Entries',
@@ -401,26 +407,19 @@ class _CreditsScreenState extends State<CreditsScreen> {
             'Credits in $_monthLabel',
             const Color(0xFFF59E0B),
             Icons.receipt_rounded,
+            isCompact: isMobile,
           ),
         ];
 
-        if (stack) {
-          return Column(
-            children: [
-              for (var i = 0; i < cards.length; i++) ...[
-                if (i > 0) const SizedBox(height: 12),
-                cards[i],
-              ],
-            ],
-          );
-        }
+        const gap = 12.0;
+        final itemWidth = (constraints.maxWidth - gap * (perRow - 1)) / perRow;
 
-        return Row(
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
           children: [
-            for (var i = 0; i < cards.length; i++) ...[
-              if (i > 0) const SizedBox(width: 14),
-              Expanded(child: cards[i]),
-            ],
+            for (final card in cards)
+              SizedBox(width: itemWidth, child: card),
           ],
         );
       },
@@ -432,46 +431,52 @@ class _CreditsScreenState extends State<CreditsScreen> {
     String value,
     String sub,
     Color color,
-    IconData icon,
-  ) {
+    IconData icon, {
+    bool isCompact = false,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(isCompact ? 11 : 18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(isCompact ? 12 : 14),
         border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: isCompact ? 32 : 44,
+            height: isCompact ? 32 : 44,
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(isCompact ? 8 : 10),
             ),
-            child: Icon(icon, color: color, size: 22),
+            child: Icon(icon, color: color, size: isCompact ? 17 : 22),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: isCompact ? 10 : 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF64748B),
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: isCompact ? 10.5 : 11,
+                        color: const Color(0xFF64748B),
                         fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
+                SizedBox(height: isCompact ? 2 : 4),
                 Text(value,
-                    style: const TextStyle(
-                        fontSize: 20,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: isCompact ? 18 : 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF141A24))),
-                const SizedBox(height: 2),
+                        letterSpacing: isCompact ? -0.3 : 0,
+                        color: const Color(0xFF141A24))),
+                SizedBox(height: isCompact ? 1 : 2),
                 Text(sub,
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF94A3B8))),
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: isCompact ? 10 : 11,
+                        color: const Color(0xFF94A3B8))),
               ],
             ),
           ),

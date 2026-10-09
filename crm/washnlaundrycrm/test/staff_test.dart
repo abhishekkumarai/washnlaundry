@@ -27,12 +27,12 @@ void main() {
   });
 
   final roster = [
-    const StaffModel(id: '1', name: 'Ramesh Kumar', role: 'Head Washer', phone: '1'),
+    const StaffModel(id: '1', name: 'Ramesh Kumar', role: 'Head Washer', phone: '9876543210'),
     StaffModel(
       id: '2',
       name: 'Geeta Devi',
       role: 'Dry Cleaning',
-      phone: '2',
+      phone: '9876543211',
       startDate: DateTime(2026, 3, 1),
     ),
   ];
@@ -132,14 +132,14 @@ void main() {
         id: '1',
         name: 'Ramesh Kumar',
         role: 'Head Washer',
-        phone: '1',
+        phone: '9876543210',
         status: 'INACTIVE',
       ),
       const StaffModel(
         id: '2',
         name: 'Geeta Devi',
         role: 'Dry Cleaning',
-        phone: '2',
+        phone: '9876543211',
         status: 'ACTIVE',
       ),
     ];

@@ -575,6 +575,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
   /// Footer under a windowed list: how many are showing, and a button for
   /// the next page.
   Widget _showMoreBar(int shown, int total) {
+    final totalPages = (total / _pageSize).ceil().clamp(1, 99999);
+    final currentPage = (shown / _pageSize).ceil().clamp(1, totalPages);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -587,12 +589,34 @@ class _CustomersScreenState extends State<CustomersScreen> {
         spacing: 12,
         runSpacing: 8,
         children: [
-          Text('Showing $shown of $total',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-          OutlinedButton(
-            onPressed: () => setState(() => _visibleCount += _pageSize),
-            child: Text(
-                'Show ${total - shown < _pageSize ? total - shown : _pageSize} more'),
+          Wrap(
+            spacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text('Showing $shown of $total',
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              if (totalPages > 1)
+                Text('(Page $currentPage of $totalPages)',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (shown < total)
+                OutlinedButton(
+                  onPressed: () => setState(() => _visibleCount += _pageSize),
+                  child: Text(
+                      'Show ${total - shown < _pageSize ? total - shown : _pageSize} more'),
+                ),
+              if (shown > _pageSize) ...[
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () => setState(() => _visibleCount = _pageSize),
+                  child: const Text('Reset page'),
+                ),
+              ],
+            ],
           ),
         ],
       ),

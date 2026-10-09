@@ -20,6 +20,8 @@ from rest_framework.response import Response
 
 from . import customer_import, services_import_export
 from .auth import CUSTOMER, IsOwner, IsOwnerOrStaffReadOnly, normalize_phone
+from .pagination import StandardPagination
+from .tenancy import get_current_tenant
 from .validators import clean_mobile_10_digit
 from .services.rag_service import RagService, RagServiceError
 from .services.email_service import EmailService
@@ -145,6 +147,7 @@ class ShopViewSet(viewsets.ModelViewSet):
 class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all().order_by('-created_at')
     serializer_class = CustomerSerializer
+    pagination_class = StandardPagination
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -405,6 +408,7 @@ class GarmentItemViewSet(viewsets.ModelViewSet):
 
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
+    pagination_class = StandardPagination
 
     def get_queryset(self):
         qs = Order.objects.prefetch_related('items').all().order_by('-created_at')
@@ -542,18 +546,48 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     permission_classes = [IsOwner]
     queryset = Expense.objects.all().order_by('-date')
     serializer_class = ExpenseSerializer
+    pagination_class = StandardPagination
 
 
 class CreditViewSet(viewsets.ModelViewSet):
     permission_classes = [IsOwner]
     queryset = Credit.objects.select_related('category').order_by('-date')
     serializer_class = CreditSerializer
+    pagination_class = StandardPagination
 
 
 class CreditCategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsOwner]
     queryset = CreditCategory.objects.all()
     serializer_class = CreditCategorySerializer
+
+    def get_queryset(self):
+        from .models import DEFAULT_CREDIT_CATEGORIES
+        shop = get_current_tenant() or getattr(self.request, 'shop', None)
+        if not shop and hasattr(self.request, 'user') and getattr(self.request.user, 'is_authenticated', False):
+            membership = getattr(self.request.user, 'shop_memberships', None)
+            if membership:
+                first_mem = membership.filter(is_active=True).first()
+                if first_mem:
+                    shop = first_mem.shop
+        if not shop:
+            shop = Shop.objects.first()
+
+        if shop:
+            existing_names = set(CreditCategory.all_objects.filter(shop=shop).values_list('name', flat=True))
+            to_create = []
+            for order_idx, cat_name in enumerate(DEFAULT_CREDIT_CATEGORIES):
+                if cat_name not in existing_names:
+                    to_create.append(CreditCategory(
+                        shop=shop,
+                        name=cat_name,
+                        display_order=order_idx,
+                        is_active=True,
+                    ))
+            if to_create:
+                CreditCategory.all_objects.bulk_create(to_create, ignore_conflicts=True)
+            return CreditCategory.objects.filter(shop=shop).order_by('display_order', 'id')
+        return CreditCategory.objects.all().order_by('display_order', 'id')
 
     def destroy(self, request, *args, **kwargs):
         category = self.get_object()
@@ -571,8 +605,9 @@ class CreditCategoryViewSet(viewsets.ModelViewSet):
 
 class StaffViewSet(viewsets.ModelViewSet):
     permission_classes = [IsOwner]
-    queryset = Staff.objects.all()
+    queryset = Staff.objects.all().order_by('name')
     serializer_class = StaffSerializer
+    pagination_class = StandardPagination
 
 
 class AttendanceViewSet(viewsets.ModelViewSet):
@@ -1452,20 +1487,30 @@ class MetaMessageViewSet(viewsets.ModelViewSet):
         Sends WhatsApp message to a new or existing contact phone number.
         Body: {phone, text, recipient_name?}
         """
-        phone = (request.data.get('phone') or '').strip()
+        raw_phone = (request.data.get('phone') or '').strip()
         text = (request.data.get('text') or '').strip()
         recipient_name = (request.data.get('recipient_name') or '').strip()
+
+        digits = "".join(ch for ch in raw_phone if ch.isdigit())
+        if len(digits) == 12 and digits.startswith('91'):
+            phone = digits[2:]
+        elif len(digits) == 11 and digits.startswith('0'):
+            phone = digits[1:]
+        elif len(digits) == 10:
+            phone = digits
+        else:
+            phone = digits
 
         if not phone:
             return Response({'error': 'Phone number is required.'}, status=400)
         if not re.fullmatch(r'^[6-9]\d{9}$', phone):
-            return Response({'error': 'Mobile number must be exactly 10 digits starting with 6-9 (no ISD / country code or leading 0).'}, status=400)
+            return Response({'error': 'Mobile number must be a valid 10-digit Indian mobile starting with 6-9.'}, status=400)
         if not text:
             return Response({'error': 'Message text is required.'}, status=400)
 
         shop = getattr(request, 'tenant', None)
         result = MetaSocialService.send_whatsapp_message(
-            to_number=phone,
+            to_number=digits,
             text=text,
             shop=shop,
             recipient_name=recipient_name
@@ -1478,7 +1523,7 @@ class MetaMessageViewSet(viewsets.ModelViewSet):
             'simulated': result.get('simulated', False),
             'note': result.get('note'),
             'message': serialized_msg,
-            'conversation_id': serialized_msg['conversation_id'] if serialized_msg else f"wa_{phone}"
+            'conversation_id': serialized_msg['conversation_id'] if serialized_msg else f"wa_{digits}"
         })
 
 
@@ -1530,4 +1575,36 @@ def meta_social_sync(request):
     shop = getattr(request, 'tenant', None)
     result = MetaSocialService.sync_live_data(shop=shop)
     return Response(result)
+
+
+# ── Personal WhatsApp via Neonize (Multi-Device Protocol) ───────────────────
+from .services.neonize_service import NeonizeService
+
+
+@api_view(['GET'])
+@permission_classes([IsOwnerOrStaffReadOnly])
+def neonize_status(request):
+    """GET /api/whatsapp/neonize/status/ — Connection status and live pairing QR code."""
+    shop = getattr(request, 'tenant', None)
+    data = NeonizeService.get_instance().get_status(shop=shop)
+    return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([IsOwnerOrStaffReadOnly])
+def neonize_connect(request):
+    """POST /api/whatsapp/neonize/connect/ — Request new pairing QR code for personal device."""
+    shop = getattr(request, 'tenant', None)
+    data = NeonizeService.get_instance().start_pairing(shop=shop, force_refresh=True)
+    return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([IsOwnerOrStaffReadOnly])
+def neonize_disconnect(request):
+    """POST /api/whatsapp/neonize/disconnect/ — Disconnect personal WhatsApp session."""
+    shop = getattr(request, 'tenant', None)
+    result = NeonizeService.get_instance().disconnect(shop=shop)
+    return Response(result)
+
 

@@ -78,12 +78,18 @@ class KpiCardsRow extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final screenWidth = MediaQuery.sizeOf(context).width;
         int crossAxisCount = 5;
         if (constraints.maxWidth < 1100 && constraints.maxWidth >= 700) {
           crossAxisCount = 3;
-        } else if (constraints.maxWidth < 700) {
+        } else if (constraints.maxWidth < 700 &&
+            (constraints.maxWidth >= 280 || screenWidth >= 340)) {
+          crossAxisCount = 2;
+        } else if (constraints.maxWidth < 280 && screenWidth < 340) {
           crossAxisCount = 1;
         }
+
+        final isCompact = constraints.maxWidth < 700;
 
         if (crossAxisCount == 5) {
           return Row(
@@ -91,7 +97,7 @@ class KpiCardsRow extends StatelessWidget {
                 .map((c) => Expanded(
                         child: Padding(
                       padding: const EdgeInsets.only(right: 12),
-                      child: _buildCard(c),
+                      child: _buildCard(c, isCompact: false),
                     )))
                 .toList(),
           );
@@ -104,7 +110,7 @@ class KpiCardsRow extends StatelessWidget {
               .map((c) => SizedBox(
                     width: (constraints.maxWidth - (crossAxisCount - 1) * 12) /
                         crossAxisCount,
-                    child: _buildCard(c),
+                    child: _buildCard(c, isCompact: isCompact),
                   ))
               .toList(),
         );
@@ -112,12 +118,12 @@ class KpiCardsRow extends StatelessWidget {
     );
   }
 
-  Widget _buildCard(Map<String, dynamic> c) {
+  Widget _buildCard(Map<String, dynamic> c, {bool isCompact = false}) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(isCompact ? 11 : 18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isCompact ? 12 : 16),
         border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Column(
@@ -127,38 +133,47 @@ class KpiCardsRow extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: isCompact ? 28 : 32,
+                height: isCompact ? 28 : 32,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: c['iconBg'] as Color,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(isCompact ? 6 : 8),
                 ),
                 child: Icon(c['icon'] as IconData,
-                    size: 18, color: c['iconColor'] as Color),
+                    size: isCompact ? 24 : 18, color: c['iconColor'] as Color),
               ),
-              Text(
-                c['title'] as String,
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF64748B)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  c['title'] as String,
+                  textAlign: TextAlign.end,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: isCompact ? 11 : 12,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF64748B)),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: isCompact ? 10 : 14),
           Text(
             c['value'] as String,
-            style: const TextStyle(
-                fontSize: 26,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontSize: isCompact ? 19 : 26,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF141A24),
+                letterSpacing: isCompact ? -0.4 : 0,
+                color: const Color(0xFF141A24),
                 height: 1.1),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isCompact ? 6 : 8),
           Text(
             c['subtext'] as String,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: isCompact ? 10.5 : 11,
               fontWeight: FontWeight.w600,
               color: c['subtextColor'] as Color,
             ),

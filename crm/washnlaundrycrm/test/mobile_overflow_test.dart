@@ -20,6 +20,7 @@ import 'package:washnlaundrycrm/screens/settings_screen.dart';
 import 'package:washnlaundrycrm/screens/social_suite_screen.dart';
 import 'package:washnlaundrycrm/screens/staff_screen.dart';
 import 'package:washnlaundrycrm/widgets/app_shell.dart';
+import 'package:washnlaundrycrm/widgets/kpi_cards_row.dart';
 import 'package:washnlaundrycrm/widgets/shop_onboarding_dialog.dart';
 
 import 'package:provider/provider.dart';
@@ -263,4 +264,117 @@ void main() {
       });
     });
   }
+
+  group('Mobile compact tile layouts and grid density (KAN-151)', () {
+    testWidgets('KpiCardsRow renders in 2-column grid on mobile (360px)', (tester) async {
+      final provider = createSeededProvider();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 360,
+              child: ChangeNotifierProvider.value(
+                value: provider,
+                child: const KpiCardsRow(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final wrap = tester.widget<Wrap>(find.byType(Wrap));
+      expect(wrap.children.length, 5);
+      final firstSizedBox = wrap.children.first as SizedBox;
+      expect(firstSizedBox.width, 174.0);
+    });
+
+    testWidgets('Dashboard scroll view has 16px padding on narrow viewport', (tester) async {
+      final view = TestWidgetsFlutterBinding.ensureInitialized()
+          .platformDispatcher
+          .implicitView!;
+      view.physicalSize = const Size(360, 780);
+      view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        view.resetPhysicalSize();
+        view.resetDevicePixelRatio();
+      });
+
+      final provider = createSeededProvider();
+      await tester.pumpWidget(host(provider, const DashboardScreen()));
+      await tester.pumpAndSettle();
+
+      final scrollView = tester.widget<SingleChildScrollView>(
+        find.byKey(const Key('dashboard_scroll_view')),
+      );
+      expect(scrollView.padding, const EdgeInsets.all(16));
+    });
+
+    testWidgets('CustomerDetailScreen _kpiRow renders 2-column tiles on mobile', (tester) async {
+      final view = TestWidgetsFlutterBinding.ensureInitialized()
+          .platformDispatcher
+          .implicitView!;
+      view.physicalSize = const Size(360, 780);
+      view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        view.resetPhysicalSize();
+        view.resetDevicePixelRatio();
+      });
+
+      final provider = createSeededProvider();
+      await tester.pumpWidget(
+        host(provider, CustomerDetailScreen(customer: testCustomer, onBack: () {})),
+      );
+      await tester.pumpAndSettle();
+
+      final wraps = tester.widgetList<Wrap>(find.byType(Wrap));
+      final kpiWrap = wraps.firstWhere((w) => w.children.length == 5);
+      final firstCard = kpiWrap.children.first as SizedBox;
+      expect(firstCard.width, 158.0);
+    });
+
+    testWidgets('CreditsScreen summary row renders 2-column grid on mobile (360px)', (tester) async {
+      final view = TestWidgetsFlutterBinding.ensureInitialized()
+          .platformDispatcher
+          .implicitView!;
+      view.physicalSize = const Size(360, 780);
+      view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        view.resetPhysicalSize();
+        view.resetDevicePixelRatio();
+      });
+
+      final provider = createSeededProvider();
+      await tester.pumpWidget(host(provider, const CreditsScreen()));
+      await tester.pumpAndSettle();
+
+      final wraps = tester.widgetList<Wrap>(find.byType(Wrap));
+      final summaryWrap = wraps.firstWhere((w) => w.children.length == 3);
+      final firstCard = summaryWrap.children.first as SizedBox;
+      // Width 360, padding 16 -> 328 content width. perRow = 2: (328 - 12)/2 = 158
+      expect(firstCard.width, 158.0);
+    });
+
+    testWidgets('ExpensesScreen summary row renders 2-column grid on mobile (360px)', (tester) async {
+      final view = TestWidgetsFlutterBinding.ensureInitialized()
+          .platformDispatcher
+          .implicitView!;
+      view.physicalSize = const Size(360, 780);
+      view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        view.resetPhysicalSize();
+        view.resetDevicePixelRatio();
+      });
+
+      final provider = createSeededProvider();
+      await tester.pumpWidget(host(provider, const ExpensesScreen()));
+      await tester.pumpAndSettle();
+
+      final wraps = tester.widgetList<Wrap>(find.byType(Wrap));
+      final summaryWrap = wraps.firstWhere((w) => w.children.length == 3);
+      final firstCard = summaryWrap.children.first as SizedBox;
+      // Width 360, padding 16 -> 328 content width. perRow = 2: (328 - 12)/2 = 158
+      expect(firstCard.width, 158.0);
+    });
+  });
 }

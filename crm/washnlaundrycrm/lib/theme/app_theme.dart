@@ -19,6 +19,57 @@ class AppColors {
   static const success = Color(0xFF10B981); // "active" / on
 }
 
+/// Typography tokens calibrated for mobile viewports and compact tile layouts.
+class AppTypography {
+  /// Titles: 17-18px (w600, letterSpacing: -0.3)
+  static const title = TextStyle(
+    fontSize: 17.5,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.3,
+    color: AppColors.ink,
+  );
+
+  /// KPI/Hero numbers: 18-20px (w700, letterSpacing: -0.4)
+  static const kpiHero = TextStyle(
+    fontSize: 19,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.4,
+    color: AppColors.ink,
+  );
+
+  /// Section titles: 14-15px (w600)
+  static const sectionTitle = TextStyle(
+    fontSize: 14.5,
+    fontWeight: FontWeight.w600,
+    color: AppColors.ink,
+  );
+
+  /// Body: 13-14px (w400/w500)
+  static const body = TextStyle(
+    fontSize: 13.5,
+    fontWeight: FontWeight.w400,
+    color: AppColors.ink,
+  );
+
+  static const bodyMedium = TextStyle(
+    fontSize: 13.5,
+    fontWeight: FontWeight.w500,
+    color: AppColors.ink,
+  );
+
+  /// Captions/Badges: 10-11.5px (w600)
+  static const captionBadge = TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    color: AppColors.muted,
+  );
+
+  static const badge = TextStyle(
+    fontSize: 10.5,
+    fontWeight: FontWeight.w600,
+  );
+}
+
 /// One theme for the whole app, so Material widgets (buttons, fields, cards,
 /// dialogs, chips, switches…) look right without per-screen styling.
 ///
@@ -48,10 +99,96 @@ ThemeData buildAppTheme(TextTheme baseTextTheme) {
     error: AppColors.danger,
   );
 
+  // Scaled down mobile font sizes and adjusted weights / letter-spacing
+  final adjustedTextTheme = baseTextTheme.copyWith(
+    // Titles: 17-18px (w600, letterSpacing: -0.3)
+    titleLarge: baseTextTheme.titleLarge?.copyWith(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.3,
+        ) ??
+        const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.3,
+        ),
+    titleMedium: baseTextTheme.titleMedium?.copyWith(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.2,
+        ) ??
+        const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.2,
+        ),
+    titleSmall: baseTextTheme.titleSmall?.copyWith(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ) ??
+        const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+
+    // KPI/Hero numbers: 18-20px (w700, letterSpacing: -0.4)
+    headlineMedium: baseTextTheme.headlineMedium?.copyWith(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.4,
+        ) ??
+        const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.4,
+        ),
+    headlineSmall: baseTextTheme.headlineSmall?.copyWith(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.4,
+        ) ??
+        const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.4,
+        ),
+
+    // Section titles / Body: 13-14px (w400/w500)
+    bodyLarge: baseTextTheme.bodyLarge?.copyWith(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ) ??
+        const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+    bodyMedium: baseTextTheme.bodyMedium?.copyWith(
+          fontSize: 13,
+          fontWeight: FontWeight.w400,
+        ) ??
+        const TextStyle(fontSize: 13, fontWeight: FontWeight.w400),
+    bodySmall: baseTextTheme.bodySmall?.copyWith(
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
+        ) ??
+        const TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
+
+    // Captions/Badges: 10-11.5px (w600)
+    labelLarge: baseTextTheme.labelLarge?.copyWith(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ) ??
+        const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+    labelMedium: baseTextTheme.labelMedium?.copyWith(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+        ) ??
+        const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+    labelSmall: baseTextTheme.labelSmall?.copyWith(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w600,
+        ) ??
+        const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600),
+  );
+
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
-    textTheme: baseTextTheme,
+    textTheme: adjustedTextTheme,
     scaffoldBackgroundColor: AppColors.background,
     dividerColor: AppColors.borderSubtle,
     dividerTheme: const DividerThemeData(color: AppColors.borderSubtle),

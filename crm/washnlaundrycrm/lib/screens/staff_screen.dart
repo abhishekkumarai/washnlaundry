@@ -20,6 +20,8 @@ class StaffScreen extends StatefulWidget {
 
 class _StaffScreenState extends State<StaffScreen> {
   int _selectedTab = 0; // 0: All Staff, 1: Active, 2: Inactive
+  int _currentPage = 1;
+  static const int _pageSize = 15;
   String _searchQuery = '';
 
   /// Column the table is sorted by (a roster view-model key), or null for the
@@ -803,7 +805,10 @@ class _StaffScreenState extends State<StaffScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
-              onChanged: (v) => setState(() => _searchQuery = v),
+              onChanged: (v) => setState(() {
+                _searchQuery = v;
+                _currentPage = 1;
+              }),
               style: const TextStyle(fontSize: 13),
               textAlign: TextAlign.center,
               decoration: const InputDecoration(
@@ -869,68 +874,96 @@ class _StaffScreenState extends State<StaffScreen> {
                               ],
                             ),
                           )
-                        : Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border:
-                                  Border.all(color: const Color(0xFFE4E0D8)),
-                            ),
-                            child: narrow
-                                ? _staffCardList()
-                                : Column(
-                              children: [
-                                // Table Header
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 20, vertical: 14),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFF8F7F5),
-                                    borderRadius: BorderRadius.vertical(
-                                        top: Radius.circular(16)),
-                                    border: Border(
-                                        bottom: BorderSide(
-                                            color: Color(0xFFE4E0D8))),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                          flex: 3,
-                                          child: _sortHeader(
-                                              'STAFF MEMBER', 'name')),
-                                      Expanded(
-                                          flex: 2,
-                                          child: _sortHeader('ROLE', 'role')),
-                                      Expanded(
-                                          flex: 2,
-                                          child:
-                                              _sortHeader('PHONE', 'phone')),
-                                      Expanded(
-                                          flex: 2,
-                                          child: _sortHeader(
-                                              'MONTHLY WAGE', 'wage')),
-                                      Expanded(
-                                          flex: 3,
-                                          child: _sortHeader(
-                                              'STATUS', 'status')),
-                                      const SizedBox(width: 48),
-                                    ],
-                                  ),
-                                ),
+                        : Builder(
+                            builder: (context) {
+                              final totalCount = _filteredStaff.length;
+                              final totalPages =
+                                  (totalCount / _pageSize).ceil().clamp(1, 99999);
+                              final safePage = _currentPage.clamp(1, totalPages);
+                              final startIndex = (safePage - 1) * _pageSize;
+                              final pagedStaff = totalCount > 0
+                                  ? _filteredStaff
+                                      .skip(startIndex)
+                                      .take(_pageSize)
+                                      .toList()
+                                  : <Map<String, dynamic>>[];
 
-                                // Rows
-                                ListView.separated(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: _filteredStaff.length,
-                                  separatorBuilder: (_, __) =>
-                                      const Divider(height: 1),
-                                  itemBuilder: (context, idx) {
-                                    final s = _filteredStaff[idx];
-                                    final isActive = s['status'] == 'ACTIVE';
-                                    final name = s['name'] as String;
-                                    final isLast =
-                                        idx == _filteredStaff.length - 1;
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border:
+                                      Border.all(color: const Color(0xFFE4E0D8)),
+                                ),
+                                child: Column(
+                                  children: [
+                                    narrow
+                                        ? _staffCardList(pagedStaff)
+                                        : Column(
+                                            children: [
+                                              // Table Header
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 20,
+                                                        vertical: 14),
+                                                decoration: const BoxDecoration(
+                                                  color: Color(0xFFF8F7F5),
+                                                  borderRadius:
+                                                      BorderRadius.vertical(
+                                                          top: Radius.circular(
+                                                              16)),
+                                                  border: Border(
+                                                      bottom: BorderSide(
+                                                          color:
+                                                              Color(0xFFE4E0D8))),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Expanded(
+                                                        flex: 3,
+                                                        child: _sortHeader(
+                                                            'STAFF MEMBER',
+                                                            'name')),
+                                                    Expanded(
+                                                        flex: 2,
+                                                        child: _sortHeader(
+                                                            'ROLE', 'role')),
+                                                    Expanded(
+                                                        flex: 2,
+                                                        child: _sortHeader(
+                                                            'PHONE', 'phone')),
+                                                    Expanded(
+                                                        flex: 2,
+                                                        child: _sortHeader(
+                                                            'MONTHLY WAGE',
+                                                            'wage')),
+                                                    Expanded(
+                                                        flex: 3,
+                                                        child: _sortHeader(
+                                                            'STATUS',
+                                                            'status')),
+                                                    const SizedBox(width: 48),
+                                                  ],
+                                                ),
+                                              ),
+
+                                              // Rows
+                                              ListView.separated(
+                                                shrinkWrap: true,
+                                                physics:
+                                                    const NeverScrollableScrollPhysics(),
+                                                itemCount: pagedStaff.length,
+                                                separatorBuilder: (_, __) =>
+                                                    const Divider(height: 1),
+                                                itemBuilder: (context, idx) {
+                                                  final s = pagedStaff[idx];
+                                                  final isActive =
+                                                      s['status'] == 'ACTIVE';
+                                                  final name =
+                                                      s['name'] as String;
+                                                  final isLast = idx ==
+                                                      pagedStaff.length - 1;
 
                                     // The whole row opens the edit sheet —
                                     // previously only the pencil responded,
@@ -1158,22 +1191,94 @@ class _StaffScreenState extends State<StaffScreen> {
                                 ),
                               ],
                             ),
-                          );
+                            _staffFooter(totalCount, startIndex,
+                                pagedStaff.length, safePage, totalPages),
+                          ],
+                        ),
+                      );
+                    },
+                  );
   }
 
   /// Narrow-mode replacement for the table: the same 5 fixed-flex columns
   /// squeeze to unreadable slivers below [SidebarNavigation.contentWideBreakpoint], same bug class
   /// Orders' table had.
-  Widget _staffCardList() {
+  Widget _staffCardList(List<Map<String, dynamic>> staffList) {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
-          for (final s in _filteredStaff)
+          for (final s in staffList)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _staffCard(s),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _staffFooter(int totalCount, int startIndex, int pagedCount,
+      int safePage, int totalPages) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFE4E0D8))),
+      ),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 6,
+        children: [
+          Text(
+            totalCount == 0
+                ? 'Showing 0 staff'
+                : 'Showing ${startIndex + 1}–${math.min(startIndex + pagedCount, totalCount)} of $totalCount',
+            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+          ),
+          if (totalPages > 1)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left_rounded),
+                  iconSize: 20,
+                  splashRadius: 18,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: safePage > 1
+                      ? () => setState(() => _currentPage = safePage - 1)
+                      : null,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    'Page $safePage of $totalPages',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF141A24)),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  iconSize: 20,
+                  splashRadius: 18,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 32, minHeight: 32),
+                  onPressed: safePage < totalPages
+                      ? () => setState(() => _currentPage = safePage + 1)
+                      : null,
+                ),
+              ],
+            )
+          else
+            const Text('Page 1 of 1',
+                style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
         ],
       ),
     );
@@ -1387,7 +1492,10 @@ class _StaffScreenState extends State<StaffScreen> {
       key: ValueKey('staff-subtab-$title'),
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => setState(() => _selectedTab = idx),
+        onTap: () => setState(() {
+          _selectedTab = idx;
+          _currentPage = 1;
+        }),
         borderRadius: BorderRadius.circular(8),
         hoverColor: const Color(0xFFEFF6FF),
         child: Container(
