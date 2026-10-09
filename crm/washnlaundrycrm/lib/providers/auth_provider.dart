@@ -51,6 +51,7 @@ class AuthProvider extends ChangeNotifier {
   String? _roleError;
   String? get roleError => _roleError;
   bool _isDemo = false;
+  bool get isDemo => _isDemo;
 
   /// Session token from email/password sign-in (`Bearer app.…`), if that's how
   /// the user signed in. Google sign-in uses the Google ID token instead.

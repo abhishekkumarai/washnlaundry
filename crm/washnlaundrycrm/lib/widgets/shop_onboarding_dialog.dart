@@ -55,6 +55,11 @@ class _ShopOnboardingDialogState extends State<ShopOnboardingDialog> {
 
       final newSlug = res['slug'] as String? ?? res['id']?.toString() ?? '';
       app.setActiveTenant(newSlug);
+      final currentList = List<Map<String, dynamic>>.from(app.availableShops);
+      if (!currentList.any((s) => (s['slug'] ?? s['id']?.toString()) == newSlug)) {
+        currentList.insert(0, res);
+        app.setAvailableShops(currentList);
+      }
       await auth.refreshRole();
       await app.loadDataFromBackend();
 

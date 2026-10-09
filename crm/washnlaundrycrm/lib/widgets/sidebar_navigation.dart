@@ -215,13 +215,28 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     );
   }
 
+  static String _formatShopName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed.toLowerCase() == 'washnlaundry') {
+      return 'WashNLaundry';
+    }
+    if (trimmed == trimmed.toLowerCase()) {
+      return trimmed.split(' ').map((w) {
+        if (w.isEmpty) return w;
+        return '${w[0].toUpperCase()}${w.substring(1)}';
+      }).join(' ');
+    }
+    return trimmed;
+  }
+
   Widget _brand(BuildContext context,
       {required bool expanded, required bool canExpand}) {
     const mark = BrandLogo(size: 40);
 
     // Show the active shop name in place of the app name. Fall back to
     // 'WashNLaundry' while the shop data is still loading.
-    final shopName = context.watch<AppProvider>().shop?['name'] as String? ?? 'WashNLaundry';
+    final rawShopName = context.watch<AppProvider>().shop?['name'] as String? ?? 'WashNLaundry';
+    final shopName = _formatShopName(rawShopName);
 
     if (!expanded) {
       return Padding(

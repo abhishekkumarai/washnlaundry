@@ -41,6 +41,17 @@ class ShopViewSet(viewsets.ModelViewSet):
     queryset = Shop.objects.all()
     serializer_class = ShopSerializer
 
+    def get_queryset(self):
+        shop = getattr(self.request, 'shop', None)
+        has_explicit_tenant = (
+            self.request.headers.get('X-Tenant-ID') or
+            self.request.META.get('HTTP_X_TENANT_ID') or
+            self.request.query_params.get('shop')
+        )
+        if has_explicit_tenant and shop:
+            return Shop.objects.filter(id=shop.id)
+        return Shop.objects.all()
+
     @action(detail=False, methods=['post'], url_path='provision', permission_classes=[])
     def provision(self, request):
         """POST /api/shops/provision/

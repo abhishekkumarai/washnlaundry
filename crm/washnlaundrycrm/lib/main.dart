@@ -65,6 +65,31 @@ Future<void> main() async {
           appProvider.setActiveTenant(shopData['slug'] as String? ?? shopData['id']?.toString());
         }
       }
+    } else if (authProvider.isDemo) {
+      if (appProvider.availableShops.isEmpty) {
+        try {
+          final allShops = await ApiService.fetchShops();
+          if (allShops.isNotEmpty) {
+            final activeShops = allShops
+                .where((s) => s['status'] == null || s['status'] == 'ACTIVE')
+                .take(6)
+                .toList();
+            appProvider.setAvailableShops(activeShops);
+          }
+        } catch (_) {}
+      }
+      final prefs = await SharedPreferences.getInstance();
+      final savedTenant = prefs.getString('active_tenant_id');
+      final availableSlugs = appProvider.availableShops
+          .map((s) => s['slug'] as String? ?? s['id']?.toString())
+          .toSet();
+      if (savedTenant != null && (availableSlugs.isEmpty || availableSlugs.contains(savedTenant))) {
+        appProvider.setActiveTenant(savedTenant);
+      } else if (appProvider.activeTenantId == null && appProvider.availableShops.isNotEmpty) {
+        final firstSlug = appProvider.availableShops.first['slug'] as String? ??
+            appProvider.availableShops.first['id']?.toString();
+        if (firstSlug != null) appProvider.setActiveTenant(firstSlug);
+      }
     }
     // Customers get the owner's CRM data and layout (minus their hidden
     // views, see RoleViews).
