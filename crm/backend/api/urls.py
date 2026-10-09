@@ -8,6 +8,8 @@ from .views import (
     ServiceAreaViewSet, TimeSlotViewSet, dashboard_stats, payroll_summary,
     reports, meta,
     rag_chat, create_lead, public_lead, process_leads,
+    MetaSettingsViewSet, MetaPostViewSet, MetaMessageViewSet, MetaLeadViewSet,
+    meta_social_analytics,
 )
 from .password_auth import signup, verify_email, login, forgot_password, reset_password
 from .role_views import me, link_requests, link_request_approve, link_request_reject
@@ -30,6 +32,10 @@ router.register(r'salary-payments', SalaryPaymentViewSet, basename='salarypaymen
 router.register(r'salary-advances', SalaryAdvanceViewSet, basename='salaryadvance')
 router.register(r'service-areas', ServiceAreaViewSet)
 router.register(r'time-slots', TimeSlotViewSet, basename='timeslot')
+router.register(r'meta-settings', MetaSettingsViewSet, basename='metasettings')
+router.register(r'meta-posts', MetaPostViewSet, basename='metapost')
+router.register(r'meta-messages', MetaMessageViewSet, basename='metamessage')
+router.register(r'meta-leads', MetaLeadViewSet, basename='metalead')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -41,6 +47,7 @@ urlpatterns = [
     path('leads/process/', process_leads, name='process-leads'),
     path('reports/', reports, name='reports'),
     path('meta/', meta, name='meta'),
+    path('meta-social/analytics/', meta_social_analytics, name='meta-social-analytics'),
     path('me/', me, name='me'),
     path('auth/signup/', signup, name='auth-signup'),
     path('auth/verify-email/', verify_email, name='auth-verify-email'),

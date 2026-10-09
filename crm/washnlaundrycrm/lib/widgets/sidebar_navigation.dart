@@ -135,6 +135,12 @@ class SidebarNavigation extends StatefulWidget {
       'disabled': false
     },
     {
+      'label': 'Social Suite',
+      'icon': Icons.public_rounded,
+      'index': 17,
+      'disabled': false
+    },
+    {
       'label': 'Chat',
       'icon': Icons.smart_toy_rounded,
       'index': 16,

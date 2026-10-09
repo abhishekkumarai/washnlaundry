@@ -24,6 +24,7 @@ import 'screens/profile_screen.dart';
 import 'screens/scan_screen.dart';
 import 'screens/services_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/social_suite_screen.dart';
 import 'screens/staff_screen.dart';
 import 'utils/role_views.dart';
 import 'widgets/app_shell.dart';
@@ -194,6 +195,10 @@ List<RouteBase> appRoutes() => [
       GoRoute(
         path: '/chat',
         builder: (c, s) => _section(c, 16, const ChatScreen()),
+      ),
+      GoRoute(
+        path: '/social',
+        builder: (c, s) => _section(c, 17, const SocialSuiteScreen()),
       ),
       GoRoute(
         path: '/scan',

@@ -693,3 +693,121 @@ class EmailLinkRequest(models.Model):
 
     def __str__(self):
         return f"{self.email} -> {self.customer} [{self.status}]"
+
+
+# ── Meta & Social Suite (KAN-Meta) ───────────────────────────────────────────
+
+class MetaSettings(models.Model):
+    """Stores local Meta Graph API Access Tokens, connected Facebook Page and Instagram details."""
+    shop = models.OneToOneField(Shop, on_delete=models.CASCADE, related_name='meta_settings', null=True, blank=True)
+    page_access_token = models.CharField(max_length=512, blank=True, default='')
+    app_id = models.CharField(max_length=120, blank=True, default='')
+    app_secret = models.CharField(max_length=120, blank=True, default='')
+    facebook_page_id = models.CharField(max_length=120, blank=True, default='')
+    facebook_page_name = models.CharField(max_length=255, blank=True, default='WashNLaundry Official')
+    instagram_account_id = models.CharField(max_length=120, blank=True, default='')
+    instagram_username = models.CharField(max_length=120, blank=True, default='washnlaundry')
+    auto_reply_enabled = models.BooleanField(default=True)
+    is_connected = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"MetaSettings for {self.facebook_page_name} ({'Connected' if self.is_connected else 'Disconnected'})"
+
+
+class MetaPlatform(models.TextChoices):
+    FACEBOOK = 'FACEBOOK', 'Facebook'
+    INSTAGRAM = 'INSTAGRAM', 'Instagram'
+    BOTH = 'BOTH', 'Facebook & Instagram'
+
+
+class MetaPost(models.Model):
+    """Posts scheduled or published across Facebook and Instagram."""
+    STATUS_DRAFT = 'DRAFT'
+    STATUS_SCHEDULED = 'SCHEDULED'
+    STATUS_PUBLISHED = 'PUBLISHED'
+    STATUS_FAILED = 'FAILED'
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, 'Draft'),
+        (STATUS_SCHEDULED, 'Scheduled'),
+        (STATUS_PUBLISHED, 'Published'),
+        (STATUS_FAILED, 'Failed'),
+    ]
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='meta_posts', null=True, blank=True)
+    platform = models.CharField(max_length=20, choices=MetaPlatform.choices, default=MetaPlatform.BOTH)
+    content = models.TextField()
+    image_url = models.URLField(max_length=1000, blank=True, default='')
+    scheduled_for = models.DateTimeField(null=True, blank=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    meta_post_id = models.CharField(max_length=120, blank=True, default='')
+    likes_count = models.IntegerField(default=0)
+    comments_count = models.IntegerField(default=0)
+    shares_count = models.IntegerField(default=0)
+    error_message = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.platform}] {self.content[:30]} ({self.status})"
+
+
+class MetaMessage(models.Model):
+    """Direct message conversations from Instagram & Facebook with Meta AI responses."""
+    SENDER_USER = 'USER'
+    SENDER_AI = 'AI'
+    SENDER_STAFF = 'STAFF'
+    SENDER_CHOICES = [
+        (SENDER_USER, 'Customer'),
+        (SENDER_AI, 'Meta AI'),
+        (SENDER_STAFF, 'Staff Agent'),
+    ]
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='meta_messages', null=True, blank=True)
+    platform = models.CharField(max_length=20, choices=MetaPlatform.choices, default=MetaPlatform.INSTAGRAM)
+    conversation_id = models.CharField(max_length=120, db_index=True)
+    sender_type = models.CharField(max_length=10, choices=SENDER_CHOICES, default=SENDER_USER)
+    sender_name = models.CharField(max_length=120, default='Customer')
+    sender_id = models.CharField(max_length=120, blank=True, default='')
+    text = models.TextField()
+    is_lead = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.sender_name} ({self.platform}): {self.text[:30]}"
+
+
+class MetaLead(models.Model):
+    """Ad inquiries and chat leads captured from Facebook and Instagram."""
+    STATUS_NEW = 'NEW'
+    STATUS_CONTACTED = 'CONTACTED'
+    STATUS_CONVERTED = 'CONVERTED'
+    STATUS_CHOICES = [
+        (STATUS_NEW, 'New Lead'),
+        (STATUS_CONTACTED, 'Contacted'),
+        (STATUS_CONVERTED, 'Converted to Order'),
+    ]
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='meta_leads', null=True, blank=True)
+    platform = models.CharField(max_length=20, choices=MetaPlatform.choices, default=MetaPlatform.INSTAGRAM)
+    ad_campaign = models.CharField(max_length=255, blank=True, default='Organic DM / Promo')
+    customer_name = models.CharField(max_length=120)
+    customer_phone = models.CharField(max_length=30, blank=True, default='')
+    customer_email = models.CharField(max_length=120, blank=True, default='')
+    inquiry_notes = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_NEW)
+    converted_order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Lead: {self.customer_name} via {self.platform} ({self.status})"
+
