@@ -10,13 +10,22 @@ from .models import (
 )
 
 
+class TenantModelSerializer(serializers.ModelSerializer):
+    """Base ModelSerializer for tenant-scoped models ensuring `shop` is read-only."""
+    def get_fields(self):
+        fields = super().get_fields()
+        if 'shop' in fields:
+            fields['shop'].read_only = True
+        return fields
+
+
 class ShopSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shop
         fields = '__all__'
 
 
-class CustomerSerializer(serializers.ModelSerializer):
+class CustomerSerializer(TenantModelSerializer):
     avg_order_value = serializers.FloatField(read_only=True)
 
     class Meta:
@@ -24,7 +33,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class GarmentItemSerializer(serializers.ModelSerializer):
+class GarmentItemSerializer(TenantModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     unit_label = serializers.CharField(source='get_unit_display', read_only=True)
 
@@ -33,7 +42,7 @@ class GarmentItemSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class GarmentCategorySerializer(serializers.ModelSerializer):
+class GarmentCategorySerializer(TenantModelSerializer):
     items = GarmentItemSerializer(many=True, read_only=True)
     item_count = serializers.IntegerField(read_only=True)
     price_range = serializers.DictField(read_only=True)
@@ -43,20 +52,20 @@ class GarmentCategorySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class OrderItemSerializer(serializers.ModelSerializer):
+class OrderItemSerializer(TenantModelSerializer):
     class Meta:
         model = OrderItem
         fields = '__all__'
         extra_kwargs = {'order': {'required': False}}
 
 
-class OrderAuditLogSerializer(serializers.ModelSerializer):
+class OrderAuditLogSerializer(TenantModelSerializer):
     class Meta:
         model = OrderAuditLog
         fields = ['id', 'status', 'title', 'detail', 'created_at']
 
 
-class OrderSerializer(serializers.ModelSerializer):
+class OrderSerializer(TenantModelSerializer):
     items = OrderItemSerializer(many=True)
     audit_log = OrderAuditLogSerializer(many=True, read_only=True)
     is_overdue = serializers.BooleanField(read_only=True)
@@ -65,7 +74,7 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = '__all__'
-        read_only_fields = ['order_number']
+        read_only_fields = ['order_number', 'shop']
 
     def create(self, validated_data):
         """Accept nested items on POST, and log the opening audit entry."""
@@ -113,13 +122,13 @@ class OrderSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class ExpenseSerializer(serializers.ModelSerializer):
+class ExpenseSerializer(TenantModelSerializer):
     class Meta:
         model = Expense
         fields = '__all__'
 
 
-class CreditCategorySerializer(serializers.ModelSerializer):
+class CreditCategorySerializer(TenantModelSerializer):
     credit_count = serializers.IntegerField(source='credits.count', read_only=True)
 
     class Meta:
@@ -138,7 +147,7 @@ class CreditCategorySerializer(serializers.ModelSerializer):
         return value
 
 
-class CreditSerializer(serializers.ModelSerializer):
+class CreditSerializer(TenantModelSerializer):
     # Read and written as the category's name, so the API shape stayed a plain
     # string when categories moved from fixed choices into their own table —
     # and a rename in Settings shows on every existing credit.
@@ -159,7 +168,7 @@ class CreditSerializer(serializers.ModelSerializer):
         return value
 
 
-class StaffSerializer(serializers.ModelSerializer):
+class StaffSerializer(TenantModelSerializer):
     class Meta:
         model = Staff
         fields = '__all__'
@@ -175,7 +184,7 @@ class StaffSerializer(serializers.ModelSerializer):
         return value
 
 
-class AttendanceSerializer(serializers.ModelSerializer):
+class AttendanceSerializer(TenantModelSerializer):
     staff_name = serializers.CharField(source='staff.name', read_only=True)
 
     class Meta:
@@ -193,7 +202,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class SalaryPaymentSerializer(serializers.ModelSerializer):
+class SalaryPaymentSerializer(TenantModelSerializer):
     staff_name = serializers.CharField(source='staff.name', read_only=True)
 
     class Meta:
@@ -246,7 +255,7 @@ class SalaryPaymentSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class SalaryAdvanceSerializer(serializers.ModelSerializer):
+class SalaryAdvanceSerializer(TenantModelSerializer):
     staff_name = serializers.CharField(source='staff.name', read_only=True)
 
     class Meta:
@@ -259,13 +268,13 @@ class SalaryAdvanceSerializer(serializers.ModelSerializer):
         return value
 
 
-class ServiceAreaSerializer(serializers.ModelSerializer):
+class ServiceAreaSerializer(TenantModelSerializer):
     class Meta:
         model = ServiceArea
         fields = '__all__'
 
 
-class TimeSlotSerializer(serializers.ModelSerializer):
+class TimeSlotSerializer(TenantModelSerializer):
     label = serializers.CharField(source='__str__', read_only=True)
 
     class Meta:

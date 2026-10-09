@@ -1,8 +1,12 @@
+from django.conf import settings
 from django.db import models
 from django.db.models import Max
 from django.utils import timezone
+from django.utils.text import slugify
 import re
 import uuid
+
+from .tenancy import TenantModel, get_current_tenant
 
 
 # ── Canonical vocabularies ────────────────────────────────────────────────────
@@ -75,6 +79,11 @@ class ExpenseCategory(models.TextChoices):
 
 class Shop(models.Model):
     name = models.CharField(max_length=255, default='WashNLaundry Express')
+    slug = models.SlugField(max_length=100, unique=True, blank=True, null=True)
+    subdomain = models.CharField(max_length=100, blank=True, default='')
+    custom_domain = models.CharField(max_length=255, blank=True, default='')
+    status = models.CharField(max_length=20, default='ACTIVE')
+
     owner_name = models.CharField(max_length=255, default='Aditya Sharma')
     phone = models.CharField(max_length=50, default='+91 98765 43210')
     whatsapp = models.CharField(max_length=50, blank=True, default='')
@@ -105,22 +114,27 @@ class Shop(models.Model):
     delivery_buffer_minutes = models.IntegerField(default=30)
 
     # ── Operating rules ───────────────────────────────────────────────────────
-    # These were client-side Dart constants: a 1.5x express surcharge baked into
-    # new_order_screen.dart, and a 600 wage / 'Washer' role hardcoded as the
-    # defaults on the Add Staff form. They are shop policy, not app policy.
     express_multiplier = models.FloatField(default=1.5)
     default_monthly_wage = models.FloatField(default=18000.0)
     default_staff_role = models.CharField(max_length=100, default='Washer')
 
     # ── Presentation ──────────────────────────────────────────────────────────
-    # '₹' was a bare literal in ~15 widgets and the en_IN grouping was hardcoded
-    # in the Reports screen.
     currency_symbol = models.CharField(max_length=8, default='₹')
     locale = models.CharField(max_length=16, default='en_IN')
 
     def save(self, *args, **kwargs):
         if not self.order_prefix:
             self.order_prefix = self.derive_prefix(self.name)
+        if not self.slug:
+            base_slug = slugify(self.name) or 'shop'
+            candidate = base_slug
+            idx = 1
+            while Shop.objects.filter(slug=candidate).exclude(pk=self.pk).exists():
+                candidate = f"{base_slug}-{idx}"
+                idx += 1
+            self.slug = candidate
+        if not self.subdomain and self.slug:
+            self.subdomain = self.slug
         super().save(*args, **kwargs)
 
     @staticmethod
@@ -133,12 +147,65 @@ class Shop(models.Model):
         return self.name
 
 
+class ShopRole(models.TextChoices):
+    OWNER = 'OWNER', 'Owner'
+    STAFF = 'STAFF', 'Staff'
+    CUSTOMER = 'CUSTOMER', 'Customer'
+
+
+class ShopMembership(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='shop_memberships')
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='memberships')
+    role = models.CharField(max_length=20, choices=ShopRole.choices, default=ShopRole.STAFF)
+    is_default = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'shop')
+        ordering = ['-is_default', 'created_at']
+
+    def __str__(self):
+        return f"{self.user} @ {self.shop.name} ({self.role})"
+
+
+class ShopOrderSequence(models.Model):
+    shop = models.OneToOneField(Shop, on_delete=models.CASCADE, related_name='order_sequence')
+    last_number = models.PositiveIntegerField(default=0)
+
+    @classmethod
+    def get_next_order_number(cls, shop):
+        from django.db import transaction
+        with transaction.atomic():
+            seq, _ = cls.objects.select_for_update().get_or_create(shop=shop)
+            prefix = shop.order_prefix or 'SHOP'
+            last_order = (
+                Order.objects.filter(shop=shop, order_number__startswith=f'{prefix}-')
+                .aggregate(Max('order_number'))['order_number__max']
+            )
+            max_num = 0
+            if last_order:
+                try:
+                    max_num = int(last_order.rsplit('-', 1)[1])
+                except (IndexError, ValueError):
+                    max_num = Order.objects.filter(shop=shop).count()
+            next_num = max_num + 1
+            seq.last_number = next_num
+            seq.save(update_fields=['last_number'])
+            return f"{prefix}-{next_num:05d}"
+
+    def __str__(self):
+        return f"{self.shop.name}: #{self.last_number}"
+
+
 # ── Customers ─────────────────────────────────────────────────────────────────
 
-class Customer(models.Model):
+class Customer(TenantModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='customers', db_index=True)
     name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=20, unique=True)
+    phone = models.CharField(max_length=20)
     email = models.EmailField(blank=True, null=True, db_index=True)
     address = models.TextField(blank=True, null=True)
     area = models.CharField(max_length=120, blank=True, default='')
@@ -150,6 +217,9 @@ class Customer(models.Model):
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        unique_together = ('shop', 'phone')
+
     @property
     def avg_order_value(self):
         return round(self.total_spent / self.total_orders, 2) if self.total_orders else 0.0
@@ -160,7 +230,8 @@ class Customer(models.Model):
 
 # ── Service catalogue ─────────────────────────────────────────────────────────
 
-class GarmentCategory(models.Model):
+class GarmentCategory(TenantModel):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='categories', db_index=True)
     name = models.CharField(max_length=100)
     icon = models.CharField(max_length=50, default='Shirt')
     display_order = models.IntegerField(default=0)
@@ -168,6 +239,7 @@ class GarmentCategory(models.Model):
 
     class Meta:
         verbose_name_plural = 'Garment categories'
+        unique_together = ('shop', 'name')
 
     @property
     def item_count(self):
@@ -182,13 +254,14 @@ class GarmentCategory(models.Model):
         return self.name
 
 
-class GarmentItem(models.Model):
+class GarmentItem(TenantModel):
     """One row per (category, item) with a single price.
 
     The same garment appears under several categories at different prices —
     'Shirt' is ₹15 under Ironing and ₹40 under Dry Cleaning. That is two rows,
     not one row with two price columns.
     """
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='items', db_index=True)
     category = models.ForeignKey(GarmentCategory, on_delete=models.CASCADE, related_name='items')
     name = models.CharField(max_length=255)
     icon = models.CharField(max_length=50, default='Shirt')
@@ -204,15 +277,21 @@ class GarmentItem(models.Model):
     class Meta:
         ordering = ['category__display_order', 'display_order', 'id']
 
+    def save(self, *args, **kwargs):
+        if not getattr(self, 'shop_id', None) and getattr(self, 'category_id', None):
+            self.shop = self.category.shop
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.name} ({self.category.name})"
 
 
 # ── Orders ────────────────────────────────────────────────────────────────────
 
-class Order(models.Model):
+class Order(TenantModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    order_number = models.CharField(max_length=50, unique=True, blank=True)
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='orders', db_index=True)
+    order_number = models.CharField(max_length=50, blank=True)
 
     customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     customer_name = models.CharField(max_length=255)
@@ -226,10 +305,6 @@ class Order(models.Model):
     payment_method = models.CharField(max_length=50, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
     delivery_type = models.CharField(max_length=20, choices=DeliveryType.choices, default=DeliveryType.STORE_PICKUP)
     source = models.CharField(max_length=20, choices=OrderSource.choices, default=OrderSource.WEB)
-    # Free text, not a choice: the live timeline renders "Created by abhishek
-    # kumar" for a counter order and "Created by Mobile App" for an app one, so
-    # this holds either a person or a channel. Blank falls back to the source
-    # label on the client.
     created_by = models.CharField(max_length=180, blank=True, default='')
 
     subtotal = models.FloatField(default=0.0)
@@ -243,24 +318,15 @@ class Order(models.Model):
     notes = models.TextField(blank=True, null=True)
 
     scheduled_date = models.DateField(null=True, blank=True)
-    # Separate from scheduled_date rather than upgrading it to a DateTimeField
-    # — same split TimeSlot already uses for pickup/delivery slots, and it
-    # keeps every existing scheduled_date comparison (is_overdue, the
-    # Scheduled tab filter) working unchanged.
     scheduled_time = models.TimeField(null=True, blank=True)
-    # Home pickup only: when the agent collects from the customer. The
-    # delivery leg stays on scheduled_date / scheduled_time above.
     pickup_date = models.DateField(null=True, blank=True)
     pickup_time = models.TimeField(null=True, blank=True)
-    # Where a carried order is picked up from or delivered to — the review
-    # step's "Pickup address" / "Delivery address".
     address = models.TextField(blank=True, default='')
     assigned_agent = models.ForeignKey(
         'Staff', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_orders'
     )
 
-    # Timeline — one timestamp per stage, so the order detail screen can render
-    # the full audit trail rather than just the current status.
+    # Timeline — one timestamp per stage
     placed_at = models.DateTimeField(null=True, blank=True)
     processing_at = models.DateTimeField(null=True, blank=True)
     ironing_at = models.DateTimeField(null=True, blank=True)
@@ -271,6 +337,9 @@ class Order(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('shop', 'order_number')
 
     STATUS_TIMESTAMP_FIELD = {
         OrderStatus.PLACED: 'placed_at',
@@ -283,38 +352,30 @@ class Order(models.Model):
     }
 
     def save(self, *args, **kwargs):
-        if not self.order_number:
+        if not getattr(self, 'shop_id', None):
+            tenant = get_current_tenant()
+            if tenant:
+                self.shop = tenant
+            elif self.customer and getattr(self.customer, 'shop_id', None):
+                self.shop = self.customer.shop
+            else:
+                default_shop = Shop.objects.first()
+                if default_shop:
+                    self.shop = default_shop
+        if not self.order_number and getattr(self, 'shop_id', None):
+            self.order_number = self.next_order_number(self.shop)
+        elif not self.order_number:
             self.order_number = self.next_order_number()
         super().save(*args, **kwargs)
 
-    @staticmethod
-    def next_order_number():
-        shop = Shop.objects.first()
-        prefix = shop.order_prefix if shop else 'SHOP'
-        last = (
-            Order.objects.filter(order_number__startswith=f'{prefix}-')
-            .aggregate(Max('order_number'))['order_number__max']
-        )
-        seq = 1
-        if last:
-            try:
-                seq = int(last.rsplit('-', 1)[1]) + 1
-            except (IndexError, ValueError):
-                seq = Order.objects.count() + 1
-        return f'{prefix}-{seq:05d}'
+    @classmethod
+    def next_order_number(cls, shop=None):
+        target_shop = shop or get_current_tenant() or Shop.objects.first()
+        if not target_shop:
+            return 'SHOP-00001'
+        return ShopOrderSequence.get_next_order_number(target_shop)
 
     def mark_status(self, new_status, when=None, note=''):
-        """Set status, stamp the matching timeline field, and log the change.
-
-        The stamp is always refreshed, including on a revisit (e.g. Ready
-        walked back to Processing and forward to Ready again) — the step bar
-        reads these fields, and a stale first-arrival timestamp next to a
-        Timeline that shows the revisit happened moments ago is exactly the
-        "update and the audit log don't match" report this fixes. Every
-        transition, revisit included, is still preserved in full in
-        `audit_log` below; only the single-timestamp-per-stage summary now
-        always reflects the most recent arrival.
-        """
         self.status = new_status
         field = self.STATUS_TIMESTAMP_FIELD.get(new_status)
         at = when or timezone.now()
@@ -323,6 +384,7 @@ class Order(models.Model):
         self.save()
         self.audit_log.create(
             status=new_status, title=OrderStatus(new_status).label, detail=note, created_at=at,
+            shop=self.shop
         )
 
     @property
@@ -338,17 +400,8 @@ class Order(models.Model):
         return f"Order #{self.order_number} - {self.customer_name}"
 
 
-class OrderAuditLog(models.Model):
-    """One row per recorded change to an order: creation, a status
-    transition, a payment collection, or an edit to its details. Backs the
-    order-detail "Timeline & Audit Log" panel with real per-change history,
-    unlike `STATUS_TIMESTAMP_FIELD`, which only holds one timestamp per
-    stage and can't carry a note or a payment amount.
-
-    Settable `created_at`, not auto_now_add, so seed data can backdate a
-    plausible history the same way `Expense.date` and `SalaryPayment.paid_on`
-    already do.
-    """
+class OrderAuditLog(TenantModel):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='audit_logs', db_index=True)
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='audit_log')
     status = models.CharField(max_length=20, choices=OrderStatus.choices, blank=True, default='')
     title = models.CharField(max_length=255)
@@ -358,11 +411,17 @@ class OrderAuditLog(models.Model):
     class Meta:
         ordering = ['created_at']
 
+    def save(self, *args, **kwargs):
+        if not getattr(self, 'shop_id', None) and getattr(self, 'order_id', None):
+            self.shop = self.order.shop
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.order.order_number}: {self.title}"
 
 
-class OrderItem(models.Model):
+class OrderItem(TenantModel):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='order_items', db_index=True)
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     item = models.ForeignKey(GarmentItem, on_delete=models.SET_NULL, null=True, blank=True)
     item_title = models.CharField(max_length=255)
@@ -373,13 +432,19 @@ class OrderItem(models.Model):
     unit_price = models.FloatField(default=0.0)
     total_price = models.FloatField(default=0.0)
 
+    def save(self, *args, **kwargs):
+        if not getattr(self, 'shop_id', None) and getattr(self, 'order_id', None):
+            self.shop = self.order.shop
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.quantity} x {self.item_title}"
 
 
 # ── Scheduling ────────────────────────────────────────────────────────────────
 
-class ServiceArea(models.Model):
+class ServiceArea(TenantModel):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='service_areas', db_index=True)
     name = models.CharField(max_length=180)
     pin_code = models.CharField(max_length=12, blank=True, default='')
     is_active = models.BooleanField(default=True)
@@ -388,11 +453,12 @@ class ServiceArea(models.Model):
         return self.name
 
 
-class TimeSlot(models.Model):
+class TimeSlot(TenantModel):
     PICKUP = 'PICKUP'
     DELIVERY = 'DELIVERY'
     KIND_CHOICES = [(PICKUP, 'Pickup'), (DELIVERY, 'Delivery')]
 
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='time_slots', db_index=True)
     kind = models.CharField(max_length=10, choices=KIND_CHOICES)
     start_time = models.TimeField()
     end_time = models.TimeField()
@@ -409,15 +475,12 @@ class TimeSlot(models.Model):
 
 # ── Back office ───────────────────────────────────────────────────────────────
 
-class Expense(models.Model):
+class Expense(TenantModel):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='expenses', db_index=True)
     title = models.CharField(max_length=255)
     category = models.CharField(max_length=100, choices=ExpenseCategory.choices, default=ExpenseCategory.SUPPLIES)
     amount = models.FloatField()
     payment_method = models.CharField(max_length=50, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
-    # Settable, not auto_now_add: an expense is logged when someone gets round
-    # to it, but it belongs to the day it was actually incurred. Stamping it
-    # with the moment of entry filed July's rent under whatever day you typed
-    # it in, and the monthly totals inherited that error.
     date = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True, null=True)
 
@@ -437,23 +500,23 @@ DEFAULT_CREDIT_CATEGORIES = [
 ]
 
 
-class CreditCategory(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+class CreditCategory(TenantModel):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='credit_categories', db_index=True)
+    name = models.CharField(max_length=100)
     display_order = models.IntegerField(default=0)
-    # Turning a category off hides it from new credits but keeps it on the
-    # credits already filed under it — the only option once it is in use,
-    # since Credit.category is PROTECT.
     is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ['display_order', 'name']
         verbose_name_plural = 'Credit categories'
+        unique_together = ('shop', 'name')
 
     def __str__(self):
         return self.name
 
 
-class Credit(models.Model):
+class Credit(TenantModel):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='credits', db_index=True)
     title = models.CharField(max_length=255)
     category = models.ForeignKey(CreditCategory, on_delete=models.PROTECT, related_name='credits')
     amount = models.FloatField()
@@ -465,21 +528,15 @@ class Credit(models.Model):
         return self.title
 
 
-class Staff(models.Model):
+class Staff(TenantModel):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='staff_members', db_index=True)
     name = models.CharField(max_length=255)
     role = models.CharField(max_length=100, default='Washer')
     phone = models.CharField(max_length=20)
-    # Google account used to sign in to the CRM. Only counts as CRM access when
-    # `has_app_login` is also set and the status is ACTIVE (see api/auth.py).
     email = models.EmailField(blank=True, default='')
     monthly_wage = models.FloatField(default=15000.0)
     status = models.CharField(max_length=20, default='ACTIVE')
-    # Whether this person has credentials for the Staff/Agent mobile app.
-    # Plans cap how many of these a shop gets.
     has_app_login = models.BooleanField(default=False)
-    # Null for staff added before this field existed — treated as "no
-    # restriction" everywhere it's checked, so old records aren't retroactively
-    # blocked from having attendance on file.
     start_date = models.DateField(null=True, blank=True)
 
     class Meta:
@@ -498,32 +555,14 @@ class Staff(models.Model):
         return f"{self.name} ({self.role})"
 
 
-class SalaryPayment(models.Model):
-    """A payout against one staff member's wages for one month.
-
-    Wages *earned* are derived — `Staff.monthly_wage` divided into a per-day
-    rate (by the number of days in the month being paid) times days worked,
-    which Attendance already records. Nothing recorded what was actually
-    handed over, so the Payroll screen's Paid / Pending columns had no
-    possible source and were hardcoded.
-
-    Deliberately not unique on (staff, month): a month can be paid in
-    instalments, which is what makes PARTIAL a real state rather than a
-    decoration.
-    """
+class SalaryPayment(TenantModel):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='salary_payments', db_index=True)
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='salary_payments')
-    # Always the 1st, so "which month" is a single comparable value.
     month = models.DateField()
     amount = models.FloatField()
-    # Settable, like Expense.date and for the same reason: a payout is recorded
-    # when someone gets round to it but belongs to the day it was made.
     paid_on = models.DateTimeField(default=timezone.now)
     method = models.CharField(max_length=50, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
     note = models.TextField(blank=True, default='')
-    # The real app's own text is "Paid salaries appear in Expenses
-    # automatically" — kept in sync here rather than a one-off copy, so
-    # editing or deleting a payment updates/removes its Expense too instead
-    # of leaving a stale row behind.
     expense = models.OneToOneField(
         Expense, null=True, blank=True, editable=False,
         on_delete=models.SET_NULL, related_name='salary_payment',
@@ -534,15 +573,19 @@ class SalaryPayment(models.Model):
 
     @staticmethod
     def month_start(when):
-        """Normalise any date in a month to that month's first day."""
         return when.replace(day=1)
 
     def save(self, *args, **kwargs):
+        if not getattr(self, 'shop_id', None) and getattr(self, 'staff_id', None):
+            self.shop = self.staff.shop
+        elif not getattr(self, 'shop_id', None):
+            self.shop = get_current_tenant() or Shop.objects.first()
         if self.month:
             self.month = self.month_start(self.month)
         super().save(*args, **kwargs)
 
         expense_fields = dict(
+            shop=self.shop,
             title=f'Salary — {self.staff.name} ({self.month:%b %Y})',
             category=ExpenseCategory.SALARY,
             amount=self.amount,
@@ -567,14 +610,8 @@ class SalaryPayment(models.Model):
         return f"{self.staff.name} {self.month:%b %Y} ₹{self.amount}"
 
 
-class SalaryAdvance(models.Model):
-    """An advance handed to a staff member against a month's wages.
-
-    Distinct from `SalaryPayment`: a payment records money paid out against
-    what's owed (reducing pending balance), while an advance reduces what's
-    owed in the first place — it comes off net pay before pending is even
-    computed. See `views.payroll_summary`.
-    """
+class SalaryAdvance(TenantModel):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='salary_advances', db_index=True)
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='salary_advances')
     month = models.DateField()
     amount = models.FloatField()
@@ -590,6 +627,10 @@ class SalaryAdvance(models.Model):
         return when.replace(day=1)
 
     def save(self, *args, **kwargs):
+        if not getattr(self, 'shop_id', None) and getattr(self, 'staff_id', None):
+            self.shop = self.staff.shop
+        elif not getattr(self, 'shop_id', None):
+            self.shop = get_current_tenant() or Shop.objects.first()
         if self.month:
             self.month = self.month_start(self.month)
         super().save(*args, **kwargs)
@@ -598,7 +639,7 @@ class SalaryAdvance(models.Model):
         return f"{self.staff.name} advance {self.month:%b %Y} ₹{self.amount}"
 
 
-class Attendance(models.Model):
+class Attendance(TenantModel):
     PRESENT = 'PRESENT'
     ABSENT = 'ABSENT'
     HALF_DAY = 'HALF_DAY'
@@ -610,9 +651,6 @@ class Attendance(models.Model):
         (LEAVE, 'Leave'),
     ]
 
-    # What a day in each state is worth when payroll totals it up. HALF_DAY is
-    # offered on the register and stored, so paying it as a whole day would be
-    # wrong; LEAVE is unpaid here, matching ABSENT.
     DAY_VALUE = {
         PRESENT: 1.0,
         HALF_DAY: 0.5,
@@ -620,6 +658,7 @@ class Attendance(models.Model):
         LEAVE: 0.0,
     }
 
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='attendance_records', db_index=True)
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='attendance')
     date = models.DateField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PRESENT)
@@ -629,6 +668,13 @@ class Attendance(models.Model):
     class Meta:
         unique_together = ('staff', 'date')
 
+    def save(self, *args, **kwargs):
+        if not getattr(self, 'shop_id', None) and getattr(self, 'staff_id', None):
+            self.shop = self.staff.shop
+        elif not getattr(self, 'shop_id', None):
+            self.shop = get_current_tenant() or Shop.objects.first()
+        super().save(*args, **kwargs)
+
     @property
     def day_value(self):
         return self.DAY_VALUE.get(self.status, 0.0)
@@ -637,18 +683,16 @@ class Attendance(models.Model):
         return f"{self.staff.name} {self.date} {self.status}"
 
 
-class Lead(models.Model):
-    """A pickup request captured by the website chat bot, before it is an Order."""
+class Lead(TenantModel):
     SOURCE_CHAT = 'chat'
 
-    # PENDING: saved, alert email not yet delivered (provider down / no key).
-    # SENT: delivered; FAILED: gave up after MAX_EMAIL_ATTEMPTS.
     PENDING = 'PENDING'
     SENT = 'SENT'
     FAILED = 'FAILED'
     EMAIL_STATUS_CHOICES = [(PENDING, 'Pending'), (SENT, 'Sent'), (FAILED, 'Failed')]
     MAX_EMAIL_ATTEMPTS = 5
 
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='leads', null=True, blank=True, db_index=True)
     name = models.CharField(max_length=120)
     phone = models.CharField(max_length=20)
     address = models.TextField()
@@ -665,20 +709,13 @@ class Lead(models.Model):
         return f"Lead {self.name} ({self.phone})"
 
 
-class EmailLinkRequest(models.Model):
-    """A signed-in Google account asking to be attached to an existing Customer.
-
-    Created when someone claims a phone number that already has a Customer
-    record. Without an OTP, linking automatically would let anyone take over a
-    stranger's order history by typing their number, so staff approve it
-    (Django admin, or /api/link-requests/<id>/approve/) before the email is
-    written onto the Customer.
-    """
+class EmailLinkRequest(TenantModel):
     PENDING = 'PENDING'
     APPROVED = 'APPROVED'
     REJECTED = 'REJECTED'
     STATUS_CHOICES = [(PENDING, 'Pending'), (APPROVED, 'Approved'), (REJECTED, 'Rejected')]
 
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='link_requests', null=True, blank=True, db_index=True)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='link_requests')
     email = models.EmailField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PENDING)
@@ -688,8 +725,14 @@ class EmailLinkRequest(models.Model):
     class Meta:
         ordering = ['-created_at']
 
+    def save(self, *args, **kwargs):
+        if not getattr(self, 'shop_id', None) and getattr(self, 'customer_id', None):
+            self.shop = self.customer.shop
+        elif not getattr(self, 'shop_id', None):
+            self.shop = get_current_tenant() or Shop.objects.first()
+        super().save(*args, **kwargs)
+
     def approve(self):
-        """Attach the email to the customer, unless they already have a different one."""
         if self.status != self.PENDING:
             return False
         if self.customer.email and self.customer.email.lower() != self.email.lower():
