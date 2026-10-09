@@ -49,6 +49,15 @@ class CustomerDetailScreen extends StatelessWidget {
     final provider = context.watch<AppProvider>();
     final orders = _ordersFor(provider.orders);
 
+    final deliveredDues = orders
+        .where((o) => o.status == OrderStatus.delivered && o.dueAmount > 0)
+        .fold<double>(0.0, (sum, o) => sum + o.dueAmount);
+    final effectiveDues = deliveredDues > 0
+        ? deliveredDues
+        : (customer.deliveredDueAmount > 0
+            ? customer.deliveredDueAmount
+            : customer.dueAmount);
+
     // Money and counts come from the customer record, which the backend keeps
     // as running totals — using them keeps this screen agreeing with the list.
     // "Last order" has no stored column, so it is derived from the orders.
@@ -70,9 +79,9 @@ class CustomerDetailScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _profileCard(),
+                        _profileCard(effectiveDues),
                         const SizedBox(height: 20),
-                        _kpiRow(lastOrder),
+                        _kpiRow(lastOrder, effectiveDues),
                         const SizedBox(height: 20),
                         LayoutBuilder(
                           builder: (context, innerConstraints) {
@@ -229,7 +238,7 @@ class CustomerDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _profileCard() {
+  Widget _profileCard(double dues) {
     final since = customer.createdAt;
     return Container(
       padding: const EdgeInsets.all(20),
@@ -272,19 +281,28 @@ class CustomerDetailScreen extends StatelessWidget {
               ],
             ),
           ),
-          if (customer.dueAmount > 0)
+          if (dues > 0)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFFFEF2F2),
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
               ),
-              child: Text(
-                '${Money.symbol}${customer.dueAmount.toStringAsFixed(0)} due',
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFDC2626)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      size: 16, color: Color(0xFFDC2626)),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${Money.symbol}${dues.toStringAsFixed(0)} due (Delivered)',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFDC2626)),
+                  ),
+                ],
               ),
             ),
         ],
@@ -292,8 +310,13 @@ class CustomerDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _kpiRow(DateTime? lastOrder) {
+  Widget _kpiRow(DateTime? lastOrder, double dues) {
     final cards = [
+      _kpi(
+          'Delivered Dues',
+          '${Money.symbol}${dues.toStringAsFixed(0)}',
+          Icons.receipt_long_rounded,
+          dues > 0 ? const Color(0xFFDC2626) : const Color(0xFF10B981)),
       _kpi(
           'Lifetime value',
           '${Money.symbol}${customer.totalSpent.toStringAsFixed(0)}',
@@ -312,9 +335,13 @@ class CustomerDetailScreen extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Four across needs ~880px; below that go two-by-two rather than
-        // squeezing "₹12,340" into a column too narrow to render it.
-        final perRow = constraints.maxWidth < 880 ? 2 : 4;
+        final perRow = constraints.maxWidth < 640
+            ? 1
+            : constraints.maxWidth < 950
+                ? 2
+                : constraints.maxWidth < 1250
+                    ? 3
+                    : 5;
         const gap = 16.0;
         final width = (constraints.maxWidth - gap * (perRow - 1)) / perRow;
         return Wrap(
@@ -473,7 +500,34 @@ class CustomerDetailScreen extends StatelessWidget {
                       flex: 3,
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: StatusPill(status: o.status),
+                        child: Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            StatusPill(status: o.status),
+                            if (o.status == OrderStatus.delivered &&
+                                o.dueAmount > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: const Color(0xFFFCA5A5)),
+                                ),
+                                child: Text(
+                                  'Due: ${Money.symbol}${o.dueAmount.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFDC2626),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                     Expanded(
@@ -522,6 +576,25 @@ class CustomerDetailScreen extends StatelessWidget {
               StatusPill(status: o.status),
             ],
           ),
+          if (o.status == OrderStatus.delivered && o.dueAmount > 0) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+              ),
+              child: Text(
+                'Balance Due: ${Money.symbol}${o.dueAmount.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFDC2626),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 6),
           Text(DateFormat('MMM d, yyyy').format(o.createdAt),
               style: const TextStyle(fontSize: 12, color: Color(0xFF475569))),

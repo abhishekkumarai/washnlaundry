@@ -18,6 +18,7 @@ from .models import (
     Staff, Expense, Credit, CreditCategory, DEFAULT_CREDIT_CATEGORIES, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
     EmailLinkRequest, OrderStatus, PaymentStatus, DeliveryType, PricingUnit,
 )
+from .serializers import CustomerSerializer
 
 
 class ShopTests(TestCase):
@@ -209,6 +210,45 @@ class CustomerTests(TestCase):
     def test_avg_order_value_without_orders(self):
         c = Customer.objects.create(name='B', phone='2')
         self.assertEqual(c.avg_order_value, 0.0)
+
+    def test_delivered_due_amount(self):
+        c = Customer.objects.create(name='Alice', phone='9876543210')
+        # 1. Delivered and unpaid -> counts as delivered debt
+        Order.objects.create(
+            customer=c, customer_name=c.name, customer_phone=c.phone,
+            status=OrderStatus.DELIVERED, payment_status=PaymentStatus.UNPAID,
+            total_amount=500.0, paid_amount=0.0, due_amount=500.0,
+        )
+        # 2. Delivered and partially paid -> counts remaining due_amount
+        Order.objects.create(
+            customer=c, customer_name=c.name, customer_phone=c.phone,
+            status=OrderStatus.DELIVERED, payment_status=PaymentStatus.PARTIAL,
+            total_amount=300.0, paid_amount=100.0, due_amount=200.0,
+        )
+        # 3. Delivered and fully paid -> due_amount is 0, adds 0
+        Order.objects.create(
+            customer=c, customer_name=c.name, customer_phone=c.phone,
+            status=OrderStatus.DELIVERED, payment_status=PaymentStatus.PAID,
+            total_amount=400.0, paid_amount=400.0, due_amount=0.0,
+        )
+        # 4. Processing order with unpaid amount -> NOT delivered yet, so does NOT count
+        Order.objects.create(
+            customer=c, customer_name=c.name, customer_phone=c.phone,
+            status=OrderStatus.PROCESSING, payment_status=PaymentStatus.UNPAID,
+            total_amount=600.0, paid_amount=0.0, due_amount=600.0,
+        )
+        # 5. Counter order without FK customer but matching phone -> counts
+        Order.objects.create(
+            customer=None, customer_name=c.name, customer_phone=c.phone,
+            status=OrderStatus.DELIVERED, payment_status=PaymentStatus.UNPAID,
+            total_amount=150.0, paid_amount=0.0, due_amount=150.0,
+        )
+        # Expected total delivered dues: 500 + 200 + 0 + 150 = 850.0
+        self.assertEqual(c.delivered_due_amount, 850.0)
+
+        # Serializer includes delivered_due_amount
+        serializer = CustomerSerializer(c)
+        self.assertEqual(serializer.data['delivered_due_amount'], 850.0)
 
 
 class CustomerImportTests(APITestCase):

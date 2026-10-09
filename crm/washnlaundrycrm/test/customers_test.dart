@@ -19,10 +19,14 @@ OrderModel order({
   String phone = '',
   String name = 'Someone',
   double total = 500,
+  double? paid,
+  double? due,
   String status = OrderStatus.delivered,
   DateTime? createdAt,
   int itemCount = 2,
 }) {
+  final actualPaid = paid ?? (due != null ? total - due : total);
+  final actualDue = due ?? (total - actualPaid);
   return OrderModel(
     id: id,
     orderNumber: number,
@@ -30,11 +34,13 @@ OrderModel order({
     customerName: name,
     customerPhone: phone,
     status: status,
-    paymentStatus: PaymentStatus.paid,
+    paymentStatus: actualDue > 0
+        ? (actualPaid > 0 ? PaymentStatus.partial : PaymentStatus.unpaid)
+        : PaymentStatus.paid,
     paymentMethod: 'CASH',
     totalAmount: total,
-    paidAmount: total,
-    dueAmount: 0,
+    paidAmount: actualPaid,
+    dueAmount: actualDue,
     express: false,
     createdAt: createdAt ?? DateTime.now().subtract(const Duration(hours: 3)),
     items: List.generate(
@@ -112,6 +118,7 @@ void main() {
       expect(find.text('Total'), findsOneWidget);
       expect(find.text('Active'), findsOneWidget);
       expect(find.text('New'), findsOneWidget);
+      expect(find.text('Amount Owed'), findsOneWidget);
 
       final active = tester.widget<Text>(
         find.descendant(
@@ -123,6 +130,62 @@ void main() {
         ).last,
       );
       expect(active.data, '1');
+    });
+
+    testWidgets(
+        'Amount Owed KPI aggregates delivered unpaid dues and clicking it filters roster',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(
+          customers: roster,
+          orders: [
+            // Ramesh: delivered with 200 due
+            order(
+                id: 'o1',
+                number: 'WASH-0001',
+                customerId: 'c1',
+                phone: '9711223344',
+                total: 500,
+                due: 200,
+                status: OrderStatus.delivered),
+            // Ramesh: ready with 300 due (NOT delivered yet -> does not count as delivered debt)
+            order(
+                id: 'o2',
+                number: 'WASH-0002',
+                customerId: 'c1',
+                phone: '9711223344',
+                total: 300,
+                due: 300,
+                status: OrderStatus.ready),
+            // Geeta: delivered fully paid (0 due)
+            order(
+                id: 'o3',
+                number: 'WASH-0003',
+                customerId: 'c2',
+                phone: '9922334455',
+                total: 400,
+                due: 0,
+                status: OrderStatus.delivered),
+          ],
+        );
+      await tester.pumpWidget(host(provider, const CustomersScreen()));
+      await tester.pump();
+
+      // Aggregate amount owed is ₹200 (only the delivered order)
+      expect(find.text('Amount Owed'), findsOneWidget);
+      expect(find.text('₹200'), findsOneWidget);
+      expect(find.text('1 owing'), findsOneWidget);
+
+      // Ramesh has a due badge in the table
+      expect(find.text('₹200 due'), findsOneWidget);
+
+      // Tap Amount Owed to filter
+      await tester.tap(find.text('Amount Owed'));
+      await tester.pump();
+
+      expect(find.text('Customers with delivered dues'), findsOneWidget);
+      expect(find.text('Ramesh Kumar'), findsOneWidget);
+      expect(find.text('Geeta Devi'), findsNothing);
     });
 
     testWidgets('search matches name, phone and email', (tester) async {
@@ -385,11 +448,54 @@ void main() {
       ));
       await tester.pump();
 
+      expect(find.text('Delivered Dues'), findsOneWidget);
       expect(find.text('Lifetime value'), findsOneWidget);
       expect(find.text('₹1500'), findsOneWidget);
       expect(find.text('Avg order value'), findsOneWidget);
       expect(find.text('₹500'), findsOneWidget);
       expect(find.text('Member since Jul 2026'), findsOneWidget);
+    });
+
+    testWidgets(
+        'displays delivered dues badge, KPI card, and order history warning',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(
+          customers: roster,
+          orders: [
+            order(
+                id: 'o1',
+                number: 'WA3P-00001',
+                customerId: 'c1',
+                phone: '9711223344',
+                total: 600,
+                due: 250,
+                status: OrderStatus.delivered),
+            order(
+                id: 'o2',
+                number: 'WA3P-00002',
+                customerId: 'c1',
+                phone: '9711223344',
+                total: 400,
+                due: 0,
+                status: OrderStatus.delivered),
+          ],
+        );
+      await tester.pumpWidget(host(
+        provider,
+        CustomerDetailScreen(customer: roster.first, onBack: () {}),
+      ));
+      await tester.pump();
+
+      // Profile header badge
+      expect(find.text('₹250 due (Delivered)'), findsOneWidget);
+
+      // KPI card
+      expect(find.text('Delivered Dues'), findsOneWidget);
+      expect(find.text('₹250'), findsOneWidget);
+
+      // Order history table row due indicator
+      expect(find.text('Due: ₹250'), findsOneWidget);
     });
 
     testWidgets('order history lists only this customer\'s orders',

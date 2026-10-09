@@ -154,6 +154,17 @@ class Customer(models.Model):
     def avg_order_value(self):
         return round(self.total_spent / self.total_orders, 2) if self.total_orders else 0.0
 
+    @property
+    def delivered_due_amount(self):
+        """Total unpaid amount for orders that have already been delivered."""
+        from .models import Order
+        return float(
+            Order.objects.filter(
+                models.Q(customer=self) | (models.Q(customer_phone=self.phone) if self.phone else models.Q()),
+                status=OrderStatus.DELIVERED,
+            ).aggregate(s=models.Sum('due_amount'))['s'] or 0.0
+        )
+
     def __str__(self):
         return f"{self.name} ({self.phone})"
 

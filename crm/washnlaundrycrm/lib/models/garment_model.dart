@@ -146,6 +146,7 @@ class CustomerModel {
   final int totalOrders;
   final double totalSpent;
   final double dueAmount;
+  final double deliveredDueAmount;
   final double avgOrderValue;
   final DateTime? createdAt;
 
@@ -159,6 +160,7 @@ class CustomerModel {
     this.totalOrders = 0,
     this.totalSpent = 0,
     this.dueAmount = 0,
+    this.deliveredDueAmount = 0,
     this.avgOrderValue = 0,
     this.createdAt,
   });
@@ -174,6 +176,7 @@ class CustomerModel {
       totalOrders: json['total_orders'] ?? 0,
       totalSpent: (json['total_spent'] ?? 0).toDouble(),
       dueAmount: (json['due_amount'] ?? 0).toDouble(),
+      deliveredDueAmount: ((json['delivered_due_amount'] ?? json['due_amount']) ?? 0).toDouble(),
       avgOrderValue: (json['avg_order_value'] ?? 0).toDouble(),
       createdAt: DateTime.tryParse(json['created_at'] ?? ''),
     );
