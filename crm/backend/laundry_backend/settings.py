@@ -148,7 +148,10 @@ PUBLIC_LEAD_RATE_PER_HOUR = int(os.environ.get('PUBLIC_LEAD_RATE_PER_HOUR', '5')
 API_AUTH_ENFORCED = os.environ.get('API_AUTH_ENFORCED', 'False') == 'True'
 # Owner/bootstrap emails that count as staff even without a Staff row.
 STAFF_EMAILS = [
-    e.strip().lower() for e in os.environ.get('STAFF_EMAILS', 'washnlaundry01@gmail.com,emailabhishek2@gmail.com').split(',') if e.strip()
+    e.strip().lower() for e in os.environ.get(
+        'STAFF_EMAILS',
+        'washnlaundry01@gmail.com,emailabhishek2@gmail.com,3abhishekkumar@gmail.com'
+    ).split(',') if e.strip()
 ]
 
 REST_FRAMEWORK = {
