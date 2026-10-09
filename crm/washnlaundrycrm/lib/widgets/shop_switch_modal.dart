@@ -227,7 +227,7 @@ void showShopSwitchModalSheet(BuildContext context, {double? width}) {
                           Navigator.of(dialogContext).pop();
                           showDialog<void>(
                             context: context,
-                            barrierDismissible: false,
+                            barrierDismissible: true,
                             builder: (_) => const ShopOnboardingDialog(),
                           );
                         },

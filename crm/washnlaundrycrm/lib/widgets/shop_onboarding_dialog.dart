@@ -84,18 +84,21 @@ class _ShopOnboardingDialogState extends State<ShopOnboardingDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Center(child: BrandLogo(size: 48)),
-                const SizedBox(height: 20),
-                const Text(
-                  'Set up your store',
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: SingleChildScrollView(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                    const Center(child: BrandLogo(size: 48)),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Set up your store',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 22,
@@ -176,30 +179,69 @@ class _ShopOnboardingDialogState extends State<ShopOnboardingDialog> {
                   ),
                 ),
                 const SizedBox(height: 28),
-                ElevatedButton(
-                  onPressed: _submitting ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _brandBlue,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                  child: _submitting
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text(
-                          'Create Store & Launch CRM',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _submitting
+                            ? null
+                            : () => Navigator.of(context, rootNavigator: true).pop(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _muted,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: _submitting ? null : _submit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _brandBlue,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        child: _submitting
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text(
+                                'Create Store & Launch CRM',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ),
       ),
-    );
+        Positioned(
+          top: 12,
+          right: 12,
+          child: IconButton(
+            icon: const Icon(Icons.close_rounded, size: 20, color: _muted),
+            tooltip: 'Cancel',
+            onPressed: _submitting
+                ? null
+                : () => Navigator.of(context, rootNavigator: true).pop(),
+          ),
+        ),
+      ],
+    ),
+  ),
+);
   }
 }

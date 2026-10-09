@@ -48,7 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _dialogShown = true;
       showDialog<void>(
         context: context,
-        barrierDismissible: false,
+        barrierDismissible: true,
         builder: (_) => const ShopOnboardingDialog(),
       );
     }
