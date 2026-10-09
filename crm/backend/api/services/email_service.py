@@ -87,17 +87,40 @@ class EmailService:
         key = getattr(settings, 'RESEND_API_KEY', '')
         if not key:
             return False, 'RESEND_API_KEY is not set'
+        
+        sender = getattr(settings, 'AUTH_EMAIL_FROM', 'WashNLaundry <noreply@washnlaundry.com>')
+        # Never send from public domains that Resend strictly rejects
+        if not sender or any(d in sender.lower() for d in ['@gmail.com', '@yahoo.com', '@hotmail.com', '@outlook.com']):
+            sender = 'WashNLaundry <noreply@washnlaundry.com>'
+
         try:
             resp = requests.post(
                 RESEND_URL,
                 headers={'Authorization': f'Bearer {key}'},
-                json={'from': settings.AUTH_EMAIL_FROM, 'to': [to], 'subject': subject, 'text': text},
+                json={'from': sender, 'to': [to], 'subject': subject, 'text': text},
                 timeout=10,
             )
         except requests.exceptions.RequestException as e:
             return False, str(e)
         if resp.status_code < 300:
             return True, None
+        
+        # If the sender failed with 403 (domain verification issue), retry once with default verified sender
+        if resp.status_code == 403 and sender != 'WashNLaundry <noreply@washnlaundry.com>':
+            logger.warning('Resend rejected sender "%s" (%s), retrying with verified domain sender...', sender, resp.text[:120])
+            try:
+                retry_resp = requests.post(
+                    RESEND_URL,
+                    headers={'Authorization': f'Bearer {key}'},
+                    json={'from': 'WashNLaundry <noreply@washnlaundry.com>', 'to': [to], 'subject': subject, 'text': text},
+                    timeout=10,
+                )
+                if retry_resp.status_code < 300:
+                    return True, None
+                return False, f'Resend retry {retry_resp.status_code}: {retry_resp.text[:200]}'
+            except requests.exceptions.RequestException as e:
+                return False, str(e)
+
         return False, f'Resend {resp.status_code}: {resp.text[:200]}'
 
     @classmethod

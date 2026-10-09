@@ -113,7 +113,17 @@ LEAD_EMAIL_TO = [
         'LEAD_EMAIL_TO', 'washnlaundry01@gmail.com,emailabhishek2@gmail.com'
     ).split(',') if e.strip()
 ]
-LEAD_EMAIL_FROM = os.environ.get('LEAD_EMAIL_FROM', 'WashNLaundry <noreply@washnlaundry.com>')
+def _clean_from_email(val, default='WashNLaundry <noreply@washnlaundry.com>'):
+    v = (val or '').strip()
+    if not v:
+        return default
+    lower = v.lower()
+    if any(d in lower for d in ['@gmail.com', '@yahoo.com', '@hotmail.com', '@outlook.com']):
+        return default
+    return v
+
+
+LEAD_EMAIL_FROM = _clean_from_email(os.environ.get('LEAD_EMAIL_FROM'))
 
 # Browser origins allowed to call the public (no-secret) pickup-form endpoint
 # /api/leads/public/, and how many submissions one IP may make per hour.
@@ -152,10 +162,8 @@ REST_FRAMEWORK = {
 # owner's email. Set SECRET_KEY in the environment to enable it.
 PASSWORD_AUTH_ENABLED = SECRET_KEY != _INSECURE_SECRET_KEY
 PASSWORD_RESET_TIMEOUT = 3600  # seconds a reset link stays valid
-# Sender for verification / reset emails. With Resend's shared onboarding@ sender
-# only the Resend account owner's address can receive mail: verify a domain
-# there and set this (e.g. "washnlaundry <no-reply@washnlaundry.com>").
-AUTH_EMAIL_FROM = os.environ.get('AUTH_EMAIL_FROM', LEAD_EMAIL_FROM)
+# Sender for verification / reset emails.
+AUTH_EMAIL_FROM = _clean_from_email(os.environ.get('AUTH_EMAIL_FROM'), default=LEAD_EMAIL_FROM)
 # Front-end origins the verify / reset links in emails may point at. A link goes
 # back to the origin the request came from (so a customer who signs up on
 # customer.washnlaundry.com gets a customer.washnlaundry.com link), provided it
