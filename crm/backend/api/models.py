@@ -485,6 +485,15 @@ class Staff(models.Model):
     class Meta:
         verbose_name_plural = 'Staff'
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.email:
+            try:
+                from .auth import sync_staff_user
+                sync_staff_user(self)
+            except Exception:
+                pass
+
     def __str__(self):
         return f"{self.name} ({self.role})"
 

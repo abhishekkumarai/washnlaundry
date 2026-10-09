@@ -120,22 +120,105 @@ def is_staff_email(email):
 
 @dataclass
 class Principal:
-    """What `request.user` is for a verified Google caller (not a Django User)."""
+    """What `request.user` is for a verified caller."""
     email: str
     role: str
     customer: Optional[Customer] = None
     is_authenticated: bool = True
+    user: Optional[object] = None
+
+    def has_perm(self, perm, obj=None):
+        if self.user and hasattr(self.user, 'has_perm'):
+            return self.user.has_perm(perm, obj)
+        return self.role == OWNER
+
+    def in_group(self, group_name):
+        if self.user and hasattr(self.user, 'groups'):
+            return self.user.groups.filter(name=group_name).exists()
+        if group_name.lower() == 'owner':
+            return self.role == OWNER
+        if group_name.lower() == 'staff':
+            return self.role in (OWNER, STAFF)
+        return False
+
+
+def sync_staff_user(staff):
+    """Sync a Staff record with an underlying Django auth.User and its Groups."""
+    if not staff or not staff.email:
+        return None
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    email = staff.email.strip().lower()
+    user, _ = User.objects.get_or_create(username=email, defaults={'email': email, 'is_active': True})
+    return sync_user_groups(user)
+
+
+def sync_user_groups(user):
+    """Ensure a Django User's Group memberships match their role.
+    
+    Groups: 'Owner', 'Staff'.
+    """
+    if user is None:
+        return None
+    from django.contrib.auth.models import Group
+    owner_group = Group.objects.filter(name='Owner').first()
+    staff_group = Group.objects.filter(name='Staff').first()
+    if not owner_group or not staff_group:
+        return None
+
+    email = (user.email or user.username or '').strip().lower()
+
+    # Check if Owner
+    if user.is_superuser or is_owner_email(email):
+        user.groups.add(owner_group)
+        user.groups.remove(staff_group)
+        if not user.is_staff:
+            user.is_staff = True
+            user.save(update_fields=['is_staff'])
+        return OWNER
+
+    # Check if Staff
+    if is_staff_email(email):
+        user.groups.add(staff_group)
+        user.groups.remove(owner_group)
+        if not user.is_staff:
+            user.is_staff = True
+            user.save(update_fields=['is_staff'])
+        return STAFF
+
+    return None
 
 
 def resolve_principal(email):
-    if is_owner_email(email):
-        return Principal(email, OWNER)
-    if is_staff_email(email):
-        return Principal(email, STAFF)
+    email = (email or '').strip().lower()
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    user = User.objects.filter(username__iexact=email).first()
+
+    if user:
+        group_names = set(user.groups.values_list('name', flat=True))
+        if 'Owner' in group_names or user.is_superuser:
+            return Principal(email, OWNER, user=user)
+        if 'Staff' in group_names:
+            return Principal(email, STAFF, user=user)
+
+        # Fallback to sync from settings / staff records
+        synced_role = sync_user_groups(user)
+        if synced_role == OWNER:
+            return Principal(email, OWNER, user=user)
+        if synced_role == STAFF:
+            return Principal(email, STAFF, user=user)
+    else:
+        # Fallback for Google tokens before local User creation
+        if is_owner_email(email):
+            return Principal(email, OWNER)
+        if is_staff_email(email):
+            return Principal(email, STAFF)
+
     customer = customer_for_email(email)
     if customer:
-        return Principal(email, CUSTOMER, customer=customer)
-    return Principal(email, UNLINKED)
+        return Principal(email, CUSTOMER, customer=customer, user=user)
+    return Principal(email, UNLINKED, user=user)
 
 
 class GoogleTokenAuthentication(BaseAuthentication):
@@ -160,8 +243,13 @@ class IsStaff(BasePermission):
         if not settings.API_AUTH_ENFORCED:
             return True
         user = request.user
-        # Customers are let in too for now (same CRM view as the owner).
-        return isinstance(user, Principal) and user.role in (OWNER, STAFF, CUSTOMER)
+        if not isinstance(user, Principal):
+            return False
+        return (
+            user.role in (OWNER, STAFF, CUSTOMER)
+            or user.in_group('Staff')
+            or user.in_group('Owner')
+        )
 
 
 class IsOwner(BasePermission):
@@ -171,8 +259,12 @@ class IsOwner(BasePermission):
         if not settings.API_AUTH_ENFORCED:
             return True
         user = request.user
+        if not isinstance(user, Principal):
+            return False
+        if user.role == OWNER or user.in_group('Owner'):
+            return True
         # Customers are let in too for now (same CRM view as the owner).
-        return isinstance(user, Principal) and user.role in (OWNER, CUSTOMER)
+        return user.role == CUSTOMER
 
 
 class IsOwnerOrStaffReadOnly(BasePermission):
@@ -184,9 +276,9 @@ class IsOwnerOrStaffReadOnly(BasePermission):
         user = request.user
         if not isinstance(user, Principal):
             return False
-        if user.role in (OWNER, CUSTOMER):
+        if user.role in (OWNER, CUSTOMER) or user.in_group('Owner'):
             return True
-        return user.role == STAFF and request.method in SAFE_METHODS
+        return (user.role == STAFF or user.in_group('Staff')) and request.method in SAFE_METHODS
 
 
 class IsSignedIn(BasePermission):
