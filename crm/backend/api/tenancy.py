@@ -29,11 +29,33 @@ def tenant_context(tenant):
 class TenantQuerySet(models.QuerySet):
     """QuerySet that supports automatic tenant filtering."""
 
+    _active_tenant_id = None
+    _unscoped = False
+
+    def unscoped(self):
+        """Returns a clone of the queryset with tenant filtering disabled."""
+        clone = self._clone()
+        clone._unscoped = True
+        return clone
+
     def filter_current_tenant(self):
         tenant = get_current_tenant()
         if tenant:
             return self.filter(shop=tenant)
         return self
+
+    def all(self):
+        """Overrides .all() so that evaluated or module-level querysets (like DRF's
+        `queryset = Model.objects.all()`) dynamically scope to the request's
+        active tenant when called per-request by DRF's `get_queryset()`."""
+        tenant = get_current_tenant()
+        if tenant and not getattr(self, '_unscoped', False):
+            if getattr(self, '_active_tenant_id', None) == tenant.id:
+                return super().all()
+            clone = self.filter(shop=tenant)
+            clone._active_tenant_id = tenant.id
+            return clone
+        return super().all()
 
 
 class TenantManager(models.Manager.from_queryset(TenantQuerySet)):
@@ -43,7 +65,9 @@ class TenantManager(models.Manager.from_queryset(TenantQuerySet)):
         qs = super().get_queryset()
         tenant = get_current_tenant()
         if tenant:
-            return qs.filter(shop=tenant)
+            clone = qs.filter(shop=tenant)
+            clone._active_tenant_id = tenant.id
+            return clone
         return qs
 
 
