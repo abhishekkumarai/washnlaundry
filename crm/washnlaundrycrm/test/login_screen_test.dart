@@ -124,6 +124,19 @@ void main() {
       expect(auth.isSignedIn, isFalse);
     });
 
+    testWidgets('SingleChildScrollView takes full screen width so scrollbar is at window edge',
+        (tester) async {
+      final auth = AuthProvider();
+      await tester.pumpWidget(host(auth, const LoginScreen()));
+      await tester.pumpAndSettle();
+
+      final scrollFinder = find.byType(SingleChildScrollView);
+      expect(scrollFinder, findsOneWidget);
+
+      final scrollSize = tester.getSize(scrollFinder);
+      expect(scrollSize.width, 1200.0);
+    });
+
     test('Demo Mode is hidden on the customer site only', () {
       expect(LoginScreen.showDemoOn('app.washnlaundry.com'), isTrue);
       expect(LoginScreen.showDemoOn('localhost'), isTrue);

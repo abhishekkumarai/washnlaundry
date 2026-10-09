@@ -144,43 +144,55 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 380),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _brandMark(),
-                const SizedBox(height: 20),
-                _wordmark(),
-                const SizedBox(height: 6),
-                const Text(
-                  'Sign in to manage your shop',
-                  style: TextStyle(fontSize: 13, color: _muted),
-                ),
-                const SizedBox(height: 32),
-                Container(
-                  width: double.infinity,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: constraints.maxWidth,
+                minHeight: constraints.maxHeight,
+              ),
+              child: Center(
+                child: Padding(
                   padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _border),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 380),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _brandMark(),
+                        const SizedBox(height: 20),
+                        _wordmark(),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Sign in to manage your shop',
+                          style: TextStyle(fontSize: 13, color: _muted),
+                        ),
+                        const SizedBox(height: 32),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: _border),
+                          ),
+                          child: _body(auth),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'By signing in, you agree to our Terms of Service and Privacy Policy.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 11, color: _muted),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: _body(auth),
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'By signing in, you agree to our Terms of Service and Privacy Policy.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: _muted),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
