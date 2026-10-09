@@ -137,7 +137,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
                   final narrow = constraints.maxWidth <
                       SidebarNavigation.contentWideBreakpoint;
                   return SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
+                    padding: EdgeInsets.all(narrow ? 16 : 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -315,11 +315,13 @@ class _CreditsScreenState extends State<CreditsScreen> {
   Widget _monthNav() {
     return Row(
       key: const Key('creditMonthNav'),
+      mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
           tooltip: 'Previous month',
           icon: const Icon(Icons.chevron_left_rounded, size: 22),
           onPressed: () => _stepMonth(-1),
+          visualDensity: VisualDensity.compact,
           style: IconButton.styleFrom(
             backgroundColor: Colors.white,
             side: const BorderSide(color: Color(0xFFE4E0D8)),
@@ -328,28 +330,33 @@ class _CreditsScreenState extends State<CreditsScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFE4E0D8)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.calendar_today_rounded,
-                  size: 14, color: Color(0xFF10B981)),
-              const SizedBox(width: 8),
-              Text(
-                _monthLabel,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF141A24),
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE4E0D8)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.calendar_today_rounded,
+                    size: 14, color: Color(0xFF10B981)),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    _monthLabel,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF141A24),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -357,6 +364,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
           tooltip: 'Next month',
           icon: const Icon(Icons.chevron_right_rounded, size: 22),
           onPressed: () => _stepMonth(1),
+          visualDensity: VisualDensity.compact,
           style: IconButton.styleFrom(
             backgroundColor: Colors.white,
             side: const BorderSide(color: Color(0xFFE4E0D8)),

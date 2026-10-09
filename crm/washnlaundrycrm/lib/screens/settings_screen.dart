@@ -36,22 +36,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const servicesExportImport = 'services-import-export';
 
   /// Only [businessProfile], [creditCategories], and [servicesExportImport] are built;
-  /// the rest are listed for parity with the real app and show a "Not available yet" panel.
+  /// unbuilt tabs show a "Not available yet" panel.
   static const _mainTabs = [
     _SettingsTab(businessProfile, Icons.storefront_outlined, 'Business profile'),
     _SettingsTab(servicesExportImport, Icons.swap_vert_rounded, 'Services export/import'),
-    _SettingsTab('tax-currency', Icons.attach_money_rounded, 'Tax & currency'),
-    _SettingsTab('bank-details', Icons.account_balance_outlined, 'Bank details'),
-    _SettingsTab('operations', Icons.tune_rounded, 'Operations'),
-    _SettingsTab('preferences', Icons.palette_outlined, 'Preferences'),
     _SettingsTab(creditCategories, Icons.savings_outlined, 'Credit categories'),
   ];
   static const _accountTabs = [
-    _SettingsTab('subscription', Icons.card_membership_outlined,
-        'Subscription & billing',
-        hasArrow: true),
-    _SettingsTab('payment-history', Icons.receipt_outlined, 'Payment history',
-        hasArrow: true),
     _SettingsTab('help', Icons.help_outline_rounded, 'Help & support',
         hasArrow: true),
   ];
@@ -340,8 +331,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: _saving ? null : () => _save(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF182C4F),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: EdgeInsets.symmetric(
+                    horizontal: narrow ? 12 : 20, vertical: 10),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
@@ -354,7 +345,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     )
                   : const Text('Save changes',
                       style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: Colors.white)),
             ),
@@ -479,16 +470,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 24),
 
         // Contact Information Section Header
-        Row(
-          children: const [
+        const Row(
+          children: [
             Icon(Icons.phone_outlined,
                 size: 18, color: Color(0xFF182C4F)),
             SizedBox(width: 8),
-            Text('Contact Information',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF141A24))),
+            Expanded(
+              child: Text('Contact Information',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF141A24))),
+            ),
           ],
         ),
         const SizedBox(height: 20),
@@ -579,16 +573,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 24),
 
         // Location & Map Section
-        Row(
-          children: const [
+        const Row(
+          children: [
             Icon(Icons.location_on_outlined,
                 size: 18, color: Color(0xFF182C4F)),
             SizedBox(width: 8),
-            Text('Store Location',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF141A24))),
+            Expanded(
+              child: Text('Store Location',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF141A24))),
+            ),
           ],
         ),
         const SizedBox(height: 16),

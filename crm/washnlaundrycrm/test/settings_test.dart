@@ -109,7 +109,14 @@ void main() {
       await tester.pumpWidget(host(seeded(), const SettingsScreen()));
       await tester.pump();
 
-      await tester.tap(find.byKey(const ValueKey('settings-tab-bank-details')));
+      expect(find.byKey(const ValueKey('settings-tab-tax-currency')), findsNothing);
+      expect(find.byKey(const ValueKey('settings-tab-bank-details')), findsNothing);
+      expect(find.byKey(const ValueKey('settings-tab-operations')), findsNothing);
+      expect(find.byKey(const ValueKey('settings-tab-preferences')), findsNothing);
+      expect(find.byKey(const ValueKey('settings-tab-subscription')), findsNothing);
+      expect(find.byKey(const ValueKey('settings-tab-payment-history')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('settings-tab-help')));
       await tester.pumpAndSettle();
 
       expect(find.text('Not available yet.'), findsOneWidget);

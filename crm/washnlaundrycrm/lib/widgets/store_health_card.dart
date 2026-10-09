@@ -108,8 +108,11 @@ class StoreHealthCard extends StatelessWidget {
           const SizedBox(height: 14),
           const Divider(height: 1, color: Color(0xFFF1EFEA)),
           const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
             children: [
               Text(
                 '$onSchedule active orders on schedule',
@@ -120,6 +123,7 @@ class StoreHealthCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
                 onTap: () => context.goSection(9),
                 child: const Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       'View reports',
@@ -148,8 +152,12 @@ class StoreHealthCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+          Expanded(
+            child: Text(label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+          ),
+          const SizedBox(width: 6),
           Text(
             value,
             style: const TextStyle(

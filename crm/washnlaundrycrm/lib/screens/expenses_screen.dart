@@ -118,7 +118,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   final narrow = constraints.maxWidth <
                       SidebarNavigation.contentWideBreakpoint;
                   return SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
+                    padding: EdgeInsets.all(narrow ? 16 : 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -481,7 +481,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF141A24))),
                         const SizedBox(height: 3),
-                        Row(
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 6,
+                          runSpacing: 2,
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -497,15 +500,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                       fontWeight: FontWeight.bold,
                                       color: _colorFor(expenses[i].category))),
                             ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                '${_methodLabel(provider, expenses[i].paymentMethod)} · '
-                                '${expenses[i].date == null ? 'No date' : DateFormat('MMM d, yyyy').format(expenses[i].date!)}',
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontSize: 11, color: Color(0xFF64748B)),
-                              ),
+                            Text(
+                              '${_methodLabel(provider, expenses[i].paymentMethod)} · '
+                              '${expenses[i].date == null ? 'No date' : DateFormat('MMM d, yyyy').format(expenses[i].date!)}',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Color(0xFF64748B)),
                             ),
                           ],
                         ),

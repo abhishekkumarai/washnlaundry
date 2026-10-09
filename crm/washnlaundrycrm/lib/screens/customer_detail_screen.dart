@@ -79,7 +79,7 @@ class CustomerDetailScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _profileCard(effectiveDues),
+                        _profileCard(effectiveDues, narrow: narrow),
                         const SizedBox(height: 20),
                         _kpiRow(lastOrder, effectiveDues),
                         const SizedBox(height: 20),
@@ -238,8 +238,96 @@ class CustomerDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _profileCard(double dues) {
+  Widget _profileCard(double dues, {bool narrow = false}) {
     final since = customer.createdAt;
+    final duesBadge = dues > 0
+        ? Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFCA5A5)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    size: 16, color: Color(0xFFDC2626)),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    '${Money.symbol}${dues.toStringAsFixed(0)} due (Delivered)',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFDC2626)),
+                  ),
+                ),
+              ],
+            ),
+          )
+        : null;
+
+    if (narrow) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: _panel,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 26,
+                  backgroundColor: const Color(0xFF182C4F),
+                  child: Text(
+                    customer.name.isNotEmpty ? customer.name[0].toUpperCase() : 'C',
+                    style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(customer.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF141A24))),
+                      const SizedBox(height: 2),
+                      Text(
+                        customer.phone.isEmpty ? 'No phone on file' : customer.phone,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                      ),
+                      if (since != null) ...[
+                        const SizedBox(height: 2),
+                        Text('Member since ${DateFormat('MMM yyyy').format(since)}',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12, color: Color(0xFF94A3B8))),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (duesBadge != null) ...[
+              const SizedBox(height: 12),
+              duesBadge,
+            ],
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: _panel,
@@ -262,6 +350,7 @@ class CustomerDetailScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(customer.name,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -269,42 +358,21 @@ class CustomerDetailScreen extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   customer.phone.isEmpty ? 'No phone on file' : customer.phone,
+                  overflow: TextOverflow.ellipsis,
                   style:
                       const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                 ),
                 if (since != null) ...[
                   const SizedBox(height: 2),
                   Text('Member since ${DateFormat('MMM yyyy').format(since)}',
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 12, color: Color(0xFF94A3B8))),
                 ],
               ],
             ),
           ),
-          if (dues > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFCA5A5)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.warning_amber_rounded,
-                      size: 16, color: Color(0xFFDC2626)),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${Money.symbol}${dues.toStringAsFixed(0)} due (Delivered)',
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFDC2626)),
-                  ),
-                ],
-              ),
-            ),
+          if (duesBadge != null) duesBadge,
         ],
       ),
     );
