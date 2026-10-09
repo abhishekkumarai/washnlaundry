@@ -32,6 +32,8 @@ Future<void> main() async {
   usePathUrlStrategy();
   final authProvider = AuthProvider();
   final appProvider = AppProvider(autoLoad: false);
+  ApiService.tenantIdProvider = () => appProvider.activeTenantId;
+
   // The shop data is for owner/staff only and the API rejects it without a
   // matching token, so load it once the backend has confirmed the role rather
   // than at startup.
@@ -39,6 +41,19 @@ Future<void> main() async {
   authProvider.addListener(() {
     final role = authProvider.role;
     final validRole = role == 'owner' || role == 'staff' || role == 'customer';
+    if (authProvider.me != null) {
+      final me = authProvider.me!;
+      final shopData = me['shop'] as Map<String, dynamic>?;
+      if (shopData != null && appProvider.activeTenantId == null) {
+        appProvider.setActiveTenant(shopData['slug'] as String? ?? shopData['id']?.toString());
+      }
+      final rawShops = me['shops'] as List?;
+      if (rawShops != null) {
+        appProvider.setAvailableShops(
+          rawShops.map((s) => Map<String, dynamic>.from(s as Map)).toList(),
+        );
+      }
+    }
     // Customers get the owner's CRM data and layout (minus their hidden
     // views, see RoleViews).
     if (validRole) appProvider.role = role == 'customer' ? 'owner' : role!;

@@ -58,6 +58,10 @@ class ApiService {
   static const _jsonHeaders = {'Content-Type': 'application/json'};
   static const _timeout = Duration(seconds: 15);
 
+  /// Supplies the active tenant ID / slug sent as `X-Tenant-ID`. Set by
+  /// `AppProvider` or `AuthProvider`.
+  static String? Function()? tenantIdProvider;
+
   /// Supplies the Google ID token sent as `Authorization: Bearer`. Set by
   /// `AuthProvider`; null (or a null result) sends no header, which is what
   /// Demo Mode and a backend with API_AUTH_ENFORCED off expect.
@@ -78,9 +82,11 @@ class ApiService {
     final uri = _uri(path, query);
     try {
       final token = auth ? await tokenProvider?.call() : null;
+      final tenantId = tenantIdProvider?.call();
       final headers = <String, String>{
         if (method == 'POST' || method == 'PATCH') ..._jsonHeaders,
         if (token != null) 'Authorization': 'Bearer $token',
+        if (tenantId != null && tenantId.isNotEmpty) 'X-Tenant-ID': tenantId,
       };
       late http.Response response;
       switch (method) {
@@ -741,6 +747,21 @@ class ApiService {
         if (token != null && token.isNotEmpty) yield token;
       }
     }
+  }
+
+  // ── Tenant Shop Provisioning & List ────────────────────────────────────────
+
+  static Future<List<Map<String, dynamic>>> fetchShops() async {
+    final res = await _send('GET', '/shops/');
+    if (res is List) {
+      return res.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return [];
+  }
+
+  static Future<Map<String, dynamic>> provisionShop(Map<String, dynamic> data) async {
+    final res = await _send('POST', '/shops/provision/', body: data);
+    return Map<String, dynamic>.from(res as Map);
   }
 }
 

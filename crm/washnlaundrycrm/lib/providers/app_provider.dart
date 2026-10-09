@@ -167,6 +167,28 @@ class AppProvider extends ChangeNotifier {
   Map<String, dynamic>? _shop;
   Map<String, dynamic>? get shop => _shop;
 
+  String? _activeTenantId;
+  String? get activeTenantId => _activeTenantId;
+
+  List<Map<String, dynamic>> _availableShops = [];
+  List<Map<String, dynamic>> get availableShops => _availableShops;
+
+  void setAvailableShops(List<Map<String, dynamic>> shops) {
+    _availableShops = shops;
+    notifyListeners();
+  }
+
+  void setActiveTenant(String? tenantId) {
+    _activeTenantId = tenantId;
+    notifyListeners();
+  }
+
+  Future<void> switchShop(String tenantSlugOrId) async {
+    _activeTenantId = tenantSlugOrId;
+    notifyListeners();
+    await loadDataFromBackend();
+  }
+
   /// Single writer for [Money]'s statics — call this wherever `_shop` is set.
   void _applyShopFormatting() {
     Money.configure(
