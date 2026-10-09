@@ -511,7 +511,8 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     final canSwitchShop = !isCustomer && appProvider.availableShops.length > 1;
 
     void openProfile() => context.go('/profile');
-    void switchShop() => showShopSwitchModalSheet(context);
+    void switchShop() =>
+        showShopSwitchModalSheet(context, width: widget.inDrawer ? 280.0 : expandedWidth);
 
     final avatarText = initialsFor(avatarSource);
     final avatarTooltip = avatarSource.isNotEmpty
@@ -550,6 +551,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                 Expanded(
                   child: InkWell(
                     onTap: openProfile,
+                    onLongPress: canSwitchShop ? switchShop : null,
                     borderRadius: BorderRadius.circular(10),
                     child: Row(
                       children: [
@@ -581,7 +583,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                 ),
                 if (canSwitchShop)
                   IconButton(
-                    tooltip: 'Switch Branch',
+                    tooltip: 'Switch Branch (or long-press avatar)',
                     icon: const Icon(Icons.swap_horiz_rounded,
                         size: 19, color: Color(0xFF182C4F)),
                     padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -602,7 +604,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
               children: [
                 if (canSwitchShop) ...[
                   IconButton(
-                    tooltip: 'Switch Branch',
+                    tooltip: 'Switch Branch (or long-press avatar)',
                     icon: const Icon(Icons.storefront_outlined,
                         size: 18, color: Color(0xFF182C4F)),
                     padding: EdgeInsets.zero,
@@ -616,6 +618,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                   message: subtitle.isEmpty ? title : '$title · $subtitle',
                   child: InkWell(
                     onTap: openProfile,
+                    onLongPress: canSwitchShop ? switchShop : null,
                     customBorder: const CircleBorder(),
                     child: avatar,
                   ),
