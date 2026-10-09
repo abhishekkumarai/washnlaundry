@@ -433,6 +433,52 @@ class AppProvider extends ChangeNotifier {
   int? get customersNewToday =>
       (_stats['customers_new_today'] as num?)?.toInt();
 
+  /// Total amount owed by a customer on orders that have already been delivered.
+  /// Computed dynamically from orders so any status transition or payment reflects immediately.
+  double deliveredDuesForCustomer(CustomerModel customer) {
+    final matching = _orders.where((o) {
+      final matches = (o.customerId.isNotEmpty && customer.id.isNotEmpty && o.customerId == customer.id) ||
+          (customer.phone.isNotEmpty && o.customerPhone == customer.phone);
+      return matches && o.status == OrderStatus.delivered && o.dueAmount > 0;
+    });
+    final fromOrders = matching.fold(0.0, (sum, o) => sum + o.dueAmount);
+    if (fromOrders == 0 && customer.deliveredDueAmount > 0) {
+      return customer.deliveredDueAmount;
+    }
+    return fromOrders;
+  }
+
+  /// List of delivered unpaid orders for a specific customer.
+  List<OrderModel> deliveredUnpaidOrdersFor(CustomerModel customer) {
+    return _orders.where((o) {
+      final matches = (o.customerId.isNotEmpty && customer.id.isNotEmpty && o.customerId == customer.id) ||
+          (customer.phone.isNotEmpty && o.customerPhone == customer.phone);
+      return matches && o.status == OrderStatus.delivered && o.dueAmount > 0;
+    }).toList();
+  }
+
+  /// Aggregate amount owed across all customers on orders that have been delivered.
+  double get totalDeliveredDues {
+    return _orders
+        .where((o) => o.status == OrderStatus.delivered && o.dueAmount > 0)
+        .fold(0.0, (sum, o) => sum + o.dueAmount);
+  }
+
+  /// Total count of unique customers who currently have delivered unpaid orders.
+  int get customersWithDeliveredDuesCount {
+    final owingKeys = <String>{};
+    for (final o in _orders) {
+      if (o.status == OrderStatus.delivered && o.dueAmount > 0) {
+        if (o.customerId.isNotEmpty) {
+          owingKeys.add(o.customerId);
+        } else if (o.customerPhone.isNotEmpty) {
+          owingKeys.add(o.customerPhone);
+        }
+      }
+    }
+    return owingKeys.length;
+  }
+
   /// The last 14 days of revenue, oldest first. Empty until the stats land.
   List<RevenueSeriesPointModel> get revenueSeries {
     final raw = _stats['revenue_series'];

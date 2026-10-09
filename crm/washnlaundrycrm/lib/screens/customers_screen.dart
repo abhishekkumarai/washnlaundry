@@ -95,6 +95,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       final matchesTab = switch (_kpiFilter) {
         'active' => _isActiveCustomer(c),
         'new' => _isNewCustomer(c),
+        'owing' => provider.deliveredDuesForCustomer(c) > 0,
         _ => true,
       };
       return matchesSearch && matchesTab;
@@ -118,7 +119,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _kpiRow(customers),
+                        _kpiRow(customers, provider),
                         const SizedBox(height: 20),
                         _table(filtered, lastOrders, provider, narrow),
                       ],
@@ -365,11 +366,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
-  Widget _kpiRow(List<CustomerModel> customers) {
+  Widget _kpiRow(List<CustomerModel> customers, AppProvider provider) {
     // Counts always reflect every customer, not the tab-filtered subset —
     // otherwise selecting "Active" would immediately shrink its own count.
     final active = customers.where(_isActiveCustomer).length;
     final isNew = customers.where(_isNewCustomer).length;
+    final totalDeliveredDues = provider.totalDeliveredDues;
+    final owingCustomersCount = provider.customersWithDeliveredDuesCount;
 
     final cards = [
       _kpi('all', 'Total', '${customers.length}', Icons.people_outline_rounded,
@@ -378,11 +381,23 @@ class _CustomersScreenState extends State<CustomersScreen> {
           const Color(0xFF10B981)),
       _kpi('new', 'New', '$isNew', Icons.person_add_alt_1_outlined,
           const Color(0xFF2563EB)),
+      _kpi(
+        'owing',
+        'Amount Owed',
+        '${Money.symbol}${totalDeliveredDues.toStringAsFixed(0)}',
+        Icons.account_balance_wallet_outlined,
+        const Color(0xFFDC2626),
+        subtitle: owingCustomersCount > 0 ? '$owingCustomersCount owing' : null,
+      ),
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final perRow = constraints.maxWidth < 640 ? 1 : 3;
+        final perRow = constraints.maxWidth < 640
+            ? 1
+            : constraints.maxWidth < 1100
+                ? 2
+                : 4;
         const gap = 16.0;
         final width = (constraints.maxWidth - gap * (perRow - 1)) / perRow;
         return Wrap(
@@ -394,11 +409,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
-  /// [tabKey] is one of 'all' / 'active' / 'new' — tapping a card makes it
+  /// [tabKey] is one of 'all' / 'active' / 'new' / 'owing' — tapping a card makes it
   /// the active filter tab for the table below, same idea as the Orders
   /// screen's status chips.
   Widget _kpi(
-      String tabKey, String label, String value, IconData icon, Color color) {
+      String tabKey, String label, String value, IconData icon, Color color,
+      {String? subtitle}) {
     final isSel = _kpiFilter == tabKey;
     return InkWell(
       onTap: () => setState(() {
@@ -426,19 +442,44 @@ class _CustomersScreenState extends State<CustomersScreen> {
               child: Icon(icon, size: 18, color: color),
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF64748B))),
-                const SizedBox(height: 2),
-                Text(value,
-                    style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF141A24))),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(label,
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF64748B))),
+                      if (subtitle != null) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            subtitle,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: color,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(value,
+                      style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF141A24))),
+                ],
+              ),
             ),
           ],
         ),
@@ -465,6 +506,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
               switch (_kpiFilter) {
                 'active' => 'Active customers',
                 'new' => 'New customers',
+                'owing' => 'Customers with delivered dues',
                 _ => 'All customers',
               },
               style: const TextStyle(
@@ -486,6 +528,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           : switch (_kpiFilter) {
                               'active' => 'No active customers yet.',
                               'new' => 'No new customers this month.',
+                              'owing' => 'No customers with delivered dues.',
                               _ => 'No customers yet. Add one to get started.',
                             },
                   style:
@@ -501,7 +544,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   for (final c in customers)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: _customerCard(c, _lastOrderFor(c, lastOrders)),
+                      child: _customerCard(c, _lastOrderFor(c, lastOrders), provider),
                     ),
                 ],
               ),
@@ -521,7 +564,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 ],
               ),
             ),
-            for (final c in customers) _row(c, _lastOrderFor(c, lastOrders)),
+            for (final c in customers) _row(c, _lastOrderFor(c, lastOrders), provider),
           ],
           if (total > customers.length) _showMoreBar(customers.length, total),
         ],
@@ -560,7 +603,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
   /// squeeze to unreadable slivers below [SidebarNavigation.contentWideBreakpoint], same bug class
   /// Orders' table had — stacks avatar/name/phone on top, the remaining
   /// fields as a 2-line summary below.
-  Widget _customerCard(CustomerModel c, DateTime? lastOrder) {
+  Widget _customerCard(
+      CustomerModel c, DateTime? lastOrder, AppProvider provider) {
+    final dues = provider.deliveredDuesForCustomer(c);
     return InkWell(
       onTap: () => setState(() => _selected = c),
       borderRadius: BorderRadius.circular(14),
@@ -648,6 +693,34 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 ),
               ],
             ),
+            if (dues > 0) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.warning_amber_rounded,
+                        size: 14, color: Color(0xFFDC2626)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Delivered Due: ${Money.symbol}${dues.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFDC2626),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             const Divider(height: 1, color: Color(0xFFF1EFEA)),
             const SizedBox(height: 10),
@@ -697,7 +770,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
-  Widget _row(CustomerModel c, DateTime? lastOrder) {
+  Widget _row(CustomerModel c, DateTime? lastOrder, AppProvider provider) {
+    final dues = provider.deliveredDuesForCustomer(c);
     return InkWell(
       onTap: () => setState(() => _selected = c),
       child: Container(
@@ -727,12 +801,39 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(c.name,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF141A24))),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(c.name,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF141A24))),
+                            ),
+                            if (dues > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: const Color(0xFFFCA5A5)),
+                                ),
+                                child: Text(
+                                  '${Money.symbol}${dues.toStringAsFixed(0)} due',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFDC2626),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                         Text(c.phone.isEmpty ? '—' : c.phone,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -852,6 +953,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       return;
     }
 
+    final provider = context.read<AppProvider>();
     final rows = <List<Object?>>[
       const [
         'Name',
@@ -862,6 +964,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         'Total Orders',
         'Total Spent',
         'Due Amount',
+        'Delivered Due',
         'Avg Order Value',
         'Customer Since',
       ],
@@ -875,6 +978,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           c.totalOrders,
           c.totalSpent,
           c.dueAmount,
+          provider.deliveredDuesForCustomer(c),
           c.avgOrderValue,
           c.createdAt == null
               ? ''

@@ -27,6 +27,7 @@ class ShopSerializer(serializers.ModelSerializer):
 
 class CustomerSerializer(TenantModelSerializer):
     avg_order_value = serializers.FloatField(read_only=True)
+    delivered_due_amount = serializers.FloatField(read_only=True)
 
     class Meta:
         model = Customer

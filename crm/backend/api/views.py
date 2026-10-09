@@ -7,7 +7,7 @@ from django.conf import settings
 from django.core.cache import cache
 
 from django.db.models import ProtectedError, Sum, Count, Q
-from django.http import JsonResponse, StreamingHttpResponse
+from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
@@ -17,7 +17,7 @@ from rest_framework.decorators import api_view, action, permission_classes
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
-from . import customer_import
+from . import customer_import, services_import_export
 from .auth import CUSTOMER, IsOwner, IsOwnerOrStaffReadOnly, normalize_phone
 from .services.rag_service import RagService, RagServiceError
 from .services.email_service import EmailService
@@ -270,6 +270,78 @@ class GarmentCategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsOwnerOrStaffReadOnly]
     queryset = GarmentCategory.objects.all().order_by('display_order')
     serializer_class = GarmentCategorySerializer
+
+    @action(detail=False, methods=['get'], url_path='export')
+    def export_services(self, request):
+        """GET /api/categories/export/?format=csv|json&category=1,2
+        Exports the entire services catalogue or filtered categories.
+        """
+        export_format = (request.query_params.get('format') or 'csv').lower()
+        raw_cats = request.query_params.get('category')
+        category_ids = [int(c.strip()) for c in raw_cats.split(',') if c.strip().isdigit()] if raw_cats else None
+
+        if export_format == 'json':
+            data = services_import_export.export_services_json(category_ids)
+            return Response(data)
+
+        csv_content = services_import_export.export_services_csv(category_ids)
+        response = HttpResponse(csv_content, content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="services_catalogue.csv"'
+        return response
+
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser], url_path='import/preview')
+    def import_preview(self, request):
+        """POST /api/categories/import/preview/ {file}
+        Analyzes uploaded CSV or XLSX file and returns headers, sample rows, and suggested mappings.
+        """
+        upload = request.FILES.get('file')
+        if not upload:
+            return Response({'detail': 'file is required.'}, status=400)
+        try:
+            headers, rows = services_import_export.parse_services_rows(upload)
+        except services_import_export.ImportFileError as exc:
+            return Response({'detail': str(exc)}, status=400)
+        if not headers:
+            return Response({'detail': 'The file has no header row.'}, status=400)
+
+        return Response({
+            'columns': headers,
+            'sample_rows': rows[:5],
+            'row_count': len(rows),
+            'suggested_mapping': services_import_export.guess_services_mapping(headers),
+        })
+
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser], url_path='import/commit')
+    def import_commit(self, request):
+        """POST /api/categories/import/commit/ {file, mapping, overwrite_duplicates}
+        Bulk creates or updates categories and garment items from uploaded file.
+        """
+        upload = request.FILES.get('file')
+        if not upload:
+            return Response({'detail': 'file is required.'}, status=400)
+
+        try:
+            mapping = json.loads(request.data.get('mapping') or '{}')
+        except (TypeError, ValueError):
+            return Response({'detail': 'mapping must be valid JSON.'}, status=400)
+
+        if not isinstance(mapping, dict) or not mapping.get('category') or not mapping.get('name') or not mapping.get('price'):
+            return Response(
+                {'detail': 'Map category, name, and price columns before importing.'},
+                status=400,
+            )
+
+        overwrite_duplicates = (request.data.get('overwrite_duplicates') or 'true').lower() != 'false'
+
+        try:
+            headers, rows = services_import_export.parse_services_rows(upload)
+        except services_import_export.ImportFileError as exc:
+            return Response({'detail': str(exc)}, status=400)
+
+        records = services_import_export.rows_to_records(headers, rows, mapping)
+        summary = services_import_export.import_services_commit(records, overwrite_duplicates=overwrite_duplicates)
+        return Response(summary)
+
 
 
 class GarmentItemViewSet(viewsets.ModelViewSet):

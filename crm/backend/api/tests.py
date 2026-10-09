@@ -18,6 +18,7 @@ from .models import (
     Staff, Expense, Credit, CreditCategory, DEFAULT_CREDIT_CATEGORIES, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
     EmailLinkRequest, OrderStatus, PaymentStatus, DeliveryType, PricingUnit,
 )
+from .serializers import CustomerSerializer
 
 
 class ShopTests(TestCase):
@@ -209,6 +210,45 @@ class CustomerTests(TestCase):
     def test_avg_order_value_without_orders(self):
         c = Customer.objects.create(name='B', phone='2')
         self.assertEqual(c.avg_order_value, 0.0)
+
+    def test_delivered_due_amount(self):
+        c = Customer.objects.create(name='Alice', phone='9876543210')
+        # 1. Delivered and unpaid -> counts as delivered debt
+        Order.objects.create(
+            customer=c, customer_name=c.name, customer_phone=c.phone,
+            status=OrderStatus.DELIVERED, payment_status=PaymentStatus.UNPAID,
+            total_amount=500.0, paid_amount=0.0, due_amount=500.0,
+        )
+        # 2. Delivered and partially paid -> counts remaining due_amount
+        Order.objects.create(
+            customer=c, customer_name=c.name, customer_phone=c.phone,
+            status=OrderStatus.DELIVERED, payment_status=PaymentStatus.PARTIAL,
+            total_amount=300.0, paid_amount=100.0, due_amount=200.0,
+        )
+        # 3. Delivered and fully paid -> due_amount is 0, adds 0
+        Order.objects.create(
+            customer=c, customer_name=c.name, customer_phone=c.phone,
+            status=OrderStatus.DELIVERED, payment_status=PaymentStatus.PAID,
+            total_amount=400.0, paid_amount=400.0, due_amount=0.0,
+        )
+        # 4. Processing order with unpaid amount -> NOT delivered yet, so does NOT count
+        Order.objects.create(
+            customer=c, customer_name=c.name, customer_phone=c.phone,
+            status=OrderStatus.PROCESSING, payment_status=PaymentStatus.UNPAID,
+            total_amount=600.0, paid_amount=0.0, due_amount=600.0,
+        )
+        # 5. Counter order without FK customer but matching phone -> counts
+        Order.objects.create(
+            customer=None, customer_name=c.name, customer_phone=c.phone,
+            status=OrderStatus.DELIVERED, payment_status=PaymentStatus.UNPAID,
+            total_amount=150.0, paid_amount=0.0, due_amount=150.0,
+        )
+        # Expected total delivered dues: 500 + 200 + 0 + 150 = 850.0
+        self.assertEqual(c.delivered_due_amount, 850.0)
+
+        # Serializer includes delivered_due_amount
+        serializer = CustomerSerializer(c)
+        self.assertEqual(serializer.data['delivered_due_amount'], 850.0)
 
 
 class CustomerImportTests(APITestCase):
@@ -410,6 +450,144 @@ class CustomerImportHelperTests(TestCase):
         self.assertEqual(_cell_to_str(9876500001), '9876500001')
         self.assertEqual(_cell_to_str('Asha Rao'), 'Asha Rao')
         self.assertEqual(_cell_to_str(None), '')
+
+
+class ServicesImportExportTests(APITestCase):
+    def setUp(self):
+        self.ironing = GarmentCategory.objects.create(name='Ironing', icon='Iron', display_order=1)
+        self.dry = GarmentCategory.objects.create(name='Dry Cleaning', icon='Sparkles', display_order=2)
+        GarmentItem.objects.create(category=self.ironing, name='Shirt', price=15.0, unit=PricingUnit.PIECE, display_order=1)
+        GarmentItem.objects.create(category=self.dry, name='Suit', price=250.0, unit=PricingUnit.SET, display_order=1)
+
+    def _csv_file(self, text, name='services.csv'):
+        return SimpleUploadedFile(name, text.encode('utf-8'), content_type='text/csv')
+
+    def test_export_services_csv(self):
+        response = self.client.get('/api/categories/export/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'text/csv; charset=utf-8')
+        content = response.content.decode('utf-8')
+        self.assertIn('Category,Category Icon,Item Name,Price,Unit,Item Icon,Image URL,Is Active,Display Order', content)
+        self.assertIn('Ironing,Iron,Shirt,15.00,per pc', content)
+        self.assertIn('Dry Cleaning,Sparkles,Suit,250.00,per set', content)
+
+    def test_export_services_csv_filtered_by_category(self):
+        response = self.client.get(f'/api/categories/export/?category={self.ironing.id}')
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        self.assertIn('Shirt', content)
+        self.assertNotIn('Suit', content)
+
+    def test_export_services_json(self):
+        response = self.client.get('/api/categories/export/?format=json')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 2)
+        ironing_cat = next(c for c in data if c['name'] == 'Ironing')
+        self.assertEqual(ironing_cat['items'][0]['name'], 'Shirt')
+        self.assertEqual(ironing_cat['items'][0]['price'], 15.0)
+
+    def test_import_preview_guesses_mapping(self):
+        upload = self._csv_file('Service,Garment,Rate,Unit\nWash,Bedcover,80,PC\n')
+        response = self.client.post('/api/categories/import/preview/', {'file': upload})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['columns'], ['Service', 'Garment', 'Rate', 'Unit'])
+        self.assertEqual(response.data['row_count'], 1)
+        self.assertEqual(response.data['suggested_mapping'], {
+            'category': 'Service',
+            'name': 'Garment',
+            'price': 'Rate',
+            'unit': 'Unit',
+        })
+
+    def test_import_preview_requires_file(self):
+        response = self.client.post('/api/categories/import/preview/', {})
+        self.assertEqual(response.status_code, 400)
+
+    def test_import_commit_requires_category_name_and_price_mapping(self):
+        upload = self._csv_file('Name,Price\nTowel,40\n')
+        response = self.client.post('/api/categories/import/commit/', {
+            'file': upload,
+            'mapping': '{"name": "Name", "price": "Price"}',
+        })
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('category', response.data['detail'])
+
+    def test_import_commit_creates_new_categories_and_items(self):
+        upload = self._csv_file(
+            'Service,Item,Price,Unit\n'
+            'Shoe Cleaning,Sneakers,250,per pair\n'
+            'Wash & Fold,T-Shirt,25,per pc\n'
+            ',Invalid Item,50,per pc\n'
+        )
+        response = self.client.post('/api/categories/import/commit/', {
+            'file': upload,
+            'mapping': '{"category": "Service", "name": "Item", "price": "Price", "unit": "Unit"}',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['categories_created'], 2)
+        self.assertEqual(response.data['items_created'], 2)
+        self.assertEqual(response.data['skipped_missing'], 1)
+
+        self.assertTrue(GarmentCategory.objects.filter(name='Shoe Cleaning').exists())
+        self.assertTrue(GarmentItem.objects.filter(name='Sneakers', price=250.0).exists())
+
+    def test_import_commit_updates_existing_items_on_overwrite(self):
+        upload = self._csv_file(
+            'Category,Name,Price,Unit\n'
+            'Ironing,Shirt,20,PC\n'
+        )
+        response = self.client.post('/api/categories/import/commit/', {
+            'file': upload,
+            'mapping': '{"category": "Category", "name": "Name", "price": "Price", "unit": "Unit"}',
+            'overwrite_duplicates': 'true',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['items_updated'], 1)
+        shirt = GarmentItem.objects.get(category=self.ironing, name='Shirt')
+        self.assertEqual(shirt.price, 20.0)
+
+    def test_import_commit_xlsx(self):
+        openpyxl = __import__('openpyxl')
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.append(['Category', 'Item', 'Rate', 'Unit'])
+        sheet.append(['Dry Cleaning', 'Silk Saree', 180, 'PC'])
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        upload = SimpleUploadedFile(
+            'services.xlsx', buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+
+        response = self.client.post('/api/categories/import/commit/', {
+            'file': upload,
+            'mapping': '{"category": "Category", "name": "Item", "price": "Rate", "unit": "Unit"}',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['items_created'], 1)
+        self.assertTrue(GarmentItem.objects.filter(name='Silk Saree', price=180.0).exists())
+
+
+class ServicesImportHelperTests(TestCase):
+    def test_normalize_pricing_unit(self):
+        from .services_import_export import normalize_pricing_unit
+        self.assertEqual(normalize_pricing_unit('pc'), PricingUnit.PIECE)
+        self.assertEqual(normalize_pricing_unit('piece'), PricingUnit.PIECE)
+        self.assertEqual(normalize_pricing_unit('kg'), PricingUnit.KG)
+        self.assertEqual(normalize_pricing_unit('sqft'), PricingUnit.SQFT)
+        self.assertEqual(normalize_pricing_unit('sq.ft'), PricingUnit.SQFT)
+        self.assertEqual(normalize_pricing_unit('set'), PricingUnit.SET)
+        self.assertEqual(normalize_pricing_unit('unknown'), PricingUnit.PIECE)
+
+    def test_parse_float_and_bool(self):
+        from .services_import_export import parse_float, parse_bool
+        self.assertEqual(parse_float('₹120.50'), 120.50)
+        self.assertEqual(parse_float('$50'), 50.0)
+        self.assertEqual(parse_float('invalid', default=10.0), 10.0)
+        self.assertFalse(parse_bool('no'))
+        self.assertFalse(parse_bool('inactive'))
+        self.assertTrue(parse_bool('yes'))
 
 
 class OrderApiTests(APITestCase):
