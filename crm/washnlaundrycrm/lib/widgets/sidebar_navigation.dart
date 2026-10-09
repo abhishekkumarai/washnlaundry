@@ -219,6 +219,10 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
       {required bool expanded, required bool canExpand}) {
     const mark = BrandLogo(size: 40);
 
+    // Show the active shop name in place of the app name. Fall back to
+    // 'WashNLaundry' while the shop data is still loading.
+    final shopName = context.watch<AppProvider>().shop?['name'] as String? ?? 'WashNLaundry';
+
     if (!expanded) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(0, 20, 0, 12),
@@ -255,27 +259,16 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: RichText(
-                text: const TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'WashN',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: _ink,
-                          letterSpacing: -0.5),
-                    ),
-                    TextSpan(
-                      text: 'Laundry',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: _brandBlue,
-                          letterSpacing: -0.5),
-                    ),
-                  ],
+              child: Text(
+                shopName,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: _brandBlue,
+                  letterSpacing: -0.5,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
           ),

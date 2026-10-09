@@ -250,31 +250,7 @@ void showShopSwitchModalSheet(BuildContext context, {double? width}) {
                         ),
                       ),
 
-                    // "Settings" action
-                    InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () {
-                        Navigator.of(dialogContext).pop();
-                        context.go('/settings');
-                      },
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        child: Row(
-                          children: [
-                            Icon(Icons.settings_outlined, size: 19, color: Color(0xFF475569)),
-                            SizedBox(width: 10),
-                            Text(
-                              'Settings',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF334155),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+
                   ],
                 ),
               ),
