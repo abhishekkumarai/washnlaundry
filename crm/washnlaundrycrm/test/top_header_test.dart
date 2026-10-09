@@ -67,4 +67,12 @@ void main() {
     expect(find.byIcon(Icons.help_outline_rounded), findsNothing);
     expect(find.byTooltip('Help'), findsNothing);
   });
+
+  testWidgets('does not render redundant shop storefront badge in the header', (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(body: TopHeader(title: 'Expenses')),
+    ));
+    expect(find.byIcon(Icons.storefront_rounded), findsNothing);
+  });
 }
+
