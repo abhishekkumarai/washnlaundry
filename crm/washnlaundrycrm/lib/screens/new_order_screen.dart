@@ -1700,6 +1700,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   const SizedBox(width: 40),
                   const SizedBox(width: 12),
                   Expanded(flex: 3, child: _tableColHead('ITEM')),
+                  Expanded(flex: 2, child: _tableColHead('SERVICE TYPE')),
                   Expanded(flex: 2, child: _tableColHead('UNIT')),
                   Expanded(flex: 2, child: _tableColHead('PRICE')),
                   const SizedBox(width: 150, child: Text('')),
@@ -1754,6 +1755,28 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF141A24))),
+          ),
+          Expanded(
+            flex: 2,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  item.categoryName.isEmpty ? 'General' : item.categoryName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF475569),
+                  ),
+                ),
+              ),
+            ),
           ),
           Expanded(
             flex: 2,

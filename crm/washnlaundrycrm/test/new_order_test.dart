@@ -679,7 +679,7 @@ void main() {
       expect(find.text('Priya Sundaram'), findsNothing);
       expect(find.text('Bill to walk-in customer'), findsNothing);
       expect(find.text('Full Name'), findsOneWidget);
-      expect(find.text('Phone Number'), findsOneWidget);
+      expect(find.textContaining('Phone Number'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Add Customer'), findsOneWidget);
 
       await tester.tap(find.widgetWithText(FilledButton, 'Add Customer'));
@@ -871,15 +871,20 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('wide width renders the items table, not the card grid',
+    testWidgets('wide width renders the items table with SERVICE TYPE column',
         (tester) async {
       // Wide screens mirror the Services screen's Items tab: a table
-      // (Photo/Item/Unit/Price/Add to Cart) instead of the card grid,
+      // (Photo/Item/Service Type/Unit/Price/Add to Cart) instead of the card grid,
       // which stays for narrow/phone widths only.
       await pumpAt(tester, 1400);
 
       expect(find.byKey(const Key('itemsTable')), findsOneWidget);
       expect(find.byType(GridView), findsNothing);
+      expect(find.text('ITEM'), findsOneWidget);
+      expect(find.text('SERVICE TYPE'), findsOneWidget);
+      expect(find.text('UNIT'), findsOneWidget);
+      expect(find.text('PRICE'), findsOneWidget);
+      expect(find.text('Ironing'), findsWidgets);
     });
 
     testWidgets('cart sits beside the table at wide width', (tester) async {
