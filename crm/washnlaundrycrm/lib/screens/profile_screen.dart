@@ -5,6 +5,7 @@ import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/panel_card.dart';
+import '../widgets/shop_switch_modal.dart';
 
 /// The page behind the avatar at the bottom of the sidebar.
 ///
@@ -360,6 +361,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (shopName.isNotEmpty) ...[
             const SizedBox(height: 16),
             _readOnly('Shop', shopName, Icons.storefront_outlined),
+          ],
+          if (context.watch<AppProvider>().availableShops.length > 1) ...[
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: () => showShopSwitchModalSheet(context),
+              icon: const Icon(Icons.swap_horiz_rounded, size: 18, color: _brand),
+              label: const Text(
+                'Switch Store / Branch',
+                style: TextStyle(color: _brand, fontWeight: FontWeight.w600),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: _line),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
           ],
         ],
       ),

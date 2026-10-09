@@ -7,6 +7,7 @@ import '../utils/navigation.dart';
 import '../utils/role_views.dart';
 import 'brand_logo.dart';
 import 'panel_card.dart';
+import 'shop_switch_modal.dart';
 
 /// Left navigation rail.
 ///
@@ -480,14 +481,6 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     final shopName = (shop?['name'] as String?)?.trim() ?? '';
     final ownerName = (shop?['owner_name'] as String?)?.trim() ?? '';
 
-    final title = isCustomer
-        ? (auth?.userName?.isNotEmpty == true
-            ? auth!.userName!
-            : (auth?.me?['customer']?['name'] as String?) ?? 'Customer')
-        : (shopName.isEmpty ? 'Your shop' : shopName);
-    final subtitle = isCustomer
-        ? (auth?.userEmail ?? 'Customer')
-        : (ownerName.isEmpty ? 'Admin' : ownerName);
     // Derive username from email (the part before '@')
     final userEmail = auth?.userEmail?.trim() ?? '';
     final usernameFromEmail = userEmail.contains('@')
@@ -497,13 +490,28 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
         ? usernameFromEmail
         : (auth?.userName?.trim().isNotEmpty == true
             ? auth!.userName!.trim()
-            : (ownerName.isNotEmpty ? ownerName : shopName));
+            : (ownerName.isNotEmpty ? ownerName : 'User'));
+
+    // Title: Display User / Account name
+    // Subtitle: Display Shop Name (Store) or role
+    final title = isCustomer
+        ? (auth?.userName?.isNotEmpty == true
+            ? auth!.userName!
+            : (auth?.me?['customer']?['name'] as String?) ?? 'Customer')
+        : displayName;
+    final subtitle = isCustomer
+        ? (auth?.userEmail ?? 'Customer')
+        : (shopName.isNotEmpty ? shopName : (ownerName.isEmpty ? 'Your shop' : ownerName));
 
     final avatarSource = isCustomer
         ? (title.isNotEmpty ? title : displayName)
         : (displayName.isNotEmpty ? displayName : (shopName.isNotEmpty ? shopName : 'Owner'));
 
+    final appProvider = context.watch<AppProvider>();
+    final canSwitchShop = !isCustomer && appProvider.availableShops.length > 1;
+
     void openProfile() => context.go('/profile');
+    void switchShop() => showShopSwitchModalSheet(context);
 
     final avatarText = initialsFor(avatarSource);
     final avatarTooltip = avatarSource.isNotEmpty
@@ -511,7 +519,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
         : (subtitle.isNotEmpty ? subtitle : title);
 
     final avatar = Tooltip(
-      message: avatarTooltip,
+      message: canSwitchShop ? '$avatarTooltip (Tap to switch branch)' : avatarTooltip,
       waitDuration: const Duration(milliseconds: 300),
       child: CircleAvatar(
         radius: 18,
@@ -548,29 +556,38 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
                         avatar,
                         const SizedBox(width: 10),
                         Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: _ink),
-                      ),
-                      Text(
-                        subtitle,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11, color: _muted),
-                      ),
-                    ],
-                  ),
-                ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: _ink),
+                              ),
+                              Text(
+                                subtitle,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 11, color: _muted),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
+                if (canSwitchShop)
+                  IconButton(
+                    tooltip: 'Switch Branch',
+                    icon: const Icon(Icons.swap_horiz_rounded,
+                        size: 19, color: Color(0xFF182C4F)),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    constraints: const BoxConstraints(),
+                    onPressed: switchShop,
+                  ),
                 IconButton(
                   tooltip: 'Sign out',
                   icon: const Icon(Icons.logout_rounded,
@@ -583,6 +600,18 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
             )
           : Column(
               children: [
+                if (canSwitchShop) ...[
+                  IconButton(
+                    tooltip: 'Switch Branch',
+                    icon: const Icon(Icons.storefront_outlined,
+                        size: 18, color: Color(0xFF182C4F)),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: switchShop,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  const SizedBox(height: 6),
+                ],
                 Tooltip(
                   message: subtitle.isEmpty ? title : '$title · $subtitle',
                   child: InkWell(
