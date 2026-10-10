@@ -4,8 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
-import '../utils/csv.dart';
-import '../utils/csv_download.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -180,43 +178,8 @@ class _CreditsScreenState extends State<CreditsScreen> {
           Row(
             children: [
               Expanded(
-                flex: 60,
+                flex: 80,
                 child: _searchField(),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 20,
-                child: SizedBox(
-                  height: 38,
-                  child: FilledButton(
-                    onPressed: _showAddCredit,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Icon(Icons.add_rounded, size: 20),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 20,
-                child: SizedBox(
-                  height: 38,
-                  child: OutlinedButton(
-                    onPressed: () => _exportCreditsCsv(visible),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE4E0D8)),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: const Icon(Icons.download_rounded,
-                        size: 18, color: Color(0xFF475569)),
-                  ),
-                ),
               ),
             ],
           ),
@@ -229,8 +192,6 @@ class _CreditsScreenState extends State<CreditsScreen> {
         titleBlock,
         SizedBox(width: 240, child: _searchField()),
         const SizedBox(width: 14),
-        _exportButton(visible),
-        const SizedBox(width: 8),
         FilledButton.icon(
           onPressed: _showAddCredit,
           icon: const Icon(Icons.add_rounded, size: 18),
@@ -278,57 +239,6 @@ class _CreditsScreenState extends State<CreditsScreen> {
         ),
       ),
     );
-  }
-
-  Widget _exportButton(List<CreditModel> visible) {
-    return OutlinedButton.icon(
-      onPressed: () => _exportCreditsCsv(visible),
-      icon: const Icon(Icons.download_rounded,
-          size: 16, color: Color(0xFF475569)),
-      label: const Text('Export',
-          style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF334155))),
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Color(0xFFE4E0D8)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      ),
-    );
-  }
-
-  void _exportCreditsCsv(List<CreditModel> credits) {
-    if (credits.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No credits to export.')),
-      );
-      return;
-    }
-
-    final provider = context.read<AppProvider>();
-    final rows = <List<Object?>>[
-      const ['Title', 'Category', 'Amount', 'Payment Method', 'Date', 'Notes'],
-      for (final c in credits)
-        [
-          c.title,
-          c.category,
-          c.amount,
-          _methodLabel(provider, c.paymentMethod),
-          c.date == null ? '' : DateFormat('yyyy-MM-dd').format(c.date!),
-          c.notes ?? '',
-        ],
-    ];
-
-    final filename =
-        'credits_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-    final ok = downloadCsv(filename, buildCsv(rows));
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Export is only available in the web app.')),
-      );
-    }
   }
 
   Widget _monthNav() {

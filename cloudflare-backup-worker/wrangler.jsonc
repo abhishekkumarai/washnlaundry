@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "washnlaundry-daily-d1-backup",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "BACKUP_DB",
+      "database_name": "washnlaundry-backups-db",
+      "database_id": "ed9a8fb7-5120-42bf-8449-dec0340395a0"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "0 2 * * *"
+    ]
+  },
+  "vars": {
+    "BACKUP_SOURCE_URL": "https://washnlaundry-backend.onrender.com/api/backup/export/?export_format=json",
+    "API_ROOT_URL": "https://washnlaundry-backend.onrender.com/api/",
+    "RETENTION_DAYS": "30"
+  }
+}

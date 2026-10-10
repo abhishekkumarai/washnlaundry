@@ -11,6 +11,7 @@ from .views import (
     MetaSettingsViewSet, MetaPostViewSet, MetaMessageViewSet, MetaLeadViewSet,
     meta_social_analytics, meta_social_sync,
     neonize_status, neonize_connect, neonize_disconnect,
+    export_backup, export_section, import_section,
 )
 from .password_auth import signup, verify_email, login, forgot_password, reset_password
 from .role_views import me, link_requests, link_request_approve, link_request_reject
@@ -66,5 +67,8 @@ urlpatterns = [
     path('whatsapp/neonize/status/', neonize_status, name='neonize-status'),
     path('whatsapp/neonize/connect/', neonize_connect, name='neonize-connect'),
     path('whatsapp/neonize/disconnect/', neonize_disconnect, name='neonize-disconnect'),
+    path('backup/export/', export_backup, name='backup-export'),
+    path('backup/export/<str:section>/', export_section, name='backup-export-section'),
+    path('backup/import/<str:section>/', import_section, name='backup-import-section'),
 ]
 

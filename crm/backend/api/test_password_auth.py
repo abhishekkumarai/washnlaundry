@@ -5,11 +5,10 @@ from django.core.cache import cache
 from django.test import Client, override_settings
 from rest_framework.test import APITestCase
 
-from .models import Customer
+from .models import Customer, Staff
 
 
 @override_settings(PASSWORD_AUTH_ENABLED=True, GOOGLE_CLIENT_ID='c', API_AUTH_ENFORCED=True,
-                   STAFF_EMAILS=['owner@shop.com'],
                    APP_ORIGINS=['https://customer.washnlaundry.com'],
                    APP_BASE_URL='https://customer.washnlaundry.com')
 class PasswordAuthTests(APITestCase):
@@ -35,6 +34,11 @@ class PasswordAuthTests(APITestCase):
 
     def bearer(self, token):
         return {'HTTP_AUTHORIZATION': f'Bearer {token}'}
+
+    def make_owner_staff(self):
+        # Ownership now comes from an Owner Staff row (the old STAFF_EMAILS list is gone).
+        Staff.objects.create(name='Olive', phone='9555555555', email='owner@shop.com', role='Owner',
+                             has_app_login=True, status='ACTIVE')
 
     def signup_and_verify(self, email='cust@example.com', password='correct horse'):
         self.assertEqual(self.post('signup', {'email': email, 'phone': '9876500001', 'password': password}).status_code, 201)
@@ -78,6 +82,7 @@ class PasswordAuthTests(APITestCase):
     def test_unverified_email_never_gets_a_role(self):
         # Squatting on the owner's address must not make anyone owner.
         self.post('signup', {'email': 'owner@shop.com', 'phone': '9876500001', 'password': 'attacker pass'})
+        self.make_owner_staff()
         res = self.post('login', {'email': 'owner@shop.com', 'password': 'attacker pass'})
         self.assertEqual(res.status_code, 403)
         # And a forged token is rejected.
@@ -85,6 +90,7 @@ class PasswordAuthTests(APITestCase):
 
     def test_verified_owner_email_is_owner(self):
         token = self.signup_and_verify('owner@shop.com')
+        self.make_owner_staff()
         self.assertEqual(self.client.get('/api/me/', **self.bearer(token)).json()['role'], 'owner')
         self.assertEqual(self.client.get('/api/orders/', **self.bearer(token)).status_code, 200)
 

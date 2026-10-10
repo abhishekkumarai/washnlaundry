@@ -73,7 +73,7 @@ class TenantMiddlewareTests(TestCase):
         """Request targeting an inactive or suspended tenant returns 403."""
         res = self.client.get('/api/orders/', HTTP_X_TENANT_ID=self.shop_suspended.slug)
         self.assertEqual(res.status_code, 403)
-        self.assertEqual(res.json()['detail'], 'Tenant shop is inactive or suspended.')
+        self.assertEqual(res.json()['detail'], 'Tenant shop is inactive, suspended or archived.')
 
     def test_dashboard_stats_scoped_to_active_tenant(self):
         """Dashboard stats aggregate metrics solely for the requested shop."""

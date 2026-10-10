@@ -80,7 +80,7 @@ class ApiService {
   }
 
   static const _jsonHeaders = {'Content-Type': 'application/json'};
-  static const _timeout = Duration(seconds: 15);
+  static const _timeout = Duration(seconds: 60);
 
   /// Supplies the active tenant ID / slug sent as `X-Tenant-ID`. Set by
   /// `AppProvider` or `AuthProvider`.
@@ -791,9 +791,18 @@ class ApiService {
 
   // ── Shop ───────────────────────────────────────────────────────────────────
 
+  /// The active shop. `/shops/` lists every shop the caller belongs to, so the
+  /// one matching the active tenant (slug or id) is picked, not just the first.
   static Future<Map<String, dynamic>?> fetchShop() async {
     final shops = _asList(await _send('GET', '/shops/'));
-    return shops.isEmpty ? null : shops.first;
+    if (shops.isEmpty) return null;
+    final tenant = tenantIdProvider?.call();
+    if (tenant != null && tenant.isNotEmpty) {
+      for (final shop in shops) {
+        if (shop['slug'] == tenant || '${shop['id']}' == tenant) return shop;
+      }
+    }
+    return shops.first;
   }
 
   static Future<Map<String, dynamic>> updateShop(
@@ -1029,6 +1038,20 @@ class ApiService {
     return Map<String, dynamic>.from(res as Map);
   }
 
+  /// Closes (archives) a shop: it stops serving requests but its data is kept.
+  static Future<void> archiveShop(int id) => _send('DELETE', '/shops/$id/');
+
+  static Future<List<Map<String, dynamic>>> fetchShopMembers(int id) async {
+    final res = await _send('GET', '/shops/$id/members/');
+    return _asList(res);
+  }
+
+  static Future<void> transferShopOwnership(int id, String email) =>
+      _send('POST', '/shops/$id/transfer-ownership/', body: {'email': email});
+
+  static Future<void> setDefaultShop(int id) =>
+      _send('POST', '/shops/$id/set-default/');
+
   // ── Services Import & Export (KAN-138 / KAN-144 / KAN-145) ─────────────
 
   /// Fetches services export as multi-tab Excel (.xlsx) workbook bytes.
@@ -1113,6 +1136,73 @@ class ApiService {
           ..files
               .add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
     return _sendMultipart(request);
+  }
+
+  // ── CRM Full Backup & Section Exports ─────────────────────────────────────
+
+  /// Fetches a full multi-tab Excel (.xlsx) workbook backup containing all sections.
+  static Future<Uint8List> exportBackupXlsx() async {
+    final uri = _uri('/backup/export/', {'export_format': 'xlsx'});
+    final token = await tokenProvider?.call();
+    final tenantId = tenantIdProvider?.call();
+    final headers = <String, String>{
+      if (token != null) 'Authorization': 'Bearer $token',
+      if (tenantId != null && tenantId.isNotEmpty) 'X-Tenant-ID': tenantId,
+    };
+    final response = await http.get(uri, headers: headers).timeout(_timeout);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.bodyBytes;
+    }
+    throw ApiException(
+      describeError(response.body, '/backup/export/', statusCode: response.statusCode),
+      statusCode: response.statusCode,
+    );
+  }
+
+  /// Imports a CSV/JSON file written by the matching section export into the
+  /// current shop (staff, orders, attendance, payroll, expenses, credits).
+  /// Existing rows are skipped; the result lists created/skipped/failed rows.
+  static Future<Map<String, dynamic>> importBackupSection(
+    String section,
+    Uint8List bytes,
+    String filename, {
+    bool dryRun = false,
+  }) async {
+    final request =
+        http.MultipartRequest('POST', _uri('/backup/import/$section/'))
+          ..fields['dry_run'] = dryRun.toString()
+          ..files.add(
+              http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    return _sendMultipart(request);
+  }
+
+  /// Fetches a full JSON backup of all CRM sections.
+  static Future<dynamic> exportBackupJson() async {
+    return _send('GET', '/backup/export/', query: {'export_format': 'json'});
+  }
+
+  /// Fetches a specific section (staff, orders, attendance, payroll, customers, expenses, credits, services) as CSV text.
+  static Future<String> exportSectionCsv(String section) async {
+    final uri = _uri('/backup/export/$section/', {'export_format': 'csv'});
+    final token = await tokenProvider?.call();
+    final tenantId = tenantIdProvider?.call();
+    final headers = <String, String>{
+      if (token != null) 'Authorization': 'Bearer $token',
+      if (tenantId != null && tenantId.isNotEmpty) 'X-Tenant-ID': tenantId,
+    };
+    final response = await http.get(uri, headers: headers).timeout(_timeout);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.body;
+    }
+    throw ApiException(
+      describeError(response.body, '/backup/export/$section/', statusCode: response.statusCode),
+      statusCode: response.statusCode,
+    );
+  }
+
+  /// Fetches a specific section as structured JSON.
+  static Future<dynamic> exportSectionJson(String section) async {
+    return _send('GET', '/backup/export/$section/', query: {'export_format': 'json'});
   }
 }
 

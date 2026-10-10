@@ -374,35 +374,13 @@ void main() {
       expect(find.text('No expenses match "zzzz".'), findsOneWidget);
     });
 
-    testWidgets(
-        'was a dead/placeholder Export — now downloads the filtered rows as CSV',
+    testWidgets('has no Export button (exports live in Settings)',
         (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
       await tester.pumpWidget(host(provider, const ExpensesScreen()));
       await tester.pump();
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Export'));
-      await tester.pump();
-
-      // `flutter test` runs on the VM, not web, so `downloadCsv` resolves to
-      // the non-web stub.
-      expect(find.text('Export is not available yet.'), findsNothing);
-      expect(find.text('Export is only available in the web app.'), findsOneWidget);
-    });
-
-    testWidgets('Export with an empty filtered list says so instead of '
-        'downloading an empty file', (tester) async {
-      final provider = AppProvider(autoLoad: false)..seedForTest(expenses: ledger);
-      await tester.pumpWidget(host(provider, const ExpensesScreen()));
-      await tester.pump();
-
-      await tester.enterText(find.byType(TextField).first, 'zzzz');
-      await tester.pump();
-
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Export'));
-      await tester.pump();
-
-      expect(find.text('No expenses to export.'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Export'), findsNothing);
     });
 
     group('responsive layout', () {
@@ -415,22 +393,22 @@ void main() {
         await tester.pump();
       }
 
-      testWidgets('shows a labeled Add Expense and Export at wide width',
+      testWidgets('shows a labeled Add Expense at wide width',
           (tester) async {
         await pumpAt(tester, 1600);
 
         expect(find.widgetWithText(FilledButton, 'Add Expense'), findsOneWidget);
-        expect(find.widgetWithText(OutlinedButton, 'Export'), findsOneWidget);
+        expect(find.widgetWithText(OutlinedButton, 'Export'), findsNothing);
       });
 
       testWidgets(
-          'collapses Add Expense to an icon and keeps search/Export full-width '
+          'collapses Add Expense to an icon and keeps search full-width '
           'at phone width', (tester) async {
         await pumpAt(tester, 390);
 
         expect(find.widgetWithText(FilledButton, 'Add Expense'), findsNothing);
         expect(find.byIcon(Icons.add_rounded), findsWidgets);
-        expect(find.widgetWithText(OutlinedButton, 'Export'), findsOneWidget);
+        expect(find.widgetWithText(OutlinedButton, 'Export'), findsNothing);
         expect(find.text('Commercial Detergent (50L)'), findsOneWidget);
       });
     });

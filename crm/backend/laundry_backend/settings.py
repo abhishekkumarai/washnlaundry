@@ -81,7 +81,7 @@ if os.environ.get('DJANGO_DATABASE_URL'):
         os.environ['DJANGO_DATABASE_URL'],
         conn_max_age=600,
         conn_health_checks=True,
-        ssl_require=True,
+        ssl_require=os.environ.get('DJANGO_DATABASE_SSL', 'True') != 'False',
     )
 
 AUTH_PASSWORD_VALIDATORS = []
@@ -163,17 +163,10 @@ PUBLIC_LEAD_RATE_PER_HOUR = int(os.environ.get('PUBLIC_LEAD_RATE_PER_HOUR', '5')
 # Off by default so the Flutter app (which must send tokens first) can roll out
 # before the API is locked down; turn on in Render once it has.
 API_AUTH_ENFORCED = os.environ.get('API_AUTH_ENFORCED', 'False') == 'True'
-# Owner/bootstrap emails that count as staff even without a Staff row.
-STAFF_EMAILS = [
-    e.strip().lower() for e in os.environ.get(
-        'STAFF_EMAILS',
-        'washnlaundry01@gmail.com,emailabhishek2@gmail.com,3abhishekkumar@gmail.com'
-    ).split(',') if e.strip()
-]
-
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ['api.auth.GoogleTokenAuthentication'],
     'DEFAULT_PERMISSION_CLASSES': ['api.auth.IsStaff'],
+    'DEFAULT_THROTTLE_RATES': {'shop_provision': '20/hour'},
 }
 
 # ── Email + password sign-in (api/password_auth.py) ───────────────────────────
@@ -212,3 +205,6 @@ META_INSTAGRAM_ACCOUNT_ID = os.environ.get('META_INSTAGRAM_ACCOUNT_ID', '')
 META_INSTAGRAM_USERNAME = os.environ.get('META_INSTAGRAM_USERNAME', 'washnlaundrydotcom')
 META_BUSINESS_ID = os.environ.get('META_BUSINESS_ID', '')
 META_GRAPH_ACCESS_TOKEN = META_PAGE_ACCESS_TOKEN or META_USER_ACCESS_TOKEN
+
+# Most shops one account may own (self-service provisioning).
+MAX_SHOPS_PER_USER = int(os.environ.get('MAX_SHOPS_PER_USER', '5'))

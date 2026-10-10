@@ -36,3 +36,44 @@ class DatabaseBackupRefreshTests(TestCase):
 
         # Check data is intact
         self.assertTrue(Order.objects.filter(order_number='BACK-00001').exists())
+
+    def test_export_backup_endpoints(self):
+        """Test API endpoints for full backup and section exports."""
+        from rest_framework.test import APIClient
+        from api.models import Staff, Attendance, SalaryPayment, Customer
+        from datetime import date
+
+        staff = Staff.objects.create(shop=self.shop, name='Test Staff', phone='9876543210', monthly_wage=15000)
+        Attendance.objects.create(shop=self.shop, staff=staff, date=date(2026, 10, 1), status='PRESENT')
+        SalaryPayment.objects.create(shop=self.shop, staff=staff, month=date(2026, 10, 1), amount=5000)
+        Customer.objects.create(shop=self.shop, name='Cust One', phone='9876543211')
+
+        client = APIClient()
+
+        # 1. Full backup XLSX
+        r_xlsx = client.get(f'/api/backup/export/?export_format=xlsx&shop={self.shop.id}')
+        self.assertEqual(r_xlsx.status_code, 200)
+        self.assertIn('application/vnd.openxmlformats', r_xlsx['Content-Type'])
+        self.assertGreater(len(r_xlsx.content), 0)
+
+        # 2. Full backup JSON
+        r_json = client.get(f'/api/backup/export/?export_format=json&shop={self.shop.id}')
+        self.assertEqual(r_json.status_code, 200)
+        self.assertIn('sections', r_json.data)
+        self.assertIn('staff', r_json.data['sections'])
+        self.assertIn('orders', r_json.data['sections'])
+        self.assertIn('attendance', r_json.data['sections'])
+        self.assertIn('payroll', r_json.data['sections'])
+
+        # 3. Section CSV exports
+        for sec in ['staff', 'orders', 'attendance', 'payroll', 'customers', 'expenses', 'credits', 'services']:
+            r_sec = client.get(f'/api/backup/export/{sec}/?export_format=csv&shop={self.shop.id}')
+            self.assertEqual(r_sec.status_code, 200)
+            self.assertIn('text/csv', r_sec['Content-Type'])
+            self.assertGreater(len(r_sec.content), 0)
+
+        # 4. Section JSON export
+        r_sec_json = client.get(f'/api/backup/export/staff/?export_format=json&shop={self.shop.id}')
+        self.assertEqual(r_sec_json.status_code, 200)
+        self.assertIsInstance(r_sec_json.data, list)
+        self.assertTrue(any(s['name'] == 'Test Staff' for s in r_sec_json.data))

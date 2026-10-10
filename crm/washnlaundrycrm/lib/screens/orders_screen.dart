@@ -8,8 +8,6 @@ import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/role_views.dart';
 import '../models/order_model.dart';
-import '../utils/csv.dart';
-import '../utils/csv_download.dart';
 import '../utils/navigation.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
@@ -877,8 +875,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
             _filtersButton(),
           ],
           const SizedBox(width: 8),
-          _exportButton(filteredOrders),
-          const SizedBox(width: 8),
           _newOrderButton(iconOnly: false, isCustomer: isCustomer),
         ],
       ),
@@ -977,8 +973,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   const SizedBox(width: 8),
                   _filtersButton(),
                 ],
-                const SizedBox(width: 8),
-                _exportButton(filteredOrders),
               ],
             ),
           ),
@@ -1098,87 +1092,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
     );
-  }
-
-  Widget _exportButton(List<OrderModel> filteredOrders) {
-    return OutlinedButton.icon(
-      onPressed: () => _exportOrdersCsv(filteredOrders),
-      icon: const Icon(Icons.download_rounded,
-          size: 16, color: Color(0xFF475569)),
-      label: const Text('Export',
-          style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF334155))),
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Color(0xFFE4E0D8)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      ),
-    );
-  }
-
-  /// Exports exactly what's on screen — the currently filtered/searched
-  /// rows, not the whole shop — matching what "Export" means on every other
-  /// list-with-filters screen (a report of what you're looking at).
-  void _exportOrdersCsv(List<OrderModel> orders) {
-    if (orders.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No orders to export.')),
-      );
-      return;
-    }
-
-    final rows = <List<Object?>>[
-      const [
-        'Order Number',
-        'Customer Name',
-        'Phone',
-        'Status',
-        'Payment Status',
-        'Payment Method',
-        'Delivery Type',
-        'Source',
-        'Subtotal',
-        'Delivery Charge',
-        'Discount',
-        'Total Amount',
-        'Paid Amount',
-        'Due Amount',
-        'Created At',
-        'Scheduled Date',
-      ],
-      for (final o in orders)
-        [
-          o.orderNumber,
-          o.customerName,
-          o.customerPhone,
-          o.statusLabel,
-          o.paymentStatusLabel,
-          o.paymentMethod,
-          o.deliveryTypeLabel,
-          o.sourceLabel,
-          o.subtotal,
-          o.deliveryCharge,
-          o.discountAmount,
-          o.totalAmount,
-          o.paidAmount,
-          o.dueAmount,
-          DateFormat('yyyy-MM-dd HH:mm').format(o.createdAt),
-          o.scheduledDate == null
-              ? ''
-              : DateFormat('yyyy-MM-dd').format(o.scheduledDate!),
-        ],
-    ];
-
-    final filename =
-        'orders_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-    final ok = downloadCsv(filename, buildCsv(rows));
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Export is only available in the web app.')),
-      );
-    }
   }
 
   /// `iconOnly` drops the label for the narrow header, matching the same

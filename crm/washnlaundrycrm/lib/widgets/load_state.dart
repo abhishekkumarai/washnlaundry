@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
+import 'support_info.dart';
 
 /// The error panel shown when a screen's data fails to load or when a 404/500
 /// error occurs: a clean message with Retry and Go Home actions, rather than
@@ -155,6 +156,10 @@ class ErrorState extends StatelessWidget {
                   ),
               ],
             ),
+            if (is404 || is500) ...[
+              const SizedBox(height: 24),
+              const SupportContactCard(),
+            ],
           ],
         ),
       ),

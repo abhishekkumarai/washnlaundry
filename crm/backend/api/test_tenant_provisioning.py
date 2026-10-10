@@ -8,6 +8,7 @@ from api.models import (
     ShopOrderSequence, ShopMembership, ShopRole,
 )
 from api.auth import resolve_principal, OWNER
+from api.default_services import DEFAULT_SERVICE_CATALOGUE
 
 User = get_user_model()
 
@@ -52,9 +53,11 @@ class TenantProvisioningTests(TestCase):
 
         # Check seeded default garment categories and items
         garment_cats = GarmentCategory.objects.filter(shop=shop)
-        self.assertEqual(garment_cats.count(), 4)
+        self.assertEqual(garment_cats.count(), len(DEFAULT_SERVICE_CATALOGUE))
         items = GarmentItem.objects.filter(shop=shop)
-        self.assertEqual(items.count(), 16)
+        self.assertEqual(items.count(), sum(len(c[2]) for c in DEFAULT_SERVICE_CATALOGUE))
+        # blank business details, not the model's demo GSTIN/address
+        self.assertEqual(shop.gstin, '')
 
     def test_provision_new_shop_authenticated_attaches_owner(self):
         """Provisioning by an authenticated user attaches them as OWNER and sets default membership."""

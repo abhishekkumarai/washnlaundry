@@ -117,15 +117,24 @@ One Google login for everyone; the backend (`backend/api/auth.py`) verifies the 
 
 | Role | Who | Gets |
 |---|---|---|
-| `owner` | email in `STAFF_EMAILS` env, or an ACTIVE `Staff` row with that email, `has_app_login`, and role Owner/Manager | everything |
+| `owner` | a superuser, an active `OWNER` `ShopMembership` for the requested shop, or an ACTIVE `Staff` row of that shop with `has_app_login` and role Owner/Manager | everything (in that shop) |
 | `staff` | any other ACTIVE `Staff` row with email + `has_app_login` | orders, new order, customers, scan; read-only catalogue/shop. Not payroll, reports, expenses, credits, staff, attendance, dashboard stats |
 | `customer` | a `Customer` whose email matches | `/my/*` only: own orders, rate card, pickup form (`/api/customer/*`) |
 | `unlinked` | valid Google account, no record | `/my/start` to sign up |
 
-- `API_AUTH_ENFORCED` (default False) turns enforcement on in `IsStaff`/`IsOwner`/`IsOwnerOrStaffReadOnly`. Ship the Flutter app first, then flip it on Render. Set `STAFF_EMAILS` before flipping or nobody can get in.
+- `API_AUTH_ENFORCED` (default False) turns enforcement on in `IsStaff`/`IsOwner`/`IsOwnerOrStaffReadOnly`. Ship the Flutter app first, then flip it on Render. Make sure your own account is a superuser, has an Owner `Staff` row, or has an `OWNER` membership before flipping or nobody can get in. (`STAFF_EMAILS` was removed 2026-10-11; migration `0034` backfilled memberships from login-enabled Staff rows.)
 - A customer typing a phone number the store already has creates an `EmailLinkRequest` (no OTP, so no auto-link); the owner approves in Django admin or `POST /api/link-requests/<id>/approve/`.
 - Flutter: `AuthProvider.role` drives `router.dart`'s `authRedirect`; `ApiService.tokenProvider` attaches the token and refreshes once on 401. Staff form has a "Sign-in email" field (it sets `has_app_login`). Demo Mode is always `owner` and only works while enforcement is off.
 - The same Flutter build serves both app.washnlaundry.com and customer.washnlaundry.com (role decides the view; Demo Mode is hidden on `customer.*`). The old Next.js portal was removed 2026-10-07.
+
+### Multi-tenancy and shop lifecycle (2026-10-11)
+
+- **Tenant = `Shop`.** `TenantMiddleware` resolves it from `X-Tenant-ID` (slug, else numeric id, else subdomain) → `?shop=` → Host subdomain → the session user's membership → the sole shop (single-shop deployments only). With several shops and no tenant, tenant-scoped `/api/` paths return **400**; `/api/me/`, `/api/shops/`, `/api/auth/`, `/api/customer/`, `/api/link-requests/` work without one.
+- **The header is a request, not a grant.** `resolve_principal` only trusts a role for the requested shop if the caller has an active `ShopMembership` or a Staff row there (superusers excepted). Global groups and customer lookups are ignored whenever a tenant is active. Never reintroduce a global allow-list.
+- **No silent default shop.** `TenantModel.save()` / `require_shop()` raise if no tenant is active and the deployment has more than one shop.
+- **Lifecycle:** `POST /api/shops/provision/` (signed-in, rate limited, `MAX_SHOPS_PER_USER`, validated/reserved slugs, blank business details, one catalogue seed) → `PATCH /api/shops/<id>/` (owner of that shop; `status/slug/subdomain/custom_domain/order_prefix` are superuser-only) → `DELETE` **archives** (`status=ARCHIVED`, Neonize disconnected; data kept) → hard delete only via `python manage.py purge_shop <slug> --confirm <slug>` on an archived shop (export first). Also `GET /shops/<id>/members/`, `POST /shops/<id>/transfer-ownership/`, `POST /shops/<id>/set-default/`.
+- Deleting a `Staff` row revokes its membership; the shop's last owner cannot be deleted/demoted/deactivated.
+- Open follow-ups: Postgres RLS is not a reliable second layer (permissive when `app.current_tenant` is unset; `SET LOCAL` outside a transaction is a no-op), `shop` columns are still nullable, and the Flutter shop switcher has no UI for members/transfer/archive yet.
 
 ### Email + password sign-in (added 2026-10-07)
 

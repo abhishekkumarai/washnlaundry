@@ -1,0 +1,16 @@
+{
+  "name": "daily-r2-backup-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker running daily cron triggers to backup data directly to Cloudflare R2",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241004.0",
+    "typescript": "^5.5.0",
+    "wrangler": "^3.80.0"
+  }
+}

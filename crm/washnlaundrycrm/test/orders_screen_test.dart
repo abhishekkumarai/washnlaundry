@@ -293,33 +293,11 @@ void main() {
   });
 
   group('OrdersScreen Export', () {
-    testWidgets('was a dead button — now exports the filtered rows as CSV',
+    testWidgets('has no Export button (exports live in Settings)',
         (tester) async {
-      // `flutter test` runs on the VM, not web, so `downloadCsv` resolves to
-      // the non-web stub and reports it couldn't trigger a real download —
-      // this pins that the button is wired up (builds the CSV, calls the
-      // download hook) rather than still being `onPressed: () {}`.
       await pumpOrders(tester);
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Export'));
-      await tester.pump();
-
-      expect(find.text('Export is only available in the web app.'), findsOneWidget);
-    });
-
-    testWidgets('an empty filtered list says so instead of exporting nothing',
-        (tester) async {
-      final provider = await pumpOrders(tester);
-
-      // Narrow to a status nothing matches.
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Cancelled'));
-      await tester.pump();
-      expect(provider.orders.length, 2); // sanity: shop still has orders
-
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Export'));
-      await tester.pump();
-
-      expect(find.text('No orders to export.'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Export'), findsNothing);
     });
   });
 

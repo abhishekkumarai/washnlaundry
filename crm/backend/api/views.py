@@ -12,16 +12,19 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_http_methods
+from django.db import transaction
 from rest_framework import viewsets
-from rest_framework.decorators import api_view, action, permission_classes
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.throttling import SimpleRateThrottle
+from rest_framework.decorators import api_view, action, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser
 from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 
 from . import customer_import, services_import_export, default_services
-from .auth import CUSTOMER, IsOwner, IsOwnerOrStaffReadOnly, normalize_phone
+from .auth import CUSTOMER, OWNER_JOB_TITLES, CanProvisionShop, is_last_owner, IsOwner, IsOwnerOrStaffReadOnly, is_shop_owner, normalize_phone
 from .pagination import StandardPagination
-from .tenancy import get_current_tenant
+from .tenancy import fallback_shop, get_current_tenant, require_shop
 from .validators import clean_mobile_10_digit
 from .services.rag_service import RagService, RagServiceError
 from .services.email_service import EmailService
@@ -30,6 +33,7 @@ from .models import (
     Expense, Credit, CreditCategory, Staff, Attendance, SalaryPayment, SalaryAdvance, ServiceArea, TimeSlot,
     Lead, OrderStatus, PaymentStatus, DeliveryType, OrderSource, PricingUnit,
     PaymentMethod, ExpenseCategory, MetaSettings, MetaPost, MetaMessage, MetaLead, MetaPlatform,
+    ShopStatus, ShopRole, ShopMembership, ShopOrderSequence, DEFAULT_CREDIT_CATEGORIES, RESERVED_SHOP_SLUGS,
 )
 from .serializers import (
     ShopSerializer, CustomerSerializer, GarmentCategorySerializer,
@@ -40,49 +44,120 @@ from .serializers import (
 )
 
 
+class ProvisionThrottle(SimpleRateThrottle):
+    """Per-account (else per-IP) cap on shop creation."""
+    scope = 'shop_provision'
+
+    def get_cache_key(self, request, view):
+        ident = getattr(request.user, 'email', None) or self.get_ident(request)
+        return self.cache_format % {'scope': self.scope, 'ident': ident}
+
+
+PROTECTED_SHOP_FIELDS = {'status', 'slug', 'subdomain', 'custom_domain', 'order_prefix'}
+SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
+
+
 class ShopViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsOwnerOrStaffReadOnly]
+    """Shop (tenant) lifecycle: provision -> update -> archive (never a hard delete here).
+
+    Callers only ever see the shops they belong to. Hard deletion is the
+    superuser-only `purge_shop` management command, after the shop is archived.
+    """
+    # Signed-in is enough here: what a caller can see is limited to their own
+    # shops (get_queryset) and what they can change to shops they own
+    # (_require_owner), whichever shop the X-Tenant-ID header names.
+    permission_classes = [CanProvisionShop]
     queryset = Shop.objects.all()
     serializer_class = ShopSerializer
 
-    def get_queryset(self):
-        shop = getattr(self.request, 'shop', None)
-        has_explicit_tenant = (
-            self.request.headers.get('X-Tenant-ID') or
-            self.request.META.get('HTTP_X_TENANT_ID') or
-            self.request.query_params.get('shop')
-        )
-        if has_explicit_tenant and shop:
-            return Shop.objects.filter(id=shop.id)
-        return Shop.objects.all()
+    def _django_user(self):
+        return getattr(self.request.user, 'user', None)
 
-    @action(detail=False, methods=['post'], url_path='provision', permission_classes=[])
+    def _is_superuser(self):
+        user = self._django_user()
+        return bool(user and user.is_superuser)
+
+    def get_queryset(self):
+        user = self._django_user()
+        if user and user.is_superuser:
+            return Shop.objects.all()
+        if user:
+            return Shop.objects.filter(
+                memberships__user=user, memberships__is_active=True,
+            ).exclude(status=ShopStatus.ARCHIVED).distinct()
+        # Anonymous (Demo Mode / enforcement off): only the tenant they named.
+        shop = getattr(self.request, 'shop', None)
+        return Shop.objects.filter(pk=shop.pk) if shop else Shop.objects.none()
+
+    def create(self, request, *args, **kwargs):
+        return Response({'detail': 'Use POST /api/shops/provision/.'}, status=405)
+
+    def _require_owner(self, shop):
+        if settings.API_AUTH_ENFORCED and not is_shop_owner(self.request.user, shop):
+            raise PermissionDenied('Only an owner of this shop can do that.')
+
+    def perform_update(self, serializer):
+        self._require_owner(serializer.instance)
+        if not self._is_superuser() and PROTECTED_SHOP_FIELDS & set(self.request.data.keys()):
+            raise PermissionDenied(
+                'Status, slug, subdomain, custom domain and order prefix are managed by support.')
+        serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        """Archive the shop: it stops serving requests but keeps its data."""
+        shop = self.get_object()
+        self._require_owner(shop)
+        shop.status = ShopStatus.ARCHIVED
+        shop.save(update_fields=['status'])
+        try:  # don't leave a paired WhatsApp session running for a closed shop
+            NeonizeService.get_instance().disconnect(shop=shop)
+        except Exception:
+            pass
+        return Response(status=204)
+
+    @action(detail=False, methods=['post'], url_path='provision',
+            permission_classes=[CanProvisionShop],
+            throttle_classes=[ProvisionThrottle])
     def provision(self, request):
         """POST /api/shops/provision/
         Self-service tenant provisioning. Creates a new Shop, initializes its
-        order sequence, seeds default service categories and credit categories,
-        and assigns the caller as OWNER.
+        order sequence, seeds the default service catalogue and credit
+        categories, and assigns the caller as OWNER.
         """
-        from .models import ShopRole, ShopMembership, ShopOrderSequence, CreditCategory, DEFAULT_CREDIT_CATEGORIES
-        from django.db import transaction
-
         data = request.data
         name = str(data.get('name') or '').strip()
         if not name:
             return Response({'detail': 'Shop name is required.'}, status=400)
 
-        slug = str(data.get('slug') or '').strip() or None
-        phone = str(data.get('phone') or '').strip() or '+91 98765 43210'
-        owner_name = str(data.get('owner_name') or '').strip() or 'Owner'
-        order_prefix = str(data.get('order_prefix') or '').strip() or None
+        slug = str(data.get('slug') or '').strip().lower() or None
+        if slug:
+            if len(slug) > 100 or not SLUG_RE.match(slug):
+                return Response({'detail': 'Slug may only contain lowercase letters, digits and hyphens.'}, status=400)
+            if slug in RESERVED_SHOP_SLUGS:
+                return Response({'detail': 'That slug is reserved.'}, status=400)
+            if Shop.objects.filter(slug=slug).exists():
+                return Response({'detail': 'That slug is already taken.'}, status=400)
+
+        django_user = getattr(request.user, 'user', None)
+        if django_user:
+            owned = django_user.shop_memberships.filter(
+                is_active=True, role=ShopRole.OWNER).exclude(shop__status=ShopStatus.ARCHIVED).count()
+            if owned >= getattr(settings, 'MAX_SHOPS_PER_USER', 5):
+                return Response({'detail': 'Shop limit reached for this account.'}, status=403)
+        elif settings.API_AUTH_ENFORCED:
+            return Response({'detail': 'Sign in with an account that can own a shop.'}, status=403)
 
         with transaction.atomic():
+            # Business details start blank: the model's defaults are demo values
+            # (someone else's GSTIN and address) that would print on invoices.
             shop = Shop(
                 name=name,
-                owner_name=owner_name,
-                phone=phone,
-                order_prefix=order_prefix or Shop.derive_prefix(name),
-                status='ACTIVE',
+                owner_name=str(data.get('owner_name') or '').strip() or 'Owner',
+                phone=str(data.get('phone') or '').strip(),
+                address=str(data.get('address') or '').strip(),
+                gstin='',
+                order_prefix=str(data.get('order_prefix') or '').strip() or Shop.derive_prefix(name),
+                status=ShopStatus.ACTIVE,
             )
             if slug:
                 shop.slug = slug
@@ -91,46 +166,19 @@ class ShopViewSet(viewsets.ModelViewSet):
                     shop.tax_rate = float(data.get('tax_rate'))
                 except (ValueError, TypeError):
                     pass
-            if data.get('address'):
-                shop.address = str(data.get('address')).strip()
-            if data.get('city'):
-                shop.city = str(data.get('city')).strip()
-            if data.get('state'):
-                shop.state = str(data.get('state')).strip()
-            if data.get('pin_code'):
-                shop.pin_code = str(data.get('pin_code')).strip()
-            if data.get('currency_symbol'):
-                shop.currency_symbol = str(data.get('currency_symbol')).strip()
+            for field in ('city', 'state', 'pin_code', 'currency_symbol'):
+                if data.get(field):
+                    setattr(shop, field, str(data.get(field)).strip())
 
+            shop._skip_default_services = True  # seeded once, explicitly, below
             shop.save()
 
-            # Initialize order sequence
             ShopOrderSequence.objects.get_or_create(shop=shop, defaults={'last_number': 0})
-
-            # Seed default credit categories
             for order_idx, cat_name in enumerate(DEFAULT_CREDIT_CATEGORIES):
-                CreditCategory.objects.get_or_create(shop=shop, name=cat_name, defaults={'display_order': order_idx})
+                CreditCategory.all_objects.get_or_create(
+                    shop=shop, name=cat_name, defaults={'display_order': order_idx})
+            default_services.populate_default_services_for_shop(shop)
 
-            # Seed default Garment Categories and Items
-            default_categories = [
-                ('Wash & Fold', 'Shirt', [('Shirt', 20.0, 'PC'), ('T-Shirt', 20.0, 'PC'), ('Trousers', 25.0, 'PC'), ('Bed Sheet', 40.0, 'PC')]),
-                ('Wash & Iron', 'Shirt', [('Shirt', 30.0, 'PC'), ('T-Shirt', 30.0, 'PC'), ('Trousers', 35.0, 'PC'), ('Kurta', 40.0, 'PC')]),
-                ('Steam Iron', 'Shirt', [('Shirt', 15.0, 'PC'), ('Trousers', 15.0, 'PC'), ('Saree', 30.0, 'PC'), ('Suit', 60.0, 'PC')]),
-                ('Dry Clean', 'Shirt', [('Suit (2 Pc)', 180.0, 'SET'), ('Blazer / Coat', 120.0, 'PC'), ('Saree (Silk)', 150.0, 'PC'), ('Blanket (Dbl)', 250.0, 'PC')]),
-            ]
-            for cat_order, (cat_name, icon, items) in enumerate(default_categories):
-                cat, _ = GarmentCategory.objects.get_or_create(
-                    shop=shop, name=cat_name, defaults={'icon': icon, 'display_order': cat_order}
-                )
-                for item_order, (item_name, item_price, item_unit) in enumerate(items):
-                    GarmentItem.objects.get_or_create(
-                        shop=shop, category=cat, name=item_name,
-                        defaults={'price': item_price, 'unit': item_unit, 'display_order': item_order}
-                    )
-
-            # Assign membership if caller is authenticated
-            user = getattr(request, 'user', None)
-            django_user = getattr(user, 'user', None)
             if django_user:
                 ShopMembership.objects.create(
                     user=django_user,
@@ -140,8 +188,54 @@ class ShopViewSet(viewsets.ModelViewSet):
                     is_active=True,
                 )
 
-        serializer = self.get_serializer(shop)
-        return Response(serializer.data, status=201)
+        return Response(self.get_serializer(shop).data, status=201)
+
+    @action(detail=True, methods=['get'], url_path='members')
+    def members(self, request, pk=None):
+        """GET /api/shops/<id>/members/ - who can sign in to this shop, and as what."""
+        shop = self.get_object()
+        self._require_owner(shop)
+        rows = shop.memberships.select_related('user').order_by('-is_default', 'created_at')
+        return Response([
+            {'id': str(m.id), 'email': m.user.email or m.user.username, 'role': m.role,
+             'is_active': m.is_active, 'is_default': m.is_default}
+            for m in rows
+        ])
+
+    @action(detail=True, methods=['post'], url_path='transfer-ownership')
+    def transfer_ownership(self, request, pk=None):
+        """POST /api/shops/<id>/transfer-ownership/ {email} - hand the shop to an existing member.
+
+        The target becomes OWNER; the caller drops to STAFF so the shop always has an owner.
+        """
+        shop = self.get_object()
+        self._require_owner(shop)
+        email = str(request.data.get('email') or '').strip().lower()
+        target = shop.memberships.filter(user__username__iexact=email, is_active=True).first()
+        if not target:
+            return Response({'detail': 'That person is not an active member of this shop.'}, status=400)
+        caller = self._django_user()
+        with transaction.atomic():
+            target.role = ShopRole.OWNER
+            target.save(update_fields=['role'])
+            if caller and caller.pk != target.user_id:
+                shop.memberships.filter(user=caller, role=ShopRole.OWNER).update(role=ShopRole.STAFF)
+        return Response({'detail': 'Ownership transferred.'})
+
+    @action(detail=True, methods=['post'], url_path='set-default')
+    def set_default(self, request, pk=None):
+        """POST /api/shops/<id>/set-default/ - make this the caller's default shop."""
+        shop = self.get_object()
+        user = self._django_user()
+        if not user:
+            return Response({'detail': 'Sign in first.'}, status=403)
+        mine = shop.memberships.filter(user=user, is_active=True)
+        if not mine.exists():
+            return Response({'detail': 'You are not a member of this shop.'}, status=403)
+        with transaction.atomic():
+            user.shop_memberships.update(is_default=False)
+            mine.update(is_default=True)
+        return Response({'detail': 'Default shop updated.'})
 
 
 class CustomerViewSet(viewsets.ModelViewSet):
@@ -425,8 +519,9 @@ class GarmentCategoryViewSet(viewsets.ModelViewSet):
         """POST /api/categories/load-defaults/
         Populates default laundromat services into the current tenant shop.
         """
-        shop = get_current_tenant() or Shop.objects.first()
-        if not shop:
+        try:
+            shop = require_shop()
+        except ValueError:
             return Response({'detail': 'No shop found for this request.'}, status=400)
 
         overwrite = (request.data.get('overwrite') or False) in (True, 'true', '1')
@@ -623,7 +718,7 @@ class CreditCategoryViewSet(viewsets.ModelViewSet):
                 if first_mem:
                     shop = first_mem.shop
         if not shop:
-            shop = Shop.objects.first()
+            shop = fallback_shop()
 
         if shop:
             existing_names = set(CreditCategory.all_objects.filter(shop=shop).values_list('name', flat=True))
@@ -660,6 +755,22 @@ class StaffViewSet(viewsets.ModelViewSet):
     queryset = Staff.objects.all().order_by('name')
     serializer_class = StaffSerializer
     pagination_class = StandardPagination
+
+    def perform_update(self, serializer):
+        staff = serializer.instance
+        if is_last_owner(staff):
+            d = serializer.validated_data
+            role = str(d.get('role', staff.role)).strip().lower()
+            if (d.get('status', staff.status) != 'ACTIVE'
+                    or not d.get('has_app_login', staff.has_app_login)
+                    or role not in OWNER_JOB_TITLES):
+                raise ValidationError('This is the only owner of the shop. Transfer ownership first.')
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if is_last_owner(instance):
+            raise ValidationError('This is the only owner of the shop. Transfer ownership first.')
+        instance.delete()
 
 
 class AttendanceViewSet(viewsets.ModelViewSet):
@@ -1416,15 +1527,19 @@ class MetaSettingsViewSet(viewsets.ModelViewSet):
     queryset = MetaSettings.objects.all()
     serializer_class = MetaSettingsSerializer
 
+    def get_queryset(self):
+        shop = getattr(self.request, 'shop', None)
+        return MetaSettings.objects.filter(shop=shop) if shop else MetaSettings.objects.none()
+
     def list(self, request, *args, **kwargs):
-        settings_obj = MetaSocialService.get_settings()
+        settings_obj = MetaSocialService.get_settings(shop=getattr(request, 'shop', None))
         serializer = self.get_serializer(settings_obj)
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'], url_path='verify')
     def verify(self, request):
         """POST /api/meta-settings/verify/ — tests Meta Graph API connection."""
-        result = MetaSocialService.verify_credentials()
+        result = MetaSocialService.verify_credentials(shop=getattr(request, 'shop', None))
         return Response(result)
 
 
@@ -1560,7 +1675,7 @@ class MetaMessageViewSet(viewsets.ModelViewSet):
         if not text:
             return Response({'error': 'Message text is required.'}, status=400)
 
-        shop = getattr(request, 'tenant', None)
+        shop = getattr(request, 'shop', None)
         result = MetaSocialService.send_whatsapp_message(
             to_number=digits,
             text=text,
@@ -1590,7 +1705,7 @@ class MetaLeadViewSet(viewsets.ModelViewSet):
         lead = self.get_object()
         phone = lead.customer_phone or '9999999999'
         customer, _ = Customer.objects.get_or_create(
-            phone=phone,
+            phone=phone, shop=lead.shop,
             defaults={'name': lead.customer_name, 'email': lead.customer_email}
         )
         order = Order.objects.create(
@@ -1615,7 +1730,7 @@ class MetaLeadViewSet(viewsets.ModelViewSet):
 @permission_classes([IsOwnerOrStaffReadOnly])
 def meta_social_analytics(request):
     """GET /api/meta-social/analytics/ — Summary of live reach, followers, posts & leads from Meta."""
-    shop = getattr(request, 'tenant', None)
+    shop = getattr(request, 'shop', None)
     data = MetaSocialService.get_analytics_summary(shop=shop)
     return Response(data)
 
@@ -1624,7 +1739,7 @@ def meta_social_analytics(request):
 @permission_classes([IsOwnerOrStaffReadOnly])
 def meta_social_sync(request):
     """POST /api/meta-social/sync/ — Triggers live synchronization of media, reels, and followers from Meta Graph API."""
-    shop = getattr(request, 'tenant', None)
+    shop = getattr(request, 'shop', None)
     result = MetaSocialService.sync_live_data(shop=shop)
     return Response(result)
 
@@ -1637,7 +1752,7 @@ from .services.neonize_service import NeonizeService
 @permission_classes([IsOwnerOrStaffReadOnly])
 def neonize_status(request):
     """GET /api/whatsapp/neonize/status/ — Connection status and live pairing QR code."""
-    shop = getattr(request, 'tenant', None)
+    shop = getattr(request, 'shop', None)
     data = NeonizeService.get_instance().get_status(shop=shop)
     return Response(data)
 
@@ -1646,7 +1761,7 @@ def neonize_status(request):
 @permission_classes([IsOwnerOrStaffReadOnly])
 def neonize_connect(request):
     """POST /api/whatsapp/neonize/connect/ — Request new pairing QR code for personal device."""
-    shop = getattr(request, 'tenant', None)
+    shop = getattr(request, 'shop', None)
     data = NeonizeService.get_instance().start_pairing(shop=shop, force_refresh=True)
     return Response(data)
 
@@ -1655,8 +1770,84 @@ def neonize_connect(request):
 @permission_classes([IsOwnerOrStaffReadOnly])
 def neonize_disconnect(request):
     """POST /api/whatsapp/neonize/disconnect/ — Disconnect personal WhatsApp session."""
-    shop = getattr(request, 'tenant', None)
+    shop = getattr(request, 'shop', None)
     result = NeonizeService.get_instance().disconnect(shop=shop)
     return Response(result)
 
 
+# ── Full CRM Backup & Section Exports ─────────────────────────────────────────
+from . import backup_export_service
+from . import backup_import_service
+
+
+@api_view(['GET'])
+@permission_classes([IsOwner])
+def export_backup(request):
+    """GET /api/backup/export/?export_format=xlsx|json
+    Generates a full backup of all CRM sections (Staff, Orders, Attendance, Payroll, Customers, Expenses, Credits, Services).
+    Default is multi-tab Excel (.xlsx) workbook.
+    """
+    export_format = (request.query_params.get('export_format') or request.query_params.get('format') or 'xlsx').lower()
+    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+
+    if export_format == 'json':
+        data = backup_export_service.export_all_json(request)
+        return Response(data)
+
+    xlsx_bytes = backup_export_service.export_full_backup_xlsx(request)
+    response = HttpResponse(
+        xlsx_bytes,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="crm_full_backup_{timestamp}.xlsx"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([IsOwner])
+def export_section(request, section):
+    """GET /api/backup/export/<section>/?export_format=csv|json
+    Exports a specific CRM section (staff, orders, attendance, payroll, customers, expenses, credits, services).
+    Default format is csv.
+    """
+    export_format = (request.query_params.get('export_format') or request.query_params.get('format') or 'csv').lower()
+    section_clean = str(section).strip().lower()
+    timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+
+    if section_clean not in backup_export_service.SECTIONS:
+        return Response(
+            {'detail': f"Invalid section '{section}'. Available: {list(backup_export_service.SECTIONS.keys())}"},
+            status=400,
+        )
+
+    if export_format == 'json':
+        data = backup_export_service.export_section_json(section_clean, request)
+        return Response(data)
+
+    csv_content = backup_export_service.export_section_csv(section_clean, request)
+    response = HttpResponse(csv_content, content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{section_clean}_export_{timestamp}.csv"'
+    return response
+
+
+
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser])
+@permission_classes([IsOwner])
+def import_section(request, section):
+    """POST /api/backup/import/<section>/ {file, dry_run?}
+
+    Imports a CSV/JSON file written by the matching export into the current
+    shop only. Rows already present are skipped, bad rows are reported, and
+    nothing is written when dry_run=true.
+    """
+    section_clean = str(section).strip().lower()
+    upload = request.FILES.get('file')
+    if not upload:
+        return Response({'detail': 'file is required.'}, status=400)
+    dry_run = str(request.data.get('dry_run') or '').lower() == 'true'
+    try:
+        return Response(backup_import_service.import_section(section_clean, upload, dry_run))
+    except backup_import_service.ImportFileError as exc:
+        return Response({'detail': str(exc)}, status=400)

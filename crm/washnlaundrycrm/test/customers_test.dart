@@ -6,6 +6,7 @@ import 'package:washnlaundrycrm/models/order_model.dart';
 import 'package:washnlaundrycrm/providers/app_provider.dart';
 import 'package:washnlaundrycrm/screens/customer_detail_screen.dart';
 import 'package:washnlaundrycrm/screens/customers_screen.dart';
+import 'package:washnlaundrycrm/widgets/customers_import_dialog.dart';
 
 Widget host(AppProvider provider, Widget child) => ChangeNotifierProvider.value(
       value: provider,
@@ -418,7 +419,8 @@ void main() {
       await pumpAt(tester, 1400);
 
       expect(find.text('CUSTOMER'), findsOneWidget);
-      expect(find.text('Export'), findsOneWidget);
+      expect(find.text('Export'), findsNothing);
+      expect(find.text('Import'), findsNothing);
     });
 
     testWidgets('shows cards instead of the table at phone width',
@@ -612,57 +614,36 @@ void main() {
     });
   });
 
-  group('CustomersScreen Export', () {
-    testWidgets(
-        'was a placeholder snackbar — now exports the filtered rows as CSV',
+  group('Customers import lives in Settings', () {
+    testWidgets('the Customers screen has no Import or Export buttons',
         (tester) async {
-      // `flutter test` runs on the VM, not web, so `downloadCsv` resolves to
-      // the non-web stub and reports it couldn't trigger a real download —
-      // this pins that the button is wired up (builds the CSV, calls the
-      // download hook) rather than always showing "Export is not available
-      // yet."
       final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
       await tester.pumpWidget(host(provider, const CustomersScreen()));
       await tester.pump();
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Export'));
-      await tester.pump();
-
-      expect(find.text('Export is not available yet.'), findsNothing);
-      expect(find.text('Export is only available in the web app.'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Import'), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, 'Export'), findsNothing);
     });
 
-    testWidgets('a search matching nobody says so instead of exporting nothing',
+    testWidgets('the import dialog opens from the shared dialog widget',
         (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
-      await tester.pumpWidget(host(provider, const CustomersScreen()));
-      await tester.pump();
-
-      await tester.enterText(find.byType(TextField).first, 'zzzz');
-      await tester.pump();
-
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Export'));
-      await tester.pump();
-
-      expect(find.text('No customers to export.'), findsOneWidget);
-    });
-  });
-
-  group('CustomersScreen Import', () {
-    testWidgets('opens the Import Customers dialog with a file picker step',
-        (tester) async {
-      final provider = AppProvider(autoLoad: false)..seedForTest(customers: roster);
-      await tester.pumpWidget(host(provider, const CustomersScreen()));
-      await tester.pump();
-
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Import'));
+      await tester.pumpWidget(host(
+          provider,
+          Scaffold(
+            body: Builder(
+              builder: (ctx) => TextButton(
+                onPressed: () => showDialog<bool>(
+                    context: ctx, builder: (_) => const ImportCustomersDialog()),
+                child: const Text('open'),
+              ),
+            ),
+          )));
+      await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
       expect(find.text('Import Customers'), findsOneWidget);
       expect(find.text('Choose File'), findsOneWidget);
-      // Only reached once a file has been picked and previewed.
-      expect(find.text('Match each field to a column from your file.'),
-          findsNothing);
 
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();

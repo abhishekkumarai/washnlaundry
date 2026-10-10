@@ -108,8 +108,8 @@ class TenantRBACTests(TestCase):
         principal = resolve_principal(user.email, shop=self.shop_a)
         self.assertNotEqual(principal.role, OWNER)
 
-    def test_superuser_and_staff_emails_remain_global_owner(self):
-        """Superusers and explicit STAFF_EMAILS retain OWNER across all shops."""
+    def test_superuser_remains_global_owner(self):
+        """Superusers retain OWNER across all shops."""
         superuser = User.objects.create_superuser(
             username='super@example.com',
             email='super@example.com',

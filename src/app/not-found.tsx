@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import SupportCard from './SupportCard';
 
 export default function NotFound() {
   return (
@@ -71,6 +72,8 @@ export default function NotFound() {
               Customer Portal
             </a>
           </div>
+
+          <SupportCard />
         </div>
       </main>
 

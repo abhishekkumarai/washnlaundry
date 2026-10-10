@@ -21,6 +21,17 @@ from .models import (
 from .serializers import CustomerSerializer
 
 
+
+def only_shop(**kwargs):
+    """The single shop of a legacy single-tenant test.
+
+    Migration 0028 seeds a default shop; with two shops the app (correctly) refuses
+    to guess which one an unscoped request means, so these tests start from one.
+    """
+    Shop.all_objects.all().delete() if hasattr(Shop, 'all_objects') else Shop.objects.all().delete()
+    return Shop.objects.create(**kwargs)
+
+
 class ShopTests(TestCase):
     def test_order_prefix_derived_from_name(self):
         shop = Shop.objects.create(name='washing')
@@ -41,7 +52,7 @@ class ShopTests(TestCase):
 
 class OrderNumberTests(TestCase):
     def setUp(self):
-        Shop.objects.create(name='washing', order_prefix='WA3P')
+        only_shop(name='washing', order_prefix='WA3P')
 
     def test_first_order_number(self):
         order = Order.objects.create(customer_name='A', customer_phone='1')
@@ -63,7 +74,7 @@ class OrderNumberTests(TestCase):
 
 class OrderTimelineTests(TestCase):
     def setUp(self):
-        Shop.objects.create(name='washing')
+        only_shop(name='washing')
         self.order = Order.objects.create(customer_name='A', customer_phone='1')
 
     def test_mark_status_stamps_matching_field(self):
@@ -110,7 +121,7 @@ class OrderTimelineTests(TestCase):
 
 class OrderOverdueTests(TestCase):
     def setUp(self):
-        Shop.objects.create(name='washing')
+        only_shop(name='washing')
         self.today = timezone.localdate()
 
     def _order(self, **kwargs):
@@ -646,7 +657,7 @@ class ServicesImportHelperTests(TestCase):
 
 class OrderApiTests(APITestCase):
     def setUp(self):
-        Shop.objects.create(name='washing', order_prefix='WA3P')
+        only_shop(name='washing', order_prefix='WA3P')
         self.category = GarmentCategory.objects.create(name='Ironing')
         self.item = GarmentItem.objects.create(category=self.category, name='Shirt', price=15)
 
@@ -752,7 +763,7 @@ class OrderApiTests(APITestCase):
 
 class OrderFilterTests(APITestCase):
     def setUp(self):
-        Shop.objects.create(name='washing')
+        only_shop(name='washing')
         today = timezone.localdate()
         self.overdue = Order.objects.create(
             customer_name='Overdue', customer_phone='1',
@@ -870,7 +881,7 @@ class SchedulingApiTests(APITestCase):
 
 class DashboardStatsTests(APITestCase):
     def setUp(self):
-        Shop.objects.create(name='washing')
+        only_shop(name='washing')
         today = timezone.localdate()
 
         Order.objects.create(
@@ -969,7 +980,7 @@ class DashboardStatsTests(APITestCase):
 
 class ShopApiTests(APITestCase):
     def setUp(self):
-        self.shop = Shop.objects.create(name='washing', city='Bengaluru')
+        self.shop = only_shop(name='washing', city='Bengaluru')
 
     def test_patch_updates_the_profile(self):
         response = self.client.patch(
@@ -1652,7 +1663,7 @@ class ReportsApiTests(APITestCase):
     """
 
     def setUp(self):
-        Shop.objects.create(name='washing')
+        only_shop(name='washing')
         self.today = timezone.localdate()
         self.month_start = self.today.replace(day=1)
 
@@ -1823,7 +1834,7 @@ class PosCheckoutContractTests(APITestCase):
     """
 
     def setUp(self):
-        Shop.objects.create(name='washing', order_prefix='WA3P')
+        only_shop(name='washing', order_prefix='WA3P')
         self.customer = Customer.objects.create(name='Priya Sundaram', phone='9000000002')
 
     def _checkout(self, **overrides):
@@ -2258,7 +2269,7 @@ class ShopOperatingRulesTests(APITestCase):
     """Rules that used to live as Dart constants in the client."""
 
     def setUp(self):
-        self.shop = Shop.objects.create(name='washing')
+        self.shop = only_shop(name='washing')
 
     def test_defaults_match_the_constants_they_replace(self):
         data = self.client.get('/api/shops/').data[0]
@@ -2581,11 +2592,12 @@ class RoleAuthTests(APITestCase):
         Staff.objects.create(name='Sam', phone='9333333333', email='sam@shop.com',
                              has_app_login=True, status='ACTIVE')
         Staff.objects.create(name='NoLogin', phone='9444444444', email='nologin@shop.com')
+        Staff.objects.create(name='Olive', phone='9555555555', email='owner@shop.com', role='Owner',
+                             has_app_login=True, status='ACTIVE')
         patcher = mock.patch('api.auth.id_token.verify_oauth2_token')
         self.verify = patcher.start()
         self.addCleanup(patcher.stop)
-        for o in (override_settings(GOOGLE_CLIENT_ID='c', API_AUTH_ENFORCED=True,
-                                    STAFF_EMAILS=['owner@shop.com']),):
+        for o in (override_settings(GOOGLE_CLIENT_ID='c', API_AUTH_ENFORCED=True),):
             o.enable()
             self.addCleanup(o.disable)
         self.auth = {'HTTP_AUTHORIZATION': 'Bearer tok'}

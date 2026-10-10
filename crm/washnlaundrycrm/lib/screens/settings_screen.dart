@@ -4,7 +4,9 @@ import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/credit_categories_panel.dart';
+import '../widgets/shop_access_panel.dart';
 import '../widgets/services_import_export_panel.dart';
+import '../widgets/backup_export_panel.dart';
 import '../widgets/sidebar_navigation.dart';
 
 /// One entry in Settings' vertical tab list.
@@ -32,15 +34,19 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   static const businessProfile = 'business-profile';
+  static const backupExport = 'backup-export';
   static const creditCategories = 'credit-categories';
   static const servicesExportImport = 'services-import-export';
+  static const shopAccess = 'shop-access';
 
-  /// Only [businessProfile], [creditCategories], and [servicesExportImport] are built;
+  /// Only [businessProfile], [backupExport], [servicesExportImport], and [creditCategories] are built;
   /// unbuilt tabs show a "Not available yet" panel.
   static const _mainTabs = [
     _SettingsTab(businessProfile, Icons.storefront_outlined, 'Business profile'),
+    _SettingsTab(backupExport, Icons.backup_outlined, 'Backup, Data Import & Export'),
     _SettingsTab(servicesExportImport, Icons.swap_vert_rounded, 'Services export/import'),
     _SettingsTab(creditCategories, Icons.savings_outlined, 'Credit categories'),
+    _SettingsTab(shopAccess, Icons.admin_panel_settings_outlined, 'Shop access'),
   ];
   static const _accountTabs = [
     _SettingsTab('help', Icons.help_outline_rounded, 'Help & support',
@@ -360,11 +366,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case businessProfile:
         child = _businessProfileForm();
         break;
+      case backupExport:
+        child = const BackupExportPanel();
+        break;
       case servicesExportImport:
         child = const ServicesImportExportPanel();
         break;
       case creditCategories:
         child = const CreditCategoriesPanel();
+        break;
+      case shopAccess:
+        child = const ShopAccessPanel();
         break;
       default:
         child = _notAvailable(_current);

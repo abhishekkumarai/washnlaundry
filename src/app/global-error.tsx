@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import SupportCard from './SupportCard';
 
 export default function GlobalError({
   error,
@@ -60,6 +61,8 @@ export default function GlobalError({
               Return to Home
             </a>
           </div>
+
+          <SupportCard />
         </div>
       </body>
     </html>

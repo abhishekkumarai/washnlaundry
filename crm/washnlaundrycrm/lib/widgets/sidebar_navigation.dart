@@ -8,6 +8,7 @@ import '../utils/role_views.dart';
 import 'brand_logo.dart';
 import 'panel_card.dart';
 import 'shop_switch_modal.dart';
+import 'support_info.dart';
 
 /// Left navigation rail.
 ///
@@ -689,19 +690,19 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
             _helpContactRow(
               icon: Icons.email_outlined,
               label: 'Email Support',
-              value: 'support@washnlaundry.com',
+              value: SupportInfo.email,
             ),
             const SizedBox(height: 10),
             _helpContactRow(
               icon: Icons.phone_outlined,
               label: 'Phone Support',
-              value: '+91 80 4567 8900',
+              value: SupportInfo.phone,
             ),
             const SizedBox(height: 10),
             _helpContactRow(
               icon: Icons.schedule_outlined,
               label: 'Hours',
-              value: 'Mon – Sat, 9:00 AM – 8:00 PM',
+              value: SupportInfo.hours,
             ),
           ],
         ),

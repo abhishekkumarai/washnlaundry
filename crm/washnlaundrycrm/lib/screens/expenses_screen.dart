@@ -3,8 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
-import '../utils/csv.dart';
-import '../utils/csv_download.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -155,12 +153,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          titleBlock,
+          const Text(
+              'Log shop operational expenses, rent, detergents, & repairs',
+              style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                flex: 60,
+                flex: 80,
                 child: _searchField(),
               ),
               const SizedBox(width: 8),
@@ -180,24 +180,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 20,
-                child: SizedBox(
-                  height: 38,
-                  child: OutlinedButton(
-                    onPressed: () => _exportExpensesCsv(visible),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE4E0D8)),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: const Icon(Icons.download_rounded,
-                        size: 18, color: Color(0xFF475569)),
-                  ),
-                ),
-              ),
             ],
           ),
         ],
@@ -209,8 +191,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         titleBlock,
         SizedBox(width: 240, child: _searchField()),
         const SizedBox(width: 14),
-        _exportButton(visible),
-        const SizedBox(width: 8),
         FilledButton.icon(
           onPressed: _showAddExpense,
           icon: const Icon(Icons.add_rounded, size: 18),
@@ -258,58 +238,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         ),
       ),
     );
-  }
-
-  Widget _exportButton(List<ExpenseModel> visible) {
-    return OutlinedButton.icon(
-      onPressed: () => _exportExpensesCsv(visible),
-      icon: const Icon(Icons.download_rounded,
-          size: 16, color: Color(0xFF475569)),
-      label: const Text('Export',
-          style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF334155))),
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Color(0xFFE4E0D8)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      ),
-    );
-  }
-
-  /// Exports exactly what's on screen — the currently category-filtered and
-  /// searched rows — same convention as Orders'/Customers' Export.
-  void _exportExpensesCsv(List<ExpenseModel> expenses) {
-    if (expenses.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No expenses to export.')),
-      );
-      return;
-    }
-
-    final provider = context.read<AppProvider>();
-    final rows = <List<Object?>>[
-      const ['Title', 'Category', 'Amount', 'Payment Method', 'Date', 'Notes'],
-      for (final e in expenses)
-        [
-          e.title,
-          e.category,
-          e.amount,
-          _methodLabel(provider, e.paymentMethod),
-          e.date == null ? '' : DateFormat('yyyy-MM-dd').format(e.date!),
-          e.notes ?? '',
-        ],
-    ];
-
-    final filename =
-        'expenses_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
-    final ok = downloadCsv(filename, buildCsv(rows));
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Export is only available in the web app.')),
-      );
-    }
   }
 
   /// Chevron month stepper — same pattern as Payroll's, so switching which

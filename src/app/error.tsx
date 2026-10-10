@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import SupportCard from './SupportCard';
 
 export default function Error({
   error,
@@ -85,6 +86,8 @@ export default function Error({
               Return to Home
             </Link>
           </div>
+
+          <SupportCard />
         </div>
       </main>
 

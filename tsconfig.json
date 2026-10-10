@@ -39,6 +39,7 @@
   "exclude": [
     "crm",
     "customer-web",
+    "cloudflare-backup-worker",
     "node_modules"
   ]
 }

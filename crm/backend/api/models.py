@@ -6,7 +6,7 @@ from django.utils.text import slugify
 import re
 import uuid
 
-from .tenancy import TenantModel, get_current_tenant
+from .tenancy import TenantModel, get_current_tenant, require_shop
 
 
 # ── Canonical vocabularies ────────────────────────────────────────────────────
@@ -77,12 +77,25 @@ class ExpenseCategory(models.TextChoices):
 
 # ── Shop ──────────────────────────────────────────────────────────────────────
 
+class ShopStatus(models.TextChoices):
+    ACTIVE = 'ACTIVE', 'Active'
+    SUSPENDED = 'SUSPENDED', 'Suspended'
+    ARCHIVED = 'ARCHIVED', 'Archived'
+
+
+# Slugs/subdomains that would shadow platform hosts or routes.
+RESERVED_SHOP_SLUGS = frozenset({
+    'app', 'customer', 'www', 'api', 'admin', 'localhost', 'static', 'media',
+    'login', 'signup', 'mail', 'support', 'help', 'staging', 'demo', 'test',
+})
+
+
 class Shop(models.Model):
     name = models.CharField(max_length=255, default='WashNLaundry Express')
     slug = models.SlugField(max_length=100, unique=True, blank=True, null=True)
     subdomain = models.CharField(max_length=100, blank=True, default='')
     custom_domain = models.CharField(max_length=255, blank=True, default='')
-    status = models.CharField(max_length=20, default='ACTIVE')
+    status = models.CharField(max_length=20, choices=ShopStatus.choices, default=ShopStatus.ACTIVE)
 
     owner_name = models.CharField(max_length=255, default='Aditya Sharma')
     phone = models.CharField(max_length=50, default='+91 98765 43210')
@@ -122,11 +135,23 @@ class Shop(models.Model):
     currency_symbol = models.CharField(max_length=8, default='₹')
     locale = models.CharField(max_length=16, default='en_IN')
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['subdomain'], condition=~models.Q(subdomain=''),
+                name='shop_subdomain_unique_when_set'),
+            models.UniqueConstraint(
+                fields=['custom_domain'], condition=~models.Q(custom_domain=''),
+                name='shop_custom_domain_unique_when_set'),
+        ]
+
     def save(self, *args, **kwargs):
         if not self.order_prefix:
             self.order_prefix = self.derive_prefix(self.name)
         if not self.slug:
             base_slug = slugify(self.name) or 'shop'
+            if base_slug in RESERVED_SHOP_SLUGS:
+                base_slug = f'{base_slug}-shop'
             candidate = base_slug
             idx = 1
             while Shop.objects.filter(slug=candidate).exclude(pk=self.pk).exists():
@@ -137,7 +162,7 @@ class Shop(models.Model):
             self.subdomain = self.slug
         is_new = self._state.adding
         super().save(*args, **kwargs)
-        if is_new:
+        if is_new and not getattr(self, '_skip_default_services', False):
             import sys
             if 'test' not in sys.argv and not getattr(settings, 'TESTING', False):
                 try:
@@ -379,9 +404,7 @@ class Order(TenantModel):
             elif self.customer and getattr(self.customer, 'shop_id', None):
                 self.shop = self.customer.shop
             else:
-                default_shop = Shop.objects.first()
-                if default_shop:
-                    self.shop = default_shop
+                self.shop = require_shop()
         if not self.order_number and getattr(self, 'shop_id', None):
             self.order_number = self.next_order_number(self.shop)
         elif not self.order_number:
@@ -390,9 +413,7 @@ class Order(TenantModel):
 
     @classmethod
     def next_order_number(cls, shop=None):
-        target_shop = shop or get_current_tenant() or Shop.objects.first()
-        if not target_shop:
-            return 'SHOP-00001'
+        target_shop = shop or require_shop()
         return ShopOrderSequence.get_next_order_number(target_shop)
 
     def mark_status(self, new_status, when=None, note=''):
@@ -571,6 +592,12 @@ class Staff(TenantModel):
             except Exception:
                 pass
 
+    def delete(self, *args, **kwargs):
+        # Deleting a staff row must also revoke the sign-in access it created.
+        from .auth import drop_staff_membership
+        drop_staff_membership(self)
+        return super().delete(*args, **kwargs)
+
     def __str__(self):
         return f"{self.name} ({self.role})"
 
@@ -599,7 +626,7 @@ class SalaryPayment(TenantModel):
         if not getattr(self, 'shop_id', None) and getattr(self, 'staff_id', None):
             self.shop = self.staff.shop
         elif not getattr(self, 'shop_id', None):
-            self.shop = get_current_tenant() or Shop.objects.first()
+            self.shop = require_shop()
         if self.month:
             self.month = self.month_start(self.month)
         super().save(*args, **kwargs)
@@ -650,7 +677,7 @@ class SalaryAdvance(TenantModel):
         if not getattr(self, 'shop_id', None) and getattr(self, 'staff_id', None):
             self.shop = self.staff.shop
         elif not getattr(self, 'shop_id', None):
-            self.shop = get_current_tenant() or Shop.objects.first()
+            self.shop = require_shop()
         if self.month:
             self.month = self.month_start(self.month)
         super().save(*args, **kwargs)
@@ -692,7 +719,7 @@ class Attendance(TenantModel):
         if not getattr(self, 'shop_id', None) and getattr(self, 'staff_id', None):
             self.shop = self.staff.shop
         elif not getattr(self, 'shop_id', None):
-            self.shop = get_current_tenant() or Shop.objects.first()
+            self.shop = require_shop()
         super().save(*args, **kwargs)
 
     @property
@@ -749,7 +776,7 @@ class EmailLinkRequest(TenantModel):
         if not getattr(self, 'shop_id', None) and getattr(self, 'customer_id', None):
             self.shop = self.customer.shop
         elif not getattr(self, 'shop_id', None):
-            self.shop = get_current_tenant() or Shop.objects.first()
+            self.shop = require_shop()
         super().save(*args, **kwargs)
 
     def approve(self):
@@ -803,7 +830,7 @@ class MetaPlatform(models.TextChoices):
     BOTH = 'BOTH', 'Facebook & Instagram'
 
 
-class MetaPost(models.Model):
+class MetaPost(TenantModel):
     """Posts scheduled or published across Facebook and Instagram."""
     STATUS_DRAFT = 'DRAFT'
     STATUS_SCHEDULED = 'SCHEDULED'
@@ -839,7 +866,7 @@ class MetaPost(models.Model):
         return f"[{self.platform}] {self.content[:30]} ({self.status})"
 
 
-class MetaMessage(models.Model):
+class MetaMessage(TenantModel):
     """Direct message conversations from Instagram & Facebook with Meta AI responses."""
     SENDER_USER = 'USER'
     SENDER_AI = 'AI'
@@ -867,7 +894,7 @@ class MetaMessage(models.Model):
         return f"{self.sender_name} ({self.platform}): {self.text[:30]}"
 
 
-class MetaLead(models.Model):
+class MetaLead(TenantModel):
     """Ad inquiries and chat leads captured from Facebook and Instagram."""
     STATUS_NEW = 'NEW'
     STATUS_CONTACTED = 'CONTACTED'

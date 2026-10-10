@@ -23,6 +23,17 @@ class Command(BaseCommand):
             default=7,
             help='Number of days of backups to retain (deletes older backups).',
         )
+        parser.add_argument(
+            '--upload-r2',
+            action='store_true',
+            help='Upload the generated backup to Cloudflare R2.',
+        )
+        parser.add_argument(
+            '--r2-bucket',
+            type=str,
+            default=os.getenv('R2_BACKUP_BUCKET', 'washnlaundry-backups'),
+            help='Cloudflare R2 bucket name.',
+        )
 
     def handle(self, *args, **options):
         output_dir = Path(options['output_dir'])
@@ -80,3 +91,34 @@ class Command(BaseCommand):
             if f.is_file() and (now - f.stat().st_mtime) > cutoff_seconds:
                 f.unlink()
                 self.stdout.write(self.style.WARNING(f'Pruned old backup: {f.name}'))
+
+        # Optional upload to Cloudflare R2
+        if options.get('upload_r2'):
+            self._upload_to_r2(backup_file, options['r2_bucket'])
+
+    def _upload_to_r2(self, file_path: Path, bucket_name: str):
+        account_id = os.getenv('R2_ACCOUNT_ID')
+        access_key = os.getenv('R2_ACCESS_KEY_ID')
+        secret_key = os.getenv('R2_SECRET_ACCESS_KEY')
+
+        if not (account_id and access_key and secret_key):
+            self.stdout.write(self.style.WARNING('Skipping R2 upload: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, or R2_SECRET_ACCESS_KEY not set.'))
+            return
+
+        try:
+            import boto3
+            from botocore.config import Config
+            s3 = boto3.client(
+                's3',
+                endpoint_url=f'https://{account_id}.r2.cloudflarestorage.com',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                config=Config(signature_version='s3v4'),
+                region_name='auto',
+            )
+            key = f"db-backups/{file_path.name}"
+            self.stdout.write(f'Uploading {file_path.name} to Cloudflare R2 bucket "{bucket_name}"...')
+            s3.upload_file(str(file_path), bucket_name, key)
+            self.stdout.write(self.style.SUCCESS(f'Successfully uploaded backup to Cloudflare R2: s3://{bucket_name}/{key}'))
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f'Failed to upload to Cloudflare R2: {e}'))

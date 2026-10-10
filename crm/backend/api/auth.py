@@ -5,7 +5,7 @@ The CRM and the customer portal share one login: Google, or email + password
 (a Google ID token verified against GOOGLE_CLIENT_ID, or an `app.` session
 token), and the verified email decides the role:
 
-* owner    - an address in the STAFF_EMAILS env allow-list, or an ACTIVE `Staff`
+* owner    - a superuser, a `ShopMembership` with role OWNER, or an ACTIVE `Staff`
              row with that email whose `role` is Owner or Manager. Everything.
 * staff    - any other ACTIVE `Staff` row with `has_app_login` and that email.
              Day-to-day work only: orders, customers, scanning. No payroll,
@@ -111,8 +111,6 @@ def _active_staff(email, shop=None):
 
 
 def is_owner_email(email, shop=None):
-    if email in settings.STAFF_EMAILS:
-        return True
     return any(
         s.role.strip().lower() in OWNER_JOB_TITLES for s in _active_staff(email, shop=shop))
 
@@ -202,6 +200,31 @@ def sync_staff_user(staff):
     return sync_user_groups(user)
 
 
+def _staff_membership(staff):
+    from .models import ShopMembership
+    if not (staff and staff.email and staff.shop_id):
+        return None
+    return ShopMembership.objects.filter(
+        user__username__iexact=staff.email.strip(), shop_id=staff.shop_id).first()
+
+
+def is_last_owner(staff):
+    """True if `staff` is the only active OWNER member of their shop."""
+    from .models import ShopMembership, ShopRole
+    m = _staff_membership(staff)
+    if not (m and m.is_active and m.role == ShopRole.OWNER):
+        return False
+    return not ShopMembership.objects.filter(
+        shop_id=m.shop_id, is_active=True, role=ShopRole.OWNER).exclude(pk=m.pk).exists()
+
+
+def drop_staff_membership(staff):
+    """Remove the sign-in access a Staff row granted (called when the row is deleted)."""
+    m = _staff_membership(staff)
+    if m:
+        m.delete()
+
+
 def sync_user_groups(user):
     """Ensure a Django User's Group memberships match their hierarchical role.
     
@@ -260,10 +283,11 @@ def resolve_principal(email, shop=None):
     """Resolve the authenticated caller's identity and effective role.
 
     If a tenant `shop` is active (or passed explicitly), role resolution checks:
-    1. Superusers and global settings.STAFF_EMAILS -> OWNER
+    1. Superusers -> OWNER
     2. ShopMembership for (user, shop) -> mapped to OWNER, STAFF, or CUSTOMER
     3. Shop-specific Staff or Customer records
-    4. Fallback to global user groups / global records
+    4. Only when NO tenant is active (e.g. /api/me/): global groups / records.
+       With a tenant active, a caller matching none of 1-3 is UNLINKED.
     """
     email = (email or '').strip().lower()
     from django.contrib.auth import get_user_model
@@ -276,8 +300,8 @@ def resolve_principal(email, shop=None):
     User = get_user_model()
     user = User.objects.filter(username__iexact=email).first()
 
-    # Superusers and allowlisted staff emails are always global OWNER
-    if (user and user.is_superuser) or email in settings.STAFF_EMAILS:
+    # Superusers are always global OWNER (platform admins)
+    if user and user.is_superuser:
         return Principal(email, OWNER, user=user, shop=shop)
 
     # 1. Check shop-specific ShopMembership if a tenant context exists
@@ -290,8 +314,6 @@ def resolve_principal(email, shop=None):
                 return Principal(email, STAFF, user=user, shop=shop)
             elif membership.role == ShopRole.CUSTOMER:
                 c = Customer.objects.filter(email__iexact=email, shop=shop).order_by('created_at').first()
-                if not c:
-                    c = customer_for_email(email)
                 return Principal(email, CUSTOMER, customer=c, user=user, shop=shop)
 
     # 2. Check shop-specific Staff or Customer rows if shop context is active
@@ -304,7 +326,13 @@ def resolve_principal(email, shop=None):
         if shop_cust:
             return Principal(email, CUSTOMER, customer=shop_cust, user=user, shop=shop)
 
-    # 3. Global group checks / fallback (when user is found)
+    # With a tenant active, only the checks above count. Groups and Customer
+    # lookups are global, so honouring them here would let a role earned in one
+    # shop (or a customer record in another) carry over into this one.
+    if shop:
+        return Principal(email, UNLINKED, user=user, shop=shop)
+
+    # 3. No tenant (e.g. /api/me/): global group checks / fallback
     if user:
         group_names = set(user.groups.values_list('name', flat=True))
         if 'Owner' in group_names:
@@ -315,7 +343,7 @@ def resolve_principal(email, shop=None):
             c = customer_for_email(email)
             return Principal(email, CUSTOMER, customer=c, user=user, shop=shop)
 
-        # Fallback to sync from settings / staff records
+        # Fallback to sync from staff records
         synced_role = sync_user_groups(user)
         if synced_role == OWNER:
             return Principal(email, OWNER, user=user, shop=shop)
@@ -326,10 +354,10 @@ def resolve_principal(email, shop=None):
             return Principal(email, CUSTOMER, customer=c, user=user, shop=shop)
     else:
         # Fallback for Google tokens before local User creation
-        if is_owner_email(email, shop=shop):
-            return Principal(email, OWNER, shop=shop)
-        if is_staff_email(email, shop=shop):
-            return Principal(email, STAFF, shop=shop)
+        if is_owner_email(email):
+            return Principal(email, OWNER)
+        if is_staff_email(email):
+            return Principal(email, STAFF)
 
     customer = customer_for_email(email)
     if customer:
@@ -403,6 +431,30 @@ class IsCustomer(BasePermission):
         if not isinstance(user, Principal):
             return False
         return user.has_role(CUSTOMER) or user.in_group('Customers')
+
+
+def is_shop_owner(principal, shop):
+    """True for a superuser or an active OWNER of `shop` (object-level check)."""
+    user = getattr(principal, 'user', None)
+    if not user or not shop:
+        return False
+    if user.is_superuser:
+        return True
+    from .models import ShopMembership, ShopRole
+    return ShopMembership.objects.filter(
+        user=user, shop=shop, is_active=True, role=ShopRole.OWNER).exists()
+
+
+class CanProvisionShop(BasePermission):
+    """Any signed-in user; anonymous only while auth is not enforced (Demo Mode).
+
+    For endpoints whose real checks are object-level (shops): provisioning and the
+    caller's own shops."""
+
+    def has_permission(self, request, view):
+        if not settings.API_AUTH_ENFORCED:
+            return True
+        return isinstance(request.user, Principal)
 
 
 class IsSignedIn(BasePermission):

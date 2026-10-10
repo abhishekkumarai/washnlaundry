@@ -16,6 +16,26 @@ def set_current_tenant(tenant):
     return _current_tenant.set(tenant)
 
 
+def fallback_shop():
+    """The shop to assume when a request resolved no tenant.
+
+    Only safe in a single-shop deployment, so it returns the sole shop, and
+    None as soon as there are several - callers must then fail loudly instead
+    of silently landing data in whichever shop happens to be first.
+    """
+    from .models import Shop
+    shops = list(Shop.objects.all()[:2])
+    return shops[0] if len(shops) == 1 else None
+
+
+def require_shop():
+    """The active tenant, else the sole shop of a single-shop deployment, else an error."""
+    shop = get_current_tenant() or fallback_shop()
+    if shop is None:
+        raise ValueError('No tenant is active and the shop cannot be inferred.')
+    return shop
+
+
 @contextmanager
 def tenant_context(tenant):
     """Context manager to temporarily run code in the context of a given Shop."""
@@ -100,8 +120,9 @@ class TenantModel(models.Model):
             if tenant:
                 self.shop = tenant
             else:
-                from .models import Shop
-                default_shop = Shop.objects.first()
-                if default_shop:
-                    self.shop = default_shop
+                default_shop = fallback_shop()
+                if default_shop is None:
+                    raise ValueError(
+                        f'{type(self).__name__} saved without a shop and no tenant is active.')
+                self.shop = default_shop
         super().save(*args, **kwargs)

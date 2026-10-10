@@ -1,7 +1,7 @@
 from django.db import connection
 from django.http import JsonResponse
 from .models import Shop
-from .tenancy import set_current_tenant
+from .tenancy import fallback_shop, set_current_tenant
 
 
 class TenantMiddleware:
@@ -12,8 +12,13 @@ class TenantMiddleware:
     2. Query param `?shop=<slug_or_id>`
     3. Host subdomain (e.g. `cp.washnlaundry.com` -> 'cp'), ignoring standard platform hosts
     4. Authenticated user's default/first active ShopMembership
-    5. Fallback to default Shop (first shop in database)
+    5. The sole shop, if the deployment has exactly one. With several shops and
+       no tenant, tenant-scoped API paths are rejected rather than guessed.
     """
+
+    # Paths that work without a tenant: they look at the caller's memberships.
+    # (The customer portal is cross-shop: a customer's rows are bound to them, not a tenant.)
+    TENANTLESS_PREFIXES = ('/api/me/', '/api/shops/', '/api/auth/', '/api/customer/', '/api/link-requests/')
 
     EXCLUDED_SUBDOMAINS = {'app', 'customer', 'www', 'api', 'localhost', '127', 'admin', 'testserver'}
 
@@ -28,15 +33,25 @@ class TenantMiddleware:
             return JsonResponse({'detail': 'Tenant shop not found.'}, status=404)
 
         if shop and getattr(shop, 'status', None) != 'ACTIVE':
-            return JsonResponse({'detail': 'Tenant shop is inactive or suspended.'}, status=403)
+            return JsonResponse({'detail': 'Tenant shop is inactive, suspended or archived.'}, status=403)
+
+        if (shop is None and request.path.startswith('/api/')
+                and not request.path.startswith(self.TENANTLESS_PREFIXES)):
+            return JsonResponse(
+                {'detail': 'No shop selected. Send the X-Tenant-ID header.'}, status=400)
 
         request.shop = shop
         token = set_current_tenant(shop)
 
-        # PostgreSQL RLS session setting (Tier 2 defense-in-depth)
-        if shop and connection.vendor == 'postgresql':
+        # PostgreSQL RLS session setting. Session-scoped (is_local=false) because
+        # requests run in autocommit, where SET LOCAL is a no-op that only logs a
+        # warning. Reset in `finally` so a pooled connection never carries it over.
+        # NB: RLS only binds a role that does not own the tables (or tables set to
+        # FORCE ROW LEVEL SECURITY); the app's usual owner role bypasses it.
+        rls_set = bool(shop and connection.vendor == 'postgresql')
+        if rls_set:
             with connection.cursor() as cursor:
-                cursor.execute("SET LOCAL app.current_tenant = %s", [str(shop.id)])
+                cursor.execute("SELECT set_config('app.current_tenant', %s, false)", [str(shop.id)])
 
         try:
             response = self.get_response(request)
@@ -45,6 +60,9 @@ class TenantMiddleware:
             return response
         finally:
             set_current_tenant(None)
+            if rls_set:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT set_config('app.current_tenant', '', false)")
 
     def resolve_tenant(self, request):
         # 1. Header `X-Tenant-ID`
@@ -87,24 +105,19 @@ class TenantMiddleware:
             if active_m:
                 return active_m.shop
 
-        # 5. Default fallback shop
-        return Shop.objects.first()
+        # 5. Single-shop deployments keep working without a header
+        return fallback_shop()
 
     def get_shop_by_id_or_slug(self, identifier):
         if not identifier:
             return None
-        # Try pk first if integer
+        # Slug first: it is unique and is what the API echoes back
+        shop = Shop.objects.filter(slug__iexact=identifier).first()
+        if shop:
+            return shop
         if identifier.isdigit():
             shop = Shop.objects.filter(pk=int(identifier)).first()
             if shop:
                 return shop
-        # Try slug
-        shop = Shop.objects.filter(slug__iexact=identifier).first()
-        if shop:
-            return shop
-        # Try subdomain
-        shop = Shop.objects.filter(subdomain__iexact=identifier).first()
-        if shop:
-            return shop
-        # Try name
-        return Shop.objects.filter(name__iexact=identifier).first()
+        # Try subdomain (unique when set)
+        return Shop.objects.filter(subdomain__iexact=identifier).first()
