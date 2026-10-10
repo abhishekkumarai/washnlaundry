@@ -1,4 +1,4 @@
-import 'package:barcode/barcode.dart';
+import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:washnlaundrycrm/utils/tag_code.dart';
 
