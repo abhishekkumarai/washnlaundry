@@ -209,13 +209,17 @@ export default function LandingPage() {
         return;
       }
       const detail = res.status === 429
-        ? "Too many requests from your connection."
+        ? "Too many requests from your connection. Please try again shortly."
         : res.status === 400
           ? "Please check your name, a 10-digit mobile number and your address."
-          : "We couldn't send your request.";
+          : res.status === 404
+            ? "The booking service is temporarily unavailable. Please try again later."
+            : res.status >= 500
+              ? "Our server encountered an issue. Please try again shortly."
+              : "We couldn't send your request. Please try again.";
       setSubmitError(detail);
     } catch {
-      setSubmitError("We couldn't reach our server.");
+      setSubmitError("We couldn't reach our server. Please check your connection and try again.");
     } finally {
       setSubmitting(false);
     }

@@ -28,6 +28,7 @@ import 'screens/social_suite_screen.dart';
 import 'screens/staff_screen.dart';
 import 'utils/role_views.dart';
 import 'widgets/app_shell.dart';
+import 'widgets/load_state.dart';
 
 /// Updates `AppProvider.currentNavIndex` to match the matched route.
 ///
@@ -93,20 +94,12 @@ Widget _buildOrderDetail(BuildContext c, String id, {required String backTo}) {
   // (confirmed live against the real app's own `/orders/:id`) never
   // hits this, since it always resolves once orders finish loading.
   return _ordersFrame(
-    Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('Order not found',
-              style:
-                  TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: () => c.go(backTo),
-            child: const Text('Back to Orders'),
-          ),
-        ],
-      ),
+    ErrorState(
+      statusCode: 404,
+      title: 'Order not found',
+      message: 'The requested order ($id) was not found or may have been deleted.',
+      onRetry: () => c.read<AppProvider>().refresh(),
+      onHome: () => c.go(backTo),
     ),
   );
 }
@@ -269,5 +262,17 @@ GoRouter buildRouter(AuthProvider auth) => GoRouter(
       initialLocation: '/dashboard',
       refreshListenable: auth,
       redirect: (context, state) => authRedirect(auth, state),
+      errorBuilder: (context, state) => Scaffold(
+        backgroundColor: const Color(0xFFF8F7F5),
+        body: Center(
+          child: ErrorState(
+            statusCode: 404,
+            title: 'Page Not Found',
+            message: 'The page "${state.uri.path}" could not be found.',
+            onRetry: () => context.go(homeFor(auth.role)),
+            onHome: () => context.go(homeFor(auth.role)),
+          ),
+        ),
+      ),
       routes: appRoutes(),
     );

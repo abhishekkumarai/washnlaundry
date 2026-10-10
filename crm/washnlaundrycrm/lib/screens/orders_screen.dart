@@ -16,6 +16,7 @@ import '../widgets/app_shell.dart';
 import '../widgets/order_calendar_heatmap.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
+import '../widgets/load_state.dart';
 import '../utils/money.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -222,6 +223,19 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
   Widget _body(
       AppProvider provider, List<OrderModel> filteredOrders, bool narrow) {
+    if (provider.hasError && provider.orders.isEmpty) {
+      return ErrorState(
+        statusCode: provider.error != null && provider.error!.contains('not found') ? 404 : 500,
+        title: 'Error loading orders',
+        message: provider.error!,
+        onRetry: () => provider.refresh(),
+        onHome: () => context.goSection(0),
+      );
+    }
+    if (provider.isLoading && provider.orders.isEmpty) {
+      return const LoadingState();
+    }
+
     final totalCount = filteredOrders.length;
     final totalPages = (totalCount / _pageSize).ceil().clamp(1, 99999);
     final safePage = _currentPage.clamp(1, totalPages);

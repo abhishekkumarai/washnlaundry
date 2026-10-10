@@ -14,6 +14,7 @@ import '../utils/navigation.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
+import '../widgets/load_state.dart';
 import 'customer_detail_screen.dart';
 import '../utils/money.dart';
 
@@ -107,6 +108,19 @@ class _CustomersScreenState extends State<CustomersScreen> {
       body: AppShell(
         body: LayoutBuilder(
           builder: (context, constraints) {
+            if (provider.hasError && provider.customers.isEmpty) {
+              return ErrorState(
+                statusCode: provider.error != null && provider.error!.contains('not found') ? 404 : 500,
+                title: 'Error loading customers',
+                message: provider.error!,
+                onRetry: () => provider.refresh(),
+                onHome: () => context.goSection(0),
+              );
+            }
+            if (provider.isLoading && provider.customers.isEmpty) {
+              return const LoadingState();
+            }
+
             final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
             return Column(
               children: [

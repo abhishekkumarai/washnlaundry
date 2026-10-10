@@ -19,26 +19,52 @@ void main() {
     final provider = AppProvider(autoLoad: false);
     await tester.pumpWidget(host(provider, const ErrorState(message: 'Something broke.')));
 
-    expect(find.text('Error loading dashboard'), findsOneWidget);
+    expect(find.text('Something went wrong'), findsOneWidget);
     expect(find.text('Something broke.'), findsOneWidget);
-    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Try Again'), findsOneWidget);
   });
 
-  testWidgets('ErrorState honours a custom title', (tester) async {
+  testWidgets('ErrorState honours a custom title and 404 status code', (tester) async {
     final provider = AppProvider(autoLoad: false);
     await tester.pumpWidget(host(
       provider,
-      const ErrorState(title: 'Error loading payroll', message: 'No luck.'),
+      const ErrorState(
+        statusCode: 404,
+        message: 'The requested order was not found.',
+      ),
     ));
 
-    expect(find.text('Error loading payroll'), findsOneWidget);
+    expect(find.text('Error 404'), findsOneWidget);
+    expect(find.text('Page Not Found'), findsOneWidget);
+    expect(find.text('The requested order was not found.'), findsOneWidget);
+  });
+
+  testWidgets('ErrorState honours 500 status code and onHome button', (tester) async {
+    final provider = AppProvider(autoLoad: false);
+    var homePressed = false;
+    await tester.pumpWidget(host(
+      provider,
+      ErrorState(
+        statusCode: 500,
+        message: 'Our server encountered an issue.',
+        onHome: () => homePressed = true,
+      ),
+    ));
+
+    expect(find.text('Error 500'), findsOneWidget);
+    expect(find.text('Server Error'), findsOneWidget);
+    expect(find.text('Back to Dashboard'), findsOneWidget);
+
+    await tester.tap(find.text('Back to Dashboard'));
+    await tester.pump();
+    expect(homePressed, isTrue);
   });
 
   testWidgets('Retry calls back into AppProvider.refresh()', (tester) async {
     final provider = AppProvider(autoLoad: false);
     await tester.pumpWidget(host(provider, const ErrorState(message: 'Broke.')));
 
-    await tester.tap(find.text('Retry'));
+    await tester.tap(find.text('Try Again'));
     await tester.pump();
 
     // No server reachable in this test environment, so `refresh()` settles

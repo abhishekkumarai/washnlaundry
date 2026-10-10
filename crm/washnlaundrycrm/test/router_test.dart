@@ -193,8 +193,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Order not found'), findsOneWidget);
+      expect(find.text('Error 404'), findsOneWidget);
 
-      await tester.tap(find.text('Back to Orders'));
+      await tester.tap(find.text('Back to Dashboard'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
       expect(find.text('Order not found'), findsNothing);

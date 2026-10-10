@@ -142,11 +142,21 @@ void main() {
       expect(msg, contains('phone: This field is required.'));
     });
 
-    test('a non-JSON body (e.g. an HTML proxy error page) falls back to the raw dump',
+    test('a non-JSON HTML proxy or 502/500 page returns clean generic server failure message',
         () {
       final msg =
           ApiService.describeError('<html>502 Bad Gateway</html>', '/staff/');
-      expect(msg, 'Request to /staff/ failed: <html>502 Bad Gateway</html>');
+      expect(msg, 'Our server encountered an issue. Please try again shortly.');
+    });
+
+    test('a 404 statusCode returns generic not found message', () {
+      final msg = ApiService.describeError('{"detail":"Not found."}', '/orders/999/', statusCode: 404);
+      expect(msg, 'The requested resource was not found.');
+    });
+
+    test('a 500+ statusCode returns clean generic server failure message', () {
+      final msg = ApiService.describeError('Traceback (most recent call last)...', '/dashboard/stats/', statusCode: 500);
+      expect(msg, 'Our server encountered an issue. Please try again shortly.');
     });
 
     test('an empty body says so instead of showing nothing', () {

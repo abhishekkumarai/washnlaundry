@@ -104,7 +104,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return const LoadingState();
     }
     if (provider.hasError && provider.orders.isEmpty) {
-      return ErrorState(message: provider.error!);
+      final is404 = provider.error != null && provider.error!.contains('not found');
+      return ErrorState(
+        statusCode: is404 ? 404 : 500,
+        title: is404 ? 'Resource Not Found' : 'Error loading dashboard',
+        message: provider.error!,
+        onRetry: () => provider.refresh(),
+      );
     }
 
     // LayoutBuilder wraps the scroll view rather than sitting inside it: nested

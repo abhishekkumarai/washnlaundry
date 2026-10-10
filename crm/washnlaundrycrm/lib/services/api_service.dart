@@ -145,7 +145,7 @@ class ApiService {
         return json.decode(response.body);
       }
       throw ApiException(
-        describeError(response.body, path),
+        describeError(response.body, path, statusCode: response.statusCode),
         statusCode: response.statusCode,
       );
     } on ApiException {
@@ -255,7 +255,13 @@ class ApiService {
   ///
   /// Public (not `_send`'s private detail) and pure — no HTTP client needed —
   /// so the parsing itself is directly unit-testable, unlike `_send`.
-  static String describeError(String body, String path) {
+  static String describeError(String body, String path, {int? statusCode}) {
+    if (statusCode == 404) {
+      return 'The requested resource was not found.';
+    }
+    if (statusCode != null && statusCode >= 500) {
+      return 'Our server encountered an issue. Please try again shortly.';
+    }
     if (body.isEmpty) return 'Request to $path failed with no response body.';
     try {
       final decoded = json.decode(body);
@@ -271,7 +277,10 @@ class ApiService {
         return decoded.join(' ');
       }
     } catch (_) {
-      // Not JSON — fall through to the raw body below.
+      // Not JSON — fall through to generic or raw body below.
+      if (body.contains('<html>') || body.contains('<html') || body.contains('502') || body.contains('500')) {
+        return 'Our server encountered an issue. Please try again shortly.';
+      }
     }
     return 'Request to $path failed: $body';
   }
@@ -547,7 +556,7 @@ class ApiService {
         return (json.decode(response.body) as Map).cast<String, dynamic>();
       }
       throw ApiException(
-        describeError(response.body, request.url.path),
+        describeError(response.body, request.url.path, statusCode: response.statusCode),
         statusCode: response.statusCode,
       );
     } on ApiException {
@@ -1041,7 +1050,7 @@ class ApiService {
       return response.bodyBytes;
     }
     throw ApiException(
-      describeError(response.body, '/categories/export/'),
+      describeError(response.body, '/categories/export/', statusCode: response.statusCode),
       statusCode: response.statusCode,
     );
   }
@@ -1065,7 +1074,7 @@ class ApiService {
       return response.body;
     }
     throw ApiException(
-      describeError(response.body, '/categories/export/'),
+      describeError(response.body, '/categories/export/', statusCode: response.statusCode),
       statusCode: response.statusCode,
     );
   }

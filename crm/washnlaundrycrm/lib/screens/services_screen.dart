@@ -7,6 +7,8 @@ import '../providers/app_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
+import '../widgets/load_state.dart';
+import '../utils/navigation.dart';
 import '../utils/money.dart';
 
 class ServicesScreen extends StatefulWidget {
@@ -186,6 +188,20 @@ class _ServicesScreenState extends State<ServicesScreen> {
       body: AppShell(
         body: LayoutBuilder(
           builder: (context, constraints) {
+            final provider = context.watch<AppProvider>();
+            if (provider.hasError && provider.categories.isEmpty) {
+              return ErrorState(
+                statusCode: provider.error != null && provider.error!.contains('not found') ? 404 : 500,
+                title: 'Error loading services',
+                message: provider.error!,
+                onRetry: () => provider.refresh(),
+                onHome: () => context.goSection(0),
+              );
+            }
+            if (provider.isLoading && provider.categories.isEmpty) {
+              return const LoadingState();
+            }
+
             final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
             return Column(
               children: [
