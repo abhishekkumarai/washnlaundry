@@ -28,8 +28,18 @@ class _CreditsScreenState extends State<CreditsScreen> {
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   static const _monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
 
   String get _monthLabel =>
@@ -68,9 +78,9 @@ class _CreditsScreenState extends State<CreditsScreen> {
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('No credit categories'),
-          content: const Text(
-              'Every category is turned off. Add or turn one on in '
-              'Settings → Credit categories first.'),
+          content:
+              const Text('Every category is turned off. Add or turn one on in '
+                  'Settings → Credit categories first.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
@@ -105,9 +115,8 @@ class _CreditsScreenState extends State<CreditsScreen> {
                 c.date!.month == _selectedMonth.month))
         .toList();
 
-    final categories = <String>{for (final c in monthFiltered) c.category}
-        .toList()
-      ..sort();
+    final categories =
+        <String>{for (final c in monthFiltered) c.category}.toList()..sort();
     final query = _searchQuery.trim().toLowerCase();
     final visible = monthFiltered.where((c) {
       final matchesCategory = _category == 'All' || c.category == _category;
@@ -173,7 +182,9 @@ class _CreditsScreenState extends State<CreditsScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          titleBlock,
+          const Text(
+              'Log shop incoming credits, advance deposits, investments, & misc income',
+              style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -228,8 +239,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
                 textAlign: TextAlign.center,
                 decoration: const InputDecoration(
                   hintText: 'Search by title, category, or method...',
-                  hintStyle:
-                      TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -347,8 +357,7 @@ class _CreditsScreenState extends State<CreditsScreen> {
           spacing: gap,
           runSpacing: gap,
           children: [
-            for (final card in cards)
-              SizedBox(width: itemWidth, child: card),
+            for (final card in cards) SizedBox(width: itemWidth, child: card),
           ],
         );
       },
@@ -724,8 +733,8 @@ class _CreditsScreenState extends State<CreditsScreen> {
                   DropdownButtonFormField<String>(
                     value: category,
                     decoration: _fieldDecoration(''),
-                    style: const TextStyle(
-                        fontSize: 13, color: Color(0xFF141A24)),
+                    style:
+                        const TextStyle(fontSize: 13, color: Color(0xFF141A24)),
                     items: [
                       for (final c in categoryList)
                         DropdownMenuItem(value: c, child: Text(c)),
@@ -748,8 +757,8 @@ class _CreditsScreenState extends State<CreditsScreen> {
                   DropdownButtonFormField<String>(
                     value: method,
                     decoration: _fieldDecoration(''),
-                    style: const TextStyle(
-                        fontSize: 13, color: Color(0xFF141A24)),
+                    style:
+                        const TextStyle(fontSize: 13, color: Color(0xFF141A24)),
                     items: [
                       for (final m in methodList)
                         DropdownMenuItem(value: m.value, child: Text(m.label)),
@@ -837,21 +846,20 @@ class _CreditsScreenState extends State<CreditsScreen> {
                         Navigator.pop(dialogContext);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                              content: Text(
-                                  isEdit ? 'Credit updated.' : 'Credit logged.')),
+                              content: Text(isEdit
+                                  ? 'Credit updated.'
+                                  : 'Credit logged.')),
                         );
                       } else {
                         setDialogState(() {
                           saving = false;
-                          error =
-                              provider.error ?? 'Could not save the credit entry.';
+                          error = provider.error ??
+                              'Could not save the credit entry.';
                         });
                       }
                     },
               child: Text(
-                saving
-                    ? 'Saving…'
-                    : (isEdit ? 'Save Changes' : 'Add Credit'),
+                saving ? 'Saving…' : (isEdit ? 'Save Changes' : 'Add Credit'),
               ),
             ),
           ],
@@ -878,8 +886,8 @@ class _CreditsScreenState extends State<CreditsScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style:
-                FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444)),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Delete'),
           ),

@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.db.models import Max
+from django.db.models.functions import Length
 from django.utils import timezone
 from django.utils.text import slugify
 import re
@@ -143,11 +144,16 @@ class Shop(models.Model):
             models.UniqueConstraint(
                 fields=['custom_domain'], condition=~models.Q(custom_domain=''),
                 name='shop_custom_domain_unique_when_set'),
+            models.UniqueConstraint(
+                fields=['order_prefix'], condition=~models.Q(order_prefix=''),
+                name='shop_order_prefix_unique_when_set'),
         ]
 
     def save(self, *args, **kwargs):
-        if not self.order_prefix:
-            self.order_prefix = self.derive_prefix(self.name)
+        if self.order_prefix:
+            self.order_prefix = self.order_prefix.strip().upper()
+        else:
+            self.order_prefix = self.unique_prefix(self.name, exclude_pk=self.pk)
         if not self.slug:
             base_slug = slugify(self.name) or 'shop'
             if base_slug in RESERVED_SHOP_SLUGS:
@@ -170,6 +176,20 @@ class Shop(models.Model):
                     populate_default_services_for_shop(self)
                 except Exception:
                     pass
+
+    @classmethod
+    def unique_prefix(cls, name, exclude_pk=None):
+        """A prefix no other shop uses, so order numbers are unique platform-wide.
+
+        Shops with similar names ("Spotless Cleaners" / "Spotless Laundry") would
+        otherwise both issue SPOT-00001: the first keeps SPOT, the next gets SPOT2...
+        """
+        base = cls.derive_prefix(name)
+        candidate, n = base, 2
+        while cls.objects.filter(order_prefix=candidate).exclude(pk=exclude_pk).exists():
+            candidate = f'{base}{n}'
+            n += 1
+        return candidate
 
     @staticmethod
     def derive_prefix(name):
@@ -214,9 +234,12 @@ class ShopOrderSequence(models.Model):
         with transaction.atomic():
             seq, _ = cls.objects.select_for_update().get_or_create(shop=shop)
             prefix = shop.order_prefix or 'SHOP'
+            # Longest-then-largest, not a string MAX: 'X-99999' > 'X-100000' as text,
+            # which would re-issue 100000 once a shop passes 99,999 orders.
             last_order = (
                 Order.objects.filter(shop=shop, order_number__startswith=f'{prefix}-')
-                .aggregate(Max('order_number'))['order_number__max']
+                .order_by(Length('order_number').desc(), '-order_number')
+                .values_list('order_number', flat=True).first()
             )
             max_num = 0
             if last_order:

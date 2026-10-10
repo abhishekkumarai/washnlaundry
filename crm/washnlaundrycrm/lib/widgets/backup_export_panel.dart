@@ -3,7 +3,6 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -11,6 +10,7 @@ import '../providers/app_provider.dart';
 import '../services/api_service.dart';
 import '../utils/csv_download.dart';
 import 'customers_import_dialog.dart';
+import 'services_import_export_panel.dart';
 
 /// Settings → Backup & Data Export panel.
 /// Allows shop owners and staff to:
@@ -143,7 +143,31 @@ class _BackupExportPanelState extends State<BackupExportPanel> {
       return;
     }
     if (key == 'services') {
-      context.go('/settings?tab=services-import-export');
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => Dialog(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760, maxHeight: 640),
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: const ServicesImportExportPanel(),
+                ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (mounted) await context.read<AppProvider>().refresh();
       return;
     }
 

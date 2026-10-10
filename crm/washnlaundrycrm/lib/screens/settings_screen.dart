@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
-import '../providers/auth_provider.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/credit_categories_panel.dart';
 import '../widgets/shop_access_panel.dart';
-import '../widgets/services_import_export_panel.dart';
 import '../widgets/backup_export_panel.dart';
 import '../widgets/sidebar_navigation.dart';
 
@@ -36,15 +34,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const businessProfile = 'business-profile';
   static const backupExport = 'backup-export';
   static const creditCategories = 'credit-categories';
-  static const servicesExportImport = 'services-import-export';
   static const shopAccess = 'shop-access';
 
-  /// Only [businessProfile], [backupExport], [servicesExportImport], and [creditCategories] are built;
+  /// Only [businessProfile], [backupExport], and [creditCategories] are built;
   /// unbuilt tabs show a "Not available yet" panel.
   static const _mainTabs = [
     _SettingsTab(businessProfile, Icons.storefront_outlined, 'Business profile'),
     _SettingsTab(backupExport, Icons.backup_outlined, 'Backup, Data Import & Export'),
-    _SettingsTab(servicesExportImport, Icons.swap_vert_rounded, 'Services export/import'),
     _SettingsTab(creditCategories, Icons.savings_outlined, 'Credit categories'),
     _SettingsTab(shopAccess, Icons.admin_panel_settings_outlined, 'Shop access'),
   ];
@@ -253,23 +249,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Divider(height: 1),
                 ),
                 for (final tab in _accountTabs) _buildTabItem(tab),
-                const SizedBox(height: 20),
-                Material(
-                  color: Colors.transparent,
-                  child: ListTile(
-                    leading: const Icon(Icons.logout_rounded,
-                        color: Color(0xFFEF4444), size: 18),
-                    title: const Text('Sign Out',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFEF4444))),
-                    // Same call as the sidebar's sign-out; router.dart's
-                    // redirect then sends the app to /login. This used to
-                    // only show a snackbar while staying signed in.
-                    onTap: () => context.read<AuthProvider>().signOut(),
-                  ),
-                ),
               ],
             ),
           ),
@@ -368,9 +347,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         break;
       case backupExport:
         child = const BackupExportPanel();
-        break;
-      case servicesExportImport:
-        child = const ServicesImportExportPanel();
         break;
       case creditCategories:
         child = const CreditCategoriesPanel();

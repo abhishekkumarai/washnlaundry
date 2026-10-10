@@ -46,8 +46,8 @@ class ShopTests(TestCase):
         self.assertEqual(shop.order_prefix, 'ABDR')
 
     def test_explicit_prefix_is_respected(self):
-        shop = Shop.objects.create(name='washing', order_prefix='WA3P')
-        self.assertEqual(shop.order_prefix, 'WA3P')
+        shop = Shop.objects.create(name='washing', order_prefix='WSH9')
+        self.assertEqual(shop.order_prefix, 'WSH9')
 
 
 class OrderNumberTests(TestCase):

@@ -10,7 +10,7 @@ import '../providers/app_provider.dart';
 import '../services/api_service.dart';
 import '../utils/csv_download.dart';
 
-/// Settings → Services export/import: Allows owners/staff to export the services
+/// Backup, Data Import & Export → Services (opened from the Services row): Allows owners/staff to export the services
 /// and garment items catalogue as CSV/JSON, and bulk-import or update services
 /// from CSV or Excel (.xlsx) files with column mapping.
 class ServicesImportExportPanel extends StatefulWidget {

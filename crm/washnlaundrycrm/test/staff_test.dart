@@ -174,7 +174,7 @@ void main() {
       expect(find.text('Geeta Devi'), findsNothing);
     });
 
-    testWidgets('Add Staff modal defaults status to Inactive with toggle radio',
+    testWidgets('Staff modal has no Status section (status is toggled from the list)',
         (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: mixedRoster);
       await tester.pumpWidget(host(provider, const StaffScreen()));
@@ -185,11 +185,9 @@ void main() {
 
       expect(find.text('Add Staff Member'), findsOneWidget);
       final dialogFinder = find.byType(AlertDialog);
-      // Radio toggle options exist in modal
-      expect(find.descendant(of: dialogFinder, matching: find.text('1. Active')), findsOneWidget);
-      expect(find.descendant(of: dialogFinder, matching: find.text('2. Inactive')), findsOneWidget);
-      // Defaults to Inactive on add
-      expect(find.descendant(of: dialogFinder, matching: find.byIcon(Icons.radio_button_checked)), findsOneWidget);
+      expect(find.descendant(of: dialogFinder, matching: find.text('Status')), findsNothing);
+      expect(find.descendant(of: dialogFinder, matching: find.text('1. Active')), findsNothing);
+      expect(find.descendant(of: dialogFinder, matching: find.byIcon(Icons.radio_button_checked)), findsNothing);
     });
 
     testWidgets('Status column in staff table renders an on/off switch per member',

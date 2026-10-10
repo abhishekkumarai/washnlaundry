@@ -159,3 +159,48 @@ class TenantSecurityTests(TestCase):
         self.assertEqual(res.status_code, 200)
         roles = dict(ShopMembership.objects.filter(shop=self.a).values_list('user__username', 'role'))
         self.assertEqual(roles, {'owner-a@x.com': ShopRole.STAFF, 'mgr@x.com': ShopRole.OWNER})
+
+
+class OrderNumberUniquenessTests(TestCase):
+    """Order numbers must not collide across shops, even for look-alike names."""
+
+    def test_shops_with_the_same_or_similar_names_get_distinct_prefixes(self):
+        a = Shop.objects.create(name='Spotless Cleaners')
+        b = Shop.objects.create(name='Spotless Cleaners')
+        c = Shop.objects.create(name='Spotless Laundry')
+        self.assertEqual(len({a.order_prefix, b.order_prefix, c.order_prefix}), 3)
+
+    def test_first_orders_of_look_alike_shops_do_not_share_a_number(self):
+        from api.tenancy import tenant_context
+        from api.models import Order
+        numbers = []
+        for _ in range(2):
+            shop = Shop.objects.create(name='Spotless Cleaners')
+            with tenant_context(shop):
+                numbers.append(Order.objects.create(customer_name='A', customer_phone='1').order_number)
+        self.assertEqual(len(set(numbers)), 2, numbers)
+
+    def test_explicit_duplicate_prefix_is_rejected_by_the_database(self):
+        from django.db import IntegrityError, transaction
+        Shop.objects.create(name='One', order_prefix='DUPE')
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Shop.objects.create(name='Two', order_prefix='dupe')  # normalised to DUPE
+
+    def test_numbering_passes_99999_without_reissuing(self):
+        from api.tenancy import tenant_context
+        from api.models import Order
+        shop = Shop.objects.create(name='Big Shop')
+        with tenant_context(shop):
+            Order.objects.create(customer_name='A', customer_phone='1',
+                                 order_number=f'{shop.order_prefix}-99999')
+            nxt = Order.objects.create(customer_name='B', customer_phone='2')
+            after = Order.objects.create(customer_name='C', customer_phone='3')
+        self.assertEqual(nxt.order_number, f'{shop.order_prefix}-100000')
+        self.assertEqual(after.order_number, f'{shop.order_prefix}-100001')
+
+    @override_settings(GOOGLE_CLIENT_ID='c', API_AUTH_ENFORCED=False)
+    def test_provision_rejects_a_taken_prefix(self):
+        Shop.objects.create(name='Taken', order_prefix='TAKE')
+        res = APIClient().post('/api/shops/provision/', {'name': 'Other', 'order_prefix': 'take'},
+                               format='json')
+        self.assertEqual(res.status_code, 400)

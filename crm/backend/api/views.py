@@ -85,7 +85,11 @@ class ShopViewSet(viewsets.ModelViewSet):
             return Shop.objects.filter(
                 memberships__user=user, memberships__is_active=True,
             ).exclude(status=ShopStatus.ARCHIVED).distinct()
-        # Anonymous (Demo Mode / enforcement off): only the tenant they named.
+        # Anonymous with enforcement off (local/Demo Mode, where the whole API
+        # is open anyway): every active shop, so Demo Mode can offer the switcher.
+        if not settings.API_AUTH_ENFORCED:
+            return Shop.objects.filter(status=ShopStatus.ACTIVE)
+        # Anonymous with enforcement on: only the tenant they named.
         shop = getattr(self.request, 'shop', None)
         return Shop.objects.filter(pk=shop.pk) if shop else Shop.objects.none()
 
@@ -138,6 +142,10 @@ class ShopViewSet(viewsets.ModelViewSet):
             if Shop.objects.filter(slug=slug).exists():
                 return Response({'detail': 'That slug is already taken.'}, status=400)
 
+        prefix = str(data.get('order_prefix') or '').strip().upper()
+        if prefix and Shop.objects.filter(order_prefix=prefix).exists():
+            return Response({'detail': 'That order prefix is already used by another shop.'}, status=400)
+
         django_user = getattr(request.user, 'user', None)
         if django_user:
             owned = django_user.shop_memberships.filter(
@@ -156,7 +164,7 @@ class ShopViewSet(viewsets.ModelViewSet):
                 phone=str(data.get('phone') or '').strip(),
                 address=str(data.get('address') or '').strip(),
                 gstin='',
-                order_prefix=str(data.get('order_prefix') or '').strip() or Shop.derive_prefix(name),
+                order_prefix=prefix or Shop.unique_prefix(name),
                 status=ShopStatus.ACTIVE,
             )
             if slug:

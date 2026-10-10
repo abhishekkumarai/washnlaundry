@@ -105,7 +105,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
           builder: (context, constraints) {
             if (provider.hasError && provider.customers.isEmpty) {
               return ErrorState(
-                statusCode: provider.error != null && provider.error!.contains('not found') ? 404 : 500,
+                statusCode: provider.error != null &&
+                        provider.error!.contains('not found')
+                    ? 404
+                    : 500,
                 title: 'Error loading customers',
                 message: provider.error!,
                 onRetry: () => provider.refresh(),
@@ -116,7 +119,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
               return const LoadingState();
             }
 
-            final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
+            final narrow =
+                constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
             return Column(
               children: [
                 narrow
@@ -272,8 +276,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             textAlign: TextAlign.center,
                             decoration: const InputDecoration(
                               hintText: 'Search by name, phone, or email...',
-                              hintStyle:
-                                  TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                              hintStyle: TextStyle(
+                                  fontSize: 12, color: Color(0xFF94A3B8)),
                               border: InputBorder.none,
                               isDense: true,
                             ),
@@ -317,35 +321,43 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final owingCustomersCount = provider.customersWithDeliveredDuesCount;
 
     final cards = [
-      _kpi('all', 'Total', '${customers.length}', Icons.people_outline_rounded,
-          const Color(0xFF182C4F)),
-      _kpi('active', 'Active', '$active', Icons.verified_user_outlined,
-          const Color(0xFF10B981)),
-      _kpi('new', 'New', '$isNew', Icons.person_add_alt_1_outlined,
-          const Color(0xFF2563EB)),
-      _kpi(
-        'owing',
-        'Amount Owed',
-        '${Money.symbol}${totalDeliveredDues.toStringAsFixed(0)}',
-        Icons.account_balance_wallet_outlined,
-        const Color(0xFFDC2626),
-        subtitle: owingCustomersCount > 0 ? '$owingCustomersCount owing' : null,
-      ),
+      (bool c) => _kpi('all', 'Total', '${customers.length}',
+          Icons.people_outline_rounded, const Color(0xFF182C4F),
+          compact: c),
+      (bool c) => _kpi('active', 'Active', '$active',
+          Icons.verified_user_outlined, const Color(0xFF10B981),
+          compact: c),
+      (bool c) => _kpi('new', 'New', '$isNew', Icons.person_add_alt_1_outlined,
+          const Color(0xFF2563EB),
+          compact: c),
+      (bool c) => _kpi(
+            'owing',
+            'Amount Owed',
+            '${Money.symbol}${totalDeliveredDues.toStringAsFixed(0)}',
+            Icons.account_balance_wallet_outlined,
+            const Color(0xFFDC2626),
+            subtitle:
+                owingCustomersCount > 0 ? '$owingCustomersCount owing' : null,
+            compact: c,
+          ),
     ];
 
+    // The four cards hold one short figure each, so they always sit inline in
+    // a single row; narrow screens get a compact card instead of wrapping.
     return LayoutBuilder(
       builder: (context, constraints) {
-        final perRow = constraints.maxWidth < 640
-            ? 1
-            : constraints.maxWidth < 1100
-                ? 2
-                : 4;
-        const gap = 16.0;
-        final width = (constraints.maxWidth - gap * (perRow - 1)) / perRow;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: [for (final c in cards) SizedBox(width: width, child: c)],
+        final compact = constraints.maxWidth < 640;
+        final gap = compact ? 8.0 : 16.0;
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < cards.length; i++) ...[
+                if (i > 0) SizedBox(width: gap),
+                Expanded(child: cards[i](compact)),
+              ],
+            ],
+          ),
         );
       },
     );
@@ -356,7 +368,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
   /// screen's status chips.
   Widget _kpi(
       String tabKey, String label, String value, IconData icon, Color color,
-      {String? subtitle}) {
+      {String? subtitle, bool compact = false}) {
     final isSel = _kpiFilter == tabKey;
     return InkWell(
       onTap: () => setState(() {
@@ -365,7 +377,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       }),
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(compact ? 10 : 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -373,58 +385,85 @@ class _CustomersScreenState extends State<CustomersScreen> {
               color: isSel ? color : const Color(0xFFE4E0D8),
               width: isSel ? 1.5 : 1),
         ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, size: 18, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
+        child: compact
+            ? Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(label,
-                          style: const TextStyle(
-                              fontSize: 12, color: Color(0xFF64748B))),
-                      if (subtitle != null) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            subtitle,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: color,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(value,
+                  Text(label,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF141A24))),
+                          fontSize: 11, color: Color(0xFF64748B))),
+                  const SizedBox(height: 2),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(value,
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF141A24))),
+                  ),
+                  if (subtitle != null)
+                    Text(subtitle,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: color)),
+                ],
+              )
+            : Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 18, color: color),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(label,
+                                style: const TextStyle(
+                                    fontSize: 12, color: Color(0xFF64748B))),
+                            if (subtitle != null) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  subtitle,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: color,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(value,
+                            style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF141A24))),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -486,7 +525,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   for (final c in customers)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: _customerCard(c, _lastOrderFor(c, lastOrders), provider),
+                      child: _customerCard(
+                          c, _lastOrderFor(c, lastOrders), provider),
                     ),
                 ],
               ),
@@ -506,7 +546,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 ],
               ),
             ),
-            for (final c in customers) _row(c, _lastOrderFor(c, lastOrders), provider),
+            for (final c in customers)
+              _row(c, _lastOrderFor(c, lastOrders), provider),
           ],
           if (total > customers.length) _showMoreBar(customers.length, total),
         ],
@@ -536,10 +577,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text('Showing $shown of $total',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
               if (totalPages > 1)
                 Text('(Page $currentPage of $totalPages)',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF94A3B8))),
             ],
           ),
           Row(
@@ -693,7 +736,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
             Row(
               children: [
                 Expanded(
-                  child: _cardStat('Area', c.area.trim().isEmpty ? '—' : c.area),
+                  child:
+                      _cardStat('Area', c.area.trim().isEmpty ? '—' : c.area),
                 ),
                 Expanded(
                   child: _cardStat('Orders', '${c.totalOrders}'),
@@ -974,8 +1018,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           return;
                         }
                         if (!RegExp(r'^[6-9]\d{9}$').hasMatch(phone)) {
-                          setDialogState(() =>
-                              error = 'Mobile number must be exactly 10 digits starting with 6-9 (no ISD / country code or leading 0).');
+                          setDialogState(() => error =
+                              'Mobile number must be exactly 10 digits starting with 6-9 (no ISD / country code or leading 0).');
                           return;
                         }
                         setDialogState(() {

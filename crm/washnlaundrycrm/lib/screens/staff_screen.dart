@@ -131,8 +131,10 @@ class _StaffScreenState extends State<StaffScreen> {
     // Ties fall back to name so equal wages/roles/statuses don't shuffle.
     final ordered = result != 0
         ? result
-        : a['name'].toString().toLowerCase().compareTo(
-            b['name'].toString().toLowerCase());
+        : a['name']
+            .toString()
+            .toLowerCase()
+            .compareTo(b['name'].toString().toLowerCase());
     return _sortAscending ? ordered : -ordered;
   }
 
@@ -210,7 +212,8 @@ class _StaffScreenState extends State<StaffScreen> {
       text: ((existing?['wage'] as num?) ?? defaultWage).toStringAsFixed(0),
     );
     // Defaults to Inactive on add per shop requirements, or hydrated from existing status.
-    bool isActive = isEdit ? ((existing['status'] as String?) != 'INACTIVE') : false;
+    bool isActive =
+        isEdit ? ((existing['status'] as String?) != 'INACTIVE') : false;
     // New hires default to joining today — almost always right, and still
     // editable before saving. An edit leaves an already-unset date alone
     // rather than backfilling one that was never actually recorded.
@@ -419,110 +422,6 @@ class _StaffScreenState extends State<StaffScreen> {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Status',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF64748B)),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      InkWell(
-                        onTap: () => setModalState(() => isActive = true),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isActive
-                                ? const Color(0xFFDCFCE7)
-                                : const Color(0xFFF1EFEA),
-                            border: Border.all(
-                              color: isActive
-                                  ? const Color(0xFF16A34A)
-                                  : const Color(0xFFD9D5CB),
-                              width: 1.5,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                isActive
-                                    ? Icons.radio_button_checked
-                                    : Icons.radio_button_unchecked,
-                                size: 16,
-                                color: isActive
-                                    ? const Color(0xFF16A34A)
-                                    : const Color(0xFF94A3B8),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '1. Active',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: isActive
-                                      ? const Color(0xFF16A34A)
-                                      : const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      InkWell(
-                        onTap: () => setModalState(() => isActive = false),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: !isActive
-                                ? const Color(0xFFFEE2E2)
-                                : const Color(0xFFF1EFEA),
-                            border: Border.all(
-                              color: !isActive
-                                  ? const Color(0xFFDC2626)
-                                  : const Color(0xFFD9D5CB),
-                              width: 1.5,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                !isActive
-                                    ? Icons.radio_button_checked
-                                    : Icons.radio_button_unchecked,
-                                size: 16,
-                                color: !isActive
-                                    ? const Color(0xFFDC2626)
-                                    : const Color(0xFF94A3B8),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '2. Inactive',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: !isActive
-                                      ? const Color(0xFFDC2626)
-                                      : const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               );
             },
@@ -544,7 +443,8 @@ class _StaffScreenState extends State<StaffScreen> {
                 await showErrorDialog(
                   ctx,
                   title: 'Invalid Mobile Number',
-                  message: 'Mobile number must be exactly 10 digits starting with 6-9 (no ISD / country code or leading 0).',
+                  message:
+                      'Mobile number must be exactly 10 digits starting with 6-9 (no ISD / country code or leading 0).',
                 );
                 return;
               }
@@ -622,12 +522,12 @@ class _StaffScreenState extends State<StaffScreen> {
       body: AppShell(
         body: LayoutBuilder(
           builder: (context, constraints) {
-            final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
+            final narrow =
+                constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
             return Column(
               children: [
                 narrow ? _narrowHeaderBar() : _wideHeaderBar(),
                 _subTabsBar(narrow),
-
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24.0),
@@ -667,8 +567,7 @@ class _StaffScreenState extends State<StaffScreen> {
             child: Text(
               '${_staffMembers.length} members',
               overflow: TextOverflow.ellipsis,
-              style:
-                  const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
             ),
           ),
         ],
@@ -687,8 +586,7 @@ class _StaffScreenState extends State<StaffScreen> {
             scrollDirection: Axis.horizontal,
             itemCount: _subTabTitles.length,
             separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, i) =>
-                _buildSubTab(i, _subTabTitles[i]),
+            itemBuilder: (context, i) => _buildSubTab(i, _subTabTitles[i]),
           ),
         ),
       );
@@ -724,8 +622,7 @@ class _StaffScreenState extends State<StaffScreen> {
                     color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF182C4F),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
               elevation: 0,
@@ -761,8 +658,8 @@ class _StaffScreenState extends State<StaffScreen> {
                 child: Text(
                   '${_staffMembers.length} members',
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF94A3B8)),
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                 ),
               ),
             ],
@@ -810,8 +707,7 @@ class _StaffScreenState extends State<StaffScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.search_rounded,
-              size: 18, color: Color(0xFF94A3B8)),
+          const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
@@ -836,378 +732,346 @@ class _StaffScreenState extends State<StaffScreen> {
 
   Widget _staffList(bool narrow) {
     return _filteredStaff.isEmpty
-                        ? Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 60),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border:
-                                  Border.all(color: const Color(0xFFE4E0D8)),
-                            ),
-                            child: Column(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(20),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFF1EFEA),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.person_rounded,
-                                      size: 36, color: Color(0xFF94A3B8)),
-                                ),
-                                const SizedBox(height: 16),
-                                const Text('No staff members found',
-                                    style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF141A24))),
-                                const SizedBox(height: 4),
-                                const Text(
-                                    'Add your first staff member to get started.',
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        color: Color(0xFF64748B))),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: () => _showStaffModal(context),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF182C4F),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8)),
-                                  ),
-                                  child: const Text('Add Staff',
-                                      style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold)),
-                                ),
-                              ],
-                            ),
-                          )
-                        : Builder(
-                            builder: (context) {
-                              final totalCount = _filteredStaff.length;
-                              final totalPages =
-                                  (totalCount / _pageSize).ceil().clamp(1, 99999);
-                              final safePage = _currentPage.clamp(1, totalPages);
-                              final startIndex = (safePage - 1) * _pageSize;
-                              final pagedStaff = totalCount > 0
-                                  ? _filteredStaff
-                                      .skip(startIndex)
-                                      .take(_pageSize)
-                                      .toList()
-                                  : <Map<String, dynamic>>[];
+        ? Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 60),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE4E0D8)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1EFEA),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.person_rounded,
+                      size: 36, color: Color(0xFF94A3B8)),
+                ),
+                const SizedBox(height: 16),
+                const Text('No staff members found',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF141A24))),
+                const SizedBox(height: 4),
+                const Text('Add your first staff member to get started.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => _showStaffModal(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF182C4F),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('Add Staff',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          )
+        : Builder(
+            builder: (context) {
+              final totalCount = _filteredStaff.length;
+              final totalPages =
+                  (totalCount / _pageSize).ceil().clamp(1, 99999);
+              final safePage = _currentPage.clamp(1, totalPages);
+              final startIndex = (safePage - 1) * _pageSize;
+              final pagedStaff = totalCount > 0
+                  ? _filteredStaff.skip(startIndex).take(_pageSize).toList()
+                  : <Map<String, dynamic>>[];
 
-                              return Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border:
-                                      Border.all(color: const Color(0xFFE4E0D8)),
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE4E0D8)),
+                ),
+                child: Column(
+                  children: [
+                    narrow
+                        ? _staffCardList(pagedStaff)
+                        : Column(
+                            children: [
+                              // Table Header
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 14),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFF8F7F5),
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(16)),
+                                  border: Border(
+                                      bottom:
+                                          BorderSide(color: Color(0xFFE4E0D8))),
                                 ),
-                                child: Column(
+                                child: Row(
                                   children: [
-                                    narrow
-                                        ? _staffCardList(pagedStaff)
-                                        : Column(
-                                            children: [
-                                              // Table Header
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 20,
-                                                        vertical: 14),
-                                                decoration: const BoxDecoration(
-                                                  color: Color(0xFFF8F7F5),
-                                                  borderRadius:
-                                                      BorderRadius.vertical(
-                                                          top: Radius.circular(
-                                                              16)),
-                                                  border: Border(
-                                                      bottom: BorderSide(
-                                                          color:
-                                                              Color(0xFFE4E0D8))),
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    Expanded(
-                                                        flex: 3,
-                                                        child: _sortHeader(
-                                                            'STAFF MEMBER',
-                                                            'name')),
-                                                    Expanded(
-                                                        flex: 2,
-                                                        child: _sortHeader(
-                                                            'ROLE', 'role')),
-                                                    Expanded(
-                                                        flex: 2,
-                                                        child: _sortHeader(
-                                                            'PHONE', 'phone')),
-                                                    Expanded(
-                                                        flex: 2,
-                                                        child: _sortHeader(
-                                                            'MONTHLY WAGE',
-                                                            'wage')),
-                                                    Expanded(
-                                                        flex: 3,
-                                                        child: _sortHeader(
-                                                            'STATUS',
-                                                            'status')),
-                                                    const SizedBox(width: 48),
-                                                  ],
-                                                ),
-                                              ),
+                                    Expanded(
+                                        flex: 3,
+                                        child: _sortHeader(
+                                            'STAFF MEMBER', 'name')),
+                                    Expanded(
+                                        flex: 2,
+                                        child: _sortHeader('ROLE', 'role')),
+                                    Expanded(
+                                        flex: 2,
+                                        child: _sortHeader('PHONE', 'phone')),
+                                    Expanded(
+                                        flex: 2,
+                                        child: _sortHeader(
+                                            'MONTHLY WAGE', 'wage')),
+                                    Expanded(
+                                        flex: 3,
+                                        child: _sortHeader('STATUS', 'status')),
+                                    const SizedBox(width: 48),
+                                  ],
+                                ),
+                              ),
 
-                                              // Rows
-                                              ListView.separated(
-                                                shrinkWrap: true,
-                                                physics:
-                                                    const NeverScrollableScrollPhysics(),
-                                                itemCount: pagedStaff.length,
-                                                separatorBuilder: (_, __) =>
-                                                    const Divider(height: 1),
-                                                itemBuilder: (context, idx) {
-                                                  final s = pagedStaff[idx];
-                                                  final isActive =
-                                                      s['status'] == 'ACTIVE';
-                                                  final name =
-                                                      s['name'] as String;
-                                                  final isLast = idx ==
-                                                      pagedStaff.length - 1;
+                              // Rows
+                              ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: pagedStaff.length,
+                                separatorBuilder: (_, __) =>
+                                    const Divider(height: 1),
+                                itemBuilder: (context, idx) {
+                                  final s = pagedStaff[idx];
+                                  final isActive = s['status'] == 'ACTIVE';
+                                  final name = s['name'] as String;
+                                  final isLast = idx == pagedStaff.length - 1;
 
-                                    // The whole row opens the edit sheet —
-                                    // previously only the pencil responded,
-                                    // so most of the table looked dead.
-                                    return Material(
-                                      color: Colors.transparent,
-                                      child: InkWell(
-                                        onTap: () => _showStaffModal(context,
-                                            existing: s),
-                                        hoverColor: const Color(0xFFF8F7F5),
-                                        borderRadius: isLast
-                                            ? const BorderRadius.vertical(
-                                                bottom: Radius.circular(16))
-                                            : BorderRadius.zero,
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 20, vertical: 14),
-                                          child: Row(
-                                            children: [
-                                              // Member Name & Avatar
-                                              Expanded(
-                                                flex: 3,
-                                                child: Row(
-                                                  children: [
-                                                    CircleAvatar(
-                                                      radius: 18,
-                                                      backgroundColor: isActive
-                                                          ? const Color(
-                                                              0xFFEFF6FF)
-                                                          : const Color(
-                                                              0xFFF1EFEA),
-                                                      child: Text(
-                                                        name.isEmpty
-                                                            ? '?'
-                                                            : name[0]
-                                                                .toUpperCase(),
-                                                        style: TextStyle(
-                                                          fontSize: 13,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color: isActive
-                                                              ? const Color(
-                                                                  0xFF182C4F)
-                                                              : const Color(
-                                                                  0xFF94A3B8),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 12),
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text(
-                                                            name,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                            style: const TextStyle(
-                                                                fontSize: 14,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                                color: Color(
-                                                                    0xFF141A24)),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-
-                                              // Role — Align keeps the pill
-                                              // hugging its label instead of
-                                              // painting across the column.
-                                              Expanded(
-                                                flex: 2,
-                                                child: Align(
-                                                  alignment:
-                                                      Alignment.centerLeft,
-                                                  child: Container(
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 3),
-                                                    decoration: BoxDecoration(
-                                                        color: const Color(
+                                  // The whole row opens the edit sheet —
+                                  // previously only the pencil responded,
+                                  // so most of the table looked dead.
+                                  return Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () =>
+                                          _showStaffModal(context, existing: s),
+                                      hoverColor: const Color(0xFFF8F7F5),
+                                      borderRadius: isLast
+                                          ? const BorderRadius.vertical(
+                                              bottom: Radius.circular(16))
+                                          : BorderRadius.zero,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 20, vertical: 14),
+                                        child: Row(
+                                          children: [
+                                            // Member Name & Avatar
+                                            Expanded(
+                                              flex: 3,
+                                              child: Row(
+                                                children: [
+                                                  CircleAvatar(
+                                                    radius: 18,
+                                                    backgroundColor: isActive
+                                                        ? const Color(
+                                                            0xFFEFF6FF)
+                                                        : const Color(
                                                             0xFFF1EFEA),
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(6)),
                                                     child: Text(
-                                                      s['role'] as String,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: const TextStyle(
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: Color(
-                                                              0xFF475569)),
+                                                      name.isEmpty
+                                                          ? '?'
+                                                          : name[0]
+                                                              .toUpperCase(),
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: isActive
+                                                            ? const Color(
+                                                                0xFF182C4F)
+                                                            : const Color(
+                                                                0xFF94A3B8),
+                                                      ),
                                                     ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          name,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style: const TextStyle(
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              color: Color(
+                                                                  0xFF141A24)),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            // Role — Align keeps the pill
+                                            // hugging its label instead of
+                                            // painting across the column.
+                                            Expanded(
+                                              flex: 2,
+                                              child: Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                      color: const Color(
+                                                          0xFFF1EFEA),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              6)),
+                                                  child: Text(
+                                                    s['role'] as String,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color:
+                                                            Color(0xFF475569)),
                                                   ),
                                                 ),
                                               ),
+                                            ),
 
-                                              // Phone
-                                              Expanded(
-                                                flex: 2,
-                                                child: Text(
-                                                  s['phone'] as String,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: Color(0xFF64748B)),
-                                                ),
+                                            // Phone
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                s['phone'] as String,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Color(0xFF64748B)),
                                               ),
+                                            ),
 
-                                              // Wage
-                                              Expanded(
-                                                flex: 2,
-                                                child: Text(
-                                                  '${Money.symbol}${(s['wage'] as num).toInt()} / month',
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: Color(0xFF141A24)),
-                                                ),
+                                            // Wage
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                '${Money.symbol}${(s['wage'] as num).toInt()} / month',
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF141A24)),
                                               ),
+                                            ),
 
-                                              // Status toggle switch (Active / Inactive)
-                                              Expanded(
-                                                flex: 3,
-                                                child: Align(
-                                                  alignment:
-                                                      Alignment.centerLeft,
-                                                  child: _buildStatusToggle(
-                                                      context, s),
-                                                ),
+                                            // Status toggle switch (Active / Inactive)
+                                            Expanded(
+                                              flex: 3,
+                                              child: Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: _buildStatusToggle(
+                                                    context, s),
                                               ),
-                                              SizedBox(
-                                                width: 48,
-                                                child: PopupMenuButton<String>(
-                                                  icon: const Icon(
-                                                      Icons.more_horiz_rounded,
-                                                      size: 18,
-                                                      color: Color(0xFF64748B)),
-                                                  tooltip: 'Actions',
-                                                  splashRadius: 18,
-                                                  shape: RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              10)),
-                                                  onSelected: (value) {
-                                                    if (value == 'edit') {
-                                                      _showStaffModal(context,
-                                                          existing: s);
-                                                    } else if (value ==
-                                                        'status') {
-                                                      _toggleActive(context, s);
-                                                    }
-                                                  },
-                                                  itemBuilder: (_) => [
-                                                    const PopupMenuItem(
-                                                      value: 'edit',
-                                                      child: Row(
-                                                        children: [
-                                                          Icon(
-                                                              Icons
-                                                                  .edit_outlined,
-                                                              size: 16,
-                                                              color: Color(
-                                                                  0xFF64748B)),
-                                                          SizedBox(width: 10),
-                                                          Text('Edit details',
-                                                              style: TextStyle(
-                                                                  fontSize:
-                                                                      13)),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    PopupMenuItem(
-                                                      value: 'status',
-                                                      child: Row(
-                                                        children: [
-                                                          Icon(
-                                                            isActive
-                                                                ? Icons
-                                                                    .person_off_outlined
-                                                                : Icons
-                                                                    .person_outline,
+                                            ),
+                                            SizedBox(
+                                              width: 48,
+                                              child: PopupMenuButton<String>(
+                                                icon: const Icon(
+                                                    Icons.more_horiz_rounded,
+                                                    size: 18,
+                                                    color: Color(0xFF64748B)),
+                                                tooltip: 'Actions',
+                                                splashRadius: 18,
+                                                shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            10)),
+                                                onSelected: (value) {
+                                                  if (value == 'edit') {
+                                                    _showStaffModal(context,
+                                                        existing: s);
+                                                  } else if (value ==
+                                                      'status') {
+                                                    _toggleActive(context, s);
+                                                  }
+                                                },
+                                                itemBuilder: (_) => [
+                                                  const PopupMenuItem(
+                                                    value: 'edit',
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(
+                                                            Icons.edit_outlined,
                                                             size: 16,
-                                                            color: const Color(
-                                                                0xFF64748B),
-                                                          ),
-                                                          const SizedBox(
-                                                              width: 10),
-                                                          Text(
-                                                              isActive
-                                                                  ? 'Mark inactive'
-                                                                  : 'Reactivate',
-                                                              style:
-                                                                  const TextStyle(
-                                                                      fontSize:
-                                                                          13)),
-                                                        ],
-                                                      ),
+                                                            color: Color(
+                                                                0xFF64748B)),
+                                                        SizedBox(width: 10),
+                                                        Text('Edit details',
+                                                            style: TextStyle(
+                                                                fontSize: 13)),
+                                                      ],
                                                     ),
-                                                  ],
-                                                ),
+                                                  ),
+                                                  PopupMenuItem(
+                                                    value: 'status',
+                                                    child: Row(
+                                                      children: [
+                                                        Icon(
+                                                          isActive
+                                                              ? Icons
+                                                                  .person_off_outlined
+                                                              : Icons
+                                                                  .person_outline,
+                                                          size: 16,
+                                                          color: const Color(
+                                                              0xFF64748B),
+                                                        ),
+                                                        const SizedBox(
+                                                            width: 10),
+                                                        Text(
+                                                            isActive
+                                                                ? 'Mark inactive'
+                                                                : 'Reactivate',
+                                                            style:
+                                                                const TextStyle(
+                                                                    fontSize:
+                                                                        13)),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                            ],
-                                          ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                            _staffFooter(totalCount, startIndex,
-                                pagedStaff.length, safePage, totalPages),
-                          ],
-                        ),
-                      );
-                    },
-                  );
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                    _staffFooter(totalCount, startIndex, pagedStaff.length,
+                        safePage, totalPages),
+                  ],
+                ),
+              );
+            },
+          );
   }
 
   /// Narrow-mode replacement for the table: the same 5 fixed-flex columns
@@ -1296,8 +1160,7 @@ class _StaffScreenState extends State<StaffScreen> {
 
   // Status column control: one switch that flips the member between Active
   // and Inactive through the same _toggleActive path the row menu uses.
-  Widget _buildStatusToggle(
-      BuildContext context, Map<String, dynamic> member) {
+  Widget _buildStatusToggle(BuildContext context, Map<String, dynamic> member) {
     final isActive = member['status'] == 'ACTIVE';
     final name = member['name'] as String;
     return Tooltip(
@@ -1318,8 +1181,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 inactiveThumbColor: Colors.white.withValues(alpha: 0.7),
                 inactiveTrackColor:
                     const Color(0xFFD9D5CB).withValues(alpha: 0.6),
-                trackOutlineColor:
-                    WidgetStateProperty.all(Colors.transparent),
+                trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 onChanged: (_) => _toggleActive(context, member),
               ),
@@ -1429,7 +1291,8 @@ class _StaffScreenState extends State<StaffScreen> {
                             Icon(Icons.edit_outlined,
                                 size: 16, color: Color(0xFF64748B)),
                             SizedBox(width: 10),
-                            Text('Edit details', style: TextStyle(fontSize: 13)),
+                            Text('Edit details',
+                                style: TextStyle(fontSize: 13)),
                           ],
                         ),
                       ),
@@ -1460,8 +1323,7 @@ class _StaffScreenState extends State<StaffScreen> {
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(
-                    child: _cardStat('Phone', s['phone'] as String)),
+                Expanded(child: _cardStat('Phone', s['phone'] as String)),
                 Expanded(
                     child: _cardStat('Wage',
                         '${Money.symbol}${(s['wage'] as num).toInt()} / month')),

@@ -1,8 +1,9 @@
 """Seed the database with rich demo data for comprehensive testing and Demo Mode.
 
-Populates realistic shops, 79 catalogue items, 65 customers, 18 staff members,
-88 orders across all lifecycle statuses, 70 days of attendance, salary payments,
-advances, expenses, and credits.
+Populates three demo shops (one large flagship, two smaller branches), each
+with its own catalogue, customers, staff, orders across all lifecycle statuses,
+70 days of attendance, salary payments, advances, expenses, and credits. Demo
+Mode lists all three in the shop switcher.
 
 WARNING: this wipes every tenant table before seeding.
 """
@@ -178,7 +179,55 @@ RAW_CUSTOMERS = [
 ]
 
 
-def seed():
+SHOPS = [
+    {
+        'key': 'flagship',
+        'shop': dict(
+            name='washing', owner_name='AK', phone='9876543210', whatsapp='9876543210',
+            email='hello@washing.example', address='Hbr layout, Bengaluru', city='Bengaluru',
+            state='Karnataka', pin_code='560064', gstin='29AAACL1234F1Z9', pan='AAACL1234F',
+            tax_rate=5.0, account_holder_name='AK', bank_name='HDFC Bank',
+            ifsc_code='HDFC0001234', upi_id='washing@upi', express_multiplier=1.5,
+            default_monthly_wage=18000.0, default_staff_role='Washer',
+        ),
+        'areas': ['HBR Layout', 'Kalyan Nagar', 'Banaswadi', 'Hennur', 'Indiranagar', 'Koramangala', 'HSR Layout', 'Whitefield'],
+        'customers': slice(0, 65), 'staff': slice(0, 18), 'orders': 88,
+        'expenses': 24, 'credits': 16, 'price_mult': 1.0, 'seed': 42,
+    },
+    {
+        'key': 'koramangala',
+        'shop': dict(
+            name='Fresh Fold Koramangala', owner_name='Meera Nair', phone='9845012345',
+            whatsapp='9845012345', email='koramangala@freshfold.example',
+            address='80 Feet Road, Koramangala 4th Block', city='Bengaluru', state='Karnataka',
+            pin_code='560034', gstin='29AABCF5678K1Z2', pan='AABCF5678K', tax_rate=5.0,
+            account_holder_name='Meera Nair', bank_name='ICICI Bank', ifsc_code='ICIC0004321',
+            upi_id='freshfold@upi', express_multiplier=1.4, default_monthly_wage=17000.0,
+            default_staff_role='Washer',
+        ),
+        'areas': ['Koramangala', 'HSR Layout', 'BTM Layout', 'Indiranagar', 'Ejipura'],
+        'customers': slice(10, 40), 'staff': slice(0, 10), 'orders': 40,
+        'expenses': 14, 'credits': 8, 'price_mult': 1.1, 'seed': 7,
+    },
+    {
+        'key': 'whitefield',
+        'shop': dict(
+            name='Sparkle Dry Clean Whitefield', owner_name='Arjun Menon', phone='9900123456',
+            whatsapp='9900123456', email='whitefield@sparkle.example',
+            address='ITPL Main Road, Whitefield', city='Bengaluru', state='Karnataka',
+            pin_code='560066', gstin='29AAFCS9012M1Z5', pan='AAFCS9012M', tax_rate=12.0,
+            account_holder_name='Arjun Menon', bank_name='Axis Bank', ifsc_code='UTIB0002468',
+            upi_id='sparkle@upi', express_multiplier=1.6, default_monthly_wage=19000.0,
+            default_staff_role='Dry Cleaning',
+        ),
+        'areas': ['Whitefield', 'Marathahalli', 'Brookefield', 'KR Puram'],
+        'customers': slice(35, 65), 'staff': slice(6, 18), 'orders': 30,
+        'expenses': 10, 'credits': 6, 'price_mult': 1.25, 'seed': 99,
+    },
+]
+
+
+def clear_all():
     print('Clearing old data...')
     OrderItem.objects.all().delete()
     OrderAuditLog.objects.all().delete()
@@ -198,34 +247,18 @@ def seed():
     ServiceArea.objects.all().delete()
     Shop.objects.all().delete()
 
-    print('Seeding Shop...')
-    shop = Shop.objects.create(
-        name='washing',
-        owner_name='AK',
-        phone='9876543210',
-        whatsapp='9876543210',
-        email='hello@washing.example',
-        address='Hbr layout, Bengaluru',
-        city='Bengaluru',
-        state='Karnataka',
-        pin_code='560064',
-        gstin='29AAACL1234F1Z9',
-        pan='AAACL1234F',
-        tax_rate=5.0,
-        account_holder_name='AK',
-        bank_name='HDFC Bank',
-        ifsc_code='HDFC0001234',
-        upi_id='washing@upi',
-        express_multiplier=1.5,
-        default_monthly_wage=18000.0,
-        default_staff_role='Washer',
-        currency_symbol='₹',
-        locale='en_IN',
-    )
+
+def seed_shop(cfg):
+    print(f"\n=== Seeding shop: {cfg['shop']['name']} ===")
+    shop = Shop.objects.create(currency_symbol='₹', locale='en_IN', **cfg['shop'])
+    # Creating a shop auto-seeds default catalogue/credit categories; replace them.
+    GarmentItem.objects.filter(shop=shop).delete()
+    GarmentCategory.objects.filter(shop=shop).delete()
+    CreditCategory.objects.filter(shop=shop).delete()
+    n_orders = cfg['orders']
+    price_mult = cfg['price_mult']
 
     print('Seeding Categories & Items...')
-    GarmentItem.objects.all().delete()
-    GarmentCategory.objects.all().delete()
     categories = {}
     total_items = 0
     for order_index, (cat_name, icon, items) in enumerate(CATALOGUE, start=1):
@@ -236,23 +269,23 @@ def seed():
         for item_index, (name, price, unit) in enumerate(items, start=1):
             GarmentItem.objects.create(
                 shop=shop,
-                category=category, name=name, price=float(price), unit=unit,
+                category=category, name=name, price=round(float(price) * price_mult, 2), unit=unit,
                 display_order=item_index,
                 image_url=ITEM_IMAGES.get(name, ''),
             )
             total_items += 1
 
     print('Seeding Service Areas & Time Slots...')
-    for area in ['HBR Layout', 'Kalyan Nagar', 'Banaswadi', 'Hennur', 'Indiranagar', 'Koramangala', 'HSR Layout', 'Whitefield']:
-        ServiceArea.objects.create(shop=shop, name=area, pin_code='560043')
+    for area in cfg['areas']:
+        ServiceArea.objects.create(shop=shop, name=area, pin_code=shop.pin_code)
     for kind in (TimeSlot.PICKUP, TimeSlot.DELIVERY):
         for start, end in DEFAULT_SLOTS:
             TimeSlot.objects.create(shop=shop, kind=kind, start_time=start, end_time=end, capacity=None)
 
-    print('Seeding 65 Customers...')
+    print('Seeding Customers...')
     customers = []
     signup_base = timezone.now()
-    for idx, (name, phone, email, addr, area) in enumerate(RAW_CUSTOMERS):
+    for idx, (name, phone, email, addr, area) in enumerate(RAW_CUSTOMERS[cfg['customers']]):
         c = Customer.objects.create(
             shop=shop,
             name=name,
@@ -269,7 +302,7 @@ def seed():
         Customer.objects.filter(pk=c.pk).update(created_at=created_at)
         customers.append(c)
 
-    print('Seeding 18 Staff Members across roles...')
+    print('Seeding Staff Members across roles...')
     staff_data = [
         ('Lakshman Rao', 'Manager', '9944556677', 28000.0, True, 'ACTIVE', date(2025, 1, 10)),
         ('Ramesh Kumar', 'Head Washer', '9711223344', 18500.0, True, 'ACTIVE', date(2025, 2, 1)),
@@ -296,15 +329,15 @@ def seed():
             name=name, role=role, phone=phone, monthly_wage=wage,
             has_app_login=app_login, status=status, start_date=s_date,
         )
-        for name, role, phone, wage, app_login, status, s_date in staff_data
+        for name, role, phone, wage, app_login, status, s_date in staff_data[cfg['staff']]
     ]
 
     delivery_drivers = [s for s in staff_objs if s.role == 'Delivery Driver']
 
-    print('Seeding 88 Orders across all lifecycle states...')
+    print(f'Seeding {n_orders} Orders across all lifecycle states...')
     today = timezone.localdate()
     now = timezone.now()
-    all_items = list(GarmentItem.objects.select_related('category').all())
+    all_items = list(GarmentItem.objects.select_related('category').filter(shop=shop))
 
     progression = [
         OrderStatus.PLACED, OrderStatus.PROCESSING, OrderStatus.IRONING,
@@ -318,32 +351,34 @@ def seed():
     # 66 placed across days 2 to 28
     orders_to_create = []
 
-    statuses_pool = (
-        [OrderStatus.PLACED] * 10 +
-        [OrderStatus.PROCESSING] * 12 +
-        [OrderStatus.IRONING] * 10 +
-        [OrderStatus.READY] * 12 +
-        [OrderStatus.OUT_FOR_DELIVERY] * 8 +
-        [OrderStatus.DELIVERED] * 31 +
-        [OrderStatus.CANCELLED] * 5
-    )
-    # Total 88 items
-    random.seed(42)  # reproducible rich seed
+    weights = [
+        (OrderStatus.PLACED, 10), (OrderStatus.PROCESSING, 12), (OrderStatus.IRONING, 10),
+        (OrderStatus.READY, 12), (OrderStatus.OUT_FOR_DELIVERY, 8),
+        (OrderStatus.DELIVERED, 31), (OrderStatus.CANCELLED, 5),
+    ]
+    statuses_pool = []
+    for status_value, weight in weights:
+        statuses_pool += [status_value] * max(1, round(weight * n_orders / 88))
+    statuses_pool = (statuses_pool + [OrderStatus.DELIVERED] * n_orders)[:n_orders]
+    random.seed(cfg['seed'])  # reproducible rich seed per shop
     random.shuffle(statuses_pool)
 
-    for i in range(88):
+    today_n = max(2, round(12 * n_orders / 88))
+    yesterday_end = today_n + max(2, round(10 * n_orders / 88))
+
+    for i in range(n_orders):
         status = statuses_pool[i]
 
         # Days ago determination:
-        if i < 12:
+        if i < today_n:
             days_ago = 0
             hours_ago = 1 + (i % 10)
-        elif i < 22:
+        elif i < yesterday_end:
             days_ago = 1
             hours_ago = 3 + (i % 8)
         else:
             # Span days 2 through 28
-            days_ago = 2 + ((i - 22) * 26) // 66
+            days_ago = 2 + ((i - yesterday_end) * 26) // max(n_orders - yesterday_end, 1)
             hours_ago = (i * 3) % 12
 
         placed_at = now - timedelta(days=days_ago, hours=hours_ago)
@@ -570,7 +605,7 @@ def seed():
                     note='Festival advance',
                 )
 
-    print('Seeding 24 Operational Expenses...')
+    print('Seeding Operational Expenses...')
     expenses_data = [
         ('Commercial Detergent & Liquid Soap (100L)', ExpenseCategory.SUPPLIES, 7500.0, 'UPI', 2),
         ('Fabric Softener & Optical Brightener', ExpenseCategory.SUPPLIES, 3200.0, 'UPI', 4),
@@ -597,7 +632,7 @@ def seed():
         ('Delivery Helmets & Reflective Jackets', ExpenseCategory.MAINTENANCE, 2200.0, 'UPI', 55),
         ('Customer Garment Loss Goodwill Claim Settlement', ExpenseCategory.OTHER, 1500.0, 'UPI', 58),
     ]
-    for title, cat, amount, method, days_ago in expenses_data:
+    for title, cat, amount, method, days_ago in expenses_data[:cfg['expenses']]:
         Expense.objects.create(
             shop=shop,
             title=title,
@@ -607,7 +642,7 @@ def seed():
             date=timezone.now() - timedelta(days=days_ago),
         )
 
-    print('Seeding 16 Credits...')
+    print('Seeding Credits...')
     credit_categories = {
         name: CreditCategory.objects.create(shop=shop, name=name, display_order=order)
         for order, name in enumerate(DEFAULT_CREDIT_CATEGORIES)
@@ -630,7 +665,7 @@ def seed():
         ('Service Apartment Bed Linen Initial Deposit', 'Customer Advance', 15000.0, 'BANK_TRANSFER', 50, 'New contract security deposit'),
         ('Shoe Spa Master Restoration Package Inflows', 'Dry Cleaning Income', 4200.0, 'UPI', 54, 'Leather boots and sneaker restorations'),
     ]
-    for title, cat, amount, method, days_ago, notes in credits_data:
+    for title, cat, amount, method, days_ago, notes in credits_data[:cfg['credits']]:
         Credit.objects.create(
             shop=shop,
             title=title,
@@ -641,15 +676,20 @@ def seed():
             notes=notes,
         )
 
-    print('\n[SUCCESS] Database seeded successfully with rich demo values!')
-    print(f'   - {Customer.objects.count()} customers')
-    print(f'   - {Order.objects.count()} orders ({Order.objects.filter(placed_at__date=today).count()} placed today)')
-    print(f'   - {Staff.objects.count()} staff ({Staff.objects.filter(status="ACTIVE").count()} active, {Staff.objects.filter(status="INACTIVE").count()} inactive)')
-    print(f'   - {Expense.objects.count()} expenses (including operational & salary)')
-    print(f'   - {Credit.objects.count()} credits across {len(credit_categories)} credit categories')
-    print(f'   - {Attendance.objects.count()} attendance records over {attendance_days} days')
-    print(f'   - {SalaryPayment.objects.count()} salary payments, {SalaryAdvance.objects.count()} advances')
-    print(f'   - {GarmentItem.objects.count()} items across {GarmentCategory.objects.count()} categories')
+    print(f"   - {Customer.objects.filter(shop=shop).count()} customers")
+    print(f"   - {Order.objects.filter(shop=shop).count()} orders ({Order.objects.filter(shop=shop, placed_at__date=today).count()} placed today)")
+    print(f"   - {Staff.objects.filter(shop=shop).count()} staff")
+    print(f"   - {Expense.objects.filter(shop=shop).count()} expenses, {Credit.objects.filter(shop=shop).count()} credits")
+    print(f"   - {Attendance.objects.filter(shop=shop).count()} attendance records over {attendance_days} days")
+    print(f"   - {SalaryPayment.objects.filter(shop=shop).count()} salary payments, {SalaryAdvance.objects.filter(shop=shop).count()} advances")
+    print(f"   - {GarmentItem.objects.filter(shop=shop).count()} items across {GarmentCategory.objects.filter(shop=shop).count()} categories")
+
+
+def seed():
+    clear_all()
+    for cfg in SHOPS:
+        seed_shop(cfg)
+    print(f"\n[SUCCESS] Seeded {Shop.objects.count()} demo shops: " + ', '.join(Shop.objects.values_list('name', flat=True)))
 
 
 if __name__ == '__main__':
