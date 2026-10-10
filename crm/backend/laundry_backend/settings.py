@@ -100,9 +100,17 @@ STORAGES = {
 }
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+from corsheaders.defaults import default_headers
+
 CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'True') == 'True'
 CORS_ALLOWED_ORIGINS = [
     origin for origin in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if origin
+]
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'x-tenant-id',
+]
+CORS_EXPOSE_HEADERS = [
+    'x-tenant-id',
 ]
 
 # ── RAG Chat (Cloudflare Workers AI + Vectorize, KAN-112) ─────────────────────
