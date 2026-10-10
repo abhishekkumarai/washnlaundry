@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:barcode_widget/barcode_widget.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../models/order_model.dart';
 import '../providers/app_provider.dart';
+import '../utils/tag_code.dart';
 
 /// The "Generate Tags" content for a single, already-chosen order — the
 /// real app's Order Placed → Generate Tags modal → Tag Preview modal, each
@@ -358,22 +360,6 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_format == _TagFormat.barcode)
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 14),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFFDE68A)),
-            ),
-            child: const Text(
-              'Barcode format is not available in this demo — showing QR '
-              'code tags instead.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
-            ),
-          ),
         Wrap(
           spacing: 16,
           runSpacing: 16,
@@ -593,6 +579,30 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
     );
   }
 
+  /// The scannable code for [tag]: Code 128 barcode or QR, both carrying the
+  /// same `<order number>-<garment no.>` text the Scan screen understands.
+  Widget _codeFor(_TagEntry tag) {
+    final data = TagCode.encode(_order.orderNumber, tag.index);
+    if (_format == _TagFormat.barcode) {
+      return BarcodeWidget(
+        key: ValueKey('tag-barcode-$data'),
+        barcode: Barcode.code128(),
+        data: data,
+        width: 126,
+        height: 56,
+        drawText: false,
+        errorBuilder: (context, error) => Text('Cannot encode "$data"',
+            style: const TextStyle(fontSize: 10, color: Color(0xFFB91C1C))),
+      );
+    }
+    return QrImageView(
+      key: ValueKey('tag-qr-$data'),
+      data: data,
+      version: QrVersions.auto,
+      size: 100,
+    );
+  }
+
   Widget _tagCard(_TagEntry tag, String shopName) {
     return Container(
       width: 150,
@@ -610,11 +620,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
           const SizedBox(height: 6),
-          QrImageView(
-            data: 'https://app.washnlaundry.com/track/${_order.orderNumber}',
-            version: QrVersions.auto,
-            size: 100,
-          ),
+          _codeFor(tag),
           const SizedBox(height: 6),
           Text(tag.label,
               textAlign: TextAlign.center,
@@ -626,7 +632,7 @@ class _TagGeneratorPanelState extends State<TagGeneratorPanel> {
           Text('${tag.index}/${tag.total}',
               style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
           const SizedBox(height: 4),
-          Text('#${_order.orderNumber}',
+          Text(TagCode.encode(_order.orderNumber, tag.index),
               style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
           Text(_order.customerName,
               overflow: TextOverflow.ellipsis,

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:washnlaundrycrm/models/order_model.dart';
 import 'package:washnlaundrycrm/providers/app_provider.dart';
 import 'package:washnlaundrycrm/screens/scan_screen.dart';
+import 'package:washnlaundrycrm/widgets/receipt_dialog.dart';
 
 Widget host(AppProvider provider, Widget child) => ChangeNotifierProvider.value(
       value: provider,
@@ -128,6 +129,39 @@ void main() {
       await tester.pump();
 
       expect(find.text('No order matches "zzzz".'), findsOneWidget);
+    });
+
+    testWidgets('scanning a garment tag code opens that order', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(orders: _orders);
+      await tester.pumpWidget(host(provider, const ScanScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('Manual'));
+      await tester.pumpAndSettle();
+      // A barcode scanner types what the tag encodes: <order number>-<garment no.>
+      await tester.enterText(find.byType(TextField).first, 'WA3P-00011-02');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Search'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ReceiptDialog), findsOneWidget);
+      expect(find.textContaining('No order found'), findsNothing);
+    });
+
+    testWidgets('a tag code for an unknown order is a miss, not another order',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(orders: _orders);
+      await tester.pumpWidget(host(provider, const ScanScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('Manual'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'WA3P-09999-01');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Search'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ReceiptDialog), findsNothing);
+      expect(find.textContaining('No order found for "WA3P-09999-01"'),
+          findsOneWidget);
     });
 
     testWidgets('picking a result shows the tag generator for that order',

@@ -30,6 +30,7 @@ dependencies:
   file_picker: ^8.1.2
   table_calendar: ^3.2.1
   flutter_calendar_collection: ^1.0.2
+  barcode_widget: ^2.0.4
 
 dev_dependencies:
   flutter_test:

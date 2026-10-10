@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/order_model.dart';
 import '../providers/app_provider.dart';
+import '../utils/tag_code.dart';
 import '../utils/money.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/receipt_dialog.dart';
@@ -68,9 +69,12 @@ class _ScanScreenState extends State<ScanScreen>
     // No `orElse` fallback: this used to return `orders.first` when nothing
     // matched, so a mistyped order number silently opened another customer's
     // receipt. A miss must read as a miss.
+    // A scanner types what the tag encodes ("SPOT-00001-02"), a bare order
+    // number or an old tracking URL; try each reading, exact matches only.
+    final wanted = TagCode.candidates(query).map((c) => c.toLowerCase()).toList();
     final matches = provider.orders.where((o) =>
-        o.orderNumber.toLowerCase() == query.toLowerCase() ||
-        o.id.toLowerCase() == query.toLowerCase());
+        wanted.contains(o.orderNumber.toLowerCase()) ||
+        wanted.contains(o.id.toLowerCase()));
 
     if (matches.isEmpty) {
       setState(() => _notFoundQuery = query);

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:washnlaundrycrm/models/order_model.dart';
 import 'package:washnlaundrycrm/providers/app_provider.dart';
@@ -190,7 +192,7 @@ void main() {
       expect(find.textContaining('3 tags · 50mm'), findsOneWidget);
     });
 
-    testWidgets('Barcode falls back to QR with an explanatory note',
+    testWidgets('Barcode draws a real Code 128 barcode per tag, with no fallback note',
         (tester) async {
       await tester.pumpWidget(pumpPanel());
       await tester.pump();
@@ -201,8 +203,24 @@ void main() {
       await tester.pump();
 
       expect(
-          find.textContaining('Barcode format is not available in this demo'),
+          find.textContaining('Barcode format is not available'), findsNothing);
+      expect(find.byType(BarcodeWidget), findsWidgets);
+      expect(find.byType(QrImageView), findsNothing);
+      // The code carries <order number>-<garment no.>
+      expect(find.byKey(const ValueKey('tag-barcode-WA3P-00011-01')),
           findsOneWidget);
+    });
+
+    testWidgets('QR (the default) encodes the same tag code, not a URL',
+        (tester) async {
+      await tester.pumpWidget(pumpPanel());
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Generate Preview'));
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('tag-qr-WA3P-00011-01')), findsOneWidget);
+      expect(find.byType(BarcodeWidget), findsNothing);
     });
 
     testWidgets('Back returns to the configure step', (tester) async {
