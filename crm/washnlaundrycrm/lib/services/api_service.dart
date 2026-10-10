@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../models/customer_stats.dart';
 import '../models/garment_model.dart';
 import '../models/order_media_model.dart';
 import '../models/order_model.dart';
@@ -537,6 +538,7 @@ class ApiService {
 
   static Future<PaginatedResult<CustomerModel>> fetchCustomersPaged({
     String? search,
+    String? filter,
     int page = 1,
     int pageSize = 20,
   }) async {
@@ -544,6 +546,7 @@ class ApiService {
       'page': '$page',
       'page_size': '$pageSize',
       if (search != null && search.isNotEmpty) 'search': search,
+      if (filter != null && filter.isNotEmpty && filter != 'all') 'filter': filter,
     });
     if (data is Map) {
       final results = _asList(data).map(CustomerModel.fromJson).toList();
@@ -565,6 +568,12 @@ class ApiService {
       pageSize: list.length,
       results: list,
     );
+  }
+
+  /// Shop-wide counts for the Customers KPI cards (total / active / new / owing).
+  static Future<CustomerStats> fetchCustomerStats() async {
+    final data = await _send('GET', '/customers/stats/');
+    return CustomerStats.fromJson((data as Map).cast<String, dynamic>());
   }
 
   static Future<CustomerModel> createCustomer(

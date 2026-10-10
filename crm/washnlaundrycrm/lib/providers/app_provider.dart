@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
 import '../services/api_service.dart';
+import '../services/customer_directory.dart';
 import '../utils/money.dart';
 
 class AppProvider extends ChangeNotifier {
@@ -102,6 +103,16 @@ class AppProvider extends ChangeNotifier {
 
   List<CustomerModel> _customers = [];
   List<CustomerModel> get customers => _customers;
+
+  /// Where the Customers screen fetches its pages from (server-side paging,
+  /// search and counts). Production talks to the API; with `autoLoad: false`
+  /// (tests) it pages over the seeded list in memory.
+  late CustomerDirectory customerDirectory;
+
+  /// Bumped whenever customers change (add / edit / delete / reload), so a
+  /// screen showing a server page knows to fetch it again.
+  int _customersRevision = 0;
+  int get customersRevision => _customersRevision;
 
   List<StaffModel> _staff = [];
   List<StaffModel> get staff => _staff;
@@ -273,6 +284,9 @@ class AppProvider extends ChangeNotifier {
   // GoRoute's builder calls setNavIndex on the way in, so a second reader of
   // the same URL here would just get overwritten on first frame.
   AppProvider({bool autoLoad = true}) {
+    customerDirectory = autoLoad
+        ? const ApiCustomerDirectory()
+        : InMemoryCustomerDirectory(() => _customers, deliveredDuesForCustomer);
     if (autoLoad) loadDataFromBackend();
   }
 
@@ -299,7 +313,10 @@ class AppProvider extends ChangeNotifier {
     if (orders != null) _orders = orders;
     if (garments != null) _garments = garments;
     if (categories != null) _categories = categories;
-    if (customers != null) _customers = customers;
+    if (customers != null) {
+      _customers = customers;
+      _customersRevision++;
+    }
     if (staff != null) _staff = staff;
     if (expenses != null) _expenses = expenses;
     if (credits != null) _credits = credits;
@@ -553,6 +570,7 @@ class AppProvider extends ChangeNotifier {
       _garments = results[1] as List<GarmentItemModel>;
       _categories = results[2] as List<GarmentCategoryModel>;
       _customers = results[3] as List<CustomerModel>;
+      _customersRevision++;
       _serviceAreas = results[4] as List<ServiceAreaModel>;
       _pickupSlots = results[5] as List<TimeSlotModel>;
       _deliverySlots = results[6] as List<TimeSlotModel>;
@@ -649,6 +667,7 @@ class AppProvider extends ChangeNotifier {
       _garments = results[1] as List<GarmentItemModel>;
       _categories = results[2] as List<GarmentCategoryModel>;
       _customers = results[3] as List<CustomerModel>;
+      _customersRevision++;
       _staff = results[4] as List<StaffModel>;
       _expenses = results[5] as List<ExpenseModel>;
       _credits = results[6] as List<CreditModel>;
@@ -771,6 +790,7 @@ class AppProvider extends ChangeNotifier {
     try {
       final customer = await ApiService.createCustomer(payload);
       _customers.insert(0, customer);
+      _customersRevision++;
       notifyListeners();
       return true;
     } on ApiException catch (e) {
@@ -789,6 +809,7 @@ class AppProvider extends ChangeNotifier {
       } else {
         _customers.insert(0, updated);
       }
+      _customersRevision++;
       _error = null;
       notifyListeners();
       return true;
@@ -806,6 +827,7 @@ class AppProvider extends ChangeNotifier {
     try {
       await ApiService.deleteCustomer(id);
       _customers.removeWhere((c) => c.id == id);
+      _customersRevision++;
       _error = null;
       notifyListeners();
       return true;

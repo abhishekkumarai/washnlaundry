@@ -251,14 +251,55 @@ class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     pagination_class = StandardPagination
 
+    @staticmethod
+    def _owing_exists():
+        """Customers with an unpaid DELIVERED order (matched by customer or by phone)."""
+        from django.db.models import Exists, OuterRef
+        unpaid = Order.objects.filter(status=OrderStatus.DELIVERED, due_amount__gt=0).filter(
+            Q(customer=OuterRef('pk')) | (Q(customer_phone=OuterRef('phone')) & ~Q(customer_phone='')))
+        return Exists(unpaid)
+
+    @staticmethod
+    def _this_month_start():
+        import datetime as _dt
+        first = timezone.localdate().replace(day=1)
+        return timezone.make_aware(_dt.datetime.combine(first, _dt.time.min))
+
+    def _apply_filter(self, qs, name):
+        """The Customers screen's KPI tabs, server-side so every page honours them."""
+        if name == 'active':
+            return qs.filter(total_orders__gt=0)
+        if name == 'new':
+            return qs.filter(created_at__gte=self._this_month_start())
+        if name == 'owing':
+            return qs.filter(self._owing_exists())
+        return qs
+
     def get_queryset(self):
         qs = super().get_queryset()
-        search = self.request.query_params.get('search')
+        search = (self.request.query_params.get('search') or '').strip()
         if search:
             qs = qs.filter(
-                Q(name__icontains=search) | Q(phone__icontains=search) | Q(email__icontains=search)
+                Q(name__icontains=search) | Q(phone__icontains=search)
+                | Q(email__icontains=search) | Q(area__icontains=search)
             )
-        return qs
+        qs = self._apply_filter(qs, (self.request.query_params.get('filter') or '').lower())
+        # '-id' makes the order total, so rows never repeat or vanish between pages
+        return qs.order_by('-created_at', '-id')
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        """GET /api/customers/stats/ - shop-wide counts for the KPI cards.
+
+        Independent of search and page, so the numbers don't move while paging.
+        """
+        base = Customer.objects.all()
+        return Response({
+            'total': base.count(),
+            'active': self._apply_filter(base, 'active').count(),
+            'new': self._apply_filter(base, 'new').count(),
+            'owing': self._apply_filter(base, 'owing').count(),
+        })
 
     @action(detail=True, methods=['post', 'delete'], url_path='credentials',
             permission_classes=[IsOwner])
