@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -5,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
+import '../services/api_service.dart';
+import '../services/customer_directory.dart';
 import '../utils/navigation.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -26,11 +30,28 @@ class _CustomersScreenState extends State<CustomersScreen> {
   String _searchQuery = '';
   CustomerModel? _selected;
 
-  /// The list renders this many customers at a time, with a "Show more"
-  /// button, so a shop with thousands of customers doesn't build every row at
-  /// once. It resets to one page whenever the search or the tab filter changes.
-  static const _pageSize = 50;
-  int _visibleCount = _pageSize;
+  /// Rows per page. The server does the paging, searching and counting, so a
+  /// shop with thousands of customers never loads them all into the screen.
+  static const _pageSize = 10;
+
+  /// How long typing pauses before the search is sent to the server.
+  static const searchDebounce = Duration(milliseconds: 300);
+
+  int _page = 1;
+  CustomerPage? _data;
+  CustomerStats _stats = const CustomerStats();
+  bool _loading = true;
+  String? _loadError;
+  Timer? _debounce;
+
+  /// Guards against an older request landing after a newer one.
+  int _requestId = 0;
+
+  /// The provider's customer revision the page / stats were fetched at; a
+  /// change (add, edit, delete, reload) means they are stale.
+  int _loadedRevision = -1;
+  int _statsRevision = -1;
+  bool _reloadScheduled = false;
 
   /// Which KPI card is acting as the active filter tab. 'all' means no
   /// extra filter beyond the search box.
@@ -56,17 +77,95 @@ class _CustomersScreenState extends State<CustomersScreen> {
   DateTime? _lastOrderFor(CustomerModel c, Map<String, DateTime> index) =>
       index[c.id] ?? index[c.phone];
 
-  bool _isActiveCustomer(CustomerModel c) => c.totalOrders > 0;
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
 
-  bool _isNewCustomer(CustomerModel c) {
-    final at = c.createdAt;
-    if (at == null) return false;
-    final now = DateTime.now();
-    return at.year == now.year && at.month == now.month;
+  /// Fetches [page] (default: the current one) for the current search + tab,
+  /// and the shop-wide counts when customers changed since they were fetched.
+  Future<void> _load({int? page}) async {
+    final provider = context.read<AppProvider>();
+    final directory = provider.customerDirectory;
+    final revision = provider.customersRevision;
+    final wantPage = page ?? _page;
+    final id = ++_requestId;
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final needStats = _statsRevision != revision;
+      final results = await Future.wait<Object>([
+        directory.page(
+            search: _searchQuery,
+            filter: _kpiFilter,
+            page: wantPage,
+            pageSize: _pageSize),
+        if (needStats) directory.stats(),
+      ]);
+      if (!mounted || id != _requestId) return;
+      final fetched = results[0] as CustomerPage;
+      setState(() {
+        _data = fetched;
+        _page = fetched.page;
+        if (needStats) {
+          _stats = results[1] as CustomerStats;
+          _statsRevision = revision;
+        }
+        _loadedRevision = revision;
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted || id != _requestId) return;
+      // The page vanished (e.g. the last customer on it was deleted): go to page 1.
+      if (e.statusCode == 404 && wantPage > 1) {
+        await _load(page: 1);
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _loadError = e.message;
+      });
+    } catch (e) {
+      if (!mounted || id != _requestId) return;
+      setState(() {
+        _loading = false;
+        _loadError = 'Could not load customers: $e';
+      });
+    }
+  }
+
+  /// Fetch again when customers changed behind our back (add/edit/delete).
+  void _syncWithProvider(AppProvider provider) {
+    if (_reloadScheduled) return;
+    if (_loadedRevision == provider.customersRevision) return;
+    _reloadScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _reloadScheduled = false;
+      if (mounted) _load();
+    });
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() => _searchQuery = value);
+    _debounce?.cancel();
+    _debounce = Timer(searchDebounce, () {
+      if (mounted) _load(page: 1);
+    });
+  }
+
+  void _selectTab(String tab) {
+    if (_kpiFilter == tab) return;
+    setState(() => _kpiFilter = tab);
+    _load(page: 1);
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<AppProvider>();
+    _syncWithProvider(provider);
     if (_selected != null) {
       return CustomerDetailScreen(
         customer: _selected!,
@@ -78,25 +177,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
       );
     }
 
-    final provider = context.watch<AppProvider>();
-    final customers = provider.customers;
+    final customers = _data?.items ?? const <CustomerModel>[];
     final lastOrders = _lastOrderIndex(provider);
-
-    final q = _searchQuery.trim().toLowerCase();
-    final filtered = customers.where((c) {
-      final matchesSearch = q.isEmpty ||
-          c.name.toLowerCase().contains(q) ||
-          c.phone.toLowerCase().contains(q) ||
-          c.email.toLowerCase().contains(q) ||
-          c.area.toLowerCase().contains(q);
-      final matchesTab = switch (_kpiFilter) {
-        'active' => _isActiveCustomer(c),
-        'new' => _isNewCustomer(c),
-        'owing' => provider.deliveredDuesForCustomer(c) > 0,
-        _ => true,
-      };
-      return matchesSearch && matchesTab;
-    }).toList();
+    final filtered = customers;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
@@ -125,15 +208,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
             return Column(
               children: [
                 narrow
-                    ? _narrowHeader(context, customers.length, filtered)
-                    : _header(context, customers.length, filtered),
+                    ? _narrowHeader(context, _stats.total, filtered)
+                    : _header(context, _stats.total, filtered),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _kpiRow(customers, provider),
+                        _kpiRow(_stats, provider),
                         const SizedBox(height: 20),
                         _table(filtered, lastOrders, provider, narrow),
                       ],
@@ -184,10 +267,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
-                      onChanged: (v) => setState(() {
-                        _searchQuery = v;
-                        _visibleCount = _pageSize;
-                      }),
+                      onChanged: _onSearchChanged,
                       style: const TextStyle(fontSize: 13),
                       textAlign: TextAlign.center,
                       decoration: const InputDecoration(
@@ -269,10 +349,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: TextField(
-                            onChanged: (v) => setState(() {
-                              _searchQuery = v;
-                              _visibleCount = _pageSize;
-                            }),
+                            onChanged: _onSearchChanged,
                             style: const TextStyle(fontSize: 13),
                             textAlign: TextAlign.center,
                             decoration: const InputDecoration(
@@ -313,16 +390,17 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
-  Widget _kpiRow(List<CustomerModel> customers, AppProvider provider) {
-    // Counts always reflect every customer, not the tab-filtered subset —
-    // otherwise selecting "Active" would immediately shrink its own count.
-    final active = customers.where(_isActiveCustomer).length;
-    final isNew = customers.where(_isNewCustomer).length;
+  Widget _kpiRow(CustomerStats stats, AppProvider provider) {
+    // Counts come from the server for the whole shop, not the page on screen or
+    // the tab-filtered subset - otherwise selecting "Active" would immediately
+    // shrink its own count.
+    final active = stats.active;
+    final isNew = stats.newThisMonth;
     final totalDeliveredDues = provider.totalDeliveredDues;
     final owingCustomersCount = provider.customersWithDeliveredDuesCount;
 
     final cards = [
-      (bool c) => _kpi('all', 'Total', '${customers.length}',
+      (bool c) => _kpi('all', 'Total', '${stats.total}',
           Icons.people_outline_rounded, const Color(0xFF182C4F),
           compact: c),
       (bool c) => _kpi('active', 'Active', '$active',
@@ -372,10 +450,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       {String? subtitle, bool compact = false}) {
     final isSel = _kpiFilter == tabKey;
     return InkWell(
-      onTap: () => setState(() {
-        _kpiFilter = tabKey;
-        _visibleCount = _pageSize;
-      }),
+      onTap: () => _selectTab(tabKey),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: EdgeInsets.all(compact ? 10 : 16),
@@ -475,8 +550,6 @@ class _CustomersScreenState extends State<CustomersScreen> {
     AppProvider provider,
     bool narrow,
   ) {
-    final total = customers.length;
-    if (total > _visibleCount) customers = customers.sublist(0, _visibleCount);
     return Container(
       decoration: _panel,
       child: Column(
@@ -484,26 +557,55 @@ class _CustomersScreenState extends State<CustomersScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(
-              switch (_kpiFilter) {
-                'active' => 'Active customers',
-                'new' => 'New customers',
-                'owing' => 'Customers with delivered dues',
-                _ => 'All customers',
-              },
-              style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF141A24)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    switch (_kpiFilter) {
+                      'active' => 'Active customers',
+                      'new' => 'New customers',
+                      'owing' => 'Customers with delivered dues',
+                      _ => 'All customers',
+                    },
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF141A24)),
+                  ),
+                ),
+                _pager(),
+              ],
             ),
           ),
           const Divider(height: 1, color: Color(0xFFE4E0D8)),
-          if (customers.isEmpty)
+          if (_loadError != null)
+            Padding(
+              key: const ValueKey('customers-load-error'),
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_loadError!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 13, color: Color(0xFFB91C1C))),
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: _loading ? null : () => _load(),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (customers.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 48),
               child: Center(
                 child: Text(
-                  provider.isLoading
+                  (_loading || provider.isLoading)
                       ? 'Loading customers…'
                       : _searchQuery.trim().isNotEmpty
                           ? 'No customer matches "${_searchQuery.trim()}".'
@@ -550,62 +652,56 @@ class _CustomersScreenState extends State<CustomersScreen> {
             for (final c in customers)
               _row(c, _lastOrderFor(c, lastOrders), provider),
           ],
-          if (total > customers.length) _showMoreBar(customers.length, total),
         ],
       ),
     );
   }
 
-  /// Footer under a windowed list: how many are showing, and a button for
-  /// the next page.
-  Widget _showMoreBar(int shown, int total) {
-    final totalPages = (total / _pageSize).ceil().clamp(1, 99999);
-    final currentPage = (shown / _pageSize).ceil().clamp(1, totalPages);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFE4E0D8))),
-      ),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 12,
-        runSpacing: 8,
-        children: [
-          Wrap(
-            spacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text('Showing $shown of $total',
-                  style:
-                      const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-              if (totalPages > 1)
-                Text('(Page $currentPage of $totalPages)',
-                    style: const TextStyle(
-                        fontSize: 12, color: Color(0xFF94A3B8))),
-            ],
+  /// Page controls, top-right of the list panel: "1-10 of 25", previous / next.
+  Widget _pager() {
+    final data = _data;
+    if (data == null || data.count == 0) return const SizedBox.shrink();
+    final from = (data.page - 1) * _pageSize + 1;
+    final to = (from + data.items.length - 1).clamp(from, data.count);
+    final canPrev = data.page > 1 && !_loading;
+    final canNext = data.page < data.totalPages && !_loading;
+    return Row(
+      key: const ValueKey('customers-pager'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          data.totalPages > 1
+              ? '$from–$to of ${data.count}'
+              : '${data.count} ${data.count == 1 ? 'customer' : 'customers'}',
+          key: const ValueKey('customers-page-range'),
+          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        ),
+        if (data.totalPages > 1) ...[
+          const SizedBox(width: 4),
+          IconButton(
+            key: const ValueKey('customers-prev-page'),
+            tooltip: 'Previous page',
+            visualDensity: VisualDensity.compact,
+            iconSize: 20,
+            onPressed: canPrev ? () => _load(page: data.page - 1) : null,
+            icon: const Icon(Icons.chevron_left_rounded),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (shown < total)
-                OutlinedButton(
-                  onPressed: () => setState(() => _visibleCount += _pageSize),
-                  child: Text(
-                      'Show ${total - shown < _pageSize ? total - shown : _pageSize} more'),
-                ),
-              if (shown > _pageSize) ...[
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: () => setState(() => _visibleCount = _pageSize),
-                  child: const Text('Reset page'),
-                ),
-              ],
-            ],
+          Text('${data.page} / ${data.totalPages}',
+              key: const ValueKey('customers-page-label'),
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF334155))),
+          IconButton(
+            key: const ValueKey('customers-next-page'),
+            tooltip: 'Next page',
+            visualDensity: VisualDensity.compact,
+            iconSize: 20,
+            onPressed: canNext ? () => _load(page: data.page + 1) : null,
+            icon: const Icon(Icons.chevron_right_rounded),
           ),
         ],
-      ),
+      ],
     );
   }
 
