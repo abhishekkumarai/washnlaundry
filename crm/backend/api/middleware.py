@@ -1,5 +1,6 @@
 from django.db import connection
 from django.http import JsonResponse
+from .media_views import FILE_PATH_RE
 from .models import Shop
 from .tenancy import fallback_shop, set_current_tenant
 
@@ -36,7 +37,8 @@ class TenantMiddleware:
             return JsonResponse({'detail': 'Tenant shop is inactive, suspended or archived.'}, status=403)
 
         if (shop is None and request.path.startswith('/api/')
-                and not request.path.startswith(self.TENANTLESS_PREFIXES)):
+                and not request.path.startswith(self.TENANTLESS_PREFIXES)
+                and not FILE_PATH_RE.match(request.path)):
             return JsonResponse(
                 {'detail': 'No shop selected. Send the X-Tenant-ID header.'}, status=400)
 

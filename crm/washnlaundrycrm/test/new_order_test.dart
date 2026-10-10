@@ -376,6 +376,8 @@ void main() {
       expect(find.text('Review order'), findsOneWidget);
       expect(find.text('Fulfillment type'), findsOneWidget);
       expect(find.text('Notes for this order (optional)'), findsOneWidget);
+      expect(find.text('Photos & videos (optional)'), findsOneWidget);
+      expect(find.byKey(const ValueKey('media-add')), findsOneWidget);
       expect(find.text('Place order · ₹15'), findsOneWidget);
       expect(find.text('Search items or scan a tag...'), findsNothing);
 

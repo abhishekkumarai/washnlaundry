@@ -1,3 +1,4 @@
+from . import media_views
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
@@ -67,6 +68,11 @@ urlpatterns = [
     path('whatsapp/neonize/status/', neonize_status, name='neonize-status'),
     path('whatsapp/neonize/connect/', neonize_connect, name='neonize-connect'),
     path('whatsapp/neonize/disconnect/', neonize_disconnect, name='neonize-disconnect'),
+    path('order-media/', media_views.media_create, name='order-media-create'),
+    path('order-media/<uuid:media_id>/', media_views.media_delete, name='order-media-delete'),
+    path('order-media/<uuid:media_id>/content/', media_views.media_content, name='order-media-content'),
+    path('order-media/<uuid:media_id>/complete/', media_views.media_complete, name='order-media-complete'),
+    path('order-media/<uuid:media_id>/file/', media_views.media_file, name='order-media-file'),
     path('backup/export/', export_backup, name='backup-export'),
     path('backup/export/<str:section>/', export_section, name='backup-export-section'),
     path('backup/import/<str:section>/', import_section, name='backup-import-section'),

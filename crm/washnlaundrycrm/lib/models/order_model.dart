@@ -1,4 +1,5 @@
 import 'garment_model.dart';
+import 'order_media_model.dart';
 
 /// Canonical order statuses. Mirrors `OrderStatus` in the backend. Never
 /// compare against ad-hoc strings — use these constants so the layers can't
@@ -210,6 +211,9 @@ class OrderModel {
   final List<TimelineEntry> auditLog;
   final List<OrderItemModel> items;
 
+  /// Photos/videos taken when the order was received.
+  final List<OrderMediaModel> media;
+
   const OrderModel({
     required this.id,
     required this.orderNumber,
@@ -238,6 +242,7 @@ class OrderModel {
     this.stageTimestamps = const {},
     this.auditLog = const [],
     required this.items,
+    this.media = const [],
   });
 
   String get statusLabel => OrderStatus.label(status);
@@ -358,6 +363,9 @@ class OrderModel {
           .toList(),
       items: rawItems
           .map((i) => OrderItemModel.fromJson(i as Map<String, dynamic>))
+          .toList(),
+      media: (json['media'] as List? ?? const [])
+          .map((m) => OrderMediaModel.fromJson((m as Map).cast<String, dynamic>()))
           .toList(),
     );
   }

@@ -13,6 +13,7 @@ import '../models/order_model.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/fulfillment_type_selector.dart';
+import '../widgets/order_media_picker.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../utils/money.dart';
 
@@ -33,6 +34,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   /// page; a bar pinned to the bottom opens it.)
   bool _cartOpen = false;
   String _searchQuery = '';
+
+  /// Photos/videos being attached to this order (review step).
+  final OrderMediaController _media = OrderMediaController();
 
   /// Null until a customer is picked or passed via initialCustomer.
   CustomerModel? _customer;
@@ -144,6 +148,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   @override
   void initState() {
     super.initState();
+    // The submit button waits for uploads, so it has to repaint as they finish.
+    _media.addListener(_onMediaChanged);
     _customer = widget.initialCustomer ?? _signedInCustomer();
     _deliveryType = _defaultDeliveryType;
     _notesController = TextEditingController();
@@ -161,8 +167,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     }
   }
 
+  void _onMediaChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    _media.removeListener(_onMediaChanged);
+    _media.dispose();
     _notesController.dispose();
     _discountController.dispose();
     _addressController.dispose();
@@ -1308,6 +1320,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          _reviewCard(
+            title: 'Photos & videos (optional)',
+            child: OrderMediaPicker(controller: _media),
+          ),
           const SizedBox(height: 20),
         ],
       ),
@@ -1570,7 +1587,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _submitting
+                  onPressed: _submitting || _media.isUploading
                       ? null
                       : () => _checkout(provider, garments, subtotal),
                   style: ElevatedButton.styleFrom(
@@ -2193,6 +2210,18 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       return;
     }
 
+    if (_media.isUploading || _media.hasFailed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                _media.isUploading
+                    ? 'Wait for the photos/videos to finish uploading'
+                    : 'Retry or remove the photos/videos that failed',
+                style: const TextStyle(fontSize: 13))),
+      );
+      return;
+    }
+
     // A carried order is scheduled against real slots — the live app won't
     // place one without them, and neither do we.
     final missingSlot = _deliveryType == DeliveryType.homePickup &&
@@ -2251,6 +2280,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       'paid_amount': paid,
       'due_amount': total - paid,
       if (notes.isNotEmpty) 'notes': notes,
+      if (_media.readyIds.isNotEmpty) 'media_ids': _media.readyIds,
       if (_readyBy != null)
         'scheduled_date': DateFormat('yyyy-MM-dd').format(_readyBy!),
       if (_isCarriedDelivery && _deliveryWindow != null)
@@ -2302,6 +2332,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       _deliveryType = _defaultDeliveryType;
       _deliveryCharge = 0;
       _notesController.clear();
+      _media.clear();
       _addressController.clear();
       _discountController.clear();
       _deliveryChargeController.text = _deliveryFee.toStringAsFixed(0);

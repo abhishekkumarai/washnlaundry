@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/garment_model.dart';
+import '../models/order_media_model.dart';
 import '../models/order_model.dart';
 
 import 'package:flutter/foundation.dart';
@@ -70,6 +71,17 @@ class ApiService {
       return 'http://127.0.0.1:8000/api';
     }
     return '/api';
+  }
+
+  /// Turns a server-relative path from the API (`/api/order-media/.../file/`)
+  /// into something the browser can fetch: joined to the API's own origin when
+  /// the build talks to a different host, left relative when it is same-origin.
+  /// Absolute URLs (presigned R2 links) pass through untouched.
+  static String absoluteUrl(String url) {
+    if (!url.startsWith('/')) return url;
+    final base = baseUrl;
+    if (base.startsWith('http')) return Uri.parse(base).origin + url;
+    return url;
   }
 
   static Uri _uri(String path, [Map<String, String>? query]) {
@@ -352,6 +364,69 @@ class ApiService {
     final data = await _send('GET', '/orders/$id/');
     return OrderModel.fromJson((data as Map).cast<String, dynamic>());
   }
+
+  // ── Order photos & videos ────────────────────────────────────────────────
+
+  /// Asks for an upload slot. The reply is the (pending) media plus an `upload`
+  /// target: a presigned Cloudflare R2 URL in production, an API URL in dev.
+  static Future<Map<String, dynamic>> createMediaSlot({
+    required String filename,
+    required String contentType,
+    required int size,
+  }) async {
+    final data = await _send('POST', '/order-media/', body: {
+      'filename': filename,
+      'content_type': contentType,
+      'size': size,
+    });
+    return (data as Map).cast<String, dynamic>();
+  }
+
+  /// Sends the file's bytes to the slot's upload target. An R2 URL is already
+  /// signed, so it must NOT get our Authorization / tenant headers; the API's
+  /// own dev target needs them.
+  static Future<void> putMediaBytes(
+      Map<String, dynamic> upload, Uint8List bytes, String contentType) async {
+    final uri = Uri.parse(absoluteUrl(upload['url'].toString()));
+    final headers = <String, String>{
+      ...((upload['headers'] as Map?) ?? const {})
+          .map((k, v) => MapEntry(k.toString(), v.toString())),
+      'Content-Type': contentType,
+    };
+    if (uri.path.startsWith('/api/order-media/')) {
+      final token = await tokenProvider?.call();
+      final tenantId = tenantIdProvider?.call();
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+      if (tenantId != null && tenantId.isNotEmpty) {
+        headers['X-Tenant-ID'] = tenantId;
+      }
+    }
+    try {
+      final res = await http
+          .put(uri, headers: headers, body: bytes)
+          .timeout(const Duration(minutes: 5));
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw ApiException(
+          res.statusCode == 413
+              ? 'That file is too large.'
+              : 'Upload failed (${res.statusCode}).',
+          statusCode: res.statusCode,
+        );
+      }
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Could not upload the file: $e');
+    }
+  }
+
+  static Future<OrderMediaModel> completeMedia(String id) async {
+    final data = await _send('POST', '/order-media/$id/complete/', body: const {});
+    return OrderMediaModel.fromJson((data as Map).cast<String, dynamic>());
+  }
+
+  static Future<void> deleteMedia(String id) =>
+      _send('DELETE', '/order-media/$id/');
 
   static Future<OrderModel> createOrder(Map<String, dynamic> payload) async {
     final data = await _send('POST', '/orders/', body: payload);

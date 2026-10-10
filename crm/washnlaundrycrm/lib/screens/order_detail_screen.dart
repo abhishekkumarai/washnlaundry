@@ -10,6 +10,7 @@ import '../services/api_service.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/fulfillment_type_selector.dart';
+import '../widgets/order_media_gallery.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
 import '../widgets/tag_generator_panel.dart';
@@ -98,6 +99,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _itemsCard(order),
+                            if (order.media.isNotEmpty) ...[
+                              const SizedBox(height: 20),
+                              _mediaCard(order),
+                            ],
                             const SizedBox(height: 20),
                             _timelineCard(order),
                           ],
@@ -444,6 +449,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   // ── Items ──────────────────────────────────────────────────────────────────
+
+  /// Photos/videos taken when the order was received.
+  Widget _mediaCard(OrderModel order) {
+    return Container(
+      key: const ValueKey('order-detail-media-card'),
+      padding: const EdgeInsets.all(16),
+      decoration: _panel,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Photos & videos (${order.media.length})',
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF141A24))),
+          const SizedBox(height: 12),
+          OrderMediaGallery(media: order.media),
+        ],
+      ),
+    );
+  }
 
   Widget _itemsCard(OrderModel order) {
     // The live app groups lines under the service heading, uppercased.

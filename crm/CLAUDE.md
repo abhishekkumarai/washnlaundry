@@ -136,6 +136,16 @@ One Google login for everyone; the backend (`backend/api/auth.py`) verifies the 
 - Deleting a `Staff` row revokes its membership; the shop's last owner cannot be deleted/demoted/deactivated.
 - Open follow-ups: Postgres RLS is not a reliable second layer (permissive when `app.current_tenant` is unset; `SET LOCAL` outside a transaction is a no-op), `shop` columns are still nullable, and the Flutter shop switcher has no UI for members/transfer/archive yet.
 
+### Order photos & videos (added 2026-10-11)
+
+New Order -> Review step has a "Photos & videos (optional)" card; the order detail page shows them (`widgets/order_media_picker.dart`, `order_media_gallery.dart`, `video_player` for playback).
+
+- **Storage = the database** (`OrderMediaBlob`, a `bytea` column in its own table), because Render's disk is ephemeral and R2 is not enabled. `api/media_storage.py` hides this behind one interface; setting `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_MEDIA_BUCKET` switches to Cloudflare R2 with presigned direct-to-bucket uploads (bucket needs a CORS rule for PUT/GET/HEAD from the app origins) and raises the caps. No data migration is written for switching: existing DB-stored files stay in the DB.
+- **Flow:** `POST /api/order-media/` (slot) -> `PUT .../content/` (bytes) -> `POST .../complete/` (verify) -> send `media_ids` on `POST /api/orders/` (or PATCH). Files are tenant-scoped; read URLs are short-lived signed tokens (an `<img>`/`<video>` tag cannot send headers), served with HTTP Range so Safari plays video and seeking works.
+- **Limits (database mode):** photos <= 8 MB (JPEG/PNG/WebP), videos <= 25 MB (MP4/MOV/WebM), 12 files and 3 videos per order. HEIC is refused (Flutter web cannot decode it; iOS Safari converts on pick). Override with `MEDIA_MAX_IMAGE_MB` / `MEDIA_MAX_VIDEO_MB`; the Flutter constants in `MediaRules` mirror the server.
+- **Cost of DB storage:** every photo grows Postgres (Neon's free tier is small) and its backups, and an upload holds the file in a Render worker's memory. Run `python manage.py purge_old_media --days 30` (closed orders) and `purge_orphan_media --hours 24` (abandoned carts) on a schedule. Give gunicorn `--timeout 120` so a slow phone upload is not killed at the 30 s default.
+- Media is not part of the XLSX/JSON export; a `pg_dump` backup includes it.
+
 ### Email + password sign-in (added 2026-10-07)
 
 Alongside Google, the login screen's Email/Password and Sign In / Create Account tabs are real (`backend/api/password_auth.py`, `lib/screens/auth_link_screens.dart`).

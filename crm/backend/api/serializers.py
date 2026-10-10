@@ -6,7 +6,7 @@ from rest_framework import serializers
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem, OrderAuditLog,
     OrderStatus, Expense, Credit, CreditCategory, Staff, Attendance, SalaryPayment, SalaryAdvance,
-    ServiceArea, TimeSlot, MetaSettings, MetaPost, MetaMessage, MetaLead,
+    ServiceArea, TimeSlot, MetaSettings, MetaPost, MetaMessage, MetaLead, OrderMedia,
 )
 from .validators import validate_mobile_10_digit
 
@@ -70,16 +70,56 @@ class OrderAuditLogSerializer(TenantModelSerializer):
         fields = ['id', 'status', 'title', 'detail', 'created_at']
 
 
+class OrderMediaSerializer(TenantModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrderMedia
+        fields = ['id', 'kind', 'content_type', 'original_name', 'size', 'status', 'url', 'created_at']
+        read_only_fields = fields
+
+    def get_url(self, obj):
+        if obj.status != OrderMedia.READY:
+            return None
+        from .media_storage import get_storage
+        return get_storage().read_url(obj, self.context.get('request'))
+
+
 class OrderSerializer(TenantModelSerializer):
     items = OrderItemSerializer(many=True)
     audit_log = OrderAuditLogSerializer(many=True, read_only=True)
     is_overdue = serializers.BooleanField(read_only=True)
     assigned_agent_name = serializers.CharField(source='assigned_agent.name', read_only=True, default=None)
+    media = OrderMediaSerializer(many=True, read_only=True)
+    # Ids of uploaded (READY, unattached) photos/videos to attach to this order.
+    media_ids = serializers.ListField(child=serializers.UUIDField(), write_only=True, required=False)
 
     class Meta:
         model = Order
         fields = '__all__'
         read_only_fields = ['order_number', 'shop']
+
+    def validate_media_ids(self, ids):
+        from .media_storage import MAX_FILES_PER_ORDER, MAX_VIDEOS_PER_ORDER
+        ids = list(dict.fromkeys(ids))
+        found = list(OrderMedia.objects.filter(
+            id__in=ids, status=OrderMedia.READY, order__isnull=True))
+        if len(found) != len(ids):
+            raise serializers.ValidationError('Some photos or videos are missing or already used. Re-add them.')
+        existing = self.instance.media.all() if self.instance is not None else []
+        total = len(found) + len(existing)
+        videos = sum(1 for m in [*found, *existing] if m.kind == 'VIDEO')
+        if total > MAX_FILES_PER_ORDER:
+            raise serializers.ValidationError(f'At most {MAX_FILES_PER_ORDER} photos/videos per order.')
+        if videos > MAX_VIDEOS_PER_ORDER:
+            raise serializers.ValidationError(f'At most {MAX_VIDEOS_PER_ORDER} videos per order.')
+        return ids
+
+    @staticmethod
+    def _attach_media(order, ids):
+        if ids:
+            OrderMedia.objects.filter(
+                id__in=ids, status=OrderMedia.READY, order__isnull=True).update(order=order)
 
     def validate_customer_phone(self, value):
         if value:
@@ -91,6 +131,7 @@ class OrderSerializer(TenantModelSerializer):
         from django.utils import timezone
 
         items_data = validated_data.pop('items', [])
+        media_ids = validated_data.pop('media_ids', [])
         user = getattr(self.context.get('request'), 'user', None)
         if getattr(user, 'role', None) == 'customer' and getattr(user, 'customer', None):
             # A customer orders for themselves: no delivery charge, no discount,
@@ -125,11 +166,15 @@ class OrderSerializer(TenantModelSerializer):
             order.total_amount = order.subtotal + order.delivery_charge - order.discount_amount
         order.due_amount = max(order.total_amount - order.paid_amount, 0.0)
         order.save()
+        self._attach_media(order, media_ids)
         return order
 
     def update(self, instance, validated_data):
         validated_data.pop('items', None)
-        return super().update(instance, validated_data)
+        media_ids = validated_data.pop('media_ids', [])
+        order = super().update(instance, validated_data)
+        self._attach_media(order, media_ids)
+        return order
 
 
 class ExpenseSerializer(TenantModelSerializer):

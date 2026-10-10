@@ -566,7 +566,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     pagination_class = StandardPagination
 
     def get_queryset(self):
-        qs = Order.objects.prefetch_related('items').all().order_by('-created_at')
+        qs = Order.objects.prefetch_related('items', 'media').all().order_by('-created_at')
         # A signed-in customer only ever sees orders whose phone matches theirs
         # (last 10 digits, so +91 / spaces / dashes don't matter).
         user = self.request.user

@@ -507,6 +507,54 @@ class OrderItem(TenantModel):
 
 # ── Scheduling ────────────────────────────────────────────────────────────────
 
+class MediaKind(models.TextChoices):
+    IMAGE = 'IMAGE', 'Image'
+    VIDEO = 'VIDEO', 'Video'
+
+
+class OrderMedia(TenantModel):
+    """A photo or video of the garments, taken when the order is received.
+
+    The bytes live in object storage (Cloudflare R2 in production, local disk in
+    development) under `storage_key`; this row is the metadata. A row starts
+    PENDING when the client asks for an upload slot, becomes READY once the
+    upload is verified, and is attached to its order when the order is placed.
+    Unattached rows are garbage-collected by `purge_orphan_media`.
+    """
+    PENDING = 'PENDING'
+    READY = 'READY'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='order_media', db_index=True)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, null=True, blank=True, related_name='media')
+    kind = models.CharField(max_length=10, choices=MediaKind.choices)
+    content_type = models.CharField(max_length=100)
+    original_name = models.CharField(max_length=255, blank=True, default='')
+    size = models.BigIntegerField(default=0)
+    storage_key = models.CharField(max_length=300, unique=True)
+    status = models.CharField(max_length=10, default=PENDING)
+    created_by = models.CharField(max_length=180, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.kind} {self.original_name or self.id}"
+
+
+class OrderMediaBlob(models.Model):
+    """The bytes of an [OrderMedia] when it is stored in the database.
+
+    Kept in its own table so listing media or orders never drags file contents
+    into memory: the blob is only touched by the upload/serve views, and ranges
+    are read with SQL SUBSTRING rather than loading the whole value.
+    """
+    media = models.OneToOneField(
+        OrderMedia, on_delete=models.CASCADE, primary_key=True, related_name='blob')
+    data = models.BinaryField()
+
+
 class ServiceArea(TenantModel):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='service_areas', db_index=True)
     name = models.CharField(max_length=180)
