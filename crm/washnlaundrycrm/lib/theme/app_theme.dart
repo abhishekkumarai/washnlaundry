@@ -17,6 +17,10 @@ class AppColors {
   static const borderSubtle = Color(0xFFECE9E2);
   static const danger = Color(0xFFDC2626);
   static const success = Color(0xFF10B981); // "active" / on
+
+  /// Bars in the dashboard revenue chart. Same green as [success], named
+  /// separately so the chart can be re-coloured without touching status chips.
+  static const chartBar = success;
 }
 
 /// Typography tokens calibrated for mobile viewports and compact tile layouts.

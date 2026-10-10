@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../models/garment_model.dart';
 import '../providers/app_provider.dart';
+import '../theme/app_theme.dart';
 import 'panel_card.dart';
 
 /// "Revenue — last 14 days".
@@ -150,7 +151,7 @@ class RevenueChartCard extends StatelessWidget {
                             // A day with no revenue still draws a stub, so the
                             // axis reads as 14 days rather than a gap.
                             toY: val == 0 ? 4 : val,
-                            color: const Color(0xFF182C4F),
+                            color: AppColors.chartBar,
                             width: 12,
                             borderRadius: const BorderRadius.only(
                               topLeft: Radius.circular(4),

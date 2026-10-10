@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:washnlaundrycrm/models/order_model.dart';
 import 'package:washnlaundrycrm/providers/app_provider.dart';
 import 'package:washnlaundrycrm/screens/scan_screen.dart';
+import 'package:washnlaundrycrm/theme/app_theme.dart';
 import 'package:washnlaundrycrm/widgets/kpi_cards_row.dart';
 import 'package:washnlaundrycrm/widgets/order_pipeline_card.dart';
 import 'package:washnlaundrycrm/widgets/receipt_dialog.dart';
@@ -154,6 +155,12 @@ void main() {
       expect(groups, hasLength(14));
       expect(groups.first.barRods.first.toY, 10.0);
       expect(groups.last.barRods.first.toY, 140.0);
+
+      // KAN-182: the bars are green, taken from the shared token.
+      for (final g in groups) {
+        expect(g.barRods.first.color, AppColors.chartBar);
+      }
+      expect(AppColors.chartBar, const Color(0xFF10B981));
 
       // The axis follows the series' own days, not a hardcoded 16..29.
       expect(find.text('1'), findsOneWidget);

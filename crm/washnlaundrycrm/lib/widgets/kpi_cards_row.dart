@@ -76,104 +76,109 @@ class KpiCardsRow extends StatelessWidget {
       },
     ];
 
+    // One inline row at every width. When the five cards fit at their minimum
+    // width they share the row equally; below that the row scrolls sideways
+    // instead of wrapping onto extra lines or squeezing the text.
     return LayoutBuilder(
       builder: (context, constraints) {
-        final screenWidth = MediaQuery.sizeOf(context).width;
-        int crossAxisCount = 5;
-        if (constraints.maxWidth < 1100 && constraints.maxWidth >= 700) {
-          crossAxisCount = 3;
-        } else if (constraints.maxWidth < 700 &&
-            (constraints.maxWidth >= 280 || screenWidth >= 340)) {
-          crossAxisCount = 2;
-        } else if (constraints.maxWidth < 280 && screenWidth < 340) {
-          crossAxisCount = 1;
+        final needed = cards.length * _minCardWidth + (cards.length - 1) * _gap;
+        final fits = !constraints.hasBoundedWidth || constraints.maxWidth >= needed;
+
+        Widget row(Widget Function(Map<String, dynamic>) wrap) => IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < cards.length; i++) ...[
+                    if (i > 0) const SizedBox(width: _gap),
+                    wrap(cards[i]),
+                  ],
+                ],
+              ),
+            );
+
+        if (fits) {
+          return row((c) => Expanded(child: _buildCard(c)));
         }
-
-        final isCompact = constraints.maxWidth < 700;
-
-        if (crossAxisCount == 5) {
-          return Row(
-            children: cards
-                .map((c) => Expanded(
-                        child: Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: _buildCard(c, isCompact: false),
-                    )))
-                .toList(),
-          );
-        }
-
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: cards
-              .map((c) => SizedBox(
-                    width: (constraints.maxWidth - (crossAxisCount - 1) * 12) /
-                        crossAxisCount,
-                    child: _buildCard(c, isCompact: isCompact),
-                  ))
-              .toList(),
+        return SingleChildScrollView(
+          key: const ValueKey('kpi-scroll'),
+          scrollDirection: Axis.horizontal,
+          child: row((c) => SizedBox(width: _scrollCardWidth, child: _buildCard(c))),
         );
       },
     );
   }
 
-  Widget _buildCard(Map<String, dynamic> c, {bool isCompact = false}) {
+  /// Smallest a card may get while the five still share the row.
+  static const double _minCardWidth = 112;
+
+  /// Card width once the row scrolls (a little wider so labels stay readable).
+  static const double _scrollCardWidth = 132;
+  static const double _gap = 8;
+
+  /// Compact card: icon + title on one line, the figure, then the delta. Text
+  /// ellipsises and the figure scales down, so a long rupee amount or a long
+  /// label can never overflow the card.
+  Widget _buildCard(Map<String, dynamic> c) {
     return Container(
-      padding: EdgeInsets.all(isCompact ? 11 : 18),
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(isCompact ? 12 : 16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFE4E0D8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: isCompact ? 28 : 32,
-                height: isCompact ? 28 : 32,
+                width: 22,
+                height: 22,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: c['iconBg'] as Color,
-                  borderRadius: BorderRadius.circular(isCompact ? 6 : 8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Icon(c['icon'] as IconData,
-                    size: isCompact ? 24 : 18, color: c['iconColor'] as Color),
+                    size: 14, color: c['iconColor'] as Color),
               ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   c['title'] as String,
-                  textAlign: TextAlign.end,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      fontSize: isCompact ? 11 : 12,
+                  style: const TextStyle(
+                      fontSize: 11,
                       fontWeight: FontWeight.w500,
-                      color: const Color(0xFF64748B)),
+                      color: Color(0xFF64748B)),
                 ),
               ),
             ],
           ),
-          SizedBox(height: isCompact ? 10 : 14),
-          Text(
-            c['value'] as String,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-                fontSize: isCompact ? 19 : 26,
-                fontWeight: FontWeight.bold,
-                letterSpacing: isCompact ? -0.4 : 0,
-                color: const Color(0xFF141A24),
-                height: 1.1),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              c['value'] as String,
+              maxLines: 1,
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.3,
+                  color: Color(0xFF141A24),
+                  height: 1.1),
+            ),
           ),
-          SizedBox(height: isCompact ? 6 : 8),
+          const SizedBox(height: 3),
           Text(
             c['subtext'] as String,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: isCompact ? 10.5 : 11,
+              fontSize: 10,
               fontWeight: FontWeight.w600,
               color: c['subtextColor'] as Color,
             ),

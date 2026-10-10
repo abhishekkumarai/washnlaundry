@@ -266,7 +266,7 @@ void main() {
   }
 
   group('Mobile compact tile layouts and grid density (KAN-151)', () {
-    testWidgets('KpiCardsRow renders in 2-column grid on mobile (360px)', (tester) async {
+    testWidgets('KpiCardsRow stays on one scrolling row on mobile (360px)', (tester) async {
       final provider = createSeededProvider();
       await tester.pumpWidget(
         MaterialApp(
@@ -283,10 +283,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final wrap = tester.widget<Wrap>(find.byType(Wrap));
-      expect(wrap.children.length, 5);
-      final firstSizedBox = wrap.children.first as SizedBox;
-      expect(firstSizedBox.width, 174.0);
+      // KAN-181: no wrapping onto extra rows any more - one inline row that
+      // scrolls sideways when the five cards don't fit.
+      expect(find.byType(Wrap), findsNothing);
+      expect(find.byKey(const ValueKey('kpi-scroll')), findsOneWidget);
     });
 
     testWidgets('Dashboard scroll view has 16px padding on narrow viewport', (tester) async {
