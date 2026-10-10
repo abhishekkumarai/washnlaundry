@@ -689,6 +689,10 @@ def seed():
     clear_all()
     for cfg in SHOPS:
         seed_shop(cfg)
+    # Demo photos/videos on the most recent orders of each shop.
+    from api.sample_media import attach_sample_media
+    for shop in Shop.objects.all():
+        attach_sample_media(shop, limit=8)
     print(f"\n[SUCCESS] Seeded {Shop.objects.count()} demo shops: " + ', '.join(Shop.objects.values_list('name', flat=True)))
 
 
