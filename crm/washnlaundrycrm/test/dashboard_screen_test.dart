@@ -5,6 +5,8 @@ import 'package:washnlaundrycrm/models/order_model.dart';
 import 'package:washnlaundrycrm/providers/app_provider.dart';
 import 'package:washnlaundrycrm/screens/dashboard_screen.dart';
 
+import 'support_offline_http.dart';
+
 /// Until this file, `DashboardScreen` and every side panel it composes
 /// (`NeedsAttentionCard`, `OrderChannelsCard`,
 /// `StaffAttendanceCard`, `StoreHealthCard`, `RevenueAnalyticsCard`) were
@@ -161,7 +163,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('a failed load shows Retry, not a blank dashboard', (tester) async {
+    testWidgets('a failed load shows Try Again, not a blank dashboard', (tester) async {
       // There is no server reachable in this test environment (same gap
       // noted throughout this suite for order/customer/expense creation), so
       // `loadDataFromBackend` always ends in its `catch` branch here — this
@@ -170,17 +172,22 @@ void main() {
       // between isn't asserted: the failure resolves within the same
       // microtask flush a single `pump()` performs, the same reason
       // `payroll_test.dart`'s History dialog only checks the settled state.
-      final provider = AppProvider(autoLoad: false);
-      await tester.pumpWidget(host(provider));
-      await provider.loadDataFromBackend();
-      await tester.pump();
+      //
+      // The "no server" is now explicit: HTTP is mocked to fail, so this no
+      // longer flakes when a real backend (e.g. the Docker one on :8000) is up.
+      await withOfflineHttp(() async {
+        final provider = AppProvider(autoLoad: false);
+        await tester.pumpWidget(host(provider));
+        await provider.loadDataFromBackend();
+        await tester.pump();
 
-      expect(find.text('Retry'), findsOneWidget);
-      expect(tester.takeException(), isNull);
+        expect(find.text('Try Again'), findsOneWidget);
+        expect(tester.takeException(), isNull);
 
-      await tester.tap(find.text('Retry'));
-      await tester.pump();
-      expect(tester.takeException(), isNull);
+        await tester.tap(find.text('Try Again'));
+        await tester.pump();
+        expect(tester.takeException(), isNull);
+      });
     });
 
     testWidgets('narrow width: panels default expanded and collapse on tap',

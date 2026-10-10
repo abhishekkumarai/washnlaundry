@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:washnlaundrycrm/services/api_service.dart';
 
+import 'support_offline_http.dart';
+
 /// `ApiService` had zero direct unit coverage before this file — every
 /// screen/provider test that touches it does so indirectly through
 /// `AppProvider`. There is no mock HTTP client wired into this suite (see
@@ -11,9 +13,8 @@ import 'package:washnlaundrycrm/services/api_service.dart';
 /// contract: it's the one `AppProvider`'s every `try { ... } on ApiException`
 /// depends on to fail gracefully instead of crashing the screen.
 void main() {
-  Future<void> expectApiException(Future<void> Function() call) async {
-    await expectLater(call(), throwsA(isA<ApiException>()));
-  }
+  Future<void> expectApiException(Future<void> Function() call) =>
+      withOfflineHttp(() => expectLater(call(), throwsA(isA<ApiException>())));
 
   group('ApiService surfaces ApiException, not a raw platform error', () {
     test('fetchDashboardStats', () => expectApiException(ApiService.fetchDashboardStats));
