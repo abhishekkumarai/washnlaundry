@@ -1,13 +1,35 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
 import '../providers/auth_provider.dart';
-import 'panel_card.dart';
 import 'shop_onboarding_dialog.dart';
 import 'sidebar_navigation.dart';
+
+/// Extracts strictly the first two letters of a shop name for avatar display in the modal.
+/// Examples:
+/// - "WashNLaundry" -> "WA"
+/// - "Downtown Cleaners" -> "DO"
+/// - "A & B" -> "AB"
+/// - "Shop" -> "SH"
+/// - "S" -> "S"
+/// - "" or null -> "?"
+String shopAvatarLetters(String? name) {
+  final cleaned = (name ?? '').trim();
+  if (cleaned.isEmpty) return '?';
+  final letters = RegExp(r'[\p{L}\p{N}]', unicode: true)
+      .allMatches(cleaned)
+      .map((m) => m.group(0)!)
+      .join();
+  if (letters.isEmpty) {
+    return cleaned.length <= 2 ? cleaned.toUpperCase() : cleaned.substring(0, 2).toUpperCase();
+  }
+  return letters.length <= 2
+      ? letters.toUpperCase()
+      : letters.substring(0, 2).toUpperCase();
+}
+
 
 /// Displays the Instagram/Craft-style account switching sheet,
 /// constrained strictly to the navbar/sidebar width and anchored to the bottom-left.
@@ -34,7 +56,7 @@ void showShopSwitchModalSheet(BuildContext context, {double? width}) {
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Switch Account',
-    barrierColor: Colors.black.withOpacity(0.25),
+    barrierColor: Colors.black.withValues(alpha: 0.25),
     transitionDuration: const Duration(milliseconds: 180),
     transitionBuilder: (dialogContext, anim1, anim2, child) {
       return SlideTransition(
@@ -58,7 +80,7 @@ void showShopSwitchModalSheet(BuildContext context, {double? width}) {
               border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 18,
                   offset: const Offset(2, -4),
                 ),
@@ -78,12 +100,14 @@ void showShopSwitchModalSheet(BuildContext context, {double? width}) {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            'Switch Account',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF64748B),
+                          const Expanded(
+                            child: Text(
+                              'Switch Account',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B),
+                              ),
                             ),
                           ),
                           InkWell(
@@ -142,9 +166,9 @@ void showShopSwitchModalSheet(BuildContext context, {double? width}) {
                                             ? const Color(0xFFDBEAFE)
                                             : const Color(0xFFF1EFEA),
                                         child: Text(
-                                          initialsFor(name),
+                                          shopAvatarLetters(name),
                                           style: TextStyle(
-                                            fontSize: 11,
+                                            fontSize: 12,
                                             fontWeight: FontWeight.bold,
                                             color: isSelected
                                                 ? const Color(0xFF2563EB)
