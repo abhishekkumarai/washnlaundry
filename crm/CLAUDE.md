@@ -145,6 +145,7 @@ New Order -> Review step has a "Photos & videos (optional)" card; the order deta
 - **Limits (database mode):** photos <= 8 MB (JPEG/PNG/WebP), videos <= 25 MB (MP4/MOV/WebM), 12 files and 3 videos per order. HEIC is refused (Flutter web cannot decode it; iOS Safari converts on pick). Override with `MEDIA_MAX_IMAGE_MB` / `MEDIA_MAX_VIDEO_MB`; the Flutter constants in `MediaRules` mirror the server.
 - **Cost of DB storage:** every photo grows Postgres (Neon's free tier is small) and its backups, and an upload holds the file in a Render worker's memory. Run `python manage.py purge_old_media --days 30` (closed orders) and `purge_orphan_media --hours 24` (abandoned carts) on a schedule. Give gunicorn `--timeout 120` so a slow phone upload is not killed at the 30 s default.
 - Media is not part of the XLSX/JSON export; a `pg_dump` backup includes it.
+- **Demo data:** `python manage.py seed_order_media [--shop SLUG] [--orders N]` attaches sample photos and a short video (committed under `api/seed_media/`) to the most recent orders that have none; it is repeatable and non-destructive, and `seed_db.py` calls it for each shop.
 
 ### Email + password sign-in (added 2026-10-07)
 
