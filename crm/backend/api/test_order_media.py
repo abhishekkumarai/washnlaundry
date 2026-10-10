@@ -236,3 +236,45 @@ class R2StorageTests(TestCase):
         self.assertIn('X-Amz-Expires=900', target['url'])
         self.assertIn('acct.r2.cloudflarestorage.com/wnl-media/', read)
         self.assertIn('X-Amz-Expires=3600', read)
+
+
+class SeedOrderMediaTests(TestCase):
+    """The demo-data command and its committed sample files."""
+
+    def setUp(self):
+        self.shop = Shop.objects.create(name='Seed Shop', slug='seed-shop')
+        with tenant_context(self.shop):
+            for i in range(5):
+                Order.objects.create(customer_name=f'C{i}', customer_phone='')
+
+    def test_sample_files_are_real_and_within_the_upload_rules(self):
+        from api.sample_media import PHOTOS, SEED_DIR, VIDEO
+        for name in PHOTOS:
+            data = (SEED_DIR / name).read_bytes()
+            self.assertEqual(data[:3], b'\xff\xd8\xff', name)  # JPEG
+            self.assertLess(len(data), ms.max_bytes_for('IMAGE'))
+        video = (SEED_DIR / VIDEO).read_bytes()
+        self.assertEqual(video[4:8], b'ftyp')  # MP4
+        self.assertLess(len(video), ms.max_bytes_for('VIDEO'))
+
+    def test_command_attaches_media_and_serves_it(self):
+        call_command('seed_order_media', '--shop', 'seed-shop', '--orders', '3', stdout=StringIO())
+        with_media = Order.all_objects.filter(shop=self.shop, media__isnull=False).distinct()
+        self.assertEqual(with_media.count(), 3)
+        first = OrderMedia.all_objects.filter(shop=self.shop, kind='VIDEO').first()
+        self.assertIsNotNone(first)
+        self.assertEqual(first.status, OrderMedia.READY)
+        self.assertGreater(OrderMediaBlob.objects.get(pk=first.pk).data.__len__(), 1000)
+        # and it comes back through the API like any upload
+        res = self.client.get('/api/orders/', HTTP_X_TENANT_ID='seed-shop')
+        body = res.json()
+        rows = body.get('results', body) if isinstance(body, dict) else body
+        self.assertTrue(any(o['media'] for o in rows))
+
+    def test_command_is_repeatable_and_skips_orders_that_have_media(self):
+        call_command('seed_order_media', '--shop', 'seed-shop', '--orders', '2', stdout=StringIO())
+        before = OrderMedia.all_objects.filter(shop=self.shop).count()
+        call_command('seed_order_media', '--shop', 'seed-shop', '--orders', '2', stdout=StringIO())
+        # the second run picked two *other* orders, never doubled up the first two
+        self.assertEqual(Order.all_objects.filter(shop=self.shop, media__isnull=False).distinct().count(), 4)
+        self.assertGreater(OrderMedia.all_objects.filter(shop=self.shop).count(), before)

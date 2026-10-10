@@ -45,6 +45,10 @@ class _CreditsScreenState extends State<CreditsScreen> {
   String get _monthLabel =>
       '${_monthNames[_selectedMonth.month - 1]} ${_selectedMonth.year}';
 
+  /// "Oct 2026" for the cramped phone toolbar.
+  String get _monthLabelShort =>
+      '${_monthNames[_selectedMonth.month - 1].substring(0, 3)} ${_selectedMonth.year}';
+
   void _stepMonth(int delta) {
     setState(() {
       _selectedMonth =
@@ -148,10 +152,8 @@ class _CreditsScreenState extends State<CreditsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _titleRow(narrow, visible),
-                        const SizedBox(height: 16),
-                        _monthNav(),
-                        const SizedBox(height: 16),
+                        _toolbar(narrow),
+                        const SizedBox(height: 12),
                         _summaryRow(monthTotal, total, monthFiltered.length),
                         const SizedBox(height: 20),
                         if (categories.isNotEmpty) ...[
@@ -171,28 +173,29 @@ class _CreditsScreenState extends State<CreditsScreen> {
     );
   }
 
-  Widget _titleRow(bool narrow, List<CreditModel> visible) {
-    const titleBlock = Expanded(
-      child: Text(
-          'Log shop incoming credits, advance deposits, investments, & misc income',
-          style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-    );
-
+  /// Month stepper, search and the add button on one line (no description
+  /// line above), so the page doesn't spend a row on empty space.
+  Widget _toolbar(bool narrow) {
     if (narrow) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      return Row(
         children: [
-          const Text(
-              'Log shop incoming credits, advance deposits, investments, & misc income',
-              style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                flex: 80,
-                child: _searchField(),
+          _monthNav(compact: true),
+          const SizedBox(width: 8),
+          Expanded(child: _searchField(compact: true)),
+          const SizedBox(width: 8),
+          SizedBox(
+            height: 38,
+            width: 42,
+            child: FilledButton(
+              onPressed: _showAddCredit,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
-            ],
+              child: const Icon(Icons.add_rounded, size: 20),
+            ),
           ),
         ],
       );
@@ -200,8 +203,9 @@ class _CreditsScreenState extends State<CreditsScreen> {
 
     return Row(
       children: [
-        titleBlock,
-        SizedBox(width: 240, child: _searchField()),
+        _monthNav(),
+        const SizedBox(width: 14),
+        Expanded(child: _searchField()),
         const SizedBox(width: 14),
         FilledButton.icon(
           onPressed: _showAddCredit,
@@ -218,11 +222,11 @@ class _CreditsScreenState extends State<CreditsScreen> {
     );
   }
 
-  Widget _searchField() {
+  Widget _searchField({bool compact = false}) {
     return SizedBox(
       height: 38,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12),
         decoration: BoxDecoration(
           color: const Color(0xFFF1EFEA),
           borderRadius: BorderRadius.circular(10),
@@ -237,9 +241,12 @@ class _CreditsScreenState extends State<CreditsScreen> {
                 onChanged: (v) => setState(() => _searchQuery = v),
                 style: const TextStyle(fontSize: 13),
                 textAlign: TextAlign.center,
-                decoration: const InputDecoration(
-                  hintText: 'Search by title, category, or method...',
-                  hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                decoration: InputDecoration(
+                  hintText: compact
+                      ? 'Search'
+                      : 'Search by title, category, or method...',
+                  hintStyle:
+                      const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -251,13 +258,15 @@ class _CreditsScreenState extends State<CreditsScreen> {
     );
   }
 
-  Widget _monthNav() {
+  Widget _monthNav({bool compact = false}) {
     return Row(
       key: const Key('creditMonthNav'),
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
           tooltip: 'Previous month',
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 36),
           icon: const Icon(Icons.chevron_left_rounded, size: 22),
           onPressed: () => _stepMonth(-1),
           visualDensity: VisualDensity.compact,
@@ -268,10 +277,11 @@ class _CreditsScreenState extends State<CreditsScreen> {
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: compact ? 4 : 8),
         Flexible(
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding:
+                EdgeInsets.symmetric(horizontal: compact ? 8 : 12, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(8),
@@ -280,12 +290,14 @@ class _CreditsScreenState extends State<CreditsScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.calendar_today_rounded,
-                    size: 14, color: Color(0xFF10B981)),
-                const SizedBox(width: 8),
+                if (!compact) ...[
+                  const Icon(Icons.calendar_today_rounded,
+                      size: 14, color: Color(0xFF10B981)),
+                  const SizedBox(width: 8),
+                ],
                 Flexible(
                   child: Text(
-                    _monthLabel,
+                    compact ? _monthLabelShort : _monthLabel,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 13,
@@ -298,9 +310,11 @@ class _CreditsScreenState extends State<CreditsScreen> {
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: compact ? 4 : 8),
         IconButton(
           tooltip: 'Next month',
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 36),
           icon: const Icon(Icons.chevron_right_rounded, size: 22),
           onPressed: () => _stepMonth(1),
           visualDensity: VisualDensity.compact,

@@ -29,6 +29,17 @@ class ShopSerializer(serializers.ModelSerializer):
 class CustomerSerializer(TenantModelSerializer):
     avg_order_value = serializers.FloatField(read_only=True)
     delivered_due_amount = serializers.FloatField(read_only=True)
+    has_app_login = serializers.SerializerMethodField()
+
+    def get_has_app_login(self, obj):
+        """True when the owner has issued this customer a sign-in (shop membership)."""
+        email = (obj.email or '').strip()
+        if not email or not obj.shop_id:
+            return False
+        from .models import ShopMembership, ShopRole
+        return ShopMembership.objects.filter(
+            user__username__iexact=email, shop_id=obj.shop_id,
+            role=ShopRole.CUSTOMER, is_active=True).exists()
 
     class Meta:
         model = Customer

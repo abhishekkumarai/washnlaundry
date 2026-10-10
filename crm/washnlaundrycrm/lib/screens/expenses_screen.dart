@@ -30,16 +30,31 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
   static const _monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
 
   String get _monthLabel =>
       '${_monthNames[_selectedMonth.month - 1]} ${_selectedMonth.year}';
 
+  /// "Oct 2026" for the cramped phone toolbar.
+  String get _monthLabelShort =>
+      '${_monthNames[_selectedMonth.month - 1].substring(0, 3)} ${_selectedMonth.year}';
+
   void _stepMonth(int delta) {
     setState(() {
-      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + delta);
+      _selectedMonth =
+          DateTime(_selectedMonth.year, _selectedMonth.month + delta);
       // A category chip from the old month may not exist in the new one —
       // left as-is, filtering by it would silently show an empty list with
       // no chip visibly selected to explain why.
@@ -80,9 +95,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 e.date!.month == _selectedMonth.month))
         .toList();
 
-    final categories = <String>{for (final e in monthFiltered) e.category}
-        .toList()
-      ..sort();
+    final categories =
+        <String>{for (final e in monthFiltered) e.category}.toList()..sort();
     final query = _searchQuery.trim().toLowerCase();
     final visible = monthFiltered.where((e) {
       final matchesCategory = _category == 'All' || e.category == _category;
@@ -104,7 +118,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         body: Column(
           children: [
             // No action button here — the in-page "Add Expense" button in
-            // _titleRow below is the one, pre-existing control for this;
+            // _toolbar below is the one, pre-existing control for this;
             // giving the header its own copy would just be a second button
             // doing the same job (the same redundant-duplicate pattern this
             // codebase has already caught and removed on Services and
@@ -120,10 +134,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _titleRow(narrow, visible),
-                        const SizedBox(height: 16),
-                        _monthNav(),
-                        const SizedBox(height: 16),
+                        _toolbar(narrow),
+                        const SizedBox(height: 12),
                         _summaryRow(monthTotal, total, monthFiltered.length),
                         const SizedBox(height: 20),
                         if (categories.isNotEmpty) ...[
@@ -143,44 +155,29 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  Widget _titleRow(bool narrow, List<ExpenseModel> visible) {
-    const titleBlock = Expanded(
-      child: Text('Log shop operational expenses, rent, detergents, & repairs',
-          style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-    );
-
+  /// Month stepper, search and the add button on one line (no description
+  /// line above), so the page doesn't spend a row on empty space.
+  Widget _toolbar(bool narrow) {
     if (narrow) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      return Row(
         children: [
-          const Text(
-              'Log shop operational expenses, rent, detergents, & repairs',
-              style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                flex: 80,
-                child: _searchField(),
+          _monthNav(compact: true),
+          const SizedBox(width: 8),
+          Expanded(child: _searchField(compact: true)),
+          const SizedBox(width: 8),
+          SizedBox(
+            height: 38,
+            width: 42,
+            child: FilledButton(
+              onPressed: _showAddExpense,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF182C4F),
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 20,
-                child: SizedBox(
-                  height: 38,
-                  child: FilledButton(
-                    onPressed: _showAddExpense,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF182C4F),
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Icon(Icons.add_rounded, size: 20),
-                  ),
-                ),
-              ),
-            ],
+              child: const Icon(Icons.add_rounded, size: 20),
+            ),
           ),
         ],
       );
@@ -188,8 +185,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
     return Row(
       children: [
-        titleBlock,
-        SizedBox(width: 240, child: _searchField()),
+        _monthNav(),
+        const SizedBox(width: 14),
+        Expanded(child: _searchField()),
         const SizedBox(width: 14),
         FilledButton.icon(
           onPressed: _showAddExpense,
@@ -206,11 +204,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  Widget _searchField() {
+  Widget _searchField({bool compact = false}) {
     return SizedBox(
       height: 38,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12),
         decoration: BoxDecoration(
           color: const Color(0xFFF1EFEA),
           borderRadius: BorderRadius.circular(10),
@@ -225,10 +223,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 onChanged: (v) => setState(() => _searchQuery = v),
                 style: const TextStyle(fontSize: 13),
                 textAlign: TextAlign.center,
-                decoration: const InputDecoration(
-                  hintText: 'Search by title, category, or method...',
+                decoration: InputDecoration(
+                  hintText: compact
+                      ? 'Search'
+                      : 'Search by title, category, or method...',
                   hintStyle:
-                      TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                      const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -242,7 +242,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   /// Chevron month stepper — same pattern as Payroll's, so switching which
   /// month's expenses are shown reads the same way across both screens.
-  Widget _monthNav() {
+  Widget _monthNav({bool compact = false}) {
     return Container(
       key: const Key('expenseMonthNav'),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -257,10 +257,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           IconButton(
             icon: const Icon(Icons.chevron_left_rounded, size: 20),
             tooltip: 'Previous month',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 36),
             onPressed: () => _stepMonth(-1),
           ),
           Text(
-            _monthLabel,
+            compact ? _monthLabelShort : _monthLabel,
             style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
@@ -269,6 +271,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           IconButton(
             icon: const Icon(Icons.chevron_right_rounded, size: 20),
             tooltip: 'Next month',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 36),
             onPressed: () => _stepMonth(1),
           ),
         ],
@@ -672,7 +676,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       controller: notesController,
                       style: const TextStyle(fontSize: 13),
                       maxLines: 2,
-                      decoration: _fieldDecoration('Additional details, receipt ref, etc.'),
+                      decoration: _fieldDecoration(
+                          'Additional details, receipt ref, etc.'),
                     ),
                     if (error != null) ...[
                       const SizedBox(height: 10),

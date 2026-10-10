@@ -340,107 +340,6 @@ void main() {
     });
   });
 
-  group('ServicesScreen service areas', () {
-    testWidgets('renders the areas the backend returned', (tester) async {
-      final provider = _seeded(serviceAreas: [
-        ServiceAreaModel.fromJson({'id': 1, 'name': 'HBR Layout'}),
-        ServiceAreaModel.fromJson({'id': 2, 'name': 'Banaswadi'}),
-      ]);
-      await tester.pumpWidget(host(provider, const ServicesScreen()));
-      await tester.pump();
-      await openTab(tester, 'Service Areas');
-
-      // These used to be a local list that started empty regardless of the API.
-      expect(find.text('HBR Layout'), findsOneWidget);
-      expect(find.text('Banaswadi'), findsOneWidget);
-      expect(find.text('No areas added yet'), findsNothing);
-    });
-
-    testWidgets('a duplicate area is rejected without a request',
-        (tester) async {
-      final provider = _seeded(serviceAreas: [
-        ServiceAreaModel.fromJson({'id': 1, 'name': 'HBR Layout'}),
-      ]);
-      await tester.pumpWidget(host(provider, const ServicesScreen()));
-      await tester.pump();
-      await openTab(tester, 'Service Areas');
-
-      await tester.enterText(
-          find.widgetWithText(TextField, 'Enter area name'), 'hbr layout');
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
-      await tester.pump();
-
-      expect(find.text('"hbr layout" is already a service area'), findsOneWidget);
-    });
-
-    testWidgets('an empty area name is rejected', (tester) async {
-      await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
-      await tester.pump();
-      await openTab(tester, 'Service Areas');
-
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
-      await tester.pump();
-
-      expect(find.text('Enter an area name'), findsOneWidget);
-    });
-  });
-
-  group('ServicesScreen time slots', () {
-    final slots = [
-      TimeSlotModel.fromJson({
-        'id': 1,
-        'kind': 'PICKUP',
-        'start_time': '09:00:00',
-        'end_time': '11:00:00',
-        'capacity': null,
-        'is_active': true,
-      }),
-      TimeSlotModel.fromJson({
-        'id': 2,
-        'kind': 'PICKUP',
-        'start_time': '14:00:00',
-        'end_time': '16:00:00',
-        'capacity': 20,
-        'is_active': false,
-      }),
-    ];
-
-    testWidgets('renders the slots the backend returned', (tester) async {
-      await tester.pumpWidget(
-          host(_seeded(pickupSlots: slots), const ServicesScreen()));
-      await tester.pump();
-      await openTab(tester, 'Pickup');
-
-      expect(find.text('9:00 AM - 11:00 AM'), findsOneWidget);
-      expect(find.text('2:00 PM - 4:00 PM'), findsOneWidget);
-      // Once on the null-capacity row, once as the Capacity field's own hint.
-      expect(find.text('Unlimited'), findsNWidgets(2));
-      expect(find.text('20'), findsOneWidget);
-    });
-
-    testWidgets('an empty schedule says so instead of showing fake slots',
-        (tester) async {
-      await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
-      await tester.pump();
-      await openTab(tester, 'Pickup');
-
-      // The screen used to ship four hardcoded slots on every account.
-      expect(find.text('No time slots added yet'), findsOneWidget);
-      expect(find.text('9:00 AM - 11:00 AM'), findsNothing);
-    });
-
-    testWidgets('saving without both times is rejected', (tester) async {
-      await tester.pumpWidget(host(_seeded(), const ServicesScreen()));
-      await tester.pump();
-      await openTab(tester, 'Pickup');
-
-      await tester.tap(find.widgetWithText(ElevatedButton, 'Save'));
-      await tester.pump();
-
-      expect(find.text('Pick a start and an end time'), findsOneWidget);
-    });
-  });
-
   group('ServicesScreen responsive layout', () {
     Future<void> pumpAt(WidgetTester tester, double width) async {
       tester.view
@@ -465,12 +364,13 @@ void main() {
       expect(find.text('Ironing'), findsWidgets);
     });
 
-    testWidgets('the tab bar scrolls horizontally at phone width instead of '
-        'overflowing', (tester) async {
+    testWidgets('has no Items/Service Areas/Pickup/Delivery tab bar',
+        (tester) async {
       await pumpAt(tester, 390);
 
-      expect(find.text('Items'), findsOneWidget);
-      expect(find.text('Service Areas'), findsOneWidget);
+      expect(find.text('Service Areas'), findsNothing);
+      expect(find.text('Pickup'), findsNothing);
+      expect(find.text('Delivery'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   });

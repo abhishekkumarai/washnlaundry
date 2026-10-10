@@ -260,6 +260,97 @@ class CustomerViewSet(viewsets.ModelViewSet):
             )
         return qs
 
+    @action(detail=True, methods=['post', 'delete'], url_path='credentials',
+            permission_classes=[IsOwner])
+    def credentials(self, request, pk=None):
+        """POST   /api/customers/<id>/credentials/ {email, password}
+        DELETE /api/customers/<id>/credentials/
+
+        Owner-issued email + password sign-in for a customer of this shop (they
+        land on the customer-only /my/* views). Same safety rule as staff: a
+        password is only set on an account that exists solely as this
+        customer's login; an email that already belongs to another account
+        (other shop, staff, owner) is linked but its password is left alone.
+        DELETE removes the shop membership and the password sign-in; a
+        customer whose email is on file can still use Google sign-in, as
+        before.
+        """
+        from django.contrib.auth import get_user_model
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.core.validators import validate_email
+
+        customer = self.get_object()
+        shop = customer.shop
+        User = get_user_model()
+
+        def solely_this_customer(user, email):
+            memberships = ShopMembership.objects.filter(user=user)
+            return not (
+                user.is_superuser
+                or memberships.exclude(shop=shop, role=ShopRole.CUSTOMER).exists()
+                or Staff.objects.unscoped().filter(email__iexact=email).exists()
+                or Customer.objects.unscoped().filter(email__iexact=email).exclude(shop=shop).exists()
+            )
+
+        if request.method == 'DELETE':
+            email = (customer.email or '').strip().lower()
+            user = User.objects.filter(username__iexact=email).first() if email else None
+            if user:
+                ShopMembership.objects.filter(user=user, shop=shop, role=ShopRole.CUSTOMER).delete()
+                if solely_this_customer(user, email):
+                    user.set_unusable_password()
+                    user.save(update_fields=['password'])
+            return Response({'has_app_login': False})
+
+        email = str(request.data.get('email') or '').strip().lower()
+        password = str(request.data.get('password') or '')
+        try:
+            validate_email(email)
+        except DjangoValidationError:
+            raise ValidationError({'email': 'Enter a valid email address.'})
+        if not 8 <= len(password) <= 128:
+            raise ValidationError({'password': 'Password must be 8-128 characters.'})
+        if Customer.objects.filter(shop=shop, email__iexact=email).exclude(pk=customer.pk).exists():
+            raise ValidationError({'email': 'Another customer already uses this email.'})
+
+        user = User.objects.filter(username__iexact=email).first()
+        if user is not None and user.is_superuser:
+            raise ValidationError({'email': 'This email cannot be used for customer sign-in.'})
+
+        has_own_password = bool(user and user.password and user.has_usable_password())
+        only_this_customer_membership = bool(user) and (
+            ShopMembership.objects.filter(user=user).count() == 1
+            and ShopMembership.objects.filter(user=user, shop=shop, role=ShopRole.CUSTOMER).exists()
+        )
+        may_set_password = user is None or (
+            solely_this_customer(user, email)
+            and (not has_own_password or only_this_customer_membership)
+        )
+
+        if user is None:
+            user = User(username=email, email=email, is_active=True)
+            user.set_unusable_password()
+            user.save()
+        customer.email = email
+        customer.save()
+        ShopMembership.objects.get_or_create(
+            user=user, shop=shop, defaults={'role': ShopRole.CUSTOMER, 'is_active': True})
+
+        password_set = False
+        if may_set_password:
+            user.set_password(password)
+            user.is_active = True
+            user.save(update_fields=['password', 'is_active'])
+            password_set = True
+
+        return Response({
+            'email': email,
+            'has_app_login': True,
+            'password_set': password_set,
+            'existing_account': not password_set,
+            'password_login_enabled': bool(settings.PASSWORD_AUTH_ENABLED),
+        })
+
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser],
             url_path='import/preview')
     def import_preview(self, request):
@@ -779,6 +870,90 @@ class StaffViewSet(viewsets.ModelViewSet):
         if is_last_owner(instance):
             raise ValidationError('This is the only owner of the shop. Transfer ownership first.')
         instance.delete()
+
+    @action(detail=True, methods=['post', 'delete'], url_path='credentials')
+    def credentials(self, request, pk=None):
+        """POST   /api/staff/<id>/credentials/ {email, password}
+        DELETE /api/staff/<id>/credentials/
+
+        Lets the shop owner give a staff member email + password sign-in to
+        this shop (their role/views come from the Staff row, via the shop
+        membership), or take it away again.
+
+        A password is only ever set on an account that is exclusively tied to
+        this shop (new, or with no sign-in password yet, or whose only
+        membership is this shop). An email that already belongs to someone
+        else's account is linked to the shop but its password is left alone, so
+        an owner can never take over an account that exists elsewhere.
+        """
+        from django.contrib.auth import get_user_model
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.core.validators import validate_email
+
+        staff = self.get_object()
+        shop = staff.shop
+
+        if request.method == 'DELETE':
+            if is_last_owner(staff):
+                raise ValidationError('This is the only owner of the shop. Transfer ownership first.')
+            staff.has_app_login = False
+            staff.save()  # Staff.save() -> sync_staff_user drops the shop membership
+            return Response({'has_app_login': False})
+
+        email = str(request.data.get('email') or '').strip().lower()
+        password = str(request.data.get('password') or '')
+        try:
+            validate_email(email)
+        except DjangoValidationError:
+            raise ValidationError({'email': 'Enter a valid email address.'})
+        if not 8 <= len(password) <= 128:
+            raise ValidationError({'password': 'Password must be 8-128 characters.'})
+        if Staff.objects.filter(shop=shop, email__iexact=email).exclude(pk=staff.pk).exists():
+            raise ValidationError({'email': 'Another staff member already uses this email.'})
+
+        User = get_user_model()
+        user = User.objects.filter(username__iexact=email).first()
+        if user is not None and user.is_superuser:
+            raise ValidationError({'email': 'This email cannot be used for staff sign-in.'})
+
+        # Decide whether we may set a password BEFORE saving (saving creates the
+        # account and this shop's membership, which would blur the picture).
+        # Only an account that exists solely as this shop's staff login, or that
+        # has no password yet, qualifies: never one with memberships elsewhere,
+        # a customer record, or a real password of its own.
+        memberships = ShopMembership.objects.filter(user=user) if user else ShopMembership.objects.none()
+        has_own_password = bool(user and user.password and user.has_usable_password())
+        belongs_elsewhere = bool(user) and (
+            memberships.exclude(shop=shop).exists()
+            or Customer.objects.unscoped().filter(email__iexact=email).exists()
+        )
+        only_this_shop_staff = bool(user) and (
+            memberships.count() == 1
+            and memberships.filter(shop=shop, role=ShopRole.STAFF).exists()
+        )
+        may_set_password = not belongs_elsewhere and (
+            user is None or not has_own_password or only_this_shop_staff
+        )
+
+        staff.email = email
+        staff.has_app_login = True
+        staff.save()  # creates the User (if new) and this shop's membership
+
+        password_set = False
+        if may_set_password:
+            user = User.objects.filter(username__iexact=email).first()
+            user.set_password(password)
+            user.is_active = True
+            user.save(update_fields=['password', 'is_active'])
+            password_set = True
+
+        return Response({
+            'email': email,
+            'has_app_login': True,
+            'password_set': password_set,
+            'existing_account': not password_set,
+            'password_login_enabled': bool(settings.PASSWORD_AUTH_ENABLED),
+        })
 
 
 class AttendanceViewSet(viewsets.ModelViewSet):

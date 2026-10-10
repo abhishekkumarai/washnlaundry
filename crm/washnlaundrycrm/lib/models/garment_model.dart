@@ -150,6 +150,9 @@ class CustomerModel {
   final double avgOrderValue;
   final DateTime? createdAt;
 
+  /// True when the owner has issued this customer an email + password sign-in.
+  final bool hasAppLogin;
+
   const CustomerModel({
     required this.id,
     required this.name,
@@ -163,6 +166,7 @@ class CustomerModel {
     this.deliveredDueAmount = 0,
     this.avgOrderValue = 0,
     this.createdAt,
+    this.hasAppLogin = false,
   });
 
   factory CustomerModel.fromJson(Map<String, dynamic> json) {
@@ -176,9 +180,12 @@ class CustomerModel {
       totalOrders: json['total_orders'] ?? 0,
       totalSpent: (json['total_spent'] ?? 0).toDouble(),
       dueAmount: (json['due_amount'] ?? 0).toDouble(),
-      deliveredDueAmount: ((json['delivered_due_amount'] ?? json['due_amount']) ?? 0).toDouble(),
+      deliveredDueAmount:
+          ((json['delivered_due_amount'] ?? json['due_amount']) ?? 0)
+              .toDouble(),
       avgOrderValue: (json['avg_order_value'] ?? 0).toDouble(),
       createdAt: DateTime.tryParse(json['created_at'] ?? ''),
+      hasAppLogin: json['has_app_login'] == true,
     );
   }
 

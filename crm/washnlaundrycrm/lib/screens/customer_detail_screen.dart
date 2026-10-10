@@ -69,7 +69,8 @@ class CustomerDetailScreen extends StatelessWidget {
       body: AppShell(
         body: LayoutBuilder(
           builder: (context, constraints) {
-            final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
+            final narrow =
+                constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
             return Column(
               children: [
                 narrow ? _narrowHeader(context) : _header(context),
@@ -271,7 +272,7 @@ class CustomerDetailScreen extends StatelessWidget {
 
     if (narrow) {
       return Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         decoration: _panel,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,17 +280,19 @@ class CustomerDetailScreen extends StatelessWidget {
             Row(
               children: [
                 CircleAvatar(
-                  radius: 26,
+                  radius: 20,
                   backgroundColor: const Color(0xFF182C4F),
                   child: Text(
-                    customer.name.isNotEmpty ? customer.name[0].toUpperCase() : 'C',
+                    customer.name.isNotEmpty
+                        ? customer.name[0].toUpperCase()
+                        : 'C',
                     style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Colors.white),
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,19 +300,22 @@ class CustomerDetailScreen extends StatelessWidget {
                       Text(customer.name,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF141A24))),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 1),
                       Text(
-                        customer.phone.isEmpty ? 'No phone on file' : customer.phone,
+                        customer.phone.isEmpty
+                            ? 'No phone on file'
+                            : customer.phone,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                            const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                        style: const TextStyle(
+                            fontSize: 13, color: Color(0xFF64748B)),
                       ),
                       if (since != null) ...[
                         const SizedBox(height: 2),
-                        Text('Member since ${DateFormat('MMM yyyy').format(since)}',
+                        Text(
+                            'Member since ${DateFormat('MMM yyyy').format(since)}',
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                                 fontSize: 12, color: Color(0xFF94A3B8))),
@@ -329,22 +335,22 @@ class CustomerDetailScreen extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: _panel,
       child: Row(
         children: [
           CircleAvatar(
-            radius: 28,
+            radius: 22,
             backgroundColor: const Color(0xFF182C4F),
             child: Text(
               customer.name.isNotEmpty ? customer.name[0].toUpperCase() : 'C',
               style: const TextStyle(
-                  fontSize: 22,
+                  fontSize: 17,
                   fontWeight: FontWeight.bold,
                   color: Colors.white),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,10 +358,10 @@ class CustomerDetailScreen extends StatelessWidget {
                 Text(customer.name,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 17,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF141A24))),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   customer.phone.isEmpty ? 'No phone on file' : customer.phone,
                   overflow: TextOverflow.ellipsis,
@@ -385,12 +391,12 @@ class CustomerDetailScreen extends StatelessWidget {
         final isMobile = constraints.maxWidth < 640 || screenWidth < 640;
         final perRow = (constraints.maxWidth < 280 && screenWidth < 340)
             ? 1
-            : constraints.maxWidth < 950
+            : constraints.maxWidth < 480
                 ? 2
-                : constraints.maxWidth < 1250
+                : constraints.maxWidth < 760
                     ? 3
                     : 5;
-        final gap = isMobile ? 12.0 : 16.0;
+        final gap = isMobile ? 8.0 : 12.0;
         final width = (constraints.maxWidth - gap * (perRow - 1)) / perRow;
 
         final cards = [
@@ -432,7 +438,7 @@ class CustomerDetailScreen extends StatelessWidget {
   Widget _kpi(String label, String value, IconData icon, Color color,
       {bool isCompact = false}) {
     return Container(
-      padding: EdgeInsets.all(isCompact ? 11 : 16),
+      padding: EdgeInsets.all(isCompact ? 9 : 12),
       decoration: _panel,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -440,12 +446,12 @@ class CustomerDetailScreen extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: EdgeInsets.all(isCompact ? 6 : 7),
+                padding: EdgeInsets.all(isCompact ? 5 : 6),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, size: isCompact ? 15 : 16, color: color),
+                child: Icon(icon, size: isCompact ? 13 : 14, color: color),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -453,18 +459,18 @@ class CustomerDetailScreen extends StatelessWidget {
                   label,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      fontSize: isCompact ? 11 : 12,
+                      fontSize: isCompact ? 10.5 : 11.5,
                       color: const Color(0xFF64748B)),
                 ),
               ),
             ],
           ),
-          SizedBox(height: isCompact ? 8 : 12),
+          SizedBox(height: isCompact ? 5 : 8),
           Text(
             value,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-                fontSize: isCompact ? 19 : 22,
+                fontSize: isCompact ? 16 : 18,
                 fontWeight: FontWeight.bold,
                 letterSpacing: isCompact ? -0.4 : 0,
                 color: const Color(0xFF141A24)),
@@ -633,7 +639,7 @@ class CustomerDetailScreen extends StatelessWidget {
   /// the full phone width instead of half a desktop screen.
   Widget _orderCard(OrderModel o) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -698,7 +704,7 @@ class CustomerDetailScreen extends StatelessWidget {
 
   Widget _contactCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: _panel,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

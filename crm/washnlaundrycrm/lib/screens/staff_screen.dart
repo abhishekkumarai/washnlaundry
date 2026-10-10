@@ -9,6 +9,7 @@ import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/sidebar_navigation.dart';
+import '../widgets/staff_credentials_dialog.dart';
 import '../utils/money.dart';
 
 class StaffScreen extends StatefulWidget {
@@ -83,6 +84,21 @@ class _StaffScreenState extends State<StaffScreen> {
           ? '${member['name']} reactivated'
           : '${member['name']} marked inactive',
     );
+  }
+
+  Future<void> _showCredentials(
+      BuildContext context, Map<String, dynamic> member) async {
+    final provider = context.read<AppProvider>();
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (_) => StaffCredentialsDialog(
+        staffId: member['id'] as String,
+        staffName: member['name'] as String,
+        initialEmail: (member['email'] as String?) ?? '',
+        hasAppLogin: member['hasAppLogin'] == true,
+      ),
+    );
+    if (changed == true) await provider.refresh();
   }
 
   List<Map<String, dynamic>> get _filteredStaff {
@@ -1007,6 +1023,9 @@ class _StaffScreenState extends State<StaffScreen> {
                                                   } else if (value ==
                                                       'status') {
                                                     _toggleActive(context, s);
+                                                  } else if (value == 'login') {
+                                                    _showCredentials(
+                                                        context, s);
                                                   }
                                                 },
                                                 itemBuilder: (_) => [
@@ -1050,6 +1069,33 @@ class _StaffScreenState extends State<StaffScreen> {
                                                                 const TextStyle(
                                                                     fontSize:
                                                                         13)),
+                                                        PopupMenuItem(
+                                                          value: 'login',
+                                                          child: Row(
+                                                            children: [
+                                                              Icon(
+                                                                  s['hasAppLogin'] ==
+                                                                          true
+                                                                      ? Icons
+                                                                          .key_rounded
+                                                                      : Icons
+                                                                          .lock_open_rounded,
+                                                                  size: 16,
+                                                                  color: const Color(
+                                                                      0xFF64748B)),
+                                                              const SizedBox(
+                                                                  width: 10),
+                                                              Text(
+                                                                  s['hasAppLogin'] ==
+                                                                          true
+                                                                      ? 'Manage sign-in'
+                                                                      : 'Enable sign-in',
+                                                                  style: const TextStyle(
+                                                                      fontSize:
+                                                                          13)),
+                                                            ],
+                                                          ),
+                                                        ),
                                                       ],
                                                     ),
                                                   ),
@@ -1281,6 +1327,8 @@ class _StaffScreenState extends State<StaffScreen> {
                         _showStaffModal(context, existing: s);
                       } else if (value == 'status') {
                         _toggleActive(context, s);
+                      } else if (value == 'login') {
+                        _showCredentials(context, s);
                       }
                     },
                     itemBuilder: (_) => [
@@ -1309,6 +1357,25 @@ class _StaffScreenState extends State<StaffScreen> {
                             ),
                             const SizedBox(width: 10),
                             Text(isActive ? 'Mark inactive' : 'Reactivate',
+                                style: const TextStyle(fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'login',
+                        child: Row(
+                          children: [
+                            Icon(
+                                s['hasAppLogin'] == true
+                                    ? Icons.key_rounded
+                                    : Icons.lock_open_rounded,
+                                size: 16,
+                                color: const Color(0xFF64748B)),
+                            const SizedBox(width: 10),
+                            Text(
+                                s['hasAppLogin'] == true
+                                    ? 'Manage sign-in'
+                                    : 'Enable sign-in',
                                 style: const TextStyle(fontSize: 13)),
                           ],
                         ),

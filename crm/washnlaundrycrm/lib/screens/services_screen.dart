@@ -19,35 +19,9 @@ class ServicesScreen extends StatefulWidget {
 }
 
 class _ServicesScreenState extends State<ServicesScreen> {
-  int _selectedTopTab = 0; // 0: Items, 1: Service Areas, 2: Pickup, 3: Delivery
+  int _selectedTopTab = 0; // Items is the only view now
   int _selectedCategoryIndex = 0;
   String _searchQuery = '';
-
-  final TextEditingController _areaController = TextEditingController();
-
-  // Pickup & Delivery "add slot" form state. The slots themselves live on the
-  // provider — these three fields are only the half-filled form above the list.
-  String? _pickupStartTime;
-  String? _pickupEndTime;
-  final TextEditingController _pickupCapacityController =
-      TextEditingController();
-  int _pickupBuffer = 0;
-
-  String? _deliveryStartTime;
-  String? _deliveryEndTime;
-  final TextEditingController _deliveryCapacityController =
-      TextEditingController();
-  int _deliveryBuffer = 0;
-
-  /// 15-minute increments from 6:00 AM to 10:00 PM, matching the live app's
-  /// start/end selects (LIVE_AUDIT.md).
-  static final List<String> _timeOptions = List.generate(
-    ((22 - 6) * 60) ~/ 15 + 1,
-    (i) => TimeSlotModel.formatTime(
-      '${(6 + (i * 15) ~/ 60).toString().padLeft(2, '0')}:'
-      '${((i * 15) % 60).toString().padLeft(2, '0')}:00',
-    ),
-  );
 
   // Presentation only — the catalogue itself comes from the API. Keyed by the
   // category's `icon` string (what the seed writes, and what the New Service
@@ -155,43 +129,45 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   @override
   void dispose() {
-    _areaController.dispose();
-    _pickupCapacityController.dispose();
-    _deliveryCapacityController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     _syncFromProvider(context.watch<AppProvider>());
-    final isMobile = MediaQuery.sizeOf(context).width < SidebarNavigation.contentWideBreakpoint;
+    final isMobile = MediaQuery.sizeOf(context).width <
+        SidebarNavigation.contentWideBreakpoint;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
-      floatingActionButton: (isMobile && _selectedTopTab == 0 && _categories.isNotEmpty)
-          ? FloatingActionButton.extended(
-              onPressed: () => _showAddItemModal(context),
-              backgroundColor: const Color(0xFF182C4F),
-              elevation: 4,
-              icon: const Icon(Icons.add, color: Colors.white, size: 20),
-              label: const Text(
-                'Add Item',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            )
-          : null,
+      floatingActionButton:
+          (isMobile && _selectedTopTab == 0 && _categories.isNotEmpty)
+              ? FloatingActionButton.extended(
+                  onPressed: () => _showAddItemModal(context),
+                  backgroundColor: const Color(0xFF182C4F),
+                  elevation: 4,
+                  icon: const Icon(Icons.add, color: Colors.white, size: 20),
+                  label: const Text(
+                    'Add Item',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                )
+              : null,
       body: AppShell(
         body: LayoutBuilder(
           builder: (context, constraints) {
             final provider = context.watch<AppProvider>();
             if (provider.hasError && provider.categories.isEmpty) {
               return ErrorState(
-                statusCode: provider.error != null && provider.error!.contains('not found') ? 404 : 500,
+                statusCode: provider.error != null &&
+                        provider.error!.contains('not found')
+                    ? 404
+                    : 500,
                 title: 'Error loading services',
                 message: provider.error!,
                 onRetry: () => provider.refresh(),
@@ -202,11 +178,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
               return const LoadingState();
             }
 
-            final narrow = constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
+            final narrow =
+                constraints.maxWidth < SidebarNavigation.contentWideBreakpoint;
             return Column(
               children: [
                 narrow ? _buildNarrowHeader() : _buildHeader(),
-                _buildTabBar(narrow),
                 Expanded(child: _buildBody(narrow)),
               ],
             );
@@ -240,13 +216,19 @@ class _ServicesScreenState extends State<ServicesScreen> {
           if (_selectedTopTab == 0) ...[
             OutlinedButton.icon(
               onPressed: _showDefaultServicesPreviewModal,
-              icon: const Icon(Icons.auto_awesome_rounded, size: 14, color: Color(0xFF0F766E)),
+              icon: const Icon(Icons.auto_awesome_rounded,
+                  size: 14, color: Color(0xFF0F766E)),
               label: const Text('Default Services',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F766E))),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFF0F766E)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
             ),
             const SizedBox(width: 12),
@@ -312,8 +294,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 child: Text(
                   '${_categories.length} Items · ${_categories.fold<int>(0, (sum, c) => sum + (c['count'] as int))} items',
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF94A3B8)),
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                 ),
               ),
             ],
@@ -356,85 +338,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
     );
   }
 
-  Widget _buildTabBar(bool narrow) {
-    final tabs = [
-      _buildTab(0, Icons.checkroom_outlined, 'Items'),
-      _buildTab(1, Icons.location_on_outlined, 'Service Areas'),
-      _buildTab(2, Icons.access_time_rounded, 'Pickup'),
-      _buildTab(3, Icons.local_shipping_outlined, 'Delivery'),
-    ];
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.symmetric(horizontal: narrow ? 16 : 24, vertical: 10),
-      // ListView, not a plain Row: at phone width the 4 pills (one with a
-      // 2-word label) no longer fit — same reasoning as Staff's sub-tab bar.
-      child: narrow
-          ? SizedBox(
-              height: 38,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: tabs.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, i) => tabs[i],
-              ),
-            )
-          : Row(
-              children: [
-                for (var i = 0; i < tabs.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 8),
-                  tabs[i],
-                ],
-              ],
-            ),
-    );
-  }
-
-  Widget _buildTab(int index, IconData icon, String label) {
-    final sel = _selectedTopTab == index;
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: () => setState(() => _selectedTopTab = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: sel ? const Color(0xFFEFF6FF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-              color: sel ? const Color(0xFF182C4F) : const Color(0xFFE4E0D8)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon,
-                size: 15,
-                color: sel ? const Color(0xFF182C4F) : const Color(0xFF64748B)),
-            const SizedBox(width: 6),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: sel ? FontWeight.w600 : FontWeight.w500,
-                    color: sel
-                        ? const Color(0xFF182C4F)
-                        : const Color(0xFF334155))),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBody(bool narrow) {
-    switch (_selectedTopTab) {
-      case 0:
-        return _buildItemsView(narrow);
-      case 1:
-        return _buildServiceAreasView();
-      case 2:
-        return _buildScheduleView(isPickup: true, narrow: narrow);
-      case 3:
-        return _buildScheduleView(isPickup: false, narrow: narrow);
-      default:
-        return _buildItemsView(narrow);
-    }
-  }
+  Widget _buildBody(bool narrow) => _buildItemsView(narrow);
 
   // ─── TAB 1: Items ───────────────────────────────────────────────────
   Widget _buildItemsView(bool narrow) {
@@ -462,21 +366,19 @@ class _ServicesScreenState extends State<ServicesScreen> {
           ),
           Expanded(
             child: ListView.builder(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               itemCount: _categories.length,
               itemBuilder: (ctx, i) {
                 final c = _categories[i];
                 final sel = _selectedCategoryIndex == i;
                 return InkWell(
-      borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8),
                   onTap: () => setState(() => _selectedCategoryIndex = i),
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 6),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color:
-                          sel ? const Color(0xFFEFF6FF) : Colors.transparent,
+                      color: sel ? const Color(0xFFEFF6FF) : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                           color: sel
@@ -508,8 +410,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                           : const Color(0xFF141A24))),
                               Text('${c['count']} items',
                                   style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Color(0xFF64748B))),
+                                      fontSize: 11, color: Color(0xFF64748B))),
                             ],
                           ),
                         ),
@@ -534,7 +435,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: InkWell(
-      borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(8),
               onTap: () => _showAddCategoryModal(context),
               child: const Row(
                 children: [
@@ -595,7 +496,9 @@ class _ServicesScreenState extends State<ServicesScreen> {
         narrow ? 16 : 24,
         narrow ? 16 : 24,
         narrow ? 16 : 24,
-        narrow ? 84 : 24, // Extra bottom padding for mobile floating action button
+        narrow
+            ? 84
+            : 24, // Extra bottom padding for mobile floating action button
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -622,7 +525,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                         color: Color(0xFF141A24))),
               ),
               InkWell(
-      borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8),
                 onTap: () => _showAddItemModal(context),
                 child: const Row(
                   children: [
@@ -824,8 +727,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
             flex: 2,
             child: Text(item['unit'] as String,
                 overflow: TextOverflow.ellipsis,
-                style:
-                    const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
           ),
           Expanded(
             flex: 2,
@@ -925,7 +827,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
                         color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF182C4F),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8)),
                   elevation: 0,
@@ -933,7 +836,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
               ),
               OutlinedButton.icon(
                 onPressed: _showDefaultServicesPreviewModal,
-                icon: const Icon(Icons.auto_awesome_rounded, size: 16, color: Color(0xFF0F766E)),
+                icon: const Icon(Icons.auto_awesome_rounded,
+                    size: 16, color: Color(0xFF0F766E)),
                 label: const Text('Load Standard Laundromat Services',
                     style: TextStyle(
                         fontSize: 13,
@@ -941,7 +845,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
                         color: Color(0xFF0F766E))),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF0F766E)),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8)),
                 ),
@@ -1013,8 +918,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
               ),
               Text('${cat['count']} items in ${cat['title']}',
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF64748B))),
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
             ],
           ),
         ),
@@ -1025,42 +930,39 @@ class _ServicesScreenState extends State<ServicesScreen> {
       icon: const Icon(Icons.more_vert_rounded,
           size: 18, color: Color(0xFF64748B)),
       tooltip: 'More actions',
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          onSelected: (action) {
-            if (action == 'edit') {
-              _showEditCategoryModal(context, cat);
-            } else if (action == 'delete') {
-              _showDeleteCategoryConfirm(context, cat);
-            }
-          },
-          itemBuilder: (ctx) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit_outlined,
-                      size: 16, color: Color(0xFF64748B)),
-                  SizedBox(width: 8),
-                  Text('Edit category', style: TextStyle(fontSize: 13)),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete_outline_rounded,
-                      size: 16, color: Color(0xFFDC2626)),
-                  SizedBox(width: 8),
-                  Text('Delete category',
-                      style:
-                          TextStyle(fontSize: 13, color: Color(0xFFDC2626))),
-                ],
-              ),
-            ),
-          ],
-        );
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      onSelected: (action) {
+        if (action == 'edit') {
+          _showEditCategoryModal(context, cat);
+        } else if (action == 'delete') {
+          _showDeleteCategoryConfirm(context, cat);
+        }
+      },
+      itemBuilder: (ctx) => [
+        const PopupMenuItem(
+          value: 'edit',
+          child: Row(
+            children: [
+              Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)),
+              SizedBox(width: 8),
+              Text('Edit category', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline_rounded,
+                  size: 16, color: Color(0xFFDC2626)),
+              SizedBox(width: 8),
+              Text('Delete category',
+                  style: TextStyle(fontSize: 13, color: Color(0xFFDC2626))),
+            ],
+          ),
+        ),
+      ],
+    );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -1155,8 +1057,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                           Icon(Icons.edit_outlined,
                               size: 15, color: Color(0xFF64748B)),
                           SizedBox(width: 8),
-                          Text('Edit item',
-                              style: TextStyle(fontSize: 13)),
+                          Text('Edit item', style: TextStyle(fontSize: 13)),
                         ],
                       ),
                     ),
@@ -1169,8 +1070,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
                           SizedBox(width: 8),
                           Text('Delete item',
                               style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFFDC2626))),
+                                  fontSize: 13, color: Color(0xFFDC2626))),
                         ],
                       ),
                     ),
@@ -1315,62 +1215,60 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   bottom: 8,
                   right: 8,
                   child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.1),
-                                blurRadius: 4),
-                          ],
-                        ),
-                        child: PopupMenuButton<String>(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.more_vert_rounded,
-                              size: 15, color: Color(0xFF64748B)),
-                          tooltip: 'Item options',
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          onSelected: (action) {
-                            if (action == 'edit') {
-                              _showEditItemModal(context, item);
-                            } else if (action == 'delete') {
-                              _showDeleteItemConfirm(context, item);
-                            }
-                          },
-                          itemBuilder: (ctx) => [
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.edit_outlined,
-                                      size: 15, color: Color(0xFF64748B)),
-                                  SizedBox(width: 8),
-                                  Text('Edit item',
-                                      style: TextStyle(fontSize: 13)),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.delete_outline_rounded,
-                                      size: 15, color: Color(0xFFDC2626)),
-                                  SizedBox(width: 8),
-                                  Text('Delete item',
-                                      style: TextStyle(
-                                          fontSize: 13,
-                                          color: Color(0xFFDC2626))),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 4),
+                      ],
                     ),
+                    child: PopupMenuButton<String>(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.more_vert_rounded,
+                          size: 15, color: Color(0xFF64748B)),
+                      tooltip: 'Item options',
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      onSelected: (action) {
+                        if (action == 'edit') {
+                          _showEditItemModal(context, item);
+                        } else if (action == 'delete') {
+                          _showDeleteItemConfirm(context, item);
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined,
+                                  size: 15, color: Color(0xFF64748B)),
+                              SizedBox(width: 8),
+                              Text('Edit item', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline_rounded,
+                                  size: 15, color: Color(0xFFDC2626)),
+                              SizedBox(width: 8),
+                              Text('Delete item',
+                                  style: TextStyle(
+                                      fontSize: 13, color: Color(0xFFDC2626))),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -1446,163 +1344,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
     );
   }
 
-  // ─── TAB 2: Service Areas ───────────────────────────────────────────
-  Widget _buildServiceAreasView() {
-    final areas = context.watch<AppProvider>().serviceAreas;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE4E0D8)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.location_on_outlined,
-                      size: 20, color: Color(0xFF182C4F)),
-                ),
-                const SizedBox(width: 14),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Service Areas',
-                        style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF141A24))),
-                    Text('Areas where you offer pickup/delivery',
-                        style:
-                            TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Detect location button
-            OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.near_me_rounded,
-                  size: 15, color: Color(0xFF182C4F)),
-              label: const Text('Detect My Location',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF182C4F))),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFF182C4F)),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // Input + Add row
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    height: 42,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFE4E0D8)),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: TextField(
-                      controller: _areaController,
-                      style: const TextStyle(fontSize: 13),
-                      decoration: const InputDecoration(
-                        hintText: 'Enter area name',
-                        hintStyle:
-                            TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                        border: InputBorder.none,
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton.icon(
-                  onPressed: () => _addServiceArea(areas),
-                  icon: const Icon(Icons.add, size: 15, color: Colors.white),
-                  label: const Text('Add',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF182C4F),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    elevation: 0,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Areas list / empty state
-            if (areas.isEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 48),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8F7F5),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Column(
-                  children: [
-                    Icon(Icons.location_off_outlined,
-                        size: 40, color: Color(0xFF94A3B8)),
-                    SizedBox(height: 10),
-                    Text('No areas added yet',
-                        style:
-                            TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-                  ],
-                ),
-              )
-            else
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: areas
-                    .map((a) => Chip(
-                          label: Text(a.name,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF182C4F))),
-                          backgroundColor: const Color(0xFFEFF6FF),
-                          deleteIcon: const Icon(Icons.close_rounded,
-                              size: 15, color: Color(0xFF182C4F)),
-                          onDeleted: () => _deleteServiceArea(a),
-                        ))
-                    .toList(),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Red SnackBar carrying the provider's message. Every write on this screen
-  /// routes failures through here — the previous code closed dialogs silently.
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1619,553 +1360,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
     );
   }
 
-  Future<void> _addServiceArea(List<ServiceAreaModel> existing) async {
-    final name = _areaController.text.trim();
-    if (name.isEmpty) {
-      _showError('Enter an area name');
-      return;
-    }
-    if (existing.any((a) => a.name.toLowerCase() == name.toLowerCase())) {
-      _showError('"$name" is already a service area');
-      return;
-    }
-
-    final provider = context.read<AppProvider>();
-    final ok = await provider.addServiceArea({
-      'name': name,
-      'pin_code': '',
-      'is_active': true,
-    });
-    if (!mounted) return;
-    if (ok) {
-      _areaController.clear();
-    } else {
-      _showError(provider.error ?? 'Could not add the service area');
-    }
-  }
-
-  Future<void> _deleteServiceArea(ServiceAreaModel area) async {
-    final provider = context.read<AppProvider>();
-    final ok = await provider.deleteServiceArea(area.id);
-    if (!ok) _showError(provider.error ?? 'Could not remove ${area.name}');
-  }
-
-  // ─── TAB 3 & 4: Pickup / Delivery Schedule ───────────────────────────
-  Widget _buildScheduleView({required bool isPickup, required bool narrow}) {
-    final title = isPickup ? 'Pickup Schedule' : 'Delivery Schedule';
-    final subtitle = isPickup
-        ? 'Time slots for home pickup'
-        : 'Time slots for home delivery';
-    final icon =
-        isPickup ? Icons.access_time_rounded : Icons.local_shipping_outlined;
-    final provider = context.watch<AppProvider>();
-    final slots = isPickup ? provider.pickupSlots : provider.deliverySlots;
-    final startTime = isPickup ? _pickupStartTime : _deliveryStartTime;
-    final endTime = isPickup ? _pickupEndTime : _deliveryEndTime;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE4E0D8)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                          color: const Color(0xFFECFDF5),
-                          borderRadius: BorderRadius.circular(10)),
-                      child:
-                          Icon(icon, size: 20, color: const Color(0xFF10B981)),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title,
-                            style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF141A24))),
-                        Text(subtitle,
-                            style: const TextStyle(
-                                fontSize: 12, color: Color(0xFF64748B))),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text('Changes save automatically.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Buffer section
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE4E0D8)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Buffer (minutes) before slot',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF141A24))),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: 120,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFE4E0D8)),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: TextField(
-                      keyboardType: TextInputType.number,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText:
-                            isPickup ? '$_pickupBuffer' : '$_deliveryBuffer',
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                      ),
-                      onChanged: (v) => setState(() {
-                        if (isPickup)
-                          _pickupBuffer = int.tryParse(v) ?? 0;
-                        else
-                          _deliveryBuffer = int.tryParse(v) ?? 0;
-                      }),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  isPickup
-                      ? 'e.g. 30 = user cannot book 9–10 AM slot after 8:30 AM'
-                      : 'e.g. 30 = user cannot book 9–10 AM slot after 8:30 AM',
-                  style:
-                      const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Add time slot section
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE4E0D8)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Add time slot',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF141A24))),
-                const SizedBox(height: 14),
-                Builder(builder: (context) {
-                  final startField = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Start time',
-                          style: TextStyle(
-                              fontSize: 12, color: Color(0xFF475569))),
-                      const SizedBox(height: 6),
-                      _buildTimeDropdown(
-                        value: startTime,
-                        hint: 'Select start',
-                        onChanged: (v) => setState(() {
-                          if (isPickup) {
-                            _pickupStartTime = v;
-                          } else {
-                            _deliveryStartTime = v;
-                          }
-                        }),
-                      ),
-                    ],
-                  );
-                  final endField = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('End time',
-                          style: TextStyle(
-                              fontSize: 12, color: Color(0xFF475569))),
-                      const SizedBox(height: 6),
-                      _buildTimeDropdown(
-                        value: endTime,
-                        hint: 'Select end',
-                        onChanged: (v) => setState(() {
-                          if (isPickup) {
-                            _pickupEndTime = v;
-                          } else {
-                            _deliveryEndTime = v;
-                          }
-                        }),
-                      ),
-                    ],
-                  );
-                  final capacityField = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Capacity',
-                          style: TextStyle(
-                              fontSize: 12, color: Color(0xFF475569))),
-                      const SizedBox(height: 6),
-                      Container(
-                        height: 42,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFFE4E0D8)),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: TextField(
-                          controller: isPickup
-                              ? _pickupCapacityController
-                              : _deliveryCapacityController,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(fontSize: 13),
-                          decoration: const InputDecoration(
-                            hintText: 'Unlimited',
-                            hintStyle: TextStyle(
-                                fontSize: 13, color: Color(0xFF94A3B8)),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                  final saveButton = ElevatedButton.icon(
-                    onPressed: () =>
-                        _addTimeSlot(isPickup: isPickup, existing: slots),
-                    icon: const Icon(Icons.add, size: 15, color: Colors.white),
-                    label: const Text('Save',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF182C4F),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
-                      minimumSize: const Size(0, 42),
-                    ),
-                  );
-
-                  if (narrow) {
-                    return Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(child: startField),
-                            const SizedBox(width: 12),
-                            Expanded(child: endField),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(child: capacityField),
-                            const SizedBox(width: 12),
-                            saveButton,
-                          ],
-                        ),
-                      ],
-                    );
-                  }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      startField,
-                      const SizedBox(width: 12),
-                      endField,
-                      const SizedBox(width: 12),
-                      Expanded(child: capacityField),
-                      const SizedBox(width: 12),
-                      saveButton,
-                    ],
-                  );
-                }),
-                const SizedBox(height: 8),
-                const Text(
-                    'Max orders per day for this slot; leave empty for unlimited',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Existing slots list
-          if (slots.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE4E0D8)),
-              ),
-              child: const Column(
-                children: [
-                  Icon(Icons.schedule_outlined,
-                      size: 36, color: Color(0xFF94A3B8)),
-                  SizedBox(height: 10),
-                  Text('No time slots added yet',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-                ],
-              ),
-            ),
-          ...slots.asMap().entries.map((e) {
-            final idx = e.key;
-            final slot = e.value;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 1),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                // A uniform border, not a zero-width top edge on inner rows:
-                // Flutter asserts on a hairline border under a border radius.
-                border: Border.all(color: const Color(0xFFE4E0D8)),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(idx == 0 ? 12 : 0),
-                  topRight: Radius.circular(idx == 0 ? 12 : 0),
-                  bottomLeft: Radius.circular(idx == slots.length - 1 ? 12 : 0),
-                  bottomRight:
-                      Radius.circular(idx == slots.length - 1 ? 12 : 0),
-                ),
-              ),
-              child: narrow
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Switch(
-                              value: slot.isActive,
-                              onChanged: (v) => _setSlotActive(slot, v),
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(Icons.access_time_rounded,
-                                size: 16, color: Color(0xFF64748B)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(slot.timeRangeLabel,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF141A24))),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Text('Capacity:',
-                                style: TextStyle(
-                                    fontSize: 12, color: Color(0xFF64748B))),
-                            const SizedBox(width: 4),
-                            Text(slot.capacityLabel,
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF182C4F))),
-                            const Spacer(),
-                            IconButton(
-                                icon: const Icon(Icons.edit_outlined,
-                                    size: 16, color: Color(0xFF64748B)),
-                                onPressed: () {}),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline_rounded,
-                                  size: 16, color: Color(0xFF64748B)),
-                              onPressed: () => _deleteTimeSlot(slot),
-                            ),
-                          ],
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        Switch(
-                          value: slot.isActive,
-                          onChanged: (v) => _setSlotActive(slot, v),
-                        ),
-                        const SizedBox(width: 10),
-                        const Icon(Icons.access_time_rounded,
-                            size: 16, color: Color(0xFF64748B)),
-                        const SizedBox(width: 8),
-                        Text(slot.timeRangeLabel,
-                            style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF141A24))),
-                        const SizedBox(width: 16),
-                        const Text('Capacity:',
-                            style: TextStyle(
-                                fontSize: 12, color: Color(0xFF64748B))),
-                        const SizedBox(width: 4),
-                        Text(slot.capacityLabel,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF182C4F))),
-                        const Spacer(),
-                        IconButton(
-                            icon: const Icon(Icons.edit_outlined,
-                                size: 16, color: Color(0xFF64748B)),
-                            onPressed: () {}),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded,
-                              size: 16, color: Color(0xFF64748B)),
-                          onPressed: () => _deleteTimeSlot(slot),
-                        ),
-                      ],
-                    ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimeDropdown(
-      {required String? value,
-      required String hint,
-      required ValueChanged<String?> onChanged}) {
-    return Container(
-      height: 42,
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFE4E0D8)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          hint: Text(hint,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
-          icon: const Icon(Icons.keyboard_arrow_down_rounded,
-              size: 18, color: Color(0xFF64748B)),
-          items: _timeOptions
-              .map((t) => DropdownMenuItem(
-                  value: t,
-                  child: Text(t, style: const TextStyle(fontSize: 13))))
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _addTimeSlot({
-    required bool isPickup,
-    required List<TimeSlotModel> existing,
-  }) async {
-    final startLabel = isPickup ? _pickupStartTime : _deliveryStartTime;
-    final endLabel = isPickup ? _pickupEndTime : _deliveryEndTime;
-    if (startLabel == null || endLabel == null) {
-      _showError('Pick a start and an end time');
-      return;
-    }
-
-    final start = TimeSlotModel.parseTime(startLabel);
-    final end = TimeSlotModel.parseTime(endLabel);
-    // String comparison is safe here: both are zero-padded "HH:MM:SS".
-    if (start == null || end == null || end.compareTo(start) <= 0) {
-      _showError('End time must be after start time');
-      return;
-    }
-
-    final rawCapacity =
-        (isPickup ? _pickupCapacityController : _deliveryCapacityController)
-            .text
-            .trim();
-    int? capacity;
-    if (rawCapacity.isNotEmpty) {
-      capacity = int.tryParse(rawCapacity);
-      if (capacity == null || capacity < 0) {
-        _showError('Capacity must be a whole number, or empty for unlimited');
-        return;
-      }
-      // The live app treats 0 the same as blank.
-      if (capacity == 0) capacity = null;
-    }
-
-    final kind = isPickup ? TimeSlotModel.pickup : TimeSlotModel.delivery;
-    if (existing.any((s) => s.startTime == start && s.endTime == end)) {
-      _showError('That slot already exists');
-      return;
-    }
-
-    final provider = context.read<AppProvider>();
-    final ok = await provider.addTimeSlot({
-      'kind': kind,
-      'start_time': start,
-      'end_time': end,
-      'capacity': capacity,
-      'is_active': true,
-    });
-    if (!mounted) return;
-    if (!ok) {
-      _showError(provider.error ?? 'Could not add the time slot');
-      return;
-    }
-    setState(() {
-      if (isPickup) {
-        _pickupStartTime = null;
-        _pickupEndTime = null;
-        _pickupCapacityController.clear();
-      } else {
-        _deliveryStartTime = null;
-        _deliveryEndTime = null;
-        _deliveryCapacityController.clear();
-      }
-    });
-  }
-
-  Future<void> _setSlotActive(TimeSlotModel slot, bool active) async {
-    final provider = context.read<AppProvider>();
-    final ok = await provider.updateTimeSlot(slot.id, {'is_active': active});
-    if (!ok) _showError(provider.error ?? 'Could not update the time slot');
-  }
-
-  Future<void> _deleteTimeSlot(TimeSlotModel slot) async {
-    final provider = context.read<AppProvider>();
-    final ok = await provider.deleteTimeSlot(slot.kind, slot.id);
-    if (!ok) _showError(provider.error ?? 'Could not remove the time slot');
-  }
-
-  /// The live modal — "Add New Service / Garment Item". Category, name and
-  /// price are required; unit is a select, so it doesn't have to be guessed
-  /// from free text.
   void _showAddItemModal(BuildContext context) {
     if (_categories.isEmpty) {
       _showError('Please select a service category first');
@@ -3084,12 +2278,14 @@ class _ServicesScreenState extends State<ServicesScreen> {
           return FutureBuilder<List<Map<String, dynamic>>>(
             future: ApiService.fetchDefaultServices(),
             builder: (ctx, snapshot) {
-              final loading = snapshot.connectionState == ConnectionState.waiting;
+              final loading =
+                  snapshot.connectionState == ConnectionState.waiting;
               final catalogue = snapshot.data ?? [];
               final hasError = snapshot.hasError;
 
               return AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
                 title: Row(
                   children: [
                     Container(
@@ -3111,7 +2307,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFF141A24))),
-                          Text('Built-in laundromat price card & garment catalogue',
+                          Text(
+                              'Built-in laundromat price card & garment catalogue',
                               style: TextStyle(
                                   fontSize: 11, color: Color(0xFF64748B))),
                         ],
@@ -3129,27 +2326,34 @@ class _ServicesScreenState extends State<ServicesScreen> {
                         )
                       : hasError
                           ? Center(
-                              child: Text('Failed to load standard services: ${snapshot.error}',
-                                  style: const TextStyle(color: Color(0xFFDC2626))),
+                              child: Text(
+                                  'Failed to load standard services: ${snapshot.error}',
+                                  style: const TextStyle(
+                                      color: Color(0xFFDC2626))),
                             )
                           : ListView.separated(
                               itemCount: catalogue.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 12),
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 12),
                               itemBuilder: (ctx, i) {
                                 final cat = catalogue[i];
                                 final items = (cat['items'] as List?) ?? [];
-                                final iconKey = cat['icon'] as String? ?? 'Shirt';
-                                final style = _categoryStyles[iconKey] ?? _fallbackStyle;
+                                final iconKey =
+                                    cat['icon'] as String? ?? 'Shirt';
+                                final style =
+                                    _categoryStyles[iconKey] ?? _fallbackStyle;
 
                                 return Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFF8F7F5),
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFE4E0D8)),
+                                    border: Border.all(
+                                        color: const Color(0xFFE4E0D8)),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -3157,10 +2361,13 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                             padding: const EdgeInsets.all(6),
                                             decoration: BoxDecoration(
                                               color: style['bg'] as Color,
-                                              borderRadius: BorderRadius.circular(6),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
                                             ),
-                                            child: Icon(style['icon'] as IconData,
-                                                size: 16, color: style['color'] as Color),
+                                            child: Icon(
+                                                style['icon'] as IconData,
+                                                size: 16,
+                                                color: style['color'] as Color),
                                           ),
                                           const SizedBox(width: 10),
                                           Expanded(
@@ -3177,9 +2384,11 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                                 horizontal: 8, vertical: 2),
                                             decoration: BoxDecoration(
                                               color: Colors.white,
-                                              borderRadius: BorderRadius.circular(12),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                               border: Border.all(
-                                                  color: const Color(0xFFE4E0D8)),
+                                                  color:
+                                                      const Color(0xFFE4E0D8)),
                                             ),
                                             child: Text(
                                               '${items.length} items',
@@ -3198,15 +2407,19 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                         children: items.take(8).map((it) {
                                           final name = it['name'] ?? '';
                                           final price = it['price'] ?? 0;
-                                          final unit = it['unit_label'] ?? it['unit'] ?? '';
+                                          final unit = it['unit_label'] ??
+                                              it['unit'] ??
+                                              '';
                                           return Container(
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 8, vertical: 4),
                                             decoration: BoxDecoration(
                                               color: Colors.white,
-                                              borderRadius: BorderRadius.circular(6),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
                                               border: Border.all(
-                                                  color: const Color(0xFFE2E8F0)),
+                                                  color:
+                                                      const Color(0xFFE2E8F0)),
                                             ),
                                             child: Text(
                                               '$name (${Money.format(price)} $unit)',
@@ -3219,17 +2432,22 @@ class _ServicesScreenState extends State<ServicesScreen> {
                                           ..addAll(items.length > 8
                                               ? [
                                                   Container(
-                                                    padding: const EdgeInsets.symmetric(
-                                                        horizontal: 8, vertical: 4),
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4),
                                                     decoration: BoxDecoration(
                                                       color: Colors.white,
-                                                      borderRadius: BorderRadius.circular(6),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              6),
                                                     ),
                                                     child: Text(
                                                       '+${items.length - 8} more',
                                                       style: const TextStyle(
                                                           fontSize: 11,
-                                                          color: Color(0xFF94A3B8)),
+                                                          color: Color(
+                                                              0xFF94A3B8)),
                                                     ),
                                                   )
                                                 ]
@@ -3250,20 +2468,26 @@ class _ServicesScreenState extends State<ServicesScreen> {
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0F766E),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
-                    icon: const Icon(Icons.download_rounded, size: 16, color: Colors.white),
+                    icon: const Icon(Icons.download_rounded,
+                        size: 16, color: Colors.white),
                     label: const Text('Import Defaults to Shop',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold)),
                     onPressed: () async {
                       Navigator.pop(ctx);
                       final provider = context.read<AppProvider>();
                       final ok = await provider.loadDefaultServices();
                       if (ok) {
-                        _showSuccess('Standard laundromat services loaded successfully!');
+                        _showSuccess(
+                            'Standard laundromat services loaded successfully!');
                       } else {
-                        _showError(provider.error ?? 'Failed to load default services');
+                        _showError(provider.error ??
+                            'Failed to load default services');
                       }
                     },
                   ),

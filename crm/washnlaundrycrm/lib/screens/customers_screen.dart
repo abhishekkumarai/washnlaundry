@@ -8,6 +8,7 @@ import '../providers/app_provider.dart';
 import '../utils/navigation.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
+import '../widgets/staff_credentials_dialog.dart';
 import '../widgets/status_pill.dart';
 import '../widgets/load_state.dart';
 import 'customer_detail_screen.dart';
@@ -669,6 +670,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   onSelected: (action) {
                     if (action == 'edit') {
                       _showCustomerDialog(existing: c);
+                    } else if (action == 'login') {
+                      _showCredentials(c);
                     } else if (action == 'delete') {
                       _showDeleteCustomerConfirm(c);
                     }
@@ -682,6 +685,25 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               size: 15, color: Color(0xFF64748B)),
                           SizedBox(width: 8),
                           Text('Edit', style: TextStyle(fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'login',
+                      child: Row(
+                        children: [
+                          Icon(
+                              c.hasAppLogin
+                                  ? Icons.key_rounded
+                                  : Icons.lock_open_rounded,
+                              size: 15,
+                              color: const Color(0xFF64748B)),
+                          const SizedBox(width: 8),
+                          Text(
+                              c.hasAppLogin
+                                  ? 'Manage sign-in'
+                                  : 'Enable sign-in',
+                              style: const TextStyle(fontSize: 13)),
                         ],
                       ),
                     ),
@@ -896,6 +918,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     onSelected: (action) {
                       if (action == 'edit') {
                         _showCustomerDialog(existing: c);
+                      } else if (action == 'login') {
+                        _showCredentials(c);
                       } else if (action == 'delete') {
                         _showDeleteCustomerConfirm(c);
                       }
@@ -909,6 +933,25 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 size: 15, color: Color(0xFF64748B)),
                             SizedBox(width: 8),
                             Text('Edit', style: TextStyle(fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'login',
+                        child: Row(
+                          children: [
+                            Icon(
+                                c.hasAppLogin
+                                    ? Icons.key_rounded
+                                    : Icons.lock_open_rounded,
+                                size: 15,
+                                color: const Color(0xFF64748B)),
+                            const SizedBox(width: 8),
+                            Text(
+                                c.hasAppLogin
+                                    ? 'Manage sign-in'
+                                    : 'Enable sign-in',
+                                style: const TextStyle(fontSize: 13)),
                           ],
                         ),
                       ),
@@ -936,6 +979,21 @@ class _CustomersScreenState extends State<CustomersScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showCredentials(CustomerModel c) async {
+    final provider = context.read<AppProvider>();
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (_) => StaffCredentialsDialog(
+        entity: 'customers',
+        staffId: c.id,
+        staffName: c.name,
+        initialEmail: c.email,
+        hasAppLogin: c.hasAppLogin,
+      ),
+    );
+    if (changed == true) await provider.refresh();
   }
 
   Future<void> _showAddCustomer() => _showCustomerDialog();

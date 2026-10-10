@@ -690,6 +690,27 @@ class ApiService {
     return StaffModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
+  /// Owner-only: gives a staff member or customer (`kind` is 'staff' or
+  /// 'customers') email + password sign-in to this shop.
+  static Future<Map<String, dynamic>> setCredentials(
+      String kind, String id, String email, String password) async {
+    final data = await _send('POST', '/$kind/$id/credentials/',
+        body: {'email': email, 'password': password});
+    return (data as Map).cast<String, dynamic>();
+  }
+
+  /// Owner-only: removes that sign-in again.
+  static Future<void> revokeCredentials(String kind, String id) async {
+    await _send('DELETE', '/$kind/$id/credentials/');
+  }
+
+  static Future<Map<String, dynamic>> setStaffCredentials(
+          String id, String email, String password) =>
+      setCredentials('staff', id, email, password);
+
+  static Future<void> revokeStaffCredentials(String id) =>
+      revokeCredentials('staff', id);
+
   static Future<List<ExpenseModel>> fetchExpenses() async {
     final data = await _send('GET', '/expenses/');
     return _asList(data).map(ExpenseModel.fromJson).toList();

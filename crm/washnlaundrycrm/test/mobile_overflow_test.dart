@@ -330,7 +330,8 @@ void main() {
       final wraps = tester.widgetList<Wrap>(find.byType(Wrap));
       final kpiWrap = wraps.firstWhere((w) => w.children.length == 5);
       final firstCard = kpiWrap.children.first as SizedBox;
-      expect(firstCard.width, 158.0);
+      // Two tiles per row at 360px (gap tightened from 12 to 8).
+      expect(firstCard.width, 160.0);
     });
 
     testWidgets('CreditsScreen summary row renders 2-column grid on mobile (360px)', (tester) async {

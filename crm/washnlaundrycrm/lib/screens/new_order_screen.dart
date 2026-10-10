@@ -101,12 +101,13 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   /// falls back to hourly windows, 9 AM to 10 PM, so a carried order can
   /// still be scheduled.
   List<_SlotWindow> _windowsFor(AppProvider provider, String kind) {
-    final configured =
-        (kind == TimeSlotModel.pickup ? provider.pickupSlots : provider.deliverySlots)
-            .where((s) => s.isActive)
-            .map(_SlotWindow.fromSlot)
-            .whereType<_SlotWindow>()
-            .toList();
+    final configured = (kind == TimeSlotModel.pickup
+            ? provider.pickupSlots
+            : provider.deliverySlots)
+        .where((s) => s.isActive)
+        .map(_SlotWindow.fromSlot)
+        .whereType<_SlotWindow>()
+        .toList();
     if (configured.isNotEmpty) return configured;
     return [
       for (var h = _slotStartHour; h < _slotEndHour; h++)
@@ -201,13 +202,11 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   /// A signed-in customer always books a Home pickup (the other two order
   /// types are hidden for them); everyone else starts on Shop pickup.
-  String get _defaultDeliveryType => _isSelfCustomer
-      ? DeliveryType.homePickup
-      : DeliveryType.storePickup;
+  String get _defaultDeliveryType =>
+      _isSelfCustomer ? DeliveryType.homePickup : DeliveryType.storePickup;
 
   bool get _isSelfCustomer =>
-      context.signedInRoleOnce == 'customer' &&
-      _customer != null;
+      context.signedInRoleOnce == 'customer' && _customer != null;
 
   static const _walkInName = 'Walk-in customer';
   static const _walkInPhone = '';
@@ -421,8 +420,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 ? _buildItemGrid(provider, filteredItems,
                     narrow: true, shrinkWrap: true)
                 : Expanded(
-                    child: _buildItemGrid(provider, filteredItems,
-                        narrow: false)),
+                    child:
+                        _buildItemGrid(provider, filteredItems, narrow: false)),
           ],
         ],
       );
@@ -440,33 +439,33 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           // Cart Header Title — the review step's Order Summary carries its
           // own title instead, as on the live app.
           if (!_showCheckoutReview) ...[
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
-              children: [
-                const Text('Current order',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF141A24))),
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text('$_totalItems',
-                      style: const TextStyle(
-                          fontSize: 11,
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Row(
+                children: [
+                  const Text('Current order',
+                      style: TextStyle(
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF182C4F))),
-                ),
-              ],
+                          color: Color(0xFF141A24))),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text('$_totalItems',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF182C4F))),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 1),
+            const Divider(height: 1),
           ],
 
           if (!_showCheckoutReview) ...[
@@ -574,7 +573,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       body: AppShell(
         body: LayoutBuilder(
           builder: (context, constraints) {
-            if (constraints.maxWidth >= SidebarNavigation.contentWideBreakpoint) {
+            if (constraints.maxWidth >=
+                SidebarNavigation.contentWideBreakpoint) {
               return Row(
                 children: [
                   // Main Center View
@@ -650,8 +650,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                         child: Column(
                           children: [
                             Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 8, 4, 0),
+                              padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
                               child: Row(
                                 children: [
                                   Container(
@@ -803,7 +802,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     // Iterates garments (not _cartItems) so each row has the garment's own id
     // to mutate _cartQuantities directly — the +/- stepper and delete button
     // live here now, not on the item card/table (see _addToCartControl).
-    final inCart = garments.where((g) => (_cartQuantities[g.id] ?? 0) > 0).toList();
+    final inCart =
+        garments.where((g) => (_cartQuantities[g.id] ?? 0) > 0).toList();
     return ListView.separated(
       shrinkWrap: shrinkWrap,
       physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
@@ -850,7 +850,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   icon: const Icon(Icons.remove,
                       size: 14, color: Color(0xFF182C4F)),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  constraints:
+                      const BoxConstraints(minWidth: 28, minHeight: 28),
                   onPressed: () => setState(() {
                     if (qty > 1) {
                       _cartQuantities[g.id] = qty - 1;
@@ -872,7 +873,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   icon:
                       const Icon(Icons.add, size: 14, color: Color(0xFF182C4F)),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  constraints:
+                      const BoxConstraints(minWidth: 28, minHeight: 28),
                   onPressed: () =>
                       setState(() => _cartQuantities[g.id] = qty + 1),
                 ),
@@ -933,16 +935,16 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             ),
           ),
           if (!_isSelfCustomer)
-          TextButton(
-            onPressed: _pickCustomer,
-            child: Text(
-              _customer == null ? 'Add' : 'Change',
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF182C4F)),
+            TextButton(
+              onPressed: _pickCustomer,
+              child: Text(
+                _customer == null ? 'Add' : 'Change',
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF182C4F)),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -956,7 +958,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   /// Review step's header: back arrow, "Review order", and the live app's
   /// 1 Items ✓ — 2 Review — 3 Done stepper (dropped on narrow widths).
   Widget _reviewHeader({required bool showStepper}) {
-    Widget step(String n, String label, {bool done = false, bool active = false}) {
+    Widget step(String n, String label,
+        {bool done = false, bool active = false}) {
       final fill = active ? _brand : Colors.white;
       return Row(
         mainAxisSize: MainAxisSize.min,
@@ -1004,7 +1007,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           onPressed: () => setState(() => _showCheckoutReview = false),
           style: IconButton.styleFrom(
             side: const BorderSide(color: _line),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
           icon: const Icon(Icons.arrow_back_rounded, size: 18, color: _ink),
         ),
@@ -1082,7 +1086,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 Text(_customerName,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600, color: _ink)),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: _ink)),
                 const SizedBox(height: 2),
                 if (_customer != null)
                   Row(
@@ -1104,19 +1110,20 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             ),
           ),
           if (!_isSelfCustomer)
-          OutlinedButton(
-            onPressed: _pickCustomer,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: _brand,
-              side: const BorderSide(color: _line),
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+            OutlinedButton(
+              onPressed: _pickCustomer,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _brand,
+                side: const BorderSide(color: _line),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(_customer == null ? 'Add' : 'Change',
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
             ),
-            child: Text(_customer == null ? 'Add' : 'Change',
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
-          ),
         ],
       ),
     );
@@ -1132,14 +1139,16 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         final today = DateUtils.dateOnly(DateTime.now());
         // `minDate` lets a field start later than today (Delivery date can't
         // be on or before the Pickup date).
-        final first = minDate == null || minDate.isBefore(today) ? today : minDate;
+        final first =
+            minDate == null || minDate.isBefore(today) ? today : minDate;
         final picked = await AppDatePicker.pickDate(
           context: context,
           initialDate: date.isBefore(first) ? first : date,
           firstDate: first,
           lastDate: first.add(const Duration(days: 60)),
         );
-        if (picked != null) setState(() => onPicked(DateUtils.dateOnly(picked)));
+        if (picked != null)
+          setState(() => onPicked(DateUtils.dateOnly(picked)));
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
@@ -1248,8 +1257,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 ),
                 const SizedBox(height: 16),
                 if (!_isCarriedDelivery)
-                  _dateField('Expected ready', _readyBy!,
-                      (d) => _readyBy = d)
+                  _dateField('Expected ready', _readyBy!, (d) => _readyBy = d)
                 else ...[
                   if (isPickup) ...[
                     _dateField('Pickup date', _pickupDate!, (d) {
@@ -1475,42 +1483,42 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               // A signed-in customer sees neither the Discount field nor the
               // Delivery line.
               if (!_isSelfCustomer) ...[
-              Row(
-                children: [
-                  const Text('Discount',
-                      style: TextStyle(fontSize: 14, color: _muted)),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: SizedBox(
-                      height: 40,
-                      child: TextField(
-                        controller: _discountController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        style: const TextStyle(fontSize: 14),
-                        decoration: _boxDecoration('Enter discount').copyWith(
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
-                          suffixIcon: Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                unitToggle('%', true),
-                                unitToggle(Money.symbol, false),
-                              ],
+                Row(
+                  children: [
+                    const Text('Discount',
+                        style: TextStyle(fontSize: 14, color: _muted)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: SizedBox(
+                        height: 40,
+                        child: TextField(
+                          controller: _discountController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          style: const TextStyle(fontSize: 14),
+                          decoration: _boxDecoration('Enter discount').copyWith(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                            suffixIcon: Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  unitToggle('%', true),
+                                  unitToggle(Money.symbol, false),
+                                ],
+                              ),
                             ),
                           ),
+                          onChanged: (v) => setState(
+                              () => _discountValue = double.tryParse(v) ?? 0),
                         ),
-                        onChanged: (v) => setState(
-                            () => _discountValue = double.tryParse(v) ?? 0),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const Divider(height: 28),
+                  ],
+                ),
+                const Divider(height: 28),
               ],
               summaryLine(
                   'Subtotal',
@@ -1706,8 +1714,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         child: Column(
           children: [
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: const BoxDecoration(
                 color: Color(0xFFF8F7F5),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
@@ -1799,8 +1806,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             flex: 2,
             child: Text(item.unitLabel,
                 overflow: TextOverflow.ellipsis,
-                style:
-                    const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
           ),
           Expanded(
             flex: 2,
@@ -2047,8 +2053,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               onPressed: () => setState(() => _cartQuantities[item.id] = 1),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFFE4E0D8)),
-                shape:
-                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 10),
               ),
               child: const Text('+ Add to Cart',
@@ -2092,61 +2098,64 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
         actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(12),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.person_search_rounded,
+                      color: Color(0xFF182C4F),
+                      size: 24,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.person_search_rounded,
-                    color: Color(0xFF182C4F),
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Customer Required',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF141A24),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Customer Required',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF141A24),
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Action needed',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF64748B),
+                        SizedBox(height: 2),
+                        Text(
+                          'Action needed',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'A customer is mandatory to create an order. Please select an existing customer or add a new customer to proceed.',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF475569),
-                height: 1.4,
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              const Text(
+                'A customer is mandatory to create an order. Please select an existing customer or add a new customer to proceed.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF475569),
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -2224,15 +2233,16 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
     // A carried order is scheduled against real slots — the live app won't
     // place one without them, and neither do we.
-    final missingSlot = _deliveryType == DeliveryType.homePickup &&
-            _pickupWindow == null
-        ? 'Pick a pickup slot'
-        : _isCarriedDelivery && _deliveryWindow == null
-            ? 'Pick a delivery slot'
-            : null;
+    final missingSlot =
+        _deliveryType == DeliveryType.homePickup && _pickupWindow == null
+            ? 'Pick a pickup slot'
+            : _isCarriedDelivery && _deliveryWindow == null
+                ? 'Pick a delivery slot'
+                : null;
     if (missingSlot != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(missingSlot, style: const TextStyle(fontSize: 13))),
+        SnackBar(
+            content: Text(missingSlot, style: const TextStyle(fontSize: 13))),
       );
       return;
     }
@@ -2340,7 +2350,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
     if (!mounted) return;
     // Go straight to the new order's details page instead of a popup.
-    context.go('/orders/${created.id.isNotEmpty ? created.id : created.orderNumber}');
+    context.go(
+        '/orders/${created.id.isNotEmpty ? created.id : created.orderNumber}');
   }
 
   /// Stand-in for the live app's product photography. Known garments get a
@@ -2749,7 +2760,8 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
                 child: SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () => setState(() => _showNewCustomerForm = true),
+                    onPressed: () =>
+                        setState(() => _showNewCustomerForm = true),
                     icon: const Icon(Icons.person_add_outlined, size: 16),
                     label: const Text('+ Add New Customer',
                         style: TextStyle(
@@ -2772,5 +2784,3 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
     );
   }
 }
-
-

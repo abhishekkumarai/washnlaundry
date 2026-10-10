@@ -208,3 +208,4 @@ META_GRAPH_ACCESS_TOKEN = META_PAGE_ACCESS_TOKEN or META_USER_ACCESS_TOKEN
 
 # Most shops one account may own (self-service provisioning).
 MAX_SHOPS_PER_USER = int(os.environ.get('MAX_SHOPS_PER_USER', '5'))
+
