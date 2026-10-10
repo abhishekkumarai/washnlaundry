@@ -10,6 +10,7 @@ import '../widgets/app_shell.dart';
 import '../widgets/error_dialog.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/staff_credentials_dialog.dart';
+import 'staff_detail_screen.dart';
 import '../utils/money.dart';
 
 class StaffScreen extends StatefulWidget {
@@ -36,6 +37,9 @@ class _StaffScreenState extends State<StaffScreen> {
   /// Roster view-models rebuilt from the provider on each build, so adds and
   /// edits reflect what the backend actually stored.
   List<Map<String, dynamic>> _staffMembers = const [];
+
+  /// The staff member whose own page is open, or null for the list.
+  String? _selectedId;
 
   void _syncFromProvider(AppProvider provider) {
     _staffMembers = provider.staff
@@ -532,6 +536,27 @@ class _StaffScreenState extends State<StaffScreen> {
   Widget build(BuildContext context) {
     _syncFromProvider(context.watch<AppProvider>());
 
+    if (_selectedId != null) {
+      final selected = _staffMembers
+          .where((m) => m['id'] == _selectedId)
+          .cast<Map<String, dynamic>?>()
+          .firstWhere((_) => true, orElse: () => null);
+      if (selected != null) {
+        return StaffDetailScreen(
+          // Keyed so a different member (or a reload) gets fresh data.
+          key: ValueKey('staff-detail-${selected['id']}'),
+          member: selected,
+          onBack: () => setState(() => _selectedId = null),
+          onEdit: () => _showStaffModal(context, existing: selected),
+          onToggleStatus: () => _toggleActive(context, selected),
+          onSignIn: () => _showCredentials(context, selected),
+        );
+      }
+      // Deleted or no longer in the roster: fall back to the list.
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => setState(() => _selectedId = null));
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
       drawer: const AppDrawer(),
@@ -845,7 +870,6 @@ class _StaffScreenState extends State<StaffScreen> {
                                     Expanded(
                                         flex: 3,
                                         child: _sortHeader('STATUS', 'status')),
-                                    const SizedBox(width: 48),
                                   ],
                                 ),
                               ),
@@ -869,8 +893,8 @@ class _StaffScreenState extends State<StaffScreen> {
                                   return Material(
                                     color: Colors.transparent,
                                     child: InkWell(
-                                      onTap: () =>
-                                          _showStaffModal(context, existing: s),
+                                      onTap: () => setState(() =>
+                                          _selectedId = s['id'] as String),
                                       hoverColor: const Color(0xFFF8F7F5),
                                       borderRadius: isLast
                                           ? const BorderRadius.vertical(
@@ -1001,105 +1025,6 @@ class _StaffScreenState extends State<StaffScreen> {
                                                 alignment: Alignment.centerLeft,
                                                 child: _buildStatusToggle(
                                                     context, s),
-                                              ),
-                                            ),
-                                            SizedBox(
-                                              width: 48,
-                                              child: PopupMenuButton<String>(
-                                                icon: const Icon(
-                                                    Icons.more_horiz_rounded,
-                                                    size: 18,
-                                                    color: Color(0xFF64748B)),
-                                                tooltip: 'Actions',
-                                                splashRadius: 18,
-                                                shape: RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            10)),
-                                                onSelected: (value) {
-                                                  if (value == 'edit') {
-                                                    _showStaffModal(context,
-                                                        existing: s);
-                                                  } else if (value ==
-                                                      'status') {
-                                                    _toggleActive(context, s);
-                                                  } else if (value == 'login') {
-                                                    _showCredentials(
-                                                        context, s);
-                                                  }
-                                                },
-                                                itemBuilder: (_) => [
-                                                  const PopupMenuItem(
-                                                    value: 'edit',
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(
-                                                            Icons.edit_outlined,
-                                                            size: 16,
-                                                            color: Color(
-                                                                0xFF64748B)),
-                                                        SizedBox(width: 10),
-                                                        Text('Edit details',
-                                                            style: TextStyle(
-                                                                fontSize: 13)),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  PopupMenuItem(
-                                                    value: 'status',
-                                                    child: Row(
-                                                      children: [
-                                                        Icon(
-                                                          isActive
-                                                              ? Icons
-                                                                  .person_off_outlined
-                                                              : Icons
-                                                                  .person_outline,
-                                                          size: 16,
-                                                          color: const Color(
-                                                              0xFF64748B),
-                                                        ),
-                                                        const SizedBox(
-                                                            width: 10),
-                                                        Text(
-                                                            isActive
-                                                                ? 'Mark inactive'
-                                                                : 'Reactivate',
-                                                            style:
-                                                                const TextStyle(
-                                                                    fontSize:
-                                                                        13)),
-                                                        PopupMenuItem(
-                                                          value: 'login',
-                                                          child: Row(
-                                                            children: [
-                                                              Icon(
-                                                                  s['hasAppLogin'] ==
-                                                                          true
-                                                                      ? Icons
-                                                                          .key_rounded
-                                                                      : Icons
-                                                                          .lock_open_rounded,
-                                                                  size: 16,
-                                                                  color: const Color(
-                                                                      0xFF64748B)),
-                                                              const SizedBox(
-                                                                  width: 10),
-                                                              Text(
-                                                                  s['hasAppLogin'] ==
-                                                                          true
-                                                                      ? 'Manage sign-in'
-                                                                      : 'Enable sign-in',
-                                                                  style: const TextStyle(
-                                                                      fontSize:
-                                                                          13)),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ],
                                               ),
                                             ),
                                           ],
@@ -1253,7 +1178,7 @@ class _StaffScreenState extends State<StaffScreen> {
     final isActive = s['status'] == 'ACTIVE';
     final name = s['name'] as String;
     return InkWell(
-      onTap: () => _showStaffModal(context, existing: s),
+      onTap: () => setState(() => _selectedId = s['id'] as String),
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -1308,76 +1233,6 @@ class _StaffScreenState extends State<StaffScreen> {
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF475569)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: 40,
-                  child: PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_horiz_rounded,
-                        size: 18, color: Color(0xFF64748B)),
-                    tooltip: 'Actions',
-                    splashRadius: 18,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        _showStaffModal(context, existing: s);
-                      } else if (value == 'status') {
-                        _toggleActive(context, s);
-                      } else if (value == 'login') {
-                        _showCredentials(context, s);
-                      }
-                    },
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit_outlined,
-                                size: 16, color: Color(0xFF64748B)),
-                            SizedBox(width: 10),
-                            Text('Edit details',
-                                style: TextStyle(fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'status',
-                        child: Row(
-                          children: [
-                            Icon(
-                              isActive
-                                  ? Icons.person_off_outlined
-                                  : Icons.person_outline,
-                              size: 16,
-                              color: const Color(0xFF64748B),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(isActive ? 'Mark inactive' : 'Reactivate',
-                                style: const TextStyle(fontSize: 13)),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'login',
-                        child: Row(
-                          children: [
-                            Icon(
-                                s['hasAppLogin'] == true
-                                    ? Icons.key_rounded
-                                    : Icons.lock_open_rounded,
-                                size: 16,
-                                color: const Color(0xFF64748B)),
-                            const SizedBox(width: 10),
-                            Text(
-                                s['hasAppLogin'] == true
-                                    ? 'Manage sign-in'
-                                    : 'Enable sign-in',
-                                style: const TextStyle(fontSize: 13)),
-                          ],
                         ),
                       ),
                     ],

@@ -62,6 +62,8 @@ void main() {
       // Ramesh Kumar (id 1) has no startDate in the fixture above.
       await tester.tap(find.text('Ramesh Kumar'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit details').first);
+      await tester.pumpAndSettle();
 
       expect(find.text('Edit Staff Member'), findsOneWidget);
       expect(find.text('Not set'), findsOneWidget);
@@ -75,6 +77,8 @@ void main() {
 
       await tester.tap(find.text('Geeta Devi'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit details').first);
+      await tester.pumpAndSettle();
 
       expect(find.text('1 Mar 2026'), findsOneWidget);
       expect(find.text('Not set'), findsNothing);
@@ -87,6 +91,8 @@ void main() {
       await tester.pump();
 
       await tester.tap(find.text('Geeta Devi'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit details').first);
       await tester.pumpAndSettle();
       expect(find.text('1 Mar 2026'), findsOneWidget);
 
@@ -113,6 +119,8 @@ void main() {
       await tester.pump();
 
       await tester.tap(find.text('Ramesh Kumar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit details').first);
       await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(ElevatedButton, 'Save Changes'));
@@ -268,6 +276,39 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('staff-sort-status')));
       await tester.pump();
       expect(rowOrder(tester), ['Geeta', 'Mohan', 'anita']);
+    });
+  });
+
+  group('StaffScreen detail page', () {
+    testWidgets('tapping a row opens that staff page with profile and actions',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('Geeta Devi'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Back to Staff'), findsOneWidget);
+      expect(find.text('Edit details'), findsOneWidget);
+      expect(find.text('Mark inactive'), findsOneWidget);
+      expect(find.text('Enable sign-in'), findsOneWidget);
+      // No Edit modal opened by the tap itself.
+      expect(find.text('Edit Staff Member'), findsNothing);
+    });
+
+    testWidgets('back returns to the roster', (tester) async {
+      final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
+      await tester.pumpWidget(host(provider, const StaffScreen()));
+      await tester.pump();
+
+      await tester.tap(find.text('Geeta Devi'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('staffDetailBack')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Back to Staff'), findsNothing);
+      expect(find.text('Ramesh Kumar'), findsWidgets);
     });
   });
 }
