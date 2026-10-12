@@ -69,9 +69,7 @@ def _email(raw):
     return email if len(email) <= 150 else None
 
 
-def _client_ip(request):
-    fwd = request.META.get('HTTP_X_FORWARDED_FOR', '')
-    return (fwd.split(',')[0].strip() if fwd else request.META.get('REMOTE_ADDR', '')) or 'unknown'
+from .netutils import client_ip as _client_ip  # noqa: E402
 
 
 def _throttled(key, limit, window=900):

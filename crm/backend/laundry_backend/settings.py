@@ -1,5 +1,8 @@
 import os
+import sys
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -14,9 +17,28 @@ except ImportError:
 _INSECURE_SECRET_KEY = 'django-insecure-laundrybill-crm-secret-key-super-secure'
 SECRET_KEY = os.environ.get('SECRET_KEY', _INSECURE_SECRET_KEY)
 
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+# Secure by default (KAN-189): DEBUG is off unless DEBUG=True is set explicitly
+# (put it in your local .env). Everything below that is dev-friendly follows it.
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = [
+    h.strip() for h in os.environ.get('ALLOWED_HOSTS', '*' if DEBUG else '').split(',') if h.strip()
+]
+
+# Refuse to boot a non-debug deployment on insecure defaults. Skipped for the
+# test runner, which never serves real traffic.
+_RUNNING_TESTS = 'test' in sys.argv[1:2] or 'pytest' in sys.modules
+if not DEBUG and not _RUNNING_TESTS:
+    _problems = []
+    if SECRET_KEY == _INSECURE_SECRET_KEY:
+        _problems.append('SECRET_KEY is the public default')
+    if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
+        _problems.append('ALLOWED_HOSTS is empty or "*"')
+    if _problems:
+        raise ImproperlyConfigured(
+            'Insecure production settings (DEBUG is off): ' + '; '.join(_problems)
+            + '. Set SECRET_KEY and ALLOWED_HOSTS in the environment, or DEBUG=True for local dev.'
+        )
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -84,7 +106,20 @@ if os.environ.get('DJANGO_DATABASE_URL'):
         ssl_require=os.environ.get('DJANGO_DATABASE_SSL', 'True') != 'False',
     )
 
-AUTH_PASSWORD_VALIDATORS = []
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
+# Transport hardening (KAN-194). Render terminates TLS and forwards the scheme.
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Kolkata'
@@ -102,7 +137,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 from corsheaders.defaults import default_headers
 
-CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'True') == 'True'
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', str(DEBUG)) == 'True'
 CORS_ALLOWED_ORIGINS = [
     origin for origin in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if origin
 ]
@@ -155,14 +190,18 @@ PUBLIC_LEAD_ORIGINS = [
 # Google OAuth web client ID the customer portal's ID tokens are verified against.
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 PUBLIC_LEAD_RATE_PER_HOUR = int(os.environ.get('PUBLIC_LEAD_RATE_PER_HOUR', '5'))
+RAG_CHAT_RATE_PER_HOUR = int(os.environ.get('RAG_CHAT_RATE_PER_HOUR', '60'))
+# Django admin path; set ADMIN_URL to an unguessable value in production
+# (ideally also behind Cloudflare Access). Default keeps local dev unchanged. (KAN-194)
+ADMIN_URL = os.environ.get('ADMIN_URL', 'admin/').strip('/') + '/'
 
 
 # ── API auth (api/auth.py) ────────────────────────────────────────────────────
 # When True every /api/ DRF endpoint requires a Google ID token belonging to
 # staff; the customer portal's /api/customer/* views are scoped to the caller.
-# Off by default so the Flutter app (which must send tokens first) can roll out
-# before the API is locked down; turn on in Render once it has.
-API_AUTH_ENFORCED = os.environ.get('API_AUTH_ENFORCED', 'False') == 'True'
+# On by default outside DEBUG (KAN-188); local dev (DEBUG=True) stays open so
+# Demo Mode works. Override with API_AUTH_ENFORCED=True/False explicitly.
+API_AUTH_ENFORCED = os.environ.get('API_AUTH_ENFORCED', str(not DEBUG)) == 'True'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ['api.auth.GoogleTokenAuthentication'],
     'DEFAULT_PERMISSION_CLASSES': ['api.auth.IsStaff'],

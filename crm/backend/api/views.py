@@ -1583,6 +1583,25 @@ def dashboard_stats(request):
     })
 
 
+RAG_MAX_BODY_BYTES = 32 * 1024
+RAG_MAX_MESSAGE_CHARS = 2000
+RAG_MAX_HISTORY_TURNS = 10
+
+
+def _rag_origins():
+    return list(settings.PUBLIC_LEAD_ORIGINS) + list(getattr(settings, 'APP_ORIGINS', []))
+
+
+def _rate_limited(key, limit, window=3600):
+    """True once `key` has been hit more than `limit` times within `window` seconds."""
+    cache.add(key, 0, window)
+    try:
+        return cache.incr(key) > limit
+    except ValueError:  # expired between add and incr
+        cache.set(key, 1, window)
+        return False
+
+
 @csrf_exempt
 @require_POST
 def rag_chat(request):
@@ -1593,17 +1612,37 @@ def rag_chat(request):
     server-side, so it never reaches the Flutter web bundle. Body:
     {"message": str, "history"?: [{"role": "user"|"assistant", "content": str}]}
     """
+    # KAN-192: browsers must come from an allowed origin; each call spends
+    # Workers AI quota, so cap per-IP rate and input size.
+    origin = request.headers.get('Origin', '')
+    if origin and origin.lower() not in {o.lower() for o in _rag_origins()}:
+        return JsonResponse({'detail': 'Origin not allowed.'}, status=403)
+    if _rate_limited(f'rag_chat:{_client_ip(request)}', settings.RAG_CHAT_RATE_PER_HOUR):
+        return JsonResponse({'detail': 'Too many requests. Please try again later.'}, status=429)
+
+    if len(request.body or b'') > RAG_MAX_BODY_BYTES:
+        return JsonResponse({'detail': 'Request too large.'}, status=413)
     try:
         body = json.loads(request.body or b'{}')
     except json.JSONDecodeError:
+        return JsonResponse({'detail': 'Invalid JSON body.'}, status=400)
+    if not isinstance(body, dict):
         return JsonResponse({'detail': 'Invalid JSON body.'}, status=400)
 
     message = body.get('message')
     if not message or not str(message).strip():
         return JsonResponse({'detail': 'message is required.'}, status=400)
+    message = str(message)[:RAG_MAX_MESSAGE_CHARS]
+
+    history = []
+    raw_history = body.get('history')
+    for turn in (raw_history if isinstance(raw_history, list) else [])[-RAG_MAX_HISTORY_TURNS:]:
+        if (isinstance(turn, dict) and turn.get('role') in ('user', 'assistant')
+                and isinstance(turn.get('content'), str)):
+            history.append({'role': turn['role'], 'content': turn['content'][:RAG_MAX_MESSAGE_CHARS]})
 
     try:
-        upstream = RagService.stream_chat(message, body.get('history'))
+        upstream = RagService.stream_chat(message, history)
     except RagServiceError as e:
         return JsonResponse({'detail': str(e)}, status=502)
 
@@ -1666,9 +1705,7 @@ def create_lead(request):
     return _save_and_email_lead(body, 'chat')
 
 
-def _client_ip(request):
-    forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
-    return (forwarded.split(',')[0].strip() if forwarded else request.META.get('REMOTE_ADDR', '')) or 'unknown'
+from .netutils import client_ip as _client_ip  # noqa: E402
 
 
 def _with_cors(response, origin):
@@ -1973,7 +2010,7 @@ from .services.neonize_service import NeonizeService
 
 
 @api_view(['GET'])
-@permission_classes([IsOwnerOrStaffReadOnly])
+@permission_classes([IsOwner])
 def neonize_status(request):
     """GET /api/whatsapp/neonize/status/ — Connection status and live pairing QR code."""
     shop = getattr(request, 'shop', None)
@@ -1982,7 +2019,7 @@ def neonize_status(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsOwnerOrStaffReadOnly])
+@permission_classes([IsOwner])
 def neonize_connect(request):
     """POST /api/whatsapp/neonize/connect/ — Request new pairing QR code for personal device."""
     shop = getattr(request, 'shop', None)
@@ -1991,7 +2028,7 @@ def neonize_connect(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsOwnerOrStaffReadOnly])
+@permission_classes([IsOwner])
 def neonize_disconnect(request):
     """POST /api/whatsapp/neonize/disconnect/ — Disconnect personal WhatsApp session."""
     shop = getattr(request, 'shop', None)

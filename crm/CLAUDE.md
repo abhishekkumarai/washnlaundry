@@ -93,7 +93,7 @@ Models (`backend/api/models.py`): `Shop`, `Customer`, `GarmentCategory`, `Garmen
 
 `Customer.id` and `Order.id` are UUIDs. `GarmentItem` carries a **column per service type** (`dry_clean_price`, `wash_iron_price`, `wash_fold_price`, `steam_press_price`, `iron_price`), and the seed sets the irrelevant ones to `0` rather than null — so "price is 0" means "service not offered for this garment", not "free".
 
-Settings read `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `CORS_ALLOW_ALL_ORIGINS` and `CORS_ALLOWED_ORIGINS` from the environment, but **default to the insecure dev values** (`DEBUG=True`, a hardcoded key, `*` hosts, all origins). Production must set them explicitly — see Deployment.
+Settings read `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `CORS_ALLOW_ALL_ORIGINS` and `CORS_ALLOWED_ORIGINS` from the environment, and are **secure by default since KAN-188/189**: `DEBUG` is off unless `DEBUG=True`, CORS-all and `*` hosts follow `DEBUG`, `API_AUTH_ENFORCED` defaults to `not DEBUG`, and with `DEBUG` off the app refuses to boot on the default `SECRET_KEY` or empty/`*` `ALLOWED_HOSTS`. Local dev needs `DEBUG=True` in `.env`. Render must set `SECRET_KEY` and `ALLOWED_HOSTS` before this reaches `main`.
 
 ---
 

@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 
 from django.db.models import Sum
@@ -9,6 +10,19 @@ from .models import (
     ServiceArea, TimeSlot, MetaSettings, MetaPost, MetaMessage, MetaLead, OrderMedia,
 )
 from .validators import validate_mobile_10_digit
+
+
+logger = logging.getLogger(__name__)
+
+
+def _is_owner(request):
+    """True for an owner principal, or anyone while API auth is not enforced (Demo Mode)."""
+    from django.conf import settings
+    from .auth import OWNER, Principal
+    if not settings.API_AUTH_ENFORCED:
+        return True
+    user = getattr(request, 'user', None)
+    return isinstance(user, Principal) and user.has_role(OWNER)
 
 
 class TenantModelSerializer(serializers.ModelSerializer):
@@ -47,6 +61,22 @@ class CustomerSerializer(TenantModelSerializer):
 
     def validate_phone(self, value):
         return validate_mobile_10_digit(value)
+
+    def validate(self, attrs):
+        # KAN-196: email grants customer-portal access and phone drives order
+        # matching, so only an owner may change them on an existing customer.
+        inst = self.instance
+        if inst is not None:
+            changed = [f for f in ('email', 'phone') if f in attrs
+                       and (attrs[f] or '').strip().lower() != (getattr(inst, f) or '').strip().lower()]
+            if changed:
+                request = self.context.get('request')
+                if not _is_owner(request):
+                    raise serializers.ValidationError(
+                        {f: 'Only the shop owner can change this field.' for f in changed})
+                logger.warning('Customer %s: %s changed by %s', inst.pk, ','.join(changed),
+                               getattr(getattr(request, 'user', None), 'email', 'unknown'))
+        return attrs
 
 
 class GarmentItemSerializer(TenantModelSerializer):
@@ -359,6 +389,29 @@ class TimeSlotSerializer(TenantModelSerializer):
 # ── Meta & Social Suite Serializers ──────────────────────────────────────────
 
 class MetaSettingsSerializer(serializers.ModelSerializer):
+    """Secrets are write-only (KAN-190): reads only say whether one is set."""
+    has_page_access_token = serializers.SerializerMethodField()
+    has_user_access_token = serializers.SerializerMethodField()
+    has_app_secret = serializers.SerializerMethodField()
+
+    SECRET_FIELDS = ('page_access_token', 'user_access_token', 'app_secret')
+
+    def get_has_page_access_token(self, obj):
+        return bool(obj.page_access_token)
+
+    def get_has_user_access_token(self, obj):
+        return bool(obj.user_access_token)
+
+    def get_has_app_secret(self, obj):
+        return bool(obj.app_secret)
+
+    def validate(self, attrs):
+        # A blank secret means "unchanged": the form never receives the stored value.
+        for name in self.SECRET_FIELDS:
+            if name in attrs and not (attrs[name] or '').strip():
+                attrs.pop(name)
+        return attrs
+
     class Meta:
         model = MetaSettings
         fields = [
@@ -366,8 +419,10 @@ class MetaSettingsSerializer(serializers.ModelSerializer):
             'facebook_page_id', 'facebook_page_name', 'facebook_followers',
             'instagram_account_id', 'instagram_username', 'instagram_followers', 'instagram_media_count',
             'whatsapp_phone_number_id', 'whatsapp_business_account_id', 'whatsapp_phone_number',
-            'profile_picture_url', 'auto_reply_enabled', 'is_connected', 'updated_at'
+            'profile_picture_url', 'auto_reply_enabled', 'is_connected', 'updated_at',
+            'has_page_access_token', 'has_user_access_token', 'has_app_secret',
         ]
+        extra_kwargs = {name: {'write_only': True} for name in ('page_access_token', 'user_access_token', 'app_secret')}
 
 
 class MetaPostSerializer(serializers.ModelSerializer):

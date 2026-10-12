@@ -28,7 +28,12 @@ export default {
     const response = await fetch(proxied);
 
     const headers = new Headers(response.headers);
-    headers.delete('X-Frame-Options');
+    // Keep the backend's X-Frame-Options and only allow our own sites to frame responses (KAN-195).
+    if (!headers.has('X-Frame-Options')) headers.set('X-Frame-Options', 'DENY');
+    headers.set(
+      'Content-Security-Policy',
+      "frame-ancestors 'self' https://app.washnlaundry.com https://customer.washnlaundry.com",
+    );
 
     return new Response(response.body, {
       status: response.status,
