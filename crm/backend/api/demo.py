@@ -10,6 +10,7 @@ abandoned without logging out is purged once it is older than DEMO_TTL.
 import contextlib
 import io
 import json
+import logging
 import secrets
 import sys
 from datetime import timedelta
@@ -18,6 +19,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.cache import cache
+from django.db import transaction
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -25,6 +27,8 @@ from django.views.decorators.http import require_POST
 
 from .models import Credit, Shop, ShopMembership, ShopRole
 from .netutils import client_ip
+
+logger = logging.getLogger(__name__)
 
 DEMO_DOMAIN = '@demo.invalid'
 DEMO_SLUG_PREFIX = 'demo-'
@@ -140,17 +144,17 @@ def demo_start(request):
     suffix = secrets.token_hex(5)
     slug = f'{DEMO_SLUG_PREFIX}{suffix}'
     email = f'{suffix}{DEMO_DOMAIN}'
-    user = get_user_model().objects.create_user(username=email, email=email)
-    user.set_unusable_password()
-    user.save()
     try:
-        shop = _seed_sandbox(slug)
-        ShopMembership.objects.create(user=user, shop=shop, role=ShopRole.OWNER, is_default=True)
+        # All-or-nothing: a failed seed must not leave a half-built shop behind.
+        with transaction.atomic():
+            user = get_user_model().objects.create_user(username=email, email=email)
+            user.set_unusable_password()
+            user.save()
+            shop = _seed_sandbox(slug)
+            ShopMembership.objects.create(user=user, shop=shop, role=ShopRole.OWNER, is_default=True)
     except Exception:
-        for leftover in Shop.objects.filter(slug=slug):
-            _delete_shop(leftover)
-        user.delete()
-        raise
+        logger.exception('Demo sandbox creation failed')
+        return JsonResponse({'detail': 'Could not start the demo. Please try again.'}, status=500)
     return JsonResponse({
         'token': mint_demo_token(user),
         'shop': {'id': shop.pk, 'slug': shop.slug, 'name': shop.name},
