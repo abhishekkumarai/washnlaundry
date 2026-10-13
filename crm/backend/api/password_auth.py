@@ -197,7 +197,12 @@ def verify_email(request):
     phone = clean_phone(data.get('p'))
     if (phone and not is_owner_email(user.email) and not is_staff_email(user.email)
             and not customer_for_email(user.email)):
-        register_customer(user.email, user.first_name or user.email.split('@')[0], phone)
+        try:
+            register_customer(user.email, user.first_name or user.email.split('@')[0], phone)
+        except ValueError:
+            # Several shops and no tenant to file the customer under: the email is still
+            # confirmed, the person just lands on /my/start instead of a 500.
+            logger.warning('No shop to register customer %s under; left unlinked', user.email)
     sync_user_groups(user)
     return _session(user)
 
