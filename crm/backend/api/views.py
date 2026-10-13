@@ -938,8 +938,8 @@ class StaffViewSet(viewsets.ModelViewSet):
             if is_last_owner(staff):
                 raise ValidationError('This is the only owner of the shop. Transfer ownership first.')
             staff.has_app_login = False
-            staff.save()  # Staff.save() -> sync_staff_user drops the shop membership
-            return Response({'has_app_login': False})
+            staff.save()  # Staff.save() -> sync_staff_user deactivates (not deletes) the membership
+            return Response({'has_app_login': False, 'revoked': True})
 
         email = str(request.data.get('email') or '').strip().lower()
         password = str(request.data.get('password') or '')
@@ -995,6 +995,24 @@ class StaffViewSet(viewsets.ModelViewSet):
             'existing_account': not password_set,
             'password_login_enabled': bool(settings.PASSWORD_AUTH_ENABLED),
         })
+
+
+    @action(detail=True, methods=['post'], url_path='reactivate')
+    def reactivate(self, request, pk=None):
+        """POST /api/staff/<id>/reactivate/ - switch a revoked sign-in back on.
+
+        Revoking only deactivates the membership and keeps the Staff row, so this restores
+        access for the email already on file (same password), if the staff member is ACTIVE.
+        To also change the password, POST /credentials/ instead.
+        """
+        staff = self.get_object()
+        if not staff.email:
+            raise ValidationError({'email': 'This staff member has no sign-in email on file. Issue credentials instead.'})
+        if staff.status != 'ACTIVE':
+            raise ValidationError('Make the staff member Active before restoring their sign-in.')
+        staff.has_app_login = True
+        staff.save()  # sync_staff_user reactivates the membership
+        return Response({'has_app_login': True, 'email': staff.email})
 
 
 class AttendanceViewSet(viewsets.ModelViewSet):

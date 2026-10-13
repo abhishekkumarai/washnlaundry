@@ -177,11 +177,12 @@ def sync_staff_user(staff):
     email = staff.email.strip().lower()
 
     if not staff.has_app_login:
-        # If staff does not have app login, they should not have active staff membership or staff group
+        # Revoked sign-in is a soft delete: the membership row stays (history, and so it can
+        # be switched back on) but is inactive, so it grants no role in this shop.
         user = User.objects.filter(username=email).first()
         if user:
             if staff.shop:
-                ShopMembership.objects.filter(user=user, shop=staff.shop).delete()
+                ShopMembership.objects.filter(user=user, shop=staff.shop).update(is_active=False)
             sync_user_groups(user)
         return None
 

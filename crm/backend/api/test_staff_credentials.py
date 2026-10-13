@@ -65,13 +65,14 @@ class StaffCredentialsTests(TestCase):
         self.assertTrue(r.data['password_set'])
         self.assertTrue(User.objects.get(username='asha@example.com').check_password('second-pass-2'))
 
-    def test_revoke_removes_membership(self):
+    def test_revoke_deactivates_membership_but_keeps_it(self):
         self.client.post(self.url(), {'email': 'asha@example.com', 'password': 'S3cret-pass'}, format='json')
         r = self.client.delete(self.url())
         self.assertEqual(r.status_code, 200)
         self.staff.refresh_from_db()
         self.assertFalse(self.staff.has_app_login)
-        self.assertFalse(ShopMembership.objects.filter(user__username='asha@example.com', shop=self.shop).exists())
+        m = ShopMembership.objects.get(user__username='asha@example.com', shop=self.shop)
+        self.assertFalse(m.is_active)  # soft delete: kept for history / reactivation
 
     def test_cannot_touch_staff_of_another_shop(self):
         foreign = Staff.objects.create(shop=self.other, name='Zed', phone='9876543299')

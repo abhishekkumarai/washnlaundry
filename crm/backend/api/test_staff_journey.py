@@ -178,3 +178,56 @@ class StaffCredentialJourneyTests(TestCase):
         res = self.client.delete(f'/api/staff/{sid}/credentials/', **self.as_owner())
         self.assertEqual(res.status_code, 200, res.content)
         self.assertEqual(self.client.get('/api/customers/', **self.as_staff(token)).status_code, 403)
+
+    def test_revoke_is_a_soft_delete_that_can_be_reactivated(self):
+        sid = self.new_staff()
+        self.client.post(f'/api/staff/{sid}/credentials/', {'email': 'asha@x.com', 'password': PW1},
+                         format='json', **self.as_owner())
+        token = self.login('asha@x.com', PW1).json()['token']
+
+        self.assertEqual(self.client.delete(f'/api/staff/{sid}/credentials/', **self.as_owner()).status_code, 200)
+        # History kept: the Staff row, the account and the membership all still exist...
+        staff = Staff.objects.get(pk=sid)
+        self.assertFalse(staff.has_app_login)
+        self.assertEqual(staff.email, 'asha@x.com')
+        membership = ShopMembership.objects.get(user__username='asha@x.com', shop=self.shop)
+        self.assertFalse(membership.is_active)
+        self.assertTrue(User.objects.filter(username='asha@x.com').exists())
+        # ...but grant nothing.
+        self.assertEqual(self.client.get('/api/customers/', **self.as_staff(token)).status_code, 403)
+
+        # Reactivate: same email, same password, access is back.
+        res = self.client.post(f'/api/staff/{sid}/reactivate/', **self.as_owner())
+        self.assertEqual(res.status_code, 200, res.content)
+        ShopMembership.objects.get(pk=membership.pk).refresh_from_db()
+        self.assertTrue(ShopMembership.objects.get(pk=membership.pk).is_active)
+        self.assertEqual(self.client.get('/api/customers/', **self.as_staff(token)).status_code, 200)
+        self.assertEqual(self.login('asha@x.com', PW1).status_code, 200)
+
+    def test_reactivate_needs_an_email_and_an_active_staff_member(self):
+        sid = self.new_staff()  # never had a sign-in
+        res = self.client.post(f'/api/staff/{sid}/reactivate/', **self.as_owner())
+        self.assertEqual(res.status_code, 400)
+        self.client.post(f'/api/staff/{sid}/credentials/', {'email': 'asha@x.com', 'password': PW1},
+                         format='json', **self.as_owner())
+        self.client.delete(f'/api/staff/{sid}/credentials/', **self.as_owner())
+        Staff.objects.filter(pk=sid).update(status='INACTIVE')
+        self.assertEqual(self.client.post(f'/api/staff/{sid}/reactivate/', **self.as_owner()).status_code, 400)
+
+    def test_reissuing_credentials_after_revoke_also_restores_access_with_a_new_password(self):
+        sid = self.new_staff()
+        self.client.post(f'/api/staff/{sid}/credentials/', {'email': 'asha@x.com', 'password': PW1},
+                         format='json', **self.as_owner())
+        self.client.delete(f'/api/staff/{sid}/credentials/', **self.as_owner())
+        res = self.client.post(f'/api/staff/{sid}/credentials/', {'email': 'asha@x.com', 'password': PW2},
+                               format='json', **self.as_owner())
+        self.assertTrue(res.json()['password_set'])
+        token = self.login('asha@x.com', PW2).json()['token']
+        self.assertEqual(self.client.get('/api/customers/', **self.as_staff(token)).status_code, 200)
+        self.assertEqual(self.login('asha@x.com', PW1).status_code, 401)
+
+    def test_a_revoked_owner_cannot_lock_the_shop_out(self):
+        owner_staff = Staff.objects.create(shop=self.shop, name='Boss', phone='9000000011', role='Owner',
+                                           email='owner@x.com', has_app_login=True)
+        res = self.client.delete(f'/api/staff/{owner_staff.pk}/credentials/', **self.as_owner())
+        self.assertEqual(res.status_code, 400)  # the only owner
