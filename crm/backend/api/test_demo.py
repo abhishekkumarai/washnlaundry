@@ -93,3 +93,20 @@ class ViewsetQuerysetScopeTests(TestCase):
         from api.views import CustomerViewSet, StaffViewSet
         for viewset in (CustomerViewSet, StaffViewSet):
             self.assertFalse(viewset.queryset.query.where, viewset.__name__)
+
+
+@override_settings(GOOGLE_CLIENT_ID='c', API_AUTH_ENFORCED=True)
+class DemoDoesNotBreakPublicEndpointsTests(TestCase):
+    def test_leads_and_chat_work_while_a_demo_sandbox_exists(self):
+        from api.models import Lead
+        Shop.objects.all().delete()
+        real = Shop.objects.create(name='Only Real Shop', slug='only-real')
+        client = APIClient()
+        self.assertEqual(client.post('/api/demo/start/').status_code, 201)
+        self.assertEqual(Shop.objects.count(), 2)
+        # The Worker's cron and the website form carry no tenant header.
+        self.assertEqual(client.post('/api/leads/process/').status_code, 401)  # key check, not 400
+        res = client.post('/api/leads/public/', {'name': 'A', 'phone': '9123456780', 'address': 'x'},
+                          format='json', HTTP_ORIGIN='https://washnlaundry.com')
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertEqual(Lead.all_objects.get().shop, real)

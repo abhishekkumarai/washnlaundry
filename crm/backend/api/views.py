@@ -1676,9 +1676,18 @@ def _save_and_email_lead(body, source):
     if not phone:
         return JsonResponse({'detail': 'A valid 10-digit Indian mobile number is required.'}, status=400)
 
-    lead = Lead.objects.create(
-        name=name, phone=phone, address=address, requirements=requirements, source=source,
-    )
+    # Leads belong to the business's own shop: LEAD_SHOP_SLUG if set, else the sole real shop.
+    shop = None
+    slug = getattr(settings, 'LEAD_SHOP_SLUG', '')
+    if slug:
+        shop = Shop.objects.filter(slug=slug).first()
+    try:
+        lead = Lead.objects.create(
+            name=name, phone=phone, address=address, requirements=requirements, source=source,
+            **({'shop': shop} if shop else {}),
+        )
+    except ValueError:
+        return JsonResponse({'detail': 'Lead capture is not configured. Please call us instead.'}, status=503)
     EmailService.send_lead_alert(lead)
     return JsonResponse(
         {'ok': True, 'id': lead.id, 'email_status': lead.email_status},

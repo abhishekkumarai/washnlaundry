@@ -190,6 +190,8 @@ PUBLIC_LEAD_ORIGINS = [
 # Google OAuth web client ID the customer portal's ID tokens are verified against.
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 PUBLIC_LEAD_RATE_PER_HOUR = int(os.environ.get('PUBLIC_LEAD_RATE_PER_HOUR', '5'))
+# Shop that website leads (pickup form, chat) are filed under; blank = the sole real shop.
+LEAD_SHOP_SLUG = os.environ.get('LEAD_SHOP_SLUG', '')
 RAG_CHAT_RATE_PER_HOUR = int(os.environ.get('RAG_CHAT_RATE_PER_HOUR', '60'))
 # Django admin path; set ADMIN_URL to an unguessable value in production
 # (ideally also behind Cloudflare Access). Default keeps local dev unchanged. (KAN-194)

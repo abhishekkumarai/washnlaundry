@@ -24,7 +24,8 @@ def fallback_shop():
     of silently landing data in whichever shop happens to be first.
     """
     from .models import Shop
-    shops = list(Shop.objects.all()[:2])
+    # Throwaway Demo Mode sandboxes (slug `demo-...`) never count as real shops.
+    shops = list(Shop.objects.exclude(slug__startswith='demo-')[:2])
     return shops[0] if len(shops) == 1 else None
 
 
