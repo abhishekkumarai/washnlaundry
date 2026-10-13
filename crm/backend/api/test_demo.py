@@ -86,3 +86,10 @@ class DemoSandboxTests(TestCase):
         slug = res.json()['shop']['slug']
         self.assertTrue(Customer.all_objects.filter(shop__slug=slug).exists())
         self.assertFalse(Customer.all_objects.filter(shop=self.real).exclude(name='Real Customer').exists())
+
+
+class ViewsetQuerysetScopeTests(TestCase):
+    def test_module_level_querysets_are_not_frozen_to_a_tenant(self):
+        from api.views import CustomerViewSet, StaffViewSet
+        for viewset in (CustomerViewSet, StaffViewSet):
+            self.assertFalse(viewset.queryset.query.where, viewset.__name__)
