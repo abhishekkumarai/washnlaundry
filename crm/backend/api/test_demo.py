@@ -1,5 +1,6 @@
 """Demo Mode sandboxes: private per session, writable, destroyed on logout/expiry."""
 from datetime import timedelta
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
@@ -75,3 +76,13 @@ class DemoSandboxTests(TestCase):
         self.assertIn(res.status_code, (400, 401, 403))
         self.assertFalse(Shop.objects.filter(slug='demo-abc').exists())
         self.assertTrue(owner)
+
+    def test_start_works_when_middleware_assumes_the_sole_real_shop(self):
+        # Production has one real shop, so the middleware falls back to it as the tenant,
+        # and Shop.save() also creates default services there (skipped under test).
+        with mock.patch('api.middleware.fallback_shop', return_value=self.real),                 mock.patch('sys.argv', ['gunicorn']):
+            res = self.client.post('/api/demo/start/')
+        self.assertEqual(res.status_code, 201, res.content)
+        slug = res.json()['shop']['slug']
+        self.assertTrue(Customer.all_objects.filter(shop__slug=slug).exists())
+        self.assertFalse(Customer.all_objects.filter(shop=self.real).exclude(name='Real Customer').exists())

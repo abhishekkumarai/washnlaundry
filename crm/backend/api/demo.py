@@ -27,6 +27,7 @@ from django.views.decorators.http import require_POST
 
 from .models import Credit, Shop, ShopMembership, ShopRole
 from .netutils import client_ip
+from .tenancy import set_current_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +134,9 @@ def _throttled(ip):
 @require_POST
 def demo_start(request):
     """POST /api/demo/start/ -> {token, shop: {id, slug, name}}"""
+    # A single-shop deployment makes the middleware assume its only shop as the
+    # tenant; sandbox work must never be scoped to (or leak into) a real shop.
+    set_current_tenant(None)
     if not getattr(settings, 'DEMO_ENABLED', True):
         return JsonResponse({'detail': 'Demo Mode is disabled.'}, status=404)
     if _throttled(client_ip(request)):
@@ -167,6 +171,7 @@ def demo_start(request):
 def demo_end(request):
     """POST /api/demo/end/ - deletes the caller's sandbox. Token in the Authorization
     header, or in the JSON body as `token` (so `navigator.sendBeacon` can use it)."""
+    set_current_tenant(None)
     header = request.headers.get('Authorization', '')
     token = header[7:].strip() if header.lower().startswith('bearer ') else ''
     if not token:
