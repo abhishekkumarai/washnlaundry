@@ -12,6 +12,7 @@ import '../models/garment_model.dart';
 import '../models/order_model.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
+import '../widgets/customer_form_dialog.dart';
 import '../widgets/fulfillment_type_selector.dart';
 import '../widgets/order_media_picker.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -934,6 +935,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               ],
             ),
           ),
+          if (_customer != null && !_isSelfCustomer)
+            IconButton(
+              tooltip: 'Edit customer',
+              onPressed: _editCustomer,
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.edit_outlined,
+                  size: 18, color: Color(0xFF64748B)),
+            ),
           if (!_isSelfCustomer)
             TextButton(
               onPressed: _pickCustomer,
@@ -1109,6 +1118,14 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               ],
             ),
           ),
+          if (_customer != null && !_isSelfCustomer)
+            IconButton(
+              tooltip: 'Edit customer',
+              onPressed: _editCustomer,
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.edit_outlined,
+                  size: 18, color: Color(0xFF64748B)),
+            ),
           if (!_isSelfCustomer)
             OutlinedButton(
               onPressed: _pickCustomer,
@@ -2190,6 +2207,19 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
     if (shouldPick == true && mounted) {
       await _pickCustomer();
+    }
+  }
+
+  Future<void> _editCustomer() async {
+    final current = _customer;
+    if (current == null) return;
+    final provider = Provider.of<AppProvider>(context, listen: false);
+    final saved = await showCustomerFormDialog(context, existing: current);
+    if (saved != true || !mounted) return;
+    // CustomerModel is immutable; pick the saved copy back up by id.
+    final updated = provider.customers.where((c) => c.id == current.id);
+    if (updated.isNotEmpty) {
+      setState(() => _customer = updated.first);
     }
   }
 
