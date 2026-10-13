@@ -630,6 +630,46 @@ void main() {
       expect(find.text('Rohan Verma'), findsOneWidget);
     });
 
+    testWidgets('the edit icon only appears once a customer is picked',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(
+          garments: _catalogue,
+          customers: const [
+            CustomerModel(id: 'c1', name: 'Priya Sundaram', phone: '9000000002'),
+          ],
+        );
+      await tester.pumpWidget(host(provider, const NewOrderScreen()));
+      await tester.pump();
+      expect(find.byTooltip('Edit customer'), findsNothing);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Add'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Priya Sundaram'));
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Edit customer'), findsOneWidget);
+    });
+
+    testWidgets('the edit icon opens the customer form pre-filled',
+        (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(garments: _catalogue);
+      await tester.pumpWidget(host(
+          provider,
+          const NewOrderScreen(
+              initialCustomer: CustomerModel(
+                  id: 'c1', name: 'Priya Sundaram', phone: '9000000002'))));
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Edit customer'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit Customer'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Priya Sundaram'), findsOneWidget);
+      expect(find.widgetWithText(TextField, '9000000002'), findsOneWidget);
+    });
+
     testWidgets('picking a customer bills the order to them', (tester) async {
       final provider = AppProvider(autoLoad: false)
         ..seedForTest(
