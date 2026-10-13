@@ -45,6 +45,8 @@ class DemoSandboxTests(TestCase):
         self.assertEqual(self.client.get('/api/customers/', **spoof).status_code, 403)
         for path in ('/api/whatsapp/neonize/status/', '/api/meta-settings/', '/api/meta-social/analytics/'):
             self.assertEqual(self.client.get(path, **auth).status_code, 403, path)
+        # /api/meta/ is just the dropdown vocabularies the dashboard needs.
+        self.assertEqual(self.client.get('/api/meta/', **auth).status_code, 200)
         self.assertEqual(self.client.post('/api/shops/provision/', {'name': 'x'}, format='json',
                                           **auth).status_code, 403)
 

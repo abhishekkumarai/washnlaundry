@@ -42,7 +42,7 @@ STARTS_PER_HOUR = 8
 # Anything that can reach the outside world (WhatsApp, Instagram/Facebook, new
 # tenants, bulk imports) is off limits to a demo account.
 BLOCKED_PREFIXES = (
-    '/api/meta', '/api/whatsapp/', '/api/shops/provision', '/api/link-requests/',
+    '/api/meta-', '/api/whatsapp/', '/api/shops/provision', '/api/link-requests/',
     '/api/backup/', '/api/auth/',
 )
 
