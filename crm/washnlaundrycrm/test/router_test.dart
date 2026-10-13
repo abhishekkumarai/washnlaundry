@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'support_offline_http.dart';
 import 'package:washnlaundrycrm/models/order_model.dart';
 import 'package:washnlaundrycrm/providers/app_provider.dart';
 import 'package:washnlaundrycrm/providers/auth_provider.dart';
@@ -94,7 +95,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Sign in to manage your shop'), findsOneWidget);
 
-      await auth.signInAsDemo();
+      await withFakeDemoServer(auth.signInAsDemo);
       // Not `pumpAndSettle` past this point: the redirect lands on
       // `DashboardScreen`, whose `SidebarNavigation` never fully settles in
       // this harness (see the `/orders/:id` group below for the same note).
@@ -108,7 +109,7 @@ void main() {
         (tester) async {
       final auth = AuthProvider();
       await tester.pump();
-      await auth.signInAsDemo();
+      await withFakeDemoServer(auth.signInAsDemo);
       final provider = AppProvider(autoLoad: false)..seedForTest(customers: const []);
 
       await tester.pumpWidget(host(auth: auth, provider: provider, initialLocation: '/customers'));
@@ -129,7 +130,7 @@ void main() {
     setUp(() async {
       auth = AuthProvider();
       await authReady();
-      await auth.signInAsDemo();
+      await withFakeDemoServer(auth.signInAsDemo);
     });
 
     testWidgets('every sidebar section renders and sets the matching nav index',
@@ -162,7 +163,7 @@ void main() {
     setUp(() async {
       auth = AuthProvider();
       await authReady();
-      await auth.signInAsDemo();
+      await withFakeDemoServer(auth.signInAsDemo);
     });
 
     testWidgets('resolves to the matching order once loaded', (tester) async {

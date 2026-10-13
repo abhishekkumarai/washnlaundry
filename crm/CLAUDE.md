@@ -124,7 +124,7 @@ One Google login for everyone; the backend (`backend/api/auth.py`) verifies the 
 
 - `API_AUTH_ENFORCED` (default False) turns enforcement on in `IsStaff`/`IsOwner`/`IsOwnerOrStaffReadOnly`. Ship the Flutter app first, then flip it on Render. Make sure your own account is a superuser, has an Owner `Staff` row, or has an `OWNER` membership before flipping or nobody can get in. (`STAFF_EMAILS` was removed 2026-10-11; migration `0034` backfilled memberships from login-enabled Staff rows.)
 - A customer typing a phone number the store already has creates an `EmailLinkRequest` (no OTP, so no auto-link); the owner approves in Django admin or `POST /api/link-requests/<id>/approve/`.
-- Flutter: `AuthProvider.role` drives `router.dart`'s `authRedirect`; `ApiService.tokenProvider` attaches the token and refreshes once on 401. Staff form has a "Sign-in email" field (it sets `has_app_login`). Demo Mode is always `owner` and only works while enforcement is off.
+- Flutter: `AuthProvider.role` drives `router.dart`'s `authRedirect`; `ApiService.tokenProvider` attaches the token and refreshes once on 401. Staff form has a "Sign-in email" field (it sets `has_app_login`). Demo Mode is `owner` of its own throwaway sandbox shop (see **Demo Mode sandboxes**), so it works with enforcement on.
 - The same Flutter build serves both app.washnlaundry.com and customer.washnlaundry.com (role decides the view; Demo Mode is hidden on `customer.*`). The old Next.js portal was removed 2026-10-07.
 
 ### Multi-tenancy and shop lifecycle (2026-10-11)
@@ -135,6 +135,13 @@ One Google login for everyone; the backend (`backend/api/auth.py`) verifies the 
 - **Lifecycle:** `POST /api/shops/provision/` (signed-in, rate limited, `MAX_SHOPS_PER_USER`, validated/reserved slugs, blank business details, one catalogue seed) → `PATCH /api/shops/<id>/` (owner of that shop; `status/slug/subdomain/custom_domain/order_prefix` are superuser-only) → `DELETE` **archives** (`status=ARCHIVED`, Neonize disconnected; data kept) → hard delete only via `python manage.py purge_shop <slug> --confirm <slug>` on an archived shop (export first). Also `GET /shops/<id>/members/`, `POST /shops/<id>/transfer-ownership/`, `POST /shops/<id>/set-default/`.
 - Deleting a `Staff` row revokes its membership; the shop's last owner cannot be deleted/demoted/deactivated.
 - Open follow-ups: Postgres RLS is not a reliable second layer (permissive when `app.current_tenant` is unset; `SET LOCAL` outside a transaction is a no-op), `shop` columns are still nullable, and the Flutter shop switcher has no UI for members/transfer/archive yet.
+
+### Demo Mode sandboxes (added 2026-10-13)
+
+`signInAsDemo` calls `POST /api/demo/start/` (`backend/api/demo.py`): the server seeds a private shop `demo-<hex>` (a trimmed copy of `seed_db.SHOPS[1]`, ~0.3 s) plus a demo-only user `<hex>@demo.invalid` who is OWNER of just that shop, and returns `Bearer demo.<signed token>` (3 h). The client keeps it as its session token and sends the slug as `X-Tenant-ID`; real shops are unreachable because the user has no membership there.
+
+- **Writable but ephemeral.** `signOut` calls `POST /api/demo/end/`, which deletes the shop and user (credits first: `Credit.category` is PROTECT). Abandoned sandboxes are purged by `purge_expired_demos()` on every `/demo/start/` once older than `DEMO_TTL`. A page reload keeps the session (token persisted); closing the tab without logging out leaves it until the TTL.
+- **Guardrails.** 8 starts/hour/IP, max 25 live sandboxes, `DEMO_ENABLED=False` switches it off. Demo accounts get 403 on `/api/meta*`, `/api/whatsapp/`, `/api/shops/provision`, `/api/link-requests/`, `/api/backup/`, `/api/auth/` (anything that can message the outside world or create tenants); `demo-*` slugs can't be provisioned by users.
 
 ### Order photos & videos (added 2026-10-11)
 

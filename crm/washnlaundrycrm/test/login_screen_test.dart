@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:washnlaundrycrm/providers/auth_provider.dart';
 import 'package:washnlaundrycrm/screens/login_screen.dart';
+import 'support_offline_http.dart';
 
 Widget host(AuthProvider auth, Widget child) => ChangeNotifierProvider.value(
       value: auth,
@@ -47,9 +48,10 @@ void main() {
       final auth = AuthProvider();
       await Future<void>.delayed(Duration.zero);
 
-      await auth.signInAsDemo();
+      await withFakeDemoServer(auth.signInAsDemo);
 
       expect(auth.isSignedIn, isTrue);
+      expect(auth.demoShopSlug, 'demo-abc');
       expect(auth.userEmail, 'demo@washnlaundry.com');
       expect(auth.userName, 'Demo Owner');
       expect(auth.error, isNull);
@@ -66,10 +68,13 @@ void main() {
     test('signOut clears both the in-memory and persisted session', () async {
       final auth = AuthProvider();
       await Future<void>.delayed(Duration.zero);
-      await auth.signInAsDemo();
+      await withFakeDemoServer(auth.signInAsDemo);
       expect(auth.isSignedIn, isTrue);
 
-      await auth.signOut();
+      final calls = <String>[];
+      await withFakeDemoServer(auth.signOut, calls: calls);
+      // Logging out of Demo Mode destroys the server-side sandbox.
+      expect(calls.any((c) => c.endsWith('/demo/end/')), isTrue);
 
       expect(auth.isSignedIn, isFalse);
       expect(auth.userEmail, isNull);

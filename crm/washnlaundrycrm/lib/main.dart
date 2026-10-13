@@ -43,7 +43,12 @@ Future<void> main() async {
   authProvider.addListener(() async {
     final role = authProvider.role;
     final validRole = role == 'owner' || role == 'staff' || role == 'customer';
-    if (authProvider.me != null) {
+    if (authProvider.isDemo && authProvider.demoShopSlug != null) {
+      // Demo Mode lives entirely in its own sandbox shop.
+      if (appProvider.activeTenantId != authProvider.demoShopSlug) {
+        appProvider.setActiveTenant(authProvider.demoShopSlug);
+      }
+    } else if (authProvider.me != null) {
       final me = authProvider.me!;
       final rawShops = me['shops'] as List?;
       if (rawShops != null) {

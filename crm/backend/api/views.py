@@ -137,7 +137,7 @@ class ShopViewSet(viewsets.ModelViewSet):
         if slug:
             if len(slug) > 100 or not SLUG_RE.match(slug):
                 return Response({'detail': 'Slug may only contain lowercase letters, digits and hyphens.'}, status=400)
-            if slug in RESERVED_SHOP_SLUGS:
+            if slug in RESERVED_SHOP_SLUGS or slug.startswith('demo-'):
                 return Response({'detail': 'That slug is reserved.'}, status=400)
             if Shop.objects.filter(slug=slug).exists():
                 return Response({'detail': 'That slug is already taken.'}, status=400)

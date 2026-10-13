@@ -19,7 +19,8 @@ class TenantMiddleware:
 
     # Paths that work without a tenant: they look at the caller's memberships.
     # (The customer portal is cross-shop: a customer's rows are bound to them, not a tenant.)
-    TENANTLESS_PREFIXES = ('/api/me/', '/api/shops/', '/api/auth/', '/api/customer/', '/api/link-requests/')
+    TENANTLESS_PREFIXES = ('/api/me/', '/api/shops/', '/api/auth/', '/api/customer/', '/api/link-requests/',
+                          '/api/demo/')
 
     EXCLUDED_SUBDOMAINS = {'app', 'customer', 'www', 'api', 'localhost', '127', 'admin', 'testserver'}
 

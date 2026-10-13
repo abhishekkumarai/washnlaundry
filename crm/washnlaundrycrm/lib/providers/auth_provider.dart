@@ -53,6 +53,10 @@ class AuthProvider extends ChangeNotifier {
   bool _isDemo = false;
   bool get isDemo => _isDemo;
 
+  /// Slug of this session's private demo shop (Demo Mode only).
+  String? _demoShopSlug;
+  String? get demoShopSlug => _demoShopSlug;
+
   /// Session token from email/password sign-in (`Bearer app.…`), if that's how
   /// the user signed in. Google sign-in uses the Google ID token instead.
   String? _appToken;
@@ -141,6 +145,16 @@ class AuthProvider extends ChangeNotifier {
       _isDemo = prefs.getBool('is_demo') ?? false;
       if (_isDemo) _role = 'owner';
       _appToken = prefs.getString('app_token');
+      _demoShopSlug = prefs.getString('demo_shop');
+      // A demo flag without its sandbox (e.g. left over from an older build)
+      // can't reach any data: end it so the user starts a fresh one.
+      if (_isDemo && (_appToken == null || _demoShopSlug == null)) {
+        _isDemo = false;
+        _role = null;
+        _isPersistedSignedIn = false;
+        await prefs.remove('is_demo');
+        await prefs.remove('is_signed_in');
+      }
 
       if (isConfigured) {
         await _googleSignIn.initialize(clientId: _clientId);
@@ -320,7 +334,20 @@ class AuthProvider extends ChangeNotifier {
       _guard(() async => _startPasswordSession(
           await ApiService.resetPassword(token, password)));
 
+  /// Asks the server for a private sandbox shop with sample data. Everything the
+  /// user does in Demo Mode lands in that shop, which is deleted on [signOut]
+  /// (or by the server once it expires).
   Future<void> signInAsDemo() async {
+    Map<String, dynamic> demo;
+    try {
+      demo = await ApiService.startDemo();
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return;
+    }
+    _appToken = demo['token'] as String;
+    _demoShopSlug = (demo['shop'] as Map)['slug'] as String;
     _isDemo = true;
     _role = 'owner';
     _isPersistedSignedIn = true;
@@ -329,6 +356,9 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('is_signed_in', true);
     await prefs.setBool('is_demo', true);
+    await prefs.setString('app_token', _appToken!);
+    await prefs.setString('demo_shop', _demoShopSlug!);
+    await prefs.setString('active_tenant_id', _demoShopSlug!);
     await prefs.setString('user_email', 'demo@washnlaundry.com');
     await prefs.setString('user_name', 'Demo Owner');
     _error = null;
@@ -336,10 +366,16 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    // Leaving Demo Mode destroys its sandbox and everything entered in it.
+    final demoToken = _isDemo ? _appToken : null;
+    if (demoToken != null) await ApiService.endDemo(demoToken);
     if (isConfigured) {
       await _googleSignIn.signOut();
     }
     _account = null;
+    _appToken = null;
+    _isDemo = false;
+    _demoShopSlug = null;
     _isPersistedSignedIn = false;
     _persistedEmail = null;
     _persistedName = null;
@@ -347,6 +383,8 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('is_demo');
     await prefs.remove('app_token');
+    await prefs.remove('demo_shop');
+    await prefs.remove('active_tenant_id');
     await prefs.remove('is_signed_in');
     await prefs.remove('user_email');
     await prefs.remove('user_name');

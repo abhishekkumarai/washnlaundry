@@ -1,4 +1,5 @@
 from . import media_views
+from .demo import demo_start, demo_end
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
@@ -53,6 +54,8 @@ urlpatterns = [
     path('meta-social/analytics/', meta_social_analytics, name='meta-social-analytics'),
     path('meta-social/sync/', meta_social_sync, name='meta-social-sync'),
     path('me/', me, name='me'),
+    path('demo/start/', demo_start, name='demo-start'),
+    path('demo/end/', demo_end, name='demo-end'),
     path('auth/signup/', signup, name='auth-signup'),
     path('auth/verify-email/', verify_email, name='auth-verify-email'),
     path('auth/login/', login, name='auth-login'),

@@ -25,7 +25,7 @@ from django.core import signing
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 from rest_framework.authentication import BaseAuthentication
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from .models import Customer, Staff
@@ -77,6 +77,9 @@ def verified_email(request):
     token = header[7:].strip()
     if token.startswith(APP_TOKEN_PREFIX):
         return _app_token_email(token[len(APP_TOKEN_PREFIX):])
+    if token.startswith('demo.'):
+        from .demo import demo_token_email
+        return demo_token_email(token[len('demo.'):])
     if not settings.GOOGLE_CLIENT_ID:
         return None
     try:
@@ -374,6 +377,9 @@ class GoogleTokenAuthentication(BaseAuthentication):
             if settings.API_AUTH_ENFORCED:
                 raise AuthenticationFailed('Invalid or expired Google sign-in.')
             return None
+        from .demo import BLOCKED_PREFIXES, is_demo_email
+        if is_demo_email(email) and request.path.startswith(BLOCKED_PREFIXES):
+            raise PermissionDenied('Not available in Demo Mode.')
         shop = getattr(request, 'shop', None)
         return resolve_principal(email, shop=shop), None
 

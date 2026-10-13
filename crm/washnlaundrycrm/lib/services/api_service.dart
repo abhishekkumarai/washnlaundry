@@ -189,6 +189,19 @@ class ApiService {
         'return_to': _returnTo,
       });
 
+  /// Starts a private, throwaway Demo Mode sandbox. Returns
+  /// `{token, shop: {id, slug, name}, expires_in}`.
+  static Future<Map<String, dynamic>> startDemo() async =>
+      Map<String, dynamic>.from(
+          await _send('POST', '/demo/start/', auth: false, body: {}) as Map);
+
+  /// Deletes the sandbox behind [token]; failures are ignored (it expires anyway).
+  static Future<void> endDemo(String token) async {
+    try {
+      await _send('POST', '/demo/end/', auth: false, body: {'token': token});
+    } catch (_) {}
+  }
+
   /// Returns `{token, email}`.
   static Future<Map<String, dynamic>> logIn(String email, String password) async =>
       Map<String, dynamic>.from(await _send('POST', '/auth/login/',
