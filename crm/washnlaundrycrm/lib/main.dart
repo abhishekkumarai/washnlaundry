@@ -103,7 +103,9 @@ Future<void> main() async {
     }
     // Customers get the owner's CRM data and layout (minus their hidden
     // views, see RoleViews).
-    if (validRole) appProvider.role = role == 'customer' ? 'owner' : role!;
+    // Customers keep their own role so AppProvider loads only their orders and the rate card
+    // (`_loadForCustomer`). Loading the owner's data for them 403s once the API enforces auth.
+    if (validRole) appProvider.role = role!;
     if (validRole && !loadedFor) appProvider.loadDataFromBackend();
     loadedFor = validRole;
   });

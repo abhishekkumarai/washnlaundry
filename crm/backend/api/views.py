@@ -351,6 +351,9 @@ class CustomerViewSet(viewsets.ModelViewSet):
             raise ValidationError({'email': 'Enter a valid email address.'})
         if not 8 <= len(password) <= 128:
             raise ValidationError({'password': 'Password must be 8-128 characters.'})
+        weak = weak_password_message(password, email, customer.name)
+        if weak:
+            raise ValidationError({'password': weak})
         if Customer.objects.filter(shop=shop, email__iexact=email).exclude(pk=customer.pk).exists():
             raise ValidationError({'email': 'Another customer already uses this email.'})
 
@@ -953,6 +956,9 @@ class StaffViewSet(viewsets.ModelViewSet):
             raise ValidationError({'email': 'Enter a valid email address.'})
         if not 8 <= len(password) <= 128:
             raise ValidationError({'password': 'Password must be 8-128 characters.'})
+        weak = weak_password_message(password, email, staff.name)
+        if weak:
+            raise ValidationError({'password': weak})
         if Staff.objects.filter(shop=shop, email__iexact=email).exclude(pk=staff.pk).exists():
             raise ValidationError({'email': 'Another staff member already uses this email.'})
 
@@ -1737,6 +1743,7 @@ def create_lead(request):
 
 
 from .netutils import client_ip as _client_ip  # noqa: E402
+from .passwords import weak_password_message  # noqa: E402
 
 
 def _with_cors(response, origin):

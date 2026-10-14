@@ -1,6 +1,7 @@
 {
   "customer": {
     "hiddenViews": [
+      "New Order",
       "Dashboard",
       "Customers",
       "Services",

@@ -31,7 +31,6 @@ class VerifyEmailScreen extends StatefulWidget {
 
 class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   String? _error;
-  bool _done = false;
 
   @override
   void initState() {
@@ -45,14 +44,16 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       setState(() => _error = 'This confirmation link is incomplete.');
       return;
     }
+    // Grab the router first: signing in rebuilds this page, so `mounted` may be false
+    // by the time the call returns, and the redirect must still happen.
+    final router = GoRouter.of(context);
     final err = await context.read<AuthProvider>().confirmEmail(token);
-    if (!mounted) return;
-    if (err != null) {
-      setState(() => _error = err);
-    } else {
-      setState(() => _done = true);
-      context.go('/');
+    if (err == null) {
+      router.go('/');
+      return;
     }
+    if (!mounted) return;
+    setState(() => _error = err);
   }
 
   @override
@@ -71,12 +72,12 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         ],
       ));
     }
-    return _frame(Column(
+    return _frame(const Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (!_done) const CircularProgressIndicator(strokeWidth: 2.5),
-        const SizedBox(height: 16),
-        const Text('Confirming your email…', style: TextStyle(color: _muted)),
+        CircularProgressIndicator(strokeWidth: 2.5),
+        SizedBox(height: 16),
+        Text('Confirming your email…', style: TextStyle(color: _muted)),
       ],
     ));
   }
@@ -118,18 +119,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       _busy = true;
       _error = null;
     });
+    final router = GoRouter.of(context);
     final err = await context
         .read<AuthProvider>()
         .resetPassword(widget.token ?? '', _password.text);
-    if (!mounted) return;
     if (err == null) {
-      context.go('/');
-    } else {
-      setState(() {
-        _busy = false;
-        _error = err;
-      });
+      router.go('/');
+      return;
     }
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _error = err;
+    });
   }
 
   @override

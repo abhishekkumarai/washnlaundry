@@ -189,7 +189,10 @@ def customer_me(request):
     phone = clean_phone(body.get('phone'))
     if not name or not phone:
         return JsonResponse({'detail': 'Enter your name and a valid phone number.'}, status=400)
-    customer, pending = register_customer(email, name, phone)
+    try:
+        customer, pending = register_customer(email, name, phone)
+    except ValueError:  # several shops and none to file this customer under
+        return JsonResponse({'detail': 'Sign-up is not available for this store yet. Please call us.'}, status=503)
     if pending:
         return JsonResponse({
             'pending': True,

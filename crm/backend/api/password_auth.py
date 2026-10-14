@@ -70,6 +70,7 @@ def _email(raw):
 
 
 from .netutils import client_ip as _client_ip  # noqa: E402
+from .passwords import weak_password_message  # noqa: E402
 
 
 def _throttled(key, limit, window=900):
@@ -150,6 +151,9 @@ def signup(request):
     phone = clean_phone(body.get('phone'))
     if not phone:
         return _err('Enter a valid phone number (10-15 digits).', 400)
+    weak = weak_password_message(password, email, str(body.get('name') or ''))
+    if weak:
+        return _err(weak, 400)
     if _throttled(f'signup:ip:{_client_ip(request)}', 10, 3600) or _throttled(f'signup:{email}', 5, 3600):
         return _err('Too many attempts. Try again later.', 429)
 
@@ -284,6 +288,9 @@ def reset_password(request):
         user = None
     if user is None or not default_token_generator.check_token(user, token):
         return invalid
+    weak = weak_password_message(password, user.email or user.username, user.first_name)
+    if weak:
+        return _err(weak, 400)
     user.set_password(password)
     user.is_active = True  # they just proved they own the mailbox
     user.save()
