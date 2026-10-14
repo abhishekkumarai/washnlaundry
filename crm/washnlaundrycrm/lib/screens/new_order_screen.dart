@@ -30,6 +30,16 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   /// Empty means "All". Matches on [GarmentItemModel.categoryName].
   String _selectedCategory = '';
 
+  /// Multi-select tag filter: empty means no tag filter applied.
+  final Set<String> _selectedTags = <String>{};
+
+  List<String> _tagsForCategory(AppProvider provider, String categoryName) {
+    for (final c in provider.categories) {
+      if (c.name == categoryName) return c.tags;
+    }
+    return const [];
+  }
+
   /// Phone width only: the cart panel is slid up over the item list. (Below
   /// the wide breakpoint the cart no longer sits at the very bottom of the
   /// page; a bar pinned to the bottom opens it.)
@@ -286,16 +296,36 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     final selectedCategory =
         categoryNames.contains(_selectedCategory) ? _selectedCategory : '';
 
+    final categoryTagsByName = <String, List<String>>{
+      for (final c in provider.categories) c.name: c.tags,
+    };
+
+    final allAvailableTags = <String>{
+      for (final c in provider.categories)
+        if (c.isActive && categoryNames.contains(c.name))
+          if (selectedCategory.isEmpty || c.name == selectedCategory)
+            ...c.tags,
+    }.toList()
+      ..sort();
+
     final filteredItems = garments.where((item) {
       final matchesCategory =
           selectedCategory.isEmpty || item.categoryName == selectedCategory;
-      final matchesSearch = _searchQuery.isEmpty ||
-          item.name.toLowerCase().contains(_searchQuery.toLowerCase());
+      final tags = categoryTagsByName[item.categoryName] ?? const [];
+      final matchesTags = _selectedTags.isEmpty ||
+          _selectedTags.any((selTag) =>
+              tags.any((t) => t.toLowerCase() == selTag.toLowerCase()));
+      final q = _searchQuery.toLowerCase();
+      final matchesSearch = q.isEmpty ||
+          item.name.toLowerCase().contains(q) ||
+          item.categoryName.toLowerCase().contains(q) ||
+          tags.any((t) => t.toLowerCase().contains(q));
       final categoryIsActive =
           !inactiveCategoryNames.contains(item.categoryName);
       return item.isActive &&
           categoryIsActive &&
           matchesCategory &&
+          matchesTags &&
           matchesSearch;
     }).toList();
 
@@ -412,6 +442,87 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                       },
                     ),
                   ),
+
+                  // Dedicated Multi-Select Tag Chips Row
+                  if (allAvailableTags.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 32,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.tag_rounded,
+                              size: 16, color: Color(0xFF94A3B8)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: allAvailableTags.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 6),
+                              itemBuilder: (context, idx) {
+                                final tag = allAvailableTags[idx];
+                                final isSel = _selectedTags.contains(tag);
+                                return FilterChip(
+                                  label: Text(
+                                    tag,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: isSel
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
+                                      color: isSel
+                                          ? const Color(0xFF1D4ED8)
+                                          : const Color(0xFF475569),
+                                    ),
+                                  ),
+                                  selected: isSel,
+                                  selectedColor: const Color(0xFFDBEAFE),
+                                  backgroundColor: const Color(0xFFF1F5F9),
+                                  checkmarkColor: const Color(0xFF1D4ED8),
+                                  side: BorderSide(
+                                    color: isSel
+                                        ? const Color(0xFF93C5FD)
+                                        : const Color(0xFFE2E8F0),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  onSelected: (selected) {
+                                    setState(() {
+                                      if (selected) {
+                                        _selectedTags.add(tag);
+                                      } else {
+                                        _selectedTags.remove(tag);
+                                      }
+                                    });
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                          if (_selectedTags.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            InkWell(
+                              onTap: () => setState(() => _selectedTags.clear()),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 4),
+                                child: Text(
+                                  'Clear (${_selectedTags.length})',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFDC2626),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1667,7 +1778,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         title: 'No items here',
         subtitle: _searchQuery.isNotEmpty
             ? 'Nothing matches "$_searchQuery".'
-            : 'This category has no active items yet.',
+            : _selectedTags.isNotEmpty
+                ? 'No items match selected tag(s): ${_selectedTags.join(", ")}.'
+                : 'This category has no active items yet.',
       );
     }
 
@@ -1758,6 +1871,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   Widget _buildItemTableRow(GarmentItemModel item) {
     final qty = _cartQuantities[item.id] ?? 0;
     final art = _artFor(item.name);
+    final tags = _tagsForCategory(context.read<AppProvider>(), item.categoryName);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1801,21 +1915,44 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             flex: 2,
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  item.categoryName.isEmpty ? 'General' : item.categoryName,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF475569),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      item.categoryName.isEmpty ? 'General' : item.categoryName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
                   ),
-                ),
+                  if (tags.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Wrap(
+                      spacing: 4,
+                      children: [
+                        for (final t in tags.take(2))
+                          Text(
+                            '#$t',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF2563EB),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -1901,6 +2038,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   Widget _itemRowCompact(GarmentItemModel item) {
     final qty = _cartQuantities[item.id] ?? 0;
     final art = _artFor(item.name);
+    final tags = _tagsForCategory(context.read<AppProvider>(), item.categoryName);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
@@ -1958,6 +2096,19 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     ),
                   ],
                 ),
+                if (tags.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    tags.map((t) => '#$t').join(' '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF2563EB),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1971,6 +2122,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   Widget _itemCard(GarmentItemModel item) {
     final qty = _cartQuantities[item.id] ?? 0;
     final art = _artFor(item.name);
+    final tags = _tagsForCategory(context.read<AppProvider>(), item.categoryName);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -2017,6 +2169,41 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             ),
           ),
           const SizedBox(height: 10),
+
+          // Category & Tags pill
+          Wrap(
+            spacing: 4,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                item.categoryName.isEmpty ? 'General' : item.categoryName,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              for (final t in tags.take(2))
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '#$t',
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF1D4ED8),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
 
           // Name & Price
           Text(item.name,
