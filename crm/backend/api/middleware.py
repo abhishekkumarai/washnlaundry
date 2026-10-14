@@ -30,6 +30,13 @@ class TenantMiddleware:
     def __call__(self, request):
         shop = self.resolve_tenant(request)
 
+        # Sign-in, /me and the other tenantless endpoints must work whatever shop a client
+        # last used: a stale X-Tenant-ID (a deleted demo sandbox, an archived shop) used to
+        # 404/403 here and lock people out of signing in at all. Ignore it on those paths.
+        if request.path.startswith(self.TENANTLESS_PREFIXES) and (
+                shop is False or (shop and getattr(shop, 'status', None) != 'ACTIVE')):
+            shop = None
+
         # If a specific tenant was requested but could not be resolved
         if shop is False:
             return JsonResponse({'detail': 'Tenant shop not found.'}, status=404)

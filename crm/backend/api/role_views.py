@@ -53,7 +53,7 @@ def me(request):
             owned_count = django_user.shop_memberships.filter(is_active=True, role='OWNER').count()
         data['needs_shop_onboarding'] = (owned_count == 0)
 
-    if user.role == CUSTOMER:
+    if user.role == CUSTOMER and user.customer is not None:
         c = user.customer
         data['customer'] = {
             **profile_json(c),

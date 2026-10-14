@@ -41,6 +41,11 @@ Future<void> main() async {
   // than at startup.
   var loadedFor = false;
   authProvider.addListener(() async {
+    // Signed out: drop the previous session's shop so it is never sent to sign-in.
+    if (!authProvider.isSignedIn && !authProvider.initializing) {
+      if (appProvider.activeTenantId != null) appProvider.clearTenant();
+      loadedFor = false;
+    }
     final role = authProvider.role;
     final validRole = role == 'owner' || role == 'staff' || role == 'customer';
     if (authProvider.isDemo && authProvider.demoShopSlug != null) {

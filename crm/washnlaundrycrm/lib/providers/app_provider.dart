@@ -207,6 +207,16 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Forgets the active shop (and the saved choice). Called on sign-out so the next
+  /// sign-in never sends the previous session's shop in `X-Tenant-ID`.
+  Future<void> clearTenant() async {
+    _activeTenantId = null;
+    _availableShops = [];
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('active_tenant_id');
+  }
+
   Future<void> switchShop(String tenantSlugOrId) async {
     _activeTenantId = tenantSlugOrId;
     final prefs = await SharedPreferences.getInstance();

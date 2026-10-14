@@ -344,8 +344,11 @@ def resolve_principal(email, shop=None):
         if 'Staff' in group_names:
             return Principal(email, STAFF, user=user, shop=shop)
         if 'Customers' in group_names or 'Customer' in group_names:
+            # Every plain account is put in this group at sign-in, so the role only holds
+            # when there is a Customer record behind it (else /me and the portal break).
             c = customer_for_email(email)
-            return Principal(email, CUSTOMER, customer=c, user=user, shop=shop)
+            if c:
+                return Principal(email, CUSTOMER, customer=c, user=user, shop=shop)
 
         # Fallback to sync from staff records
         synced_role = sync_user_groups(user)
@@ -355,7 +358,8 @@ def resolve_principal(email, shop=None):
             return Principal(email, STAFF, user=user, shop=shop)
         if synced_role == CUSTOMER:
             c = customer_for_email(email)
-            return Principal(email, CUSTOMER, customer=c, user=user, shop=shop)
+            if c:
+                return Principal(email, CUSTOMER, customer=c, user=user, shop=shop)
     else:
         # Fallback for Google tokens before local User creation
         if is_owner_email(email):
