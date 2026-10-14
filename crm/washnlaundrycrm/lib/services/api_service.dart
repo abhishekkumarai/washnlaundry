@@ -211,6 +211,12 @@ class ApiService {
       Map<String, dynamic>.from(await _send('POST', '/auth/verify-email/',
           auth: false, body: {'token': token}) as Map);
 
+  /// A fresh confirmation email for an expired link. Returns `{ok: true}` or
+  /// `{already_confirmed: true}`.
+  static Future<Map<String, dynamic>> resendVerification(String token) async =>
+      Map<String, dynamic>.from(await _send('POST', '/auth/resend-verification/',
+          auth: false, body: {'token': token, 'return_to': _returnTo}) as Map);
+
   static Future<void> forgotPassword(String email) =>
       _send('POST', '/auth/forgot-password/',
           auth: false, body: {'email': email, 'return_to': _returnTo});

@@ -97,6 +97,23 @@ class GarmentCategorySerializer(TenantModelSerializer):
         model = GarmentCategory
         fields = '__all__'
 
+    def validate_tags(self, value):
+        if value is None:
+            return []
+        if isinstance(value, str):
+            # Allow comma-separated strings as well
+            value = [t.strip() for t in value.split(',') if t.strip()]
+        elif not isinstance(value, list):
+            raise serializers.ValidationError('Tags must be a list of strings.')
+        cleaned = []
+        for tag in value:
+            if not isinstance(tag, str):
+                continue
+            t = tag.strip()
+            if t and t not in cleaned:
+                cleaned.append(t)
+        return cleaned
+
 
 class OrderItemSerializer(TenantModelSerializer):
     class Meta:

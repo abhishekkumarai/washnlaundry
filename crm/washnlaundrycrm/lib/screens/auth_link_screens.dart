@@ -3,23 +3,68 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
+import '../widgets/brand_logo.dart';
 
 const _brandBlue = Color(0xFF182C4F);
 const _ink = Color(0xFF141A24);
 const _muted = Color(0xFF64748B);
 
+/// Brand header + a white card, the same look as the login page, so the pages an email link
+/// opens do not feel like a different product.
 Widget _frame(Widget child) => Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
       body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 380),
-          child: Padding(padding: const EdgeInsets.all(24), child: child),
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const BrandLogo(size: 72),
+                  const SizedBox(height: 12),
+                  RichText(
+                    text: const TextSpan(children: [
+                      TextSpan(
+                          text: 'WashN',
+                          style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: _ink,
+                              letterSpacing: -0.5)),
+                      TextSpan(
+                          text: 'Laundry',
+                          style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: _brandBlue,
+                              letterSpacing: -0.5)),
+                    ]),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE4E0D8)),
+                    ),
+                    child: child,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
 
 /// `/verify?token=…`: the link in the confirmation email. Confirms the address,
-/// signs the user in, and lets the role-based router take it from there.
+/// shows a short "confirmed" step, signs the user in, and lets the role-based router
+/// take it from there. A bad or expired link offers a fresh email.
 class VerifyEmailScreen extends StatefulWidget {
   const VerifyEmailScreen({super.key, required this.token});
 
@@ -31,6 +76,13 @@ class VerifyEmailScreen extends StatefulWidget {
 
 class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   String? _error;
+  int? _status;
+  bool _confirmed = false;
+  bool _resending = false;
+  String? _resendNote;
+
+  /// Invalid or expired (not "already used" or "incomplete"): a new link can be sent.
+  bool get _canResend => _status == 400 && (widget.token ?? '').isNotEmpty;
 
   @override
   void initState() {
@@ -47,28 +99,84 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     // Grab the router first: signing in rebuilds this page, so `mounted` may be false
     // by the time the call returns, and the redirect must still happen.
     final router = GoRouter.of(context);
-    final err = await context.read<AuthProvider>().confirmEmail(token);
+    final auth = context.read<AuthProvider>();
+    final err = await auth.confirmEmail(token);
     if (err == null) {
+      if (mounted) setState(() => _confirmed = true);
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
       router.go('/');
       return;
     }
     if (!mounted) return;
-    setState(() => _error = err);
+    setState(() {
+      _error = err;
+      _status = auth.lastConfirmStatus;
+    });
+  }
+
+  Future<void> _resend() async {
+    setState(() {
+      _resending = true;
+      _resendNote = null;
+    });
+    String note;
+    try {
+      final res = await ApiService.resendVerification(widget.token ?? '');
+      note = res['already_confirmed'] == true
+          ? 'This email is already confirmed. Sign in with your password.'
+          : 'We sent a new confirmation link. Check your inbox.';
+    } on ApiException catch (e) {
+      note = e.message;
+    }
+    if (!mounted) return;
+    setState(() {
+      _resending = false;
+      _resendNote = note;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_confirmed) {
+      return _frame(const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle_rounded, size: 44, color: Color(0xFF16A34A)),
+          SizedBox(height: 12),
+          Text('Email confirmed',
+              style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w800, color: _ink)),
+          SizedBox(height: 6),
+          Text('Signing you in…', style: TextStyle(color: _muted)),
+        ],
+      ));
+    }
     if (_error != null) {
       return _frame(Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(_error!,
+          // Once a new link has been requested, the note replaces the red error.
+          Text(_resendNote ?? _error!,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFFDC2626))),
+              style: TextStyle(
+                  color: _resendNote == null ? const Color(0xFFDC2626) : _ink)),
           const SizedBox(height: 16),
-          FilledButton(
-              onPressed: () => context.go('/login'),
-              child: const Text('Back to sign in')),
+          if (_canResend)
+            FilledButton(
+              onPressed: _resending ? null : _resend,
+              style: FilledButton.styleFrom(backgroundColor: _brandBlue),
+              child: Text(_resending ? 'Sending…' : 'Resend confirmation email'),
+            ),
+          const SizedBox(height: 8),
+          _canResend
+              ? TextButton(
+                  onPressed: () => context.go('/login'),
+                  child: const Text('Back to sign in'))
+              : FilledButton(
+                  onPressed: () => context.go('/login'),
+                  style: FilledButton.styleFrom(backgroundColor: _brandBlue),
+                  child: const Text('Back to sign in')),
         ],
       ));
     }

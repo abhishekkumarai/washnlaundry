@@ -80,7 +80,7 @@ class ConfirmationLinkTests(TestCase):
         self.assertEqual(first.status_code, 200)
         self.assertIn('token', first.json())
         again = self.client.post('/api/auth/verify-email/', {'token': self.token}, format='json')
-        self.assertEqual(again.status_code, 400)
+        self.assertEqual(again.status_code, 409)
         self.assertNotIn('token', again.json())
         self.assertIn('already been used', again.json()['error'] if 'error' in again.json() else str(again.json()))
         # The account itself still works with the password.
@@ -94,3 +94,39 @@ class ConfirmationLinkTests(TestCase):
             old = signing.dumps({'e': 'new@x.com', 'p': '9123456780'}, salt='email-verify')
         res = self.client.post('/api/auth/verify-email/', {'token': old}, format='json')
         self.assertEqual(res.status_code, 400)
+
+    def _expired_token(self, email='new@x.com', phone='9123456780'):
+        import time
+        from django.core import signing
+        with mock.patch('time.time', return_value=time.time() - 4 * 24 * 3600):
+            return signing.dumps({'e': email, 'p': phone}, salt='email-verify')
+
+    def test_an_expired_link_can_be_resent_and_the_new_link_works_once(self):
+        old = self._expired_token()
+        self.assertEqual(self.client.post('/api/auth/verify-email/', {'token': old}, format='json').status_code, 400)
+        before = len(self.sent)
+        res = self.client.post('/api/auth/resend-verification/', {'token': old}, format='json',
+                               HTTP_ORIGIN='https://app.washnlaundry.com')
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(len(self.sent), before + 1)
+        self.assertEqual(self.sent[-1][0], 'new@x.com')
+        self.assertIn('https://app.washnlaundry.com/verify?token=', self.sent[-1][1])
+        fresh = re.search(r'token=([^\s]+)', self.sent[-1][1]).group(1)
+        first = self.client.post('/api/auth/verify-email/', {'token': fresh}, format='json')
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(self.client.post('/api/auth/verify-email/', {'token': fresh}, format='json').status_code, 409)
+
+    def test_resend_is_a_no_op_once_confirmed_and_rejects_forged_tokens(self):
+        self.client.post('/api/auth/verify-email/', {'token': self.token}, format='json')
+        before = len(self.sent)
+        done = self.client.post('/api/auth/resend-verification/', {'token': self.token}, format='json')
+        self.assertTrue(done.json().get('already_confirmed'))
+        self.assertEqual(len(self.sent), before)
+        forged = self.client.post('/api/auth/resend-verification/', {'token': 'forged.token'}, format='json')
+        self.assertEqual(forged.status_code, 400)
+
+    def test_resend_is_rate_limited_per_email(self):
+        old = self._expired_token()
+        codes = [self.client.post('/api/auth/resend-verification/', {'token': old}, format='json').status_code
+                 for _ in range(4)]
+        self.assertEqual(codes, [200, 200, 200, 429])

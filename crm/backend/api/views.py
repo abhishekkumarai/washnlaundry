@@ -531,6 +531,16 @@ class GarmentCategoryViewSet(viewsets.ModelViewSet):
     queryset = GarmentCategory.objects.all().order_by('display_order')
     serializer_class = GarmentCategorySerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        tag = self.request.query_params.get('tag')
+        if tag:
+            qs = qs.filter(tags__icontains=tag.strip())
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(tags__icontains=search))
+        return qs
+
     @action(
         detail=False,
         methods=['get'],
@@ -693,6 +703,16 @@ class GarmentItemViewSet(viewsets.ModelViewSet):
         category = self.request.query_params.get('category')
         if category:
             qs = qs.filter(category_id=category)
+        tag = self.request.query_params.get('tag')
+        if tag:
+            qs = qs.filter(category__tags__icontains=tag.strip())
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(name__icontains=search)
+                | Q(category__name__icontains=search)
+                | Q(category__tags__icontains=search)
+            )
         return qs
 
 

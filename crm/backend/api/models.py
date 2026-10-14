@@ -304,6 +304,7 @@ class GarmentCategory(TenantModel):
     icon = models.CharField(max_length=50, default='Shirt')
     display_order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    tags = models.JSONField(default=list, blank=True)
 
     class Meta:
         verbose_name_plural = 'Garment categories'

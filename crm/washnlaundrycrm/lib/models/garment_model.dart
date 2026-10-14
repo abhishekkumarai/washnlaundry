@@ -93,6 +93,7 @@ class GarmentCategoryModel {
   final String id;
   final String name;
   final String icon;
+  final List<String> tags;
   final int displayOrder;
   final bool isActive;
   final int itemCount;
@@ -104,6 +105,7 @@ class GarmentCategoryModel {
     required this.id,
     required this.name,
     this.icon = 'Shirt',
+    this.tags = const [],
     this.displayOrder = 0,
     this.isActive = true,
     this.itemCount = 0,
@@ -120,10 +122,15 @@ class GarmentCategoryModel {
   factory GarmentCategoryModel.fromJson(Map<String, dynamic> json) {
     final range = json['price_range'] as Map<String, dynamic>? ?? const {};
     final rawItems = json['items'] as List? ?? const [];
+    final rawTags = json['tags'] as List? ?? const [];
     return GarmentCategoryModel(
       id: json['id'].toString(),
       name: json['name'] ?? '',
       icon: json['icon'] ?? 'Shirt',
+      tags: rawTags
+          .map((t) => t.toString().trim())
+          .where((t) => t.isNotEmpty)
+          .toList(),
       displayOrder: json['display_order'] ?? 0,
       isActive: json['is_active'] ?? true,
       itemCount: json['item_count'] ?? rawItems.length,

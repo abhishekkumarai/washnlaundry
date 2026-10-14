@@ -15,7 +15,7 @@ from .views import (
     neonize_status, neonize_connect, neonize_disconnect,
     export_backup, export_section, import_section,
 )
-from .password_auth import signup, verify_email, login, forgot_password, reset_password
+from .password_auth import signup, verify_email, resend_verification, login, forgot_password, reset_password
 from .role_views import me, link_requests, link_request_approve, link_request_reject
 from .customer_views import (
     customer_me, customer_orders, customer_order_detail, customer_rate_card,
@@ -58,6 +58,7 @@ urlpatterns = [
     path('demo/end/', demo_end, name='demo-end'),
     path('auth/signup/', signup, name='auth-signup'),
     path('auth/verify-email/', verify_email, name='auth-verify-email'),
+    path('auth/resend-verification/', resend_verification, name='auth-resend-verification'),
     path('auth/login/', login, name='auth-login'),
     path('auth/forgot-password/', forgot_password, name='auth-forgot-password'),
     path('auth/reset-password/', reset_password, name='auth-reset-password'),

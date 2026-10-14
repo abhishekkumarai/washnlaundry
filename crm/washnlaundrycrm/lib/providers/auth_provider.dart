@@ -324,8 +324,19 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> confirmEmail(String token) => _guard(() async =>
-      _startPasswordSession(await ApiService.verifyEmail(token)));
+  /// HTTP status of the last failed [confirmEmail] (400 invalid/expired, 409 already used).
+  int? lastConfirmStatus;
+
+  Future<String?> confirmEmail(String token) async {
+    lastConfirmStatus = null;
+    try {
+      await _startPasswordSession(await ApiService.verifyEmail(token));
+      return null;
+    } on ApiException catch (e) {
+      lastConfirmStatus = e.statusCode;
+      return e.message;
+    }
+  }
 
   Future<String?> requestPasswordReset(String email) =>
       _guard(() => ApiService.forgotPassword(email.trim()));

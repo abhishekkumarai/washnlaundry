@@ -435,6 +435,7 @@ def export_services_json(category_ids=None):
             'id': cat.id,
             'name': cat.name,
             'icon': cat.icon,
+            'tags': cat.tags or [],
             'display_order': cat.display_order,
             'is_active': cat.is_active,
             'items': items,

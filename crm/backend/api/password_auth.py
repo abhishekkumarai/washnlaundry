@@ -189,14 +189,14 @@ def verify_email(request):
     try:
         data = signing.loads(str(body.get('token') or ''), salt=VERIFY_SALT, max_age=VERIFY_MAX_AGE)
     except signing.BadSignature:
-        return _err('This confirmation link is invalid or has expired. Sign up again.', 400)
+        return _err('This confirmation link is invalid or has expired.', 400)
     user = get_user_model().objects.filter(username=data.get('e')).first()
     if user is None:
-        return _err('This confirmation link is invalid or has expired. Sign up again.', 400)
+        return _err('This confirmation link is invalid or has expired.', 400)
     if user.is_active:
         # Single use: the link signs you in only while it is what activates the account.
         # Replaying it later (a forwarded email, browser history) must not log anyone in.
-        return _err('This confirmation link has already been used. Sign in with your email and password.', 400)
+        return _err('This confirmation link has already been used. Sign in with your email and password.', 409)
     user.is_active = True
     user.save(update_fields=['is_active'])
     # The phone given at signup becomes their customer record (or a link request
@@ -212,6 +212,37 @@ def verify_email(request):
             logger.warning('No shop to register customer %s under; left unlinked', user.email)
     sync_user_groups(user)
     return _session(user)
+
+
+@csrf_exempt
+@require_POST
+def resend_verification(request):
+    """POST {token}: a fresh confirmation email for an expired (or lost) link.
+
+    The old token still proves who signed up (its signature is valid, only its age is
+    not), and it carries the phone given at signup, so the new link can register them
+    as a customer exactly like the first one. The mail goes to the address inside the
+    token, never to one the caller supplies.
+    """
+    err, body = _gate(request)
+    if err:
+        return err
+    invalid = _err('This link is invalid. Please sign up again.', 400)
+    try:
+        data = signing.loads(str(body.get('token') or ''), salt=VERIFY_SALT)  # signature only, no max_age
+    except signing.BadSignature:
+        return invalid
+    email = _email(data.get('e'))
+    user = get_user_model().objects.filter(username=email).first() if email else None
+    if user is None:
+        return invalid
+    if user.is_active:
+        return JsonResponse({'already_confirmed': True})
+    if _throttled(f'resend:ip:{_client_ip(request)}', 10, 3600) or _throttled(f'resend:{email}', 3, 3600):
+        return _err('Too many attempts. Try again later.', 429)
+    if not _send_verification(user, _origin(body, request), clean_phone(data.get('p')) or '') and not settings.DEBUG:
+        return _err('We could not send the confirmation email. Try again later.', 503)
+    return JsonResponse({'ok': True})
 
 
 @csrf_exempt
