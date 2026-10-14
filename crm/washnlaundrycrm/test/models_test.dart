@@ -94,6 +94,21 @@ void main() {
       expect(category.items, hasLength(1));
       expect(category.items.first.unitShortLabel, 'sq.ft');
     });
+
+    test('parses tags and defaults to empty list', () {
+      final categoryWithTags = GarmentCategoryModel.fromJson({
+        'id': 1,
+        'name': 'Dry Clean',
+        'tags': ['express', 'delicate', ' '],
+      });
+      expect(categoryWithTags.tags, ['express', 'delicate']);
+
+      final categoryWithoutTags = GarmentCategoryModel.fromJson({
+        'id': 2,
+        'name': 'Wash',
+      });
+      expect(categoryWithoutTags.tags, isEmpty);
+    });
   });
 
   group('OrderStatus', () {
