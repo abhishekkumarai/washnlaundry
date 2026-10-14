@@ -109,14 +109,20 @@ void main() {
       expect(find.text('Mohan Das'), findsOneWidget);
     });
 
-    testWidgets('the row actions menu opens a prefilled edit dialog',
+    // Tapping a row opens that member's page (KAN-185); its actions live there.
+    Future<void> openMember(WidgetTester tester, StaffModel member) async {
+      await tester.tap(find.text(member.name));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+
+    testWidgets('the member page opens a prefilled edit dialog',
         (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
 
-      await tester.tap(find.byIcon(Icons.more_horiz_rounded).first);
-      await tester.pumpAndSettle();
+      await openMember(tester, roster.first);
       await tester.tap(find.text('Edit details'));
       await tester.pumpAndSettle();
 
@@ -125,23 +131,22 @@ void main() {
       expect(find.text('Save Changes'), findsOneWidget);
     });
 
-    testWidgets('the edit dialog offers a status toggle button radio', (tester) async {
+    testWidgets('status is changed from the member page, not the edit dialog',
+        (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
       await tester.pumpWidget(host(provider, const StaffScreen()));
       await tester.pump();
 
-      await tester.tap(find.byIcon(Icons.more_horiz_rounded).first);
-      await tester.pumpAndSettle();
+      await openMember(tester, roster.first);
+      expect(find.text('Mark inactive'), findsOneWidget);
+
       await tester.tap(find.text('Edit details'));
       await tester.pumpAndSettle();
-
       final dialog = find.byType(AlertDialog);
-      expect(find.descendant(of: dialog, matching: find.text('Status')), findsOneWidget);
-      expect(find.descendant(of: dialog, matching: find.text('1. Active')), findsOneWidget);
-      expect(find.descendant(of: dialog, matching: find.text('2. Inactive')), findsOneWidget);
+      expect(find.descendant(of: dialog, matching: find.text('Status')), findsNothing);
     });
 
-    testWidgets('the add dialog offers a status toggle button radio defaulting to inactive',
+    testWidgets('the add dialog opens from the header and has no status control',
         (tester) async {
       final provider = AppProvider(autoLoad: false)..seedForTest(staff: roster);
       await tester.pumpWidget(host(provider, const StaffScreen()));
@@ -151,9 +156,8 @@ void main() {
       await tester.pumpAndSettle();
 
       final dialog = find.byType(AlertDialog);
-      expect(find.descendant(of: dialog, matching: find.text('Status')), findsOneWidget);
-      expect(find.descendant(of: dialog, matching: find.text('1. Active')), findsOneWidget);
-      expect(find.descendant(of: dialog, matching: find.text('2. Inactive')), findsOneWidget);
+      expect(find.descendant(of: dialog, matching: find.text('Add Staff Member')), findsOneWidget);
+      expect(find.descendant(of: dialog, matching: find.text('Status')), findsNothing);
     });
 
     testWidgets(

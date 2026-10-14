@@ -231,3 +231,22 @@ class StaffCredentialJourneyTests(TestCase):
                                            email='owner@x.com', has_app_login=True)
         res = self.client.delete(f'/api/staff/{owner_staff.pk}/credentials/', **self.as_owner())
         self.assertEqual(res.status_code, 400)  # the only owner
+
+    def test_deleting_a_staff_member_archives_them_and_keeps_history(self):
+        sid = self.new_staff()
+        self.client.post(f'/api/staff/{sid}/credentials/', {'email': 'asha@x.com', 'password': PW1},
+                         format='json', **self.as_owner())
+        token = self.login('asha@x.com', PW1).json()['token']
+
+        res = self.client.delete(f'/api/staff/{sid}/', **self.as_owner())
+        self.assertEqual(res.status_code, 204, res.content)
+        staff = Staff.objects.get(pk=sid)  # still there
+        self.assertEqual(staff.status, 'INACTIVE')
+        self.assertFalse(staff.has_app_login)
+        self.assertFalse(ShopMembership.objects.get(user__username='asha@x.com', shop=self.shop).is_active)
+        self.assertEqual(self.client.get('/api/customers/', **self.as_staff(token)).status_code, 403)
+
+        # Bring them back: Active again, then restore the sign-in.
+        self.client.patch(f'/api/staff/{sid}/', {'status': 'ACTIVE'}, format='json', **self.as_owner())
+        self.assertEqual(self.client.post(f'/api/staff/{sid}/reactivate/', **self.as_owner()).status_code, 200)
+        self.assertEqual(self.client.get('/api/customers/', **self.as_staff(token)).status_code, 200)

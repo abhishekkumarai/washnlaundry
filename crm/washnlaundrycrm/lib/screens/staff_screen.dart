@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../services/api_service.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/error_dialog.dart';
@@ -103,6 +104,25 @@ class _StaffScreenState extends State<StaffScreen> {
       ),
     );
     if (changed == true) await provider.refresh();
+  }
+
+  Future<void> _restoreSignIn(
+      BuildContext context, Map<String, dynamic> member) async {
+    final provider = context.read<AppProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ApiService.reactivateStaffSignIn(member['id'] as String);
+      await provider.refresh();
+      messenger.showSnackBar(SnackBar(
+        content: Text('Sign-in restored for ${member['name']}'),
+        backgroundColor: const Color(0xFF10B981),
+      ));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(e.message),
+        backgroundColor: const Color(0xFFDC2626),
+      ));
+    }
   }
 
   List<Map<String, dynamic>> get _filteredStaff {
@@ -550,6 +570,7 @@ class _StaffScreenState extends State<StaffScreen> {
           onEdit: () => _showStaffModal(context, existing: selected),
           onToggleStatus: () => _toggleActive(context, selected),
           onSignIn: () => _showCredentials(context, selected),
+          onRestoreSignIn: () => _restoreSignIn(context, selected),
         );
       }
       // Deleted or no longer in the roster: fall back to the list.

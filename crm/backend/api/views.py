@@ -908,9 +908,13 @@ class StaffViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
+        # Soft delete: archive instead of removing, so attendance, payroll and the
+        # sign-in history survive and the person can be reactivated later.
         if is_last_owner(instance):
             raise ValidationError('This is the only owner of the shop. Transfer ownership first.')
-        instance.delete()
+        instance.status = 'INACTIVE'
+        instance.has_app_login = False  # Staff.save() -> membership deactivated, not deleted
+        instance.save()
 
     @action(detail=True, methods=['post', 'delete'], url_path='credentials')
     def credentials(self, request, pk=None):

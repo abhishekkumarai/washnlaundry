@@ -21,6 +21,9 @@ class StaffDetailScreen extends StatefulWidget {
   final VoidCallback onToggleStatus;
   final VoidCallback onSignIn;
 
+  /// Shown for an active member whose sign-in was revoked but still has an email on file.
+  final VoidCallback? onRestoreSignIn;
+
   const StaffDetailScreen({
     super.key,
     required this.member,
@@ -28,6 +31,7 @@ class StaffDetailScreen extends StatefulWidget {
     required this.onEdit,
     required this.onToggleStatus,
     required this.onSignIn,
+    this.onRestoreSignIn,
   });
 
   @override
@@ -369,6 +373,12 @@ class _StaffDetailScreenState extends State<StaffDetailScreen> {
             _hasLogin ? 'Manage sign-in' : 'Enable sign-in',
             _hasLogin ? Icons.key_rounded : Icons.lock_open_rounded,
             widget.onSignIn),
+        if (widget.onRestoreSignIn != null &&
+            _active &&
+            !_hasLogin &&
+            ((widget.member['email'] as String?) ?? '').isNotEmpty)
+          button('Restore sign-in', Icons.restore_rounded,
+              widget.onRestoreSignIn!),
       ],
     );
   }

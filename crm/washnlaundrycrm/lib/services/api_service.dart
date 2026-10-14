@@ -733,6 +733,11 @@ class ApiService {
   static Future<void> revokeStaffCredentials(String id) =>
       revokeCredentials('staff', id);
 
+  /// Owner-only: switches a revoked staff sign-in back on (same email and password).
+  static Future<void> reactivateStaffSignIn(String id) async {
+    await _send('POST', '/staff/$id/reactivate/', body: {});
+  }
+
   static Future<List<ExpenseModel>> fetchExpenses() async {
     final data = await _send('GET', '/expenses/');
     return _asList(data).map(ExpenseModel.fromJson).toList();
