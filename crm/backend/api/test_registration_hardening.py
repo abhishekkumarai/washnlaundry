@@ -58,3 +58,39 @@ class RegistrationHardeningTests(TestCase):
             res = self.client.post('/api/customer/me/', {'name': 'G', 'phone': '9123456781'}, format='json',
                                    HTTP_AUTHORIZATION='Bearer google')
         self.assertEqual(res.status_code, 503, res.content)
+
+
+@override_settings(GOOGLE_CLIENT_ID='c', API_AUTH_ENFORCED=True, PASSWORD_AUTH_ENABLED=True,
+                   APP_ORIGINS=['https://app.washnlaundry.com'])
+class ConfirmationLinkTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+        self.sent = []
+        mailer = mock.patch('api.password_auth.EmailService.send',
+                            side_effect=lambda to, subject, text: (self.sent.append((to, text)) or (True, '')))
+        mailer.start()
+        self.addCleanup(mailer.stop)
+        self.client.post('/api/auth/signup/', {'email': 'new@x.com', 'password': 'Brand-new-1', 'name': 'N',
+                                               'phone': '9123456780'}, format='json')
+        self.token = re.search(r'token=([^\s]+)', self.sent[-1][1]).group(1)
+
+    def test_the_link_signs_you_in_once_then_refuses(self):
+        first = self.client.post('/api/auth/verify-email/', {'token': self.token}, format='json')
+        self.assertEqual(first.status_code, 200)
+        self.assertIn('token', first.json())
+        again = self.client.post('/api/auth/verify-email/', {'token': self.token}, format='json')
+        self.assertEqual(again.status_code, 400)
+        self.assertNotIn('token', again.json())
+        self.assertIn('already been used', again.json()['error'] if 'error' in again.json() else str(again.json()))
+        # The account itself still works with the password.
+        login = self.client.post('/api/auth/login/', {'email': 'new@x.com', 'password': 'Brand-new-1'}, format='json')
+        self.assertEqual(login.status_code, 200)
+
+    def test_an_expired_link_is_refused(self):
+        import time
+        from django.core import signing
+        with mock.patch('time.time', return_value=time.time() - 4 * 24 * 3600):
+            old = signing.dumps({'e': 'new@x.com', 'p': '9123456780'}, salt='email-verify')
+        res = self.client.post('/api/auth/verify-email/', {'token': old}, format='json')
+        self.assertEqual(res.status_code, 400)

@@ -193,9 +193,12 @@ def verify_email(request):
     user = get_user_model().objects.filter(username=data.get('e')).first()
     if user is None:
         return _err('This confirmation link is invalid or has expired. Sign up again.', 400)
-    if not user.is_active:
-        user.is_active = True
-        user.save(update_fields=['is_active'])
+    if user.is_active:
+        # Single use: the link signs you in only while it is what activates the account.
+        # Replaying it later (a forwarded email, browser history) must not log anyone in.
+        return _err('This confirmation link has already been used. Sign in with your email and password.', 400)
+    user.is_active = True
+    user.save(update_fields=['is_active'])
     # The phone given at signup becomes their customer record (or a link request
     # if the store already has that number). Owner/staff emails keep their roles.
     phone = clean_phone(data.get('p'))
