@@ -15,6 +15,7 @@ import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
 import '../widgets/tag_generator_panel.dart';
 import '../utils/money.dart';
+import '../utils/receipt_pdf.dart';
 
 /// `/orders/:orderId` in the live app.
 ///
@@ -185,7 +186,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ],
           if (!isCustomer) ...[
             _headerButton('Print Receipt', Icons.print_outlined,
-                const Color(0xFF475569), () => _toast('Sent to the printer.')),
+                const Color(0xFF475569), () => _printReceipt(order)),
             const SizedBox(width: 8),
             FilledButton.icon(
               onPressed: _canUpdateStatus(order) ? _showUpdateStatus : null,
@@ -263,7 +264,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   child: const Text('Edit'),
                 ),
                 PopupMenuItem(
-                  value: () => _toast('Sent to the printer.'),
+                  value: () => _printReceipt(order),
                   child: const Text('Print Receipt'),
                 ),
               ],
@@ -973,6 +974,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────
+
+  /// 80mm receipt PDF into the browser print dialog — pick the thermal
+  /// printer there, or "Save as PDF".
+  Future<void> _printReceipt(OrderModel order) async {
+    final shop = context.read<AppProvider>().shop;
+    try {
+      final ok = await ReceiptPdf.printReceipt(order, shop);
+      if (!ok && mounted) {
+        _toast('Could not open the print dialog. Allow pop-ups and try again.');
+      }
+    } catch (e) {
+      if (mounted) _toast('Could not prepare the receipt: $e');
+    }
+  }
 
   void _toast(String message, {bool success = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(

@@ -503,7 +503,11 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     final ownerName = (shop?['owner_name'] as String?)?.trim() ?? '';
 
     // Derive username from email (the part before '@')
-    final userEmail = auth?.userEmail?.trim() ?? '';
+    // Demo Mode's own address is demo@..., so show the shop's real email instead.
+    final shopEmail = (shop?['email'] as String?)?.trim() ?? '';
+    final userEmail = (auth?.isDemo == true && shopEmail.contains('@'))
+        ? shopEmail
+        : (auth?.userEmail?.trim() ?? '');
     final usernameFromEmail = userEmail.contains('@')
         ? userEmail.split('@').first.trim()
         : userEmail;

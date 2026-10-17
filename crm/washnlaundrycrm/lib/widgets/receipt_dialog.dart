@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../models/order_model.dart';
 import '../utils/money.dart';
+import '../utils/receipt_pdf.dart';
 
 class ReceiptDialog extends StatefulWidget {
   final OrderModel order;
@@ -206,7 +207,7 @@ class _ReceiptDialogState extends State<ReceiptDialog> {
 
             // QR Code for Tracking
             QrImageView(
-              data: 'https://app.washnlaundry.com/track/${order.orderNumber}',
+              data: ReceiptPdf.trackingUrl(order),
               version: QrVersions.auto,
               size: 100.0,
             ),
@@ -218,6 +219,18 @@ class _ReceiptDialogState extends State<ReceiptDialog> {
             // Action Buttons
             Row(
               children: [
+                FilledButton.icon(
+                  key: const Key('printReceiptButton'),
+                  onPressed: () =>
+                      ReceiptPdf.printReceipt(order, widget.shop),
+                  icon: const Icon(Icons.print_outlined, size: 16),
+                  label: const Text('Print Receipt'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF182C4F),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
                 const Spacer(),
                 IconButton(
                   onPressed: () => Navigator.pop(context),

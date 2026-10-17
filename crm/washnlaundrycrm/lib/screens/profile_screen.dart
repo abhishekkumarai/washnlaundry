@@ -336,7 +336,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _accountCard(AuthProvider auth) {
     final shop = context.watch<AppProvider>().shop;
     final shopName = (shop?['name'] as String?)?.trim() ?? '';
-    final userEmail = auth.userEmail?.trim() ?? '';
+    // Demo Mode's own address is demo@..., so show the shop's real email instead.
+    final shopEmail = (shop?['email'] as String?)?.trim() ?? '';
+    final userEmail = (auth.isDemo == true && shopEmail.contains('@'))
+        ? shopEmail
+        : (auth.userEmail?.trim() ?? '');
     final usernameFromEmail = userEmail.contains('@')
         ? userEmail.split('@').first.trim()
         : userEmail;
