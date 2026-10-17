@@ -109,6 +109,25 @@ void main() {
       });
       expect(categoryWithoutTags.tags, isEmpty);
     });
+
+    test('parses item tags, dropping blanks, and defaults to empty list', () {
+      final withTags = GarmentItemModel.fromJson({
+        'id': 1,
+        'category': 1,
+        'name': 'Shirt',
+        'price': 20,
+        'tags': ['express', ' ', 'delicate'],
+      });
+      expect(withTags.tags, ['express', 'delicate']);
+
+      final withoutTags = GarmentItemModel.fromJson({
+        'id': 2,
+        'category': 1,
+        'name': 'Pant',
+        'price': 25,
+      });
+      expect(withoutTags.tags, isEmpty);
+    });
   });
 
   group('OrderStatus', () {

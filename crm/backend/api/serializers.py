@@ -79,6 +79,24 @@ class CustomerSerializer(TenantModelSerializer):
         return attrs
 
 
+def _clean_tags(value):
+    if value is None:
+        return []
+    if isinstance(value, str):
+        # Allow comma-separated strings as well
+        value = [t.strip() for t in value.split(',') if t.strip()]
+    elif not isinstance(value, list):
+        raise serializers.ValidationError('Tags must be a list of strings.')
+    cleaned = []
+    for tag in value:
+        if not isinstance(tag, str):
+            continue
+        t = tag.strip()
+        if t and t not in cleaned:
+            cleaned.append(t)
+    return cleaned
+
+
 class GarmentItemSerializer(TenantModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     unit_label = serializers.CharField(source='get_unit_display', read_only=True)
@@ -86,6 +104,9 @@ class GarmentItemSerializer(TenantModelSerializer):
     class Meta:
         model = GarmentItem
         fields = '__all__'
+
+    def validate_tags(self, value):
+        return _clean_tags(value)
 
 
 class GarmentCategorySerializer(TenantModelSerializer):
@@ -98,21 +119,7 @@ class GarmentCategorySerializer(TenantModelSerializer):
         fields = '__all__'
 
     def validate_tags(self, value):
-        if value is None:
-            return []
-        if isinstance(value, str):
-            # Allow comma-separated strings as well
-            value = [t.strip() for t in value.split(',') if t.strip()]
-        elif not isinstance(value, list):
-            raise serializers.ValidationError('Tags must be a list of strings.')
-        cleaned = []
-        for tag in value:
-            if not isinstance(tag, str):
-                continue
-            t = tag.strip()
-            if t and t not in cleaned:
-                cleaned.append(t)
-        return cleaned
+        return _clean_tags(value)
 
 
 class OrderItemSerializer(TenantModelSerializer):

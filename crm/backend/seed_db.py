@@ -38,6 +38,32 @@ CREATED_BY = {
     OrderSource.AGENT_APP: 'Agent App',
 }
 
+# Keyword -> tag rules for the New Order page's tag chips. Matched against the
+# lower-cased item name; a category may also contribute tags of its own.
+_ITEM_TAG_RULES = [
+    ('male', ('shirt', 'kurta', 'sherwani', 'suit', 'blazer', 'trouser', 'pant', 'jeans', 'shorts', 'overcoat')),
+    ('female', ('saree', 'lehenga', 'blouse', 'dupatta', 'salwar', 'top /', 'kurti', 'dress', 'gown', 'frock',
+                'skirt', 'leggings', 'heels')),
+    ('kids', ('frock', 'school uniform', 'soft toy', 'stroller')),
+]
+_CATEGORY_TAGS = {
+    'Shoe Cleaning': ['shoes'],
+    'Household': ['home'],
+    'Premium': ['premium'],
+}
+
+
+def tags_for(category, name):
+    lowered = name.lower()
+    tags = list(_CATEGORY_TAGS.get(category, []))
+    for tag, words in _ITEM_TAG_RULES:
+        if any(w in lowered for w in words) and tag not in tags:
+            tags.append(tag)
+    if 'bag' in lowered or 'suitcase' in lowered:
+        tags.append('bags')
+    return tags
+
+
 CATALOGUE = [
     ('Ironing', 'Iron', [
         ('Shirt', 15, PC), ('T-Shirt', 12, PC), ('Kurta', 20, PC),
@@ -263,7 +289,8 @@ def seed_shop(cfg):
     total_items = 0
     for order_index, (cat_name, icon, items) in enumerate(CATALOGUE, start=1):
         category = GarmentCategory.objects.create(
-            shop=shop, name=cat_name, icon=icon, display_order=order_index
+            shop=shop, name=cat_name, icon=icon, display_order=order_index,
+            tags=_CATEGORY_TAGS.get(cat_name, []),
         )
         categories[cat_name] = category
         for item_index, (name, price, unit) in enumerate(items, start=1):
@@ -271,6 +298,7 @@ def seed_shop(cfg):
                 shop=shop,
                 category=category, name=name, price=round(float(price) * price_mult, 2), unit=unit,
                 display_order=item_index,
+                tags=tags_for(cat_name, name),
                 image_url=ITEM_IMAGES.get(name, ''),
             )
             total_items += 1

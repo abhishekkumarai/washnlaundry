@@ -33,13 +33,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   /// Multi-select tag filter: empty means no tag filter applied.
   final Set<String> _selectedTags = <String>{};
 
-  List<String> _tagsForCategory(AppProvider provider, String categoryName) {
-    for (final c in provider.categories) {
-      if (c.name == categoryName) return c.tags;
-    }
-    return const [];
-  }
-
   /// Phone width only: the cart panel is slid up over the item list. (Below
   /// the wide breakpoint the cart no longer sits at the very bottom of the
   /// page; a bar pinned to the bottom opens it.)
@@ -296,24 +289,23 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     final selectedCategory =
         categoryNames.contains(_selectedCategory) ? _selectedCategory : '';
 
-    final categoryTagsByName = <String, List<String>>{
-      for (final c in provider.categories) c.name: c.tags,
-    };
-
+    // Tags belong to individual items; offer the ones on items you can order.
     final allAvailableTags = <String>{
-      for (final c in provider.categories)
-        if (c.isActive && categoryNames.contains(c.name))
-          if (selectedCategory.isEmpty || c.name == selectedCategory)
-            ...c.tags,
+      for (final g in garments)
+        if (g.isActive &&
+            categoryNames.contains(g.categoryName) &&
+            (selectedCategory.isEmpty || g.categoryName == selectedCategory))
+          ...g.tags,
     }.toList()
       ..sort();
 
     final filteredItems = garments.where((item) {
       final matchesCategory =
           selectedCategory.isEmpty || item.categoryName == selectedCategory;
-      final tags = categoryTagsByName[item.categoryName] ?? const [];
+      final tags = item.tags;
+      // AND: an item must carry every selected tag.
       final matchesTags = _selectedTags.isEmpty ||
-          _selectedTags.any((selTag) =>
+          _selectedTags.every((selTag) =>
               tags.any((t) => t.toLowerCase() == selTag.toLowerCase()));
       final q = _searchQuery.toLowerCase();
       final matchesSearch = q.isEmpty ||
@@ -1871,7 +1863,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   Widget _buildItemTableRow(GarmentItemModel item) {
     final qty = _cartQuantities[item.id] ?? 0;
     final art = _artFor(item.name);
-    final tags = _tagsForCategory(context.read<AppProvider>(), item.categoryName);
+    final tags = item.tags;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -2038,7 +2030,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   Widget _itemRowCompact(GarmentItemModel item) {
     final qty = _cartQuantities[item.id] ?? 0;
     final art = _artFor(item.name);
-    final tags = _tagsForCategory(context.read<AppProvider>(), item.categoryName);
+    final tags = item.tags;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
@@ -2122,7 +2114,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   Widget _itemCard(GarmentItemModel item) {
     final qty = _cartQuantities[item.id] ?? 0;
     final art = _artFor(item.name);
-    final tags = _tagsForCategory(context.read<AppProvider>(), item.categoryName);
+    final tags = item.tags;
 
     return Container(
       padding: const EdgeInsets.all(14),

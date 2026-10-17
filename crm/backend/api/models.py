@@ -342,6 +342,8 @@ class GarmentItem(TenantModel):
     unit = models.CharField(max_length=8, choices=PricingUnit.choices, default=PricingUnit.PIECE)
     is_active = models.BooleanField(default=True)
     display_order = models.IntegerField(default=0)
+    # Free-form labels (e.g. 'express', 'delicate') the New Order page filters on.
+    tags = models.JSONField(default=list, blank=True)
 
     class Meta:
         ordering = ['category__display_order', 'display_order', 'id']

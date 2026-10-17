@@ -89,7 +89,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
         'color': style['color'],
         'bg': style['bg'],
         'isActive': c.isActive,
-        'tags': c.tags,
       };
     }).toList();
 
@@ -101,15 +100,16 @@ class _ServicesScreenState extends State<ServicesScreen> {
       _selectedCategoryIndex = 0;
 
     final categoryName = _categories[_selectedCategoryIndex]['title'] as String;
-    final categoryTags = (_categories[_selectedCategoryIndex]['tags'] as List<String>?) ?? const [];
     final query = _searchQuery.toLowerCase();
-    final matchesCategoryTag = categoryTags.any((t) => t.toLowerCase().contains(query));
 
     _currentItems = provider.garments
         // Inactive items stay listed (shown as off) so they can be switched
         // back on here; only New Order limits itself to active ones.
         .where((g) => g.categoryName == categoryName)
-        .where((g) => query.isEmpty || g.name.toLowerCase().contains(query) || matchesCategoryTag)
+        .where((g) =>
+            query.isEmpty ||
+            g.name.toLowerCase().contains(query) ||
+            g.tags.any((t) => t.toLowerCase().contains(query)))
         .map((g) => <String, dynamic>{
               'id': g.id,
               'name': g.name,
@@ -117,6 +117,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
               'unit': g.unitLabel,
               'unitShort': g.unitShortLabel,
               'active': g.isActive,
+              'tags': g.tags,
               // The item's own category — Edit reads this instead of
               // assuming the sidebar's currently-selected tab, which only
               // coincidentally matches today (this list is itself always
@@ -414,40 +415,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                               Text('${c['count']} items',
                                   style: const TextStyle(
                                       fontSize: 11, color: Color(0xFF64748B))),
-                              if ((c['tags'] as List<String>?)?.isNotEmpty == true) ...[
-                                const SizedBox(height: 3),
-                                Wrap(
-                                  spacing: 4,
-                                  runSpacing: 2,
-                                  children: [
-                                    for (final t in (c['tags'] as List<String>).take(3))
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 4, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          '#$t',
-                                          style: const TextStyle(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w500,
-                                            color: Color(0xFF475569),
-                                          ),
-                                        ),
-                                      ),
-                                    if ((c['tags'] as List<String>).length > 3)
-                                      Text(
-                                        '+${(c['tags'] as List<String>).length - 3}',
-                                        style: const TextStyle(
-                                          fontSize: 9,
-                                          color: Color(0xFF94A3B8),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ],
                             ],
                           ),
                         ),
@@ -1407,6 +1374,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
     final priceCtrl = TextEditingController();
     String selectedCat = _categories[_selectedCategoryIndex]['title'] as String;
     String selectedUnit = PricingUnit.piece;
+    final tagCtrl = TextEditingController();
+    final tags = <String>[];
 
     String? nameError;
     String? priceError;
@@ -1417,6 +1386,16 @@ class _ServicesScreenState extends State<ServicesScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
+          void addTag() {
+            final t = tagCtrl.text.trim().toLowerCase();
+            if (t.isNotEmpty && !tags.contains(t)) {
+              setModalState(() {
+                tags.add(t);
+                tagCtrl.clear();
+              });
+            }
+          }
+
           Future<void> save() async {
             final name = nameCtrl.text.trim();
             final price = double.tryParse(priceCtrl.text.trim());
@@ -1444,6 +1423,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
               'name': name,
               'price': price,
               'unit': selectedUnit,
+              'tags': tags,
             });
             if (!ctx.mounted) return;
 
@@ -1483,7 +1463,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
             ),
             content: SizedBox(
               width: math.min(440.0, MediaQuery.sizeOf(ctx).width - 48),
-              child: Column(
+              child: SingleChildScrollView(
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1571,11 +1552,19 @@ class _ServicesScreenState extends State<ServicesScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 14),
+                  _tagEditor(
+                    controller: tagCtrl,
+                    tags: tags,
+                    onAdd: addTag,
+                    onRemove: (t) => setModalState(() => tags.remove(t)),
+                  ),
                   if (submitError != null) ...[
                     const SizedBox(height: 14),
                     _modalErrorBanner(submitError!),
                   ],
                 ],
+              ),
               ),
             ),
             actions: [
@@ -1612,8 +1601,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
   /// what GarmentCategory stores: name, icon and the active flag.
   void _showAddCategoryModal(BuildContext context) {
     final nameCtrl = TextEditingController();
-    final tagCtrl = TextEditingController();
-    final tags = <String>[];
     bool isActive = true;
     String? nameError;
     String? submitError;
@@ -1623,16 +1610,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
-          void addTag() {
-            final t = tagCtrl.text.trim().toLowerCase();
-            if (t.isNotEmpty && !tags.contains(t)) {
-              setModalState(() {
-                tags.add(t);
-                tagCtrl.clear();
-              });
-            }
-          }
-
           Future<void> save() async {
             final name = nameCtrl.text.trim();
             setModalState(() => nameError =
@@ -1643,7 +1620,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
             final provider = context.read<AppProvider>();
             final id = await provider.addCategory({
               'name': name,
-              'tags': tags,
               'display_order': _categories.length + 1,
               'is_active': isActive,
             });
@@ -1709,65 +1685,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                         setModalState(() => nameError = null);
                     },
                   ),
-                  const SizedBox(height: 12),
-                  _modalLabel('Tags (e.g. express, delicate)'),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: tagCtrl,
-                          decoration: InputDecoration(
-                            hintText: 'Type tag and press Add',
-                            hintStyle: const TextStyle(
-                                fontSize: 13, color: Color(0xFF94A3B8)),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                          ),
-                          onSubmitted: (_) => addTag(),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: addTag,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          foregroundColor: const Color(0xFF182C4F),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text('Add',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                      ),
-                    ],
-                  ),
-                  if (tags.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final t in tags)
-                          Chip(
-                            label: Text(t, style: const TextStyle(fontSize: 12)),
-                            deleteIcon: const Icon(Icons.close, size: 14),
-                            onDeleted: () =>
-                                setModalState(() => tags.remove(t)),
-                            backgroundColor: const Color(0xFFEFF6FF),
-                            labelStyle: const TextStyle(
-                                color: Color(0xFF1D4ED8),
-                                fontWeight: FontWeight.w500),
-                            side: const BorderSide(color: Color(0xFFBFDBFE)),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                          ),
-                      ],
-                    ),
-                  ],
                   const SizedBox(height: 8),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
@@ -1822,8 +1739,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
   void _showEditCategoryModal(BuildContext context, Map<String, dynamic> cat) {
     final nameCtrl = TextEditingController(text: cat['title'] as String);
-    final tagCtrl = TextEditingController();
-    final tags = List<String>.from((cat['tags'] as List?)?.map((e) => e.toString()) ?? const []);
     // Was hardcoded `true` regardless of the category's real state — saving
     // any edit to an already-inactive category (even just its name) would
     // silently reactivate it, since the switch always started on.
@@ -1836,16 +1751,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
-          void addTag() {
-            final t = tagCtrl.text.trim().toLowerCase();
-            if (t.isNotEmpty && !tags.contains(t)) {
-              setModalState(() {
-                tags.add(t);
-                tagCtrl.clear();
-              });
-            }
-          }
-
           Future<void> save() async {
             final name = nameCtrl.text.trim();
             setModalState(() => nameError =
@@ -1856,7 +1761,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
             final provider = context.read<AppProvider>();
             final ok = await provider.updateCategory('${cat['id']}', {
               'name': name,
-              'tags': tags,
               'is_active': isActive,
             });
             if (!ctx.mounted) return;
@@ -1918,65 +1822,6 @@ class _ServicesScreenState extends State<ServicesScreen> {
                         setModalState(() => nameError = null);
                     },
                   ),
-                  const SizedBox(height: 12),
-                  _modalLabel('Tags (e.g. express, delicate)'),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: tagCtrl,
-                          decoration: InputDecoration(
-                            hintText: 'Type tag and press Add',
-                            hintStyle: const TextStyle(
-                                fontSize: 13, color: Color(0xFF94A3B8)),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                          ),
-                          onSubmitted: (_) => addTag(),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: addTag,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          foregroundColor: const Color(0xFF182C4F),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text('Add',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                      ),
-                    ],
-                  ),
-                  if (tags.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final t in tags)
-                          Chip(
-                            label: Text(t, style: const TextStyle(fontSize: 12)),
-                            deleteIcon: const Icon(Icons.close, size: 14),
-                            onDeleted: () =>
-                                setModalState(() => tags.remove(t)),
-                            backgroundColor: const Color(0xFFEFF6FF),
-                            labelStyle: const TextStyle(
-                                color: Color(0xFF1D4ED8),
-                                fontWeight: FontWeight.w500),
-                            side: const BorderSide(color: Color(0xFFBFDBFE)),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                          ),
-                      ],
-                    ),
-                  ],
                   const SizedBox(height: 8),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
@@ -2127,6 +1972,9 @@ class _ServicesScreenState extends State<ServicesScreen> {
       orElse: () => PricingUnit.piece,
     );
     bool isActive = (item['active'] as bool?) ?? true;
+    final tagCtrl = TextEditingController();
+    final tags = List<String>.from(
+        (item['tags'] as List?)?.map((e) => e.toString()) ?? const []);
 
     String? nameError;
     String? priceError;
@@ -2137,6 +1985,16 @@ class _ServicesScreenState extends State<ServicesScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
+          void addTag() {
+            final t = tagCtrl.text.trim().toLowerCase();
+            if (t.isNotEmpty && !tags.contains(t)) {
+              setModalState(() {
+                tags.add(t);
+                tagCtrl.clear();
+              });
+            }
+          }
+
           Future<void> save() async {
             final name = nameCtrl.text.trim();
             final price = double.tryParse(priceCtrl.text.trim());
@@ -2166,6 +2024,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
               'unit': selectedUnit,
               'is_active': isActive,
               'image_url': imgCtrl.text.trim(),
+              'tags': tags,
             });
             if (!ctx.mounted) return;
 
@@ -2317,6 +2176,13 @@ class _ServicesScreenState extends State<ServicesScreen> {
                             borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
+                    const SizedBox(height: 14),
+                    _tagEditor(
+                      controller: tagCtrl,
+                      tags: tags,
+                      onAdd: addTag,
+                      onRemove: (t) => setModalState(() => tags.remove(t)),
+                    ),
                     if (submitError != null) ...[
                       const SizedBox(height: 14),
                       _modalErrorBanner(submitError!),
@@ -2391,6 +2257,76 @@ class _ServicesScreenState extends State<ServicesScreen> {
   }
 
   // ─── Shared modal chrome ────────────────────────────────────────────
+
+  /// Tag input + removable chips, shared by the Add and Edit item dialogs.
+  Widget _tagEditor({
+    required TextEditingController controller,
+    required List<String> tags,
+    required VoidCallback onAdd,
+    required void Function(String) onRemove,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _modalLabel('Tags (e.g. express, delicate)'),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  hintText: 'Type tag and press Add',
+                  hintStyle:
+                      const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                onSubmitted: (_) => onAdd(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: onAdd,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF1F5F9),
+                foregroundColor: const Color(0xFF182C4F),
+                elevation: 0,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Add',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+        if (tags.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final t in tags)
+                Chip(
+                  label: Text(t, style: const TextStyle(fontSize: 12)),
+                  deleteIcon: const Icon(Icons.close, size: 14),
+                  onDeleted: () => onRemove(t),
+                  backgroundColor: const Color(0xFFEFF6FF),
+                  labelStyle: const TextStyle(
+                      color: Color(0xFF1D4ED8), fontWeight: FontWeight.w500),
+                  side: const BorderSide(color: Color(0xFFBFDBFE)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
 
   Widget _modalLabel(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 6),

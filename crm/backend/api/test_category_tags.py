@@ -3,7 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from .models import GarmentCategory, GarmentItem, Shop, ShopMembership, ShopRole
-from .serializers import GarmentCategorySerializer
+from .serializers import GarmentCategorySerializer, GarmentItemSerializer
 from .views import GarmentCategoryViewSet, GarmentItemViewSet
 
 
@@ -34,6 +34,7 @@ class GarmentCategoryTagsTestCase(TestCase):
             category=self.cat1,
             name='Silk Saree',
             price=250.0,
+            tags=['express', 'delicate'],
             is_active=True,
         )
         self.item2 = GarmentItem.objects.create(
@@ -41,6 +42,7 @@ class GarmentCategoryTagsTestCase(TestCase):
             category=self.cat2,
             name='Cotton Bedsheet',
             price=80.0,
+            tags=['bulk'],
             is_active=True,
         )
 
@@ -89,14 +91,33 @@ class GarmentCategoryTagsTestCase(TestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['name'], 'Wash and Fold')
 
-    def test_item_viewset_search_by_category_tag(self):
+    def _items(self, query):
         view = GarmentItemViewSet.as_view({'get': 'list'})
-        # Searching "express" matches Silk Saree because its category has tag "express"
-        request = self.factory.get('/api/items/?search=express')
+        request = self.factory.get(f'/api/items/?{query}')
         force_authenticate(request, user=self.user)
         request.tenant = self.shop
         response = view(request)
         self.assertEqual(response.status_code, 200)
-        item_names = [item['name'] for item in response.data]
-        self.assertIn('Silk Saree', item_names)
-        self.assertNotIn('Cotton Bedsheet', item_names)
+        return [item['name'] for item in response.data]
+
+    def test_item_viewset_search_by_item_tag(self):
+        names = self._items('search=express')
+        self.assertIn('Silk Saree', names)
+        self.assertNotIn('Cotton Bedsheet', names)
+
+    def test_item_viewset_tag_filter(self):
+        self.assertEqual(self._items('tag=bulk'), ['Cotton Bedsheet'])
+
+    def test_category_tags_do_not_tag_items(self):
+        # 'premium' is only a category tag; items must not inherit it.
+        self.assertEqual(self._items('tag=premium'), [])
+
+    def test_item_serializer_tags_cleaning(self):
+        serializer = GarmentItemSerializer(data={
+            'category': self.cat1.id,
+            'name': 'Blazer',
+            'price': 300,
+            'tags': [' express ', 'quick', 'express', '  '],
+        })
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertEqual(serializer.validated_data['tags'], ['express', 'quick'])
