@@ -11,7 +11,7 @@ services:
     branch: develop
     rootDir: crm/backend
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    startCommand: python manage.py migrate --noinput && gunicorn laundry_backend.wsgi:application --bind 0.0.0.0:$PORT --timeout 120
+    startCommand: python manage.py migrate --noinput && python seed_db.py && gunicorn laundry_backend.wsgi:application --bind 0.0.0.0:$PORT --timeout 120
     autoDeployTrigger: commit
     envVars:
       - key: DEBUG
@@ -26,7 +26,8 @@ services:
         value: https://develop.washnlaundrycrm.pages.dev
       - key: APP_BASE_URL
         value: https://develop.washnlaundrycrm.pages.dev
-      # Neon dev branch URL, never the prod database.
+      # DJANGO_DATABASE_URL unset => ephemeral SQLite, reseeded on every start.
+      # To use Postgres instead, set it to a Neon dev branch (never prod).
       - key: DJANGO_DATABASE_URL
         sync: false
       - key: GOOGLE_CLIENT_ID
