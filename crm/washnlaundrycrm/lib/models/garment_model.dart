@@ -61,6 +61,9 @@ class GarmentItemModel {
   /// picture and a shop could never supply its own.
   final String imageUrl;
 
+  /// Free-form labels the New Order page filters and searches on.
+  final List<String> tags;
+
   const GarmentItemModel({
     required this.id,
     required this.categoryId,
@@ -70,6 +73,7 @@ class GarmentItemModel {
     this.unit = PricingUnit.piece,
     this.isActive = true,
     this.imageUrl = '',
+    this.tags = const [],
   });
 
   String get unitLabel => PricingUnit.label(unit);
@@ -85,6 +89,10 @@ class GarmentItemModel {
       unit: json['unit'] ?? PricingUnit.piece,
       isActive: json['is_active'] ?? true,
       imageUrl: json['image_url'] ?? '',
+      tags: (json['tags'] as List? ?? const [])
+          .map((t) => t.toString().trim())
+          .where((t) => t.isNotEmpty)
+          .toList(),
     );
   }
 }

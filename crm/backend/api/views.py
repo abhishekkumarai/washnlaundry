@@ -705,13 +705,13 @@ class GarmentItemViewSet(viewsets.ModelViewSet):
             qs = qs.filter(category_id=category)
         tag = self.request.query_params.get('tag')
         if tag:
-            qs = qs.filter(category__tags__icontains=tag.strip())
+            qs = qs.filter(tags__icontains=tag.strip())
         search = self.request.query_params.get('search')
         if search:
             qs = qs.filter(
                 Q(name__icontains=search)
                 | Q(category__name__icontains=search)
-                | Q(category__tags__icontains=search)
+                | Q(tags__icontains=search)
             )
         return qs
 

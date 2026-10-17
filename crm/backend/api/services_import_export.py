@@ -428,6 +428,7 @@ def export_services_json(category_ids=None):
                 'unit_label': item.get_unit_display(),
                 'icon': item.icon,
                 'image_url': item.image_url,
+                'tags': item.tags or [],
                 'is_active': item.is_active,
                 'display_order': item.display_order,
             })
