@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.db.models import Sum
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 
 from .models import (
     Shop, Customer, GarmentCategory, GarmentItem, Order, OrderItem, OrderAuditLog,
@@ -198,14 +199,10 @@ class OrderSerializer(TenantModelSerializer):
         items_data = validated_data.pop('items', [])
         media_ids = validated_data.pop('media_ids', [])
         user = getattr(self.context.get('request'), 'user', None)
-        if getattr(user, 'role', None) == 'customer' and getattr(user, 'customer', None):
-            # A customer orders for themselves: no delivery charge, no discount,
-            # nothing prepaid, and totals come from the items, not the client.
-            c = user.customer
-            validated_data.update(
-                customer=c, customer_name=c.name, customer_phone=c.phone,
-                delivery_charge=0.0, discount_amount=0.0, paid_amount=0.0,
-                subtotal=0.0, total_amount=0.0)
+        if getattr(user, 'role', None) == 'customer':
+            # This path trusts client unit prices and fields; customers book
+            # through POST /api/customer/orders/, which prices server-side.
+            raise PermissionDenied('Customers place orders through /api/customer/orders/.')
         order = Order(**validated_data)
         if not order.placed_at:
             order.placed_at = timezone.now()

@@ -400,6 +400,14 @@ class Order(TenantModel):
     pickup_date = models.DateField(null=True, blank=True)
     pickup_time = models.TimeField(null=True, blank=True)
     address = models.TextField(blank=True, default='')
+    # Copied from the customer's chosen address when they book, so editing the
+    # address book later never rewrites where an old order was picked up.
+    pin_code = models.CharField(max_length=12, blank=True, default='')
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    # Client-sent key on customer bookings: a retried or double-tapped submit
+    # returns the first order instead of creating a second one.
+    idempotency_key = models.CharField(max_length=64, null=True, blank=True)
     assigned_agent = models.ForeignKey(
         'Staff', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_orders'
     )
@@ -418,6 +426,11 @@ class Order(TenantModel):
 
     class Meta:
         unique_together = ('shop', 'order_number')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['shop', 'idempotency_key'], name='order_unique_idempotency_key',
+                condition=models.Q(idempotency_key__isnull=False)),
+        ]
 
     STATUS_TIMESTAMP_FIELD = {
         OrderStatus.PLACED: 'placed_at',

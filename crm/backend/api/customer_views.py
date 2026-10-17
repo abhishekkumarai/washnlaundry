@@ -8,16 +8,22 @@ Stateless: no sessions, nothing stored. Responses are deliberately minimal
 """
 import json
 import re
+from datetime import date, timedelta
 
 from django.conf import settings
+from django.db import IntegrityError, transaction
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
 
 from google.oauth2 import id_token  # noqa: F401  (tests patch api.customer_views.id_token)
 
 from .auth import customer_for_email, normalize_phone, verified_email
-from .models import Customer, EmailLinkRequest, GarmentCategory, Order
+from .models import (
+    Customer, DeliveryType, EmailLinkRequest, GarmentCategory, GarmentItem, Order, OrderItem,
+    OrderSource, OrderStatus, PaymentStatus, ServiceArea, TimeSlot,
+)
 
 _STATUS_TIMESTAMPS = (
     'placed_at', 'processing_at', 'ironing_at', 'ready_at',
@@ -67,6 +73,11 @@ def _order_json(order):
         'scheduled_time': _iso(order.scheduled_time),
         'pickup_date': _iso(order.pickup_date),
         'pickup_time': _iso(order.pickup_time),
+        'address': order.address,
+        'pin_code': order.pin_code,
+        'latitude': order.latitude,
+        'longitude': order.longitude,
+        'notes': order.notes or '',
         'created_at': _iso(order.created_at),
         'items': [
             {
@@ -205,11 +216,187 @@ def customer_me(request):
     # return JsonResponse(_me_json(customer), status=201)
 
 
+BOOKING_DAYS = 7          # how far ahead pickup slots are offered
+MAX_BOOKING_LINES = 50
+MAX_LINE_QUANTITY = 100
+
+
+def _slot_label(slot):
+    return f'{slot.start_time:%I:%M %p} - {slot.end_time:%I:%M %p}'
+
+
+def _slot_booked(slot, day):
+    """Live orders already taking `slot` on `day` (cancelled ones free their place)."""
+    return Order.objects.filter(
+        shop=slot.shop, pickup_date=day, pickup_time=slot.start_time,
+    ).exclude(status=OrderStatus.CANCELLED).count()
+
+
+def _served_pincodes(shop):
+    return sorted({a.pin_code.strip() for a in ServiceArea.objects.filter(shop=shop, is_active=True)
+                   if a.pin_code.strip()})
+
+
 @require_GET
+def customer_booking_options(request):
+    """What a signed-in customer can book: items with ids and server prices, pickup
+    slots with remaining capacity for the next BOOKING_DAYS days, served pincodes."""
+    customer, err = _customer_for(request)
+    if err:
+        return err
+    shop = customer.shop
+    categories = []
+    for cat in GarmentCategory.objects.filter(shop=shop, is_active=True).order_by('display_order', 'id'):
+        items = [{'id': i.id, 'name': i.name, 'price': i.price, 'unit': i.unit}
+                 for i in cat.items.filter(is_active=True)]
+        if items:
+            categories.append({'id': cat.id, 'name': cat.name, 'items': items})
+    slots = list(TimeSlot.objects.filter(shop=shop, kind=TimeSlot.PICKUP, is_active=True))
+    today = timezone.localdate()
+    now = timezone.localtime().time()
+    days = []
+    for offset in range(BOOKING_DAYS):
+        day = today + timedelta(days=offset)
+        day_slots = []
+        for slot in slots:
+            if offset == 0 and slot.start_time <= now:
+                continue  # already started today
+            remaining = None if slot.capacity is None else max(slot.capacity - _slot_booked(slot, day), 0)
+            day_slots.append({'id': slot.id, 'label': _slot_label(slot),
+                              'start_time': _iso(slot.start_time), 'end_time': _iso(slot.end_time),
+                              'remaining': remaining})
+        days.append({'date': day.isoformat(), 'slots': day_slots})
+    return JsonResponse({'categories': categories, 'days': days,
+                         'pincodes': _served_pincodes(shop)})
+
+
+def _bad(detail, status=400):
+    return JsonResponse({'detail': detail}, status=status)
+
+
+def _create_customer_order(request, customer):
+    """POST /api/customer/orders/. Only whitelisted fields are read; prices, totals,
+    customer, delivery type, status and payment are all decided here, never by the client."""
+    from .password_auth import _throttled  # local import: password_auth imports this module
+
+    shop = customer.shop
+    key = (request.headers.get('Idempotency-Key') or '').strip()[:64] or None
+    if key:
+        existing = Order.objects.filter(shop=shop, idempotency_key=key, customer=customer).first()
+        if existing:
+            return JsonResponse(_order_json(existing), status=200)
+    if _throttled(f'customer-order:{customer.id}', limit=10, window=3600):
+        return _bad('Too many bookings. Please try again later.', status=429)
+    try:
+        body = json.loads(request.body or b'{}')
+    except json.JSONDecodeError:
+        return _bad('Invalid JSON body.')
+    if not isinstance(body, dict):
+        return _bad('Invalid JSON body.')
+
+    # Items: [{item_id, quantity}] -> this shop's active GarmentItems at their own prices.
+    lines = body.get('items')
+    if not isinstance(lines, list) or not lines:
+        return _bad('Add at least one item.')
+    if len(lines) > MAX_BOOKING_LINES:
+        return _bad(f'At most {MAX_BOOKING_LINES} items per booking.')
+    wanted = []
+    for line in lines:
+        try:
+            item_id, qty = int(line['item_id']), int(line.get('quantity', 1))
+        except (KeyError, TypeError, ValueError):
+            return _bad('Each item needs an item_id and a whole-number quantity.')
+        if not 1 <= qty <= MAX_LINE_QUANTITY:
+            return _bad(f'Quantity must be between 1 and {MAX_LINE_QUANTITY}.')
+        wanted.append((item_id, qty))
+    catalogue = {i.id: i for i in GarmentItem.objects.select_related('category').filter(
+        shop=shop, is_active=True, category__is_active=True, id__in=[i for i, _ in wanted])}
+    if any(item_id not in catalogue for item_id, _ in wanted):
+        return _bad('Some items are no longer available. Refresh and try again.')
+
+    # Pickup slot, enforced against its capacity.
+    try:
+        day = date.fromisoformat(str(body.get('pickup_date') or ''))
+        slot = TimeSlot.objects.get(shop=shop, kind=TimeSlot.PICKUP, is_active=True,
+                                    id=int(body.get('slot_id')))
+    except (ValueError, TypeError, TimeSlot.DoesNotExist):
+        return _bad('Choose a pickup date and time slot.')
+    today = timezone.localdate()
+    if not today <= day < today + timedelta(days=BOOKING_DAYS) or (
+            day == today and slot.start_time <= timezone.localtime().time()):
+        return _bad('That pickup slot is not available. Choose another.')
+
+    # Address, copied onto the order; pincode must be one the shop serves.
+    address = str(body.get('address') or customer.address or '').strip()[:1000]
+    pin_code = re.sub(r'\D', '', str(body.get('pin_code') or ''))
+    if not address:
+        return _bad('Enter the pickup address.')
+    if not re.fullmatch(r'\d{6}', pin_code):
+        return _bad('Enter a 6-digit pincode.')
+    served = _served_pincodes(shop)
+    if served and pin_code not in served:
+        return _bad('Sorry, we do not pick up from that pincode yet.')
+    coords = []
+    for name, limit in (('latitude', 90), ('longitude', 180)):
+        raw = body.get(name)
+        try:
+            value = None if raw in (None, '') else float(raw)
+        except (TypeError, ValueError):
+            return _bad('Invalid map location.')
+        if value is not None and not -limit <= value <= limit:
+            return _bad('Invalid map location.')
+        coords.append(value)
+    notes = str(body.get('notes') or '').strip()[:1000] or None
+
+    with transaction.atomic():
+        # Lock the slot row so two customers cannot both take its last place.
+        slot = TimeSlot.objects.select_for_update().get(pk=slot.pk)
+        if slot.capacity is not None and _slot_booked(slot, day) >= slot.capacity:
+            return _bad('That pickup slot just filled up. Choose another.', status=409)
+        now = timezone.now()
+        order = Order(
+            shop=shop, customer=customer, customer_name=customer.name,
+            customer_phone=customer.phone, status=OrderStatus.PLACED,
+            payment_status=PaymentStatus.UNPAID, delivery_type=DeliveryType.HOME_PICKUP,
+            source=OrderSource.MOBILE_APP, created_by=customer.email or customer.name,
+            pickup_date=day, pickup_time=slot.start_time, address=address,
+            pin_code=pin_code, latitude=coords[0], longitude=coords[1],
+            notes=notes, idempotency_key=key, placed_at=now)
+        try:
+            with transaction.atomic():
+                order.save()
+        except IntegrityError:
+            # Same key raced in from a parallel request: hand back the winner.
+            existing = Order.objects.filter(shop=shop, idempotency_key=key, customer=customer).first()
+            if existing:
+                return JsonResponse(_order_json(existing), status=200)
+            raise
+        order.audit_log.create(status=OrderStatus.PLACED, title=OrderStatus.PLACED.label,
+                               detail='Booked by the customer online', created_at=now, shop=shop)
+        subtotal = 0.0
+        for item_id, qty in wanted:
+            item = catalogue[item_id]
+            total = round(item.price * qty, 2)
+            subtotal += total
+            OrderItem.objects.create(
+                order=order, shop=shop, item=item, item_title=item.name,
+                service_type=item.category.name, quantity=qty, unit=item.unit,
+                unit_price=item.price, total_price=total)
+        order.subtotal = order.total_amount = order.due_amount = round(subtotal, 2)
+        order.save(update_fields=['subtotal', 'total_amount', 'due_amount'])
+    order = Order.objects.prefetch_related('items').get(pk=order.pk)
+    return JsonResponse(_order_json(order), status=201)
+
+
+# csrf_exempt: Bearer-token auth, as for customer_me.
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
 def customer_orders(request):
     customer, err = _customer_for(request)
     if err:
         return err
+    if request.method == 'POST':
+        return _create_customer_order(request, customer)
     orders = customer.orders.prefetch_related('items').order_by('-created_at')
     return JsonResponse({'orders': [_order_json(o) for o in orders]})
 
