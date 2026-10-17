@@ -12,7 +12,7 @@ from datetime import date, timedelta
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods
@@ -21,7 +21,7 @@ from google.oauth2 import id_token  # noqa: F401  (tests patch api.customer_view
 
 from .auth import customer_for_email, normalize_phone, verified_email
 from .models import (
-    Customer, DeliveryType, EmailLinkRequest, GarmentCategory, GarmentItem, Order, OrderItem,
+    Customer, CustomerAddress, DeliveryType, EmailLinkRequest, GarmentCategory, GarmentItem, Order, OrderItem,
     OrderSource, OrderStatus, PaymentStatus, ServiceArea, TimeSlot,
 )
 
@@ -139,8 +139,8 @@ def register_customer(email, name, phone):
     return Customer.objects.create(name=name, phone=phone, email=email), False
 
 
-# Fields a customer may edit about themselves, with their max lengths. Phone and
-# email are deliberately not here: orders and the sign-in are matched on them.
+# Fields a customer may edit about themselves, with their max lengths. Email is
+# deliberately not here (the sign-in is matched on it); phone is validated apart.
 _PROFILE_FIELDS = {'name': 255, 'address': 1000, 'area': 120, 'landmark': 255,
                    'preference': 1000}
 
@@ -156,6 +156,17 @@ def _update_profile(request):
     if not isinstance(body, dict):
         return JsonResponse({'detail': 'Invalid JSON body.'}, status=400)
     changed = []
+    if 'phone' in body:
+        # Safe to edit now that orders are matched by the Customer FK (KAN-220),
+        # but it must stay unique within the shop.
+        phone = clean_phone(body['phone'])
+        if not phone:
+            return JsonResponse({'detail': 'Enter a valid 10-digit mobile number.'}, status=400)
+        taken = Customer.objects.filter(shop=customer.shop, phone__endswith=phone).exclude(pk=customer.pk)
+        if taken.exists():
+            return JsonResponse({'detail': 'That number is already registered with this shop.'}, status=409)
+        customer.phone = phone
+        changed.append('phone')
     for field, limit in _PROFILE_FIELDS.items():
         if field in body:
             value = str(body[field] or '').strip()[:limit]
@@ -274,6 +285,117 @@ def _bad(detail, status=400):
     return JsonResponse({'detail': detail}, status=status)
 
 
+def _read_json(request):
+    """(dict, error_response)."""
+    try:
+        body = json.loads(request.body or b'{}')
+    except json.JSONDecodeError:
+        return None, _bad('Invalid JSON body.')
+    if not isinstance(body, dict):
+        return None, _bad('Invalid JSON body.')
+    return body, None
+
+
+def _clean_address(body):
+    """({address, landmark, area, pin_code, latitude, longitude}, error_response)."""
+    place = {
+        'address': str(body.get('address') or '').strip()[:1000],
+        'landmark': str(body.get('landmark') or '').strip()[:255],
+        'area': str(body.get('area') or '').strip()[:120],
+        'pin_code': re.sub(r'\D', '', str(body.get('pin_code') or '')),
+    }
+    if not place['address']:
+        return None, _bad('Enter the pickup address.')
+    if not re.fullmatch(r'\d{6}', place['pin_code']):
+        return None, _bad('Enter a 6-digit pincode.')
+    for name, limit in (('latitude', 90), ('longitude', 180)):
+        raw = body.get(name)
+        try:
+            value = None if raw in (None, '') else float(raw)
+        except (TypeError, ValueError):
+            return None, _bad('Invalid map location.')
+        if value is not None and not -limit <= value <= limit:
+            return None, _bad('Invalid map location.')
+        place[name] = value
+    if (place['latitude'] is None) != (place['longitude'] is None):
+        return None, _bad('Invalid map location.')
+    return place, None
+
+
+def _address_json(a):
+    return {'id': a.id, 'label': a.label, 'address': a.address, 'landmark': a.landmark,
+            'area': a.area, 'pin_code': a.pin_code, 'latitude': a.latitude,
+            'longitude': a.longitude, 'is_default': a.is_default}
+
+
+MAX_ADDRESSES = 10
+
+
+def _make_default(address):
+    address.customer.addresses.exclude(pk=address.pk).filter(is_default=True).update(is_default=False)
+    if not address.is_default:
+        address.is_default = True
+        address.save(update_fields=['is_default'])
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
+def customer_addresses(request):
+    """GET: the customer's address book. POST: add an address (the first one, or
+    one sent with is_default, becomes the default)."""
+    customer, err = _customer_for(request)
+    if err:
+        return err
+    if request.method == 'GET':
+        return JsonResponse({'addresses': [_address_json(a) for a in customer.addresses.all()]})
+    body, err = _read_json(request)
+    if err:
+        return err
+    if customer.addresses.count() >= MAX_ADDRESSES:
+        return _bad(f'At most {MAX_ADDRESSES} saved addresses.')
+    place, err = _clean_address(body)
+    if err:
+        return err
+    label = body.get('label') if body.get('label') in dict(CustomerAddress.LABEL_CHOICES) else CustomerAddress.HOME
+    address = CustomerAddress.objects.create(customer=customer, shop=customer.shop, label=label, **place)
+    if body.get('is_default') or customer.addresses.count() == 1:
+        _make_default(address)
+    return JsonResponse(_address_json(address), status=201)
+
+
+@csrf_exempt
+@require_http_methods(['PATCH', 'DELETE'])
+def customer_address_detail(request, address_id):
+    customer, err = _customer_for(request)
+    if err:
+        return err
+    # Scoped to the caller's own book: someone else's id is a plain 404.
+    address = customer.addresses.filter(pk=address_id).first()
+    if address is None:
+        return _bad('Address not found.', status=404)
+    if request.method == 'DELETE':
+        was_default = address.is_default
+        address.delete()
+        nxt = customer.addresses.order_by('created_at').first()
+        if was_default and nxt:
+            _make_default(nxt)
+        return HttpResponse(status=204)
+    body, err = _read_json(request)
+    if err:
+        return err
+    place, err = _clean_address({**_address_json(address), **body})
+    if err:
+        return err
+    for field, value in place.items():
+        setattr(address, field, value)
+    if body.get('label') in dict(CustomerAddress.LABEL_CHOICES):
+        address.label = body['label']
+    address.save()
+    if body.get('is_default'):
+        _make_default(address)
+    return JsonResponse(_address_json(address))
+
+
 def _create_customer_order(request, customer):
     """POST /api/customer/orders/. Only whitelisted fields are read; prices, totals,
     customer, delivery type, status and payment are all decided here, never by the client."""
@@ -326,26 +448,23 @@ def _create_customer_order(request, customer):
             day == today and slot.start_time <= timezone.localtime().time()):
         return _bad('That pickup slot is not available. Choose another.')
 
-    # Address, copied onto the order; pincode must be one the shop serves.
-    address = str(body.get('address') or customer.address or '').strip()[:1000]
-    pin_code = re.sub(r'\D', '', str(body.get('pin_code') or ''))
-    if not address:
-        return _bad('Enter the pickup address.')
-    if not re.fullmatch(r'\d{6}', pin_code):
-        return _bad('Enter a 6-digit pincode.')
+    # Address (a saved one by id, or typed in), copied onto the order; the
+    # pincode must be one the shop serves.
+    if body.get('address_id') not in (None, ''):
+        saved = customer.addresses.filter(pk=body.get('address_id')).first() \
+            if str(body.get('address_id')).isdigit() else None
+        if saved is None:
+            return _bad('That saved address no longer exists.')
+        body = {**body, **_address_json(saved)}
+    place, err = _clean_address(body)
+    if err:
+        return err
     served = _served_pincodes(shop)
-    if served and pin_code not in served:
+    if served and place['pin_code'] not in served:
         return _bad('Sorry, we do not pick up from that pincode yet.')
-    coords = []
-    for name, limit in (('latitude', 90), ('longitude', 180)):
-        raw = body.get(name)
-        try:
-            value = None if raw in (None, '') else float(raw)
-        except (TypeError, ValueError):
-            return _bad('Invalid map location.')
-        if value is not None and not -limit <= value <= limit:
-            return _bad('Invalid map location.')
-        coords.append(value)
+    address = ', '.join(p for p in (place['address'], place['landmark'], place['area']) if p)
+    coords = (place['latitude'], place['longitude'])
+    pin_code = place['pin_code']
     notes = str(body.get('notes') or '').strip()[:1000] or None
 
     with transaction.atomic():

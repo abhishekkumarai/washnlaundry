@@ -18,7 +18,7 @@ from .views import (
 from .password_auth import signup, verify_email, resend_verification, login, forgot_password, reset_password
 from .role_views import me, link_requests, link_request_approve, link_request_reject
 from .customer_views import (
-    customer_booking_options, customer_me, customer_orders, customer_order_detail,
+    customer_address_detail, customer_addresses, customer_booking_options, customer_me, customer_orders, customer_order_detail,
     customer_rate_card,
 )
 
@@ -67,6 +67,8 @@ urlpatterns = [
     path('link-requests/<int:pk>/approve/', link_request_approve, name='link-request-approve'),
     path('link-requests/<int:pk>/reject/', link_request_reject, name='link-request-reject'),
     path('customer/me/', customer_me, name='customer-me'),
+    path('customer/addresses/', customer_addresses, name='customer-addresses'),
+    path('customer/addresses/<int:address_id>/', customer_address_detail, name='customer-address-detail'),
     path('customer/booking-options/', customer_booking_options, name='customer-booking-options'),
     path('customer/orders/', customer_orders, name='customer-orders'),
     path('customer/orders/<str:order_number>/', customer_order_detail, name='customer-order-detail'),

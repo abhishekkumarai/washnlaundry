@@ -303,6 +303,39 @@ class Customer(TenantModel):
         return f"{self.name} ({self.phone})"
 
 
+class CustomerAddress(TenantModel):
+    """A saved pickup address in a customer's address book (customer portal).
+
+    Orders copy the address they were booked with (Order.address/pin_code/latitude/
+    longitude), so editing or deleting a row here never rewrites history.
+    """
+    HOME, WORK, OTHER = 'HOME', 'WORK', 'OTHER'
+    LABEL_CHOICES = [(HOME, 'Home'), (WORK, 'Work'), (OTHER, 'Other')]
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='customer_addresses', db_index=True)
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='addresses')
+    label = models.CharField(max_length=10, choices=LABEL_CHOICES, default=HOME)
+    address = models.TextField()
+    landmark = models.CharField(max_length=255, blank=True, default='')
+    area = models.CharField(max_length=120, blank=True, default='')
+    pin_code = models.CharField(max_length=12)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-is_default', 'created_at']
+
+    def save(self, *args, **kwargs):
+        if not getattr(self, 'shop_id', None) and getattr(self, 'customer_id', None):
+            self.shop = self.customer.shop
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.get_label_display()}: {self.address[:40]}"
+
+
 # ── Service catalogue ─────────────────────────────────────────────────────────
 
 class GarmentCategory(TenantModel):

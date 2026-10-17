@@ -2685,20 +2685,25 @@ class RoleAuthTests(APITestCase):
         self.assertEqual([o['order_number'] for o in rows], ['WL-1'])
 
 
-    def test_customer_can_edit_own_profile_but_not_phone_or_email(self):
+    def test_customer_can_edit_own_profile_and_phone_but_not_email(self):
         self.as_('alice@example.com')
         res = self.client.patch('/api/customer/me/', {
             'address': '12 MG Road', 'landmark': 'Near the temple', 'preference': 'No starch',
-            'phone': '9000000000', 'email': 'evil@example.com'}, format='json', **self.auth)
+            'phone': '+91 90000 00000', 'email': 'evil@example.com'}, format='json', **self.auth)
         self.assertEqual(res.status_code, 200, res.content)
         self.alice.refresh_from_db()
         self.assertEqual((self.alice.address, self.alice.landmark, self.alice.preference),
                          ('12 MG Road', 'Near the temple', 'No starch'))
         self.assertEqual((self.alice.phone, self.alice.email.lower()),
-                         ('9111111111', 'alice@example.com'))
+                         ('9000000000', 'alice@example.com'))
         body = self.client.get('/api/me/', **self.auth).json()['customer']
         self.assertEqual((body['landmark'], body['preference'], body['phone']),
-                         ('Near the temple', 'No starch', '9111111111'))
+                         ('Near the temple', 'No starch', '9000000000'))
+        # Another customer's number, or a malformed one, is refused.
+        self.assertEqual(self.client.patch('/api/customer/me/', {'phone': self.bob.phone},
+                                           format='json', **self.auth).status_code, 409)
+        self.assertEqual(self.client.patch('/api/customer/me/', {'phone': '12345'},
+                                           format='json', **self.auth).status_code, 400)
         self.assertEqual(self.client.patch('/api/customer/me/', {'name': ' '}, format='json',
                                            **self.auth).status_code, 400)
         self.as_('stranger@example.com')

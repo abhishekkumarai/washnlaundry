@@ -111,6 +111,47 @@ class CustomerBookingTests(APITestCase):
         tomorrow = next(d for d in body['days'] if d['date'] == self.tomorrow)
         self.assertEqual(tomorrow['slots'][0]['remaining'], 1)
 
+    def test_booking_with_a_saved_address_copies_it_onto_the_order(self):
+        res = self.client.post('/api/customer/addresses/', {
+            'label': 'WORK', 'address': '5 Residency Rd', 'landmark': 'Opp. park',
+            'pin_code': '560038', 'latitude': 12.9, 'longitude': 77.6}, format='json', **self.auth)
+        self.assertEqual(res.status_code, 201, res.content)
+        addr_id = res.json()['id']
+        order = self.book(address_id=addr_id, address='', pin_code='')
+        self.assertEqual(order.status_code, 201, order.content)
+        self.assertEqual((order.json()['address'], order.json()['pin_code']),
+                         ('5 Residency Rd, Opp. park', '560038'))
+        # Editing the address book later does not rewrite the order.
+        self.client.patch(f'/api/customer/addresses/{addr_id}/', {'address': 'Moved'},
+                          format='json', **self.auth)
+        self.assertEqual(Order.objects.get().address, '5 Residency Rd, Opp. park')
+
+    def test_address_book_crud_default_and_validation(self):
+        url = '/api/customer/addresses/'
+        first = self.client.post(url, {'address': 'A', 'pin_code': '560038'}, format='json', **self.auth).json()
+        self.assertTrue(first['is_default'])
+        second = self.client.post(url, {'address': 'B', 'pin_code': '560001', 'is_default': True},
+                                  format='json', **self.auth).json()
+        rows = self.client.get(url, **self.auth).json()['addresses']
+        self.assertEqual([(r['address'], r['is_default']) for r in rows], [('B', True), ('A', False)])
+        self.assertEqual(self.client.post(url, {'address': 'C', 'pin_code': '12'}, format='json',
+                                          **self.auth).status_code, 400)
+        self.assertEqual(self.client.post(url, {'address': 'C', 'pin_code': '560001', 'latitude': 95,
+                                                'longitude': 1}, format='json', **self.auth).status_code, 400)
+        self.assertEqual(self.client.delete(f'{url}{second["id"]}/', **self.auth).status_code, 204)
+        rows = self.client.get(url, **self.auth).json()['addresses']
+        self.assertEqual([(r['address'], r['is_default']) for r in rows], [('A', True)])
+
+    def test_cannot_touch_another_customers_address(self):
+        from .models import CustomerAddress
+        bob = Customer.objects.create(name='Bob', phone='9222222222')
+        theirs = CustomerAddress.objects.create(customer=bob, address='Bob St', pin_code='560038')
+        url = f'/api/customer/addresses/{theirs.id}/'
+        self.assertEqual(self.client.patch(url, {'address': 'x'}, format='json', **self.auth).status_code, 404)
+        self.assertEqual(self.client.delete(url, **self.auth).status_code, 404)
+        self.assertEqual(self.book(address_id=theirs.id).status_code, 400)
+        self.assertTrue(CustomerAddress.objects.filter(pk=theirs.id, address='Bob St').exists())
+
     def test_booking_requires_sign_in(self):
         res = self.client.post('/api/customer/orders/', {}, format='json')
         self.assertEqual(res.status_code, 401)
