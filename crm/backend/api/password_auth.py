@@ -150,7 +150,7 @@ def signup(request):
         return _err(f'Password must be {MIN_PASSWORD}-{MAX_PASSWORD} characters.', 400)
     phone = clean_phone(body.get('phone'))
     if not phone:
-        return _err('Enter a valid phone number (10-15 digits).', 400)
+        return _err('Enter a valid 10-digit phone number.', 400)
     weak = weak_password_message(password, email, str(body.get('name') or ''))
     if weak:
         return _err(weak, 400)
@@ -199,17 +199,21 @@ def verify_email(request):
         return _err('This confirmation link has already been used. Sign in with your email and password.', 409)
     user.is_active = True
     user.save(update_fields=['is_active'])
+    # Customer self-registration is switched off for now: confirming the email only
+    # activates the login. A person gets a view when their email is already an
+    # owner / staff / customer record. To re-enable, restore this block (and the POST
+    # in customer_views.customer_me).
     # The phone given at signup becomes their customer record (or a link request
     # if the store already has that number). Owner/staff emails keep their roles.
-    phone = clean_phone(data.get('p'))
-    if (phone and not is_owner_email(user.email) and not is_staff_email(user.email)
-            and not customer_for_email(user.email)):
-        try:
-            register_customer(user.email, user.first_name or user.email.split('@')[0], phone)
-        except ValueError:
-            # Several shops and no tenant to file the customer under: the email is still
-            # confirmed, the person just lands on /my/start instead of a 500.
-            logger.warning('No shop to register customer %s under; left unlinked', user.email)
+    # phone = clean_phone(data.get('p'))
+    # if (phone and not is_owner_email(user.email) and not is_staff_email(user.email)
+    #         and not customer_for_email(user.email)):
+    #     try:
+    #         register_customer(user.email, user.first_name or user.email.split('@')[0], phone)
+    #     except ValueError:
+    #         # Several shops and no tenant to file the customer under: the email is still
+    #         # confirmed, the person just lands on /my/start instead of a 500.
+    #         logger.warning('No shop to register customer %s under; left unlinked', user.email)
     sync_user_groups(user)
     return _session(user)
 

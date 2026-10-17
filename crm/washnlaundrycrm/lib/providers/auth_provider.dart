@@ -83,10 +83,12 @@ class AuthProvider extends ChangeNotifier {
   }
 
   @visibleForTesting
-  void setSessionForTest({required bool signedIn, String? role}) {
+  void setSessionForTest(
+      {required bool signedIn, String? role, Map<String, dynamic>? me}) {
     _initializing = false;
     _isPersistedSignedIn = signedIn;
     _role = role;
+    _me = me;
     notifyListeners();
   }
 

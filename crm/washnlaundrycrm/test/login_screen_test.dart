@@ -129,6 +129,27 @@ void main() {
       expect(auth.isSignedIn, isFalse);
     });
 
+    testWidgets('the phone field takes digits only, at most 10', (tester) async {
+      await tester.pumpWidget(host(AuthProvider(), const LoginScreen()));
+      await tester.pump();
+      await tester.tap(find.text('Create Account'));
+      await tester.pump();
+
+      final phone = find.byType(TextField).at(1); // email, phone, password
+      await tester.enterText(phone, 'me@x.com 98-765+43210 99');
+      await tester.pump();
+      expect(tester.widget<TextField>(phone).controller!.text, '9876543210');
+    });
+
+    test('a valid mobile is exactly 10 digits starting 6-9', () {
+      expect(LoginScreen.isValidMobile('9876543210'), isTrue);
+      expect(LoginScreen.isValidMobile('6000000000'), isTrue);
+      expect(LoginScreen.isValidMobile('5876543210'), isFalse); // bad first digit
+      expect(LoginScreen.isValidMobile('987654321'), isFalse); // 9 digits
+      expect(LoginScreen.isValidMobile('98765abc10'), isFalse);
+      expect(LoginScreen.isValidMobile(''), isFalse);
+    });
+
     test('Demo Mode is hidden on the customer site only', () {
       expect(LoginScreen.showDemoOn('app.washnlaundry.com'), isTrue);
       expect(LoginScreen.showDemoOn('localhost'), isTrue);

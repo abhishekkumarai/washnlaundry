@@ -26,6 +26,9 @@ services:
         value: https://develop.washnlaundrycrm.pages.dev
       - key: APP_BASE_URL
         value: https://develop.washnlaundrycrm.pages.dev
+      # Each new account sets up (and only sees) its own shop, no approval.
+      - key: SELF_SERVICE_SHOPS
+        value: "True"
       # DJANGO_DATABASE_URL unset => ephemeral SQLite, reseeded on every start.
       # To use Postgres instead, set it to a Neon dev branch (never prod).
       - key: DJANGO_DATABASE_URL

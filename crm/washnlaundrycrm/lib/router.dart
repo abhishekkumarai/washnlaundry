@@ -24,6 +24,7 @@ import 'screens/profile_screen.dart';
 import 'screens/scan_screen.dart';
 import 'screens/services_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/shop_setup_screen.dart';
 import 'screens/social_suite_screen.dart';
 import 'screens/staff_screen.dart';
 import 'utils/role_views.dart';
@@ -124,6 +125,8 @@ List<RouteBase> appRoutes() => [
       ),
       // Sign-up for a Google account with no staff or customer record yet.
       GoRoute(path: '/my/start', builder: (_, __) => const CustomerStartScreen()),
+      // First sign-in with no shop yet: name your shop (self-service).
+      GoRoute(path: shopSetupPath, builder: (_, __) => const ShopSetupScreen()),
       GoRoute(
         path: '/profile',
         builder: (c, _) => _section(c, 99, const ProfileScreen()),
@@ -205,6 +208,9 @@ List<RouteBase> appRoutes() => [
       ),
     ];
 
+/// The "set up your shop" landing page for an account with no shop yet.
+const shopSetupPath = '/setup-shop';
+
 /// Where each role lands after sign-in.
 String homeFor(String? role) => switch (role) {
       'customer' => '/orders',
@@ -238,6 +244,10 @@ String? authRedirectFor(AuthProvider auth, String loc) {
   if (!auth.isSignedIn) return loggingIn ? null : '/login';
   final role = auth.role;
   if (role == null) return null;
+  // An account with no shop of its own yet sets one up first (backend
+  // SELF_SERVICE_SHOPS); once it has one the page is not reachable.
+  if (auth.needsShopOnboarding) return loc == shopSetupPath ? null : shopSetupPath;
+  if (loc == shopSetupPath) return homeFor(role);
   final home = homeFor(role);
   if (loggingIn || loc == '/') return home;
   final inMy = loc.startsWith('/my/');

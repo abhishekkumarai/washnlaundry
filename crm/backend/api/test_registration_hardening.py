@@ -1,5 +1,6 @@
 """Weak passwords are refused everywhere a password is set; Google signup survives several shops."""
 import re
+import unittest
 from unittest import mock
 
 from django.core.cache import cache
@@ -50,6 +51,7 @@ class RegistrationHardeningTests(TestCase):
                                    {'email': 'asha@x.com', 'password': '12345678'}, format='json')
         self.assertEqual(res.status_code, 400)
 
+    @unittest.skip('customer self-registration is switched off')
     def test_google_signup_gives_a_clean_error_instead_of_a_500_with_several_shops(self):
         Shop.objects.create(name='A', slug='shop-a')
         Shop.objects.create(name='B', slug='shop-b')

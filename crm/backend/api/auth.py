@@ -204,6 +204,15 @@ def sync_staff_user(staff):
     return sync_user_groups(user)
 
 
+def needs_shop_onboarding(user):
+    """settings.SELF_SERVICE_SHOPS: a signed-in account that belongs to no shop yet,
+    which the app sends to its "set up your shop" page."""
+    from django.conf import settings
+    from .models import ShopMembership
+    return bool(settings.SELF_SERVICE_SHOPS and user is not None and not user.is_superuser
+                and not ShopMembership.objects.filter(user=user, is_active=True).exists())
+
+
 def _staff_membership(staff):
     from .models import ShopMembership
     if not (staff and staff.email and staff.shop_id):
@@ -327,7 +336,7 @@ def resolve_principal(email, shop=None):
         if is_staff_email(email, shop=shop):
             return Principal(email, STAFF, user=user, shop=shop)
         shop_cust = Customer.objects.filter(email__iexact=email, shop=shop).order_by('created_at').first()
-        if shop_cust:
+        if shop_cust and not settings.SELF_SERVICE_SHOPS:  # the customer view is off then
             return Principal(email, CUSTOMER, customer=shop_cust, user=user, shop=shop)
 
     # With a tenant active, only the checks above count. Groups and Customer
@@ -335,6 +344,22 @@ def resolve_principal(email, shop=None):
     # shop (or a customer record in another) carry over into this one.
     if shop:
         return Principal(email, UNLINKED, user=user, shop=shop)
+
+    # settings.SELF_SERVICE_SHOPS: a bearer-token request carries no tenant (the middleware
+    # only sees session users), so resolve it to the caller's own default shop. Only shops
+    # they are a member of count, so this never opens anyone else's shop. It runs ahead of
+    # the customer lookup, so a shop owner always gets their admin view.
+    from django.conf import settings
+    if user and settings.SELF_SERVICE_SHOPS:
+        own = ShopMembership.objects.filter(  # Meta ordering: default shop first
+            user=user, is_active=True, role__in=[ShopRole.OWNER, ShopRole.STAFF],
+        ).exclude(shop__status='ARCHIVED').select_related('shop').first()
+        if own:
+            role = OWNER if own.role == ShopRole.OWNER else STAFF
+            return Principal(email, role, user=user, shop=own.shop)
+        # No shop yet: no access to anything (the customer view is off too) until they
+        # set up their own shop.
+        return Principal(email, UNLINKED, user=user, shop=None)
 
     # 3. No tenant (e.g. /api/me/): global group checks / fallback
     if user:
