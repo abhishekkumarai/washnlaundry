@@ -702,10 +702,14 @@ class RevenueSeriesPointModel {
   final int day;
   final double amount;
 
+  /// That day's expenses, drawn as a red bar beside the revenue one.
+  final double expenses;
+
   const RevenueSeriesPointModel({
     this.date = '',
     this.day = 0,
     this.amount = 0,
+    this.expenses = 0,
   });
 
   factory RevenueSeriesPointModel.fromJson(Map<String, dynamic> json) =>
@@ -713,6 +717,7 @@ class RevenueSeriesPointModel {
         date: json['date'] ?? '',
         day: (json['day'] ?? 0).toInt(),
         amount: (json['amount'] ?? 0).toDouble(),
+        expenses: (json['expenses'] ?? 0).toDouble(),
       );
 }
 

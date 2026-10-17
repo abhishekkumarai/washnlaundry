@@ -186,6 +186,11 @@ class AppProvider extends ChangeNotifier {
   Map<String, dynamic>? _shop;
   Map<String, dynamic>? get shop => _shop;
 
+  /// Per-shop features, switched on by a superuser (backend `Shop.*_enabled`,
+  /// off by default; `manage.py shop_feature`). The API enforces them too.
+  bool get socialSuiteEnabled => _shop?['social_suite_enabled'] == true;
+  bool get chatEnabled => _shop?['chat_enabled'] == true;
+
   String? _activeTenantId;
   String? get activeTenantId => _activeTenantId;
 
@@ -590,7 +595,7 @@ class AppProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {
-      _error = 'Something went wrong loading your shop: $e';
+      _error = friendlyError(e, 'load your shop');
     }
   }
 
@@ -627,7 +632,7 @@ class AppProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {
-      _error = 'Something went wrong loading your orders: $e';
+      _error = friendlyError(e, 'load your orders');
     }
   }
 
@@ -693,7 +698,7 @@ class AppProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {
-      _error = 'Something went wrong loading your shop: $e';
+      _error = friendlyError(e, 'load your shop');
     }
 
     _isLoading = false;

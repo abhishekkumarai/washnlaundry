@@ -114,7 +114,10 @@ def _seed_sandbox(slug):
     cfg = dict(seed_db.SHOPS[1])
     cfg['shop'] = dict(cfg['shop'], name='Demo Laundry', slug=slug, subdomain=slug,
                        email='demo@example.com')
-    cfg.update(customers=slice(10, 32), staff=slice(0, 8), orders=36, expenses=12, credits=6)
+    # stress: 150 extra tags and 100 extra services, so the overflow handling on
+    # New Order (tag row, category row, "+N" chips) is visible in the demo.
+    cfg.update(customers=slice(10, 32), staff=slice(0, 8), orders=36, expenses=12, credits=6,
+               stress=True)
     with contextlib.redirect_stdout(io.StringIO()):
         seed_db.seed_shop(cfg)
     return Shop.objects.get(slug=slug)

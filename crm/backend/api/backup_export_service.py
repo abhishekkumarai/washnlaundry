@@ -27,15 +27,20 @@ from .tenancy import get_current_tenant
 
 
 def _tenant_filter(qs, request=None):
-    """Filters queryset by current tenant if available."""
+    """Scopes an export queryset to the active shop.
+
+    Fails closed: with no active shop it exports nothing rather than every shop's
+    rows. (The tenant middleware already refuses these paths without a shop when
+    several exist; this is the second line of defence.)
+    """
     shop = None
     if request and hasattr(request, 'shop') and request.shop:
         shop = request.shop
     else:
         shop = get_current_tenant()
-    if shop and hasattr(qs.model, 'shop'):
-        return qs.filter(shop=shop)
-    return qs
+    if not hasattr(qs.model, 'shop'):
+        return qs
+    return qs.filter(shop=shop) if shop else qs.none()
 
 
 def _format_dt(val):

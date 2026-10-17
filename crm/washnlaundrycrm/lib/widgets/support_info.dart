@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 /// Single source of truth for the contact details shown under Help & Support
-/// (sidebar dialog) and on the 404 / 5xx error screens.
+/// (Settings tab and sidebar dialog) and on the 404 / 5xx error screens. The
+/// number matches the marketing site (src/app/SupportCard.tsx).
 class SupportInfo {
   static const email = 'support@washnlaundry.com';
-  static const phone = '+91 80 4567 8900';
+  static const phone = '08407 000 048';
+  static const phoneTel = '08407000048';
+  static const whatsapp = '918407000048'; // wa.me form: country code, no +
   static const hours = 'Mon – Sat, 9:00 AM – 8:00 PM';
 }
 

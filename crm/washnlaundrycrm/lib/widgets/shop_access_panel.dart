@@ -58,7 +58,7 @@ class _ShopAccessPanelState extends State<ShopAccessPanel> {
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
-      if (mounted) setState(() => _error = 'Could not load members: $e');
+      if (mounted) setState(() => _error = friendlyError(e, 'load members'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/load_state.dart';
+import '../widgets/tag_filter.dart';
 import '../utils/navigation.dart';
 import '../utils/money.dart';
 
@@ -22,6 +23,14 @@ class _ServicesScreenState extends State<ServicesScreen> {
   int _selectedTopTab = 0; // Items is the only view now
   int _selectedCategoryIndex = 0;
   String _searchQuery = '';
+
+  /// Multi-select tag filter (same OR rule as New Order); cleared whenever the
+  /// selected category changes, since the offered tags change with it.
+  final Set<String> _selectedTags = <String>{};
+  String _tagsCategory = '';
+
+  /// Tags on the selected category's items, sorted.
+  List<String> _availableTags = const [];
 
   // Presentation only — the catalogue itself comes from the API. Keyed by the
   // category's `icon` string (what the seed writes, and what the New Service
@@ -102,10 +111,21 @@ class _ServicesScreenState extends State<ServicesScreen> {
     final categoryName = _categories[_selectedCategoryIndex]['title'] as String;
     final query = _searchQuery.toLowerCase();
 
+    if (categoryName != _tagsCategory) {
+      _tagsCategory = categoryName;
+      _selectedTags.clear();
+    }
+    _availableTags = <String>{
+      for (final g in provider.garments)
+        if (g.categoryName == categoryName) ...g.tags,
+    }.toList()
+      ..sort();
+
     _currentItems = provider.garments
         // Inactive items stay listed (shown as off) so they can be switched
         // back on here; only New Order limits itself to active ones.
         .where((g) => g.categoryName == categoryName)
+        .where((g) => matchesSelectedTags(g.tags, _selectedTags))
         .where((g) =>
             query.isEmpty ||
             g.name.toLowerCase().contains(query) ||
@@ -511,6 +531,15 @@ class _ServicesScreenState extends State<ServicesScreen> {
           _buildCategoryHeader(cat),
           const SizedBox(height: 20),
 
+          if (_availableTags.isNotEmpty || _selectedTags.isNotEmpty) ...[
+            TagFilterRow(
+              tags: _availableTags,
+              selected: _selectedTags,
+              onChanged: () => setState(() {}),
+            ),
+            const SizedBox(height: 16),
+          ],
+
           // Items row header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -696,33 +725,43 @@ class _ServicesScreenState extends State<ServicesScreen> {
           const SizedBox(width: 12),
           Expanded(
             flex: 3,
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Flexible(
-                  child: Text(item['name'] as String,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: active
-                              ? const Color(0xFF141A24)
-                              : const Color(0xFF94A3B8))),
-                ),
-                if (!active) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1EFEA),
-                      borderRadius: BorderRadius.circular(6),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(item['name'] as String,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: active
+                                  ? const Color(0xFF141A24)
+                                  : const Color(0xFF94A3B8))),
                     ),
-                    child: const Text('Off',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF64748B))),
-                  ),
+                    if (!active) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1EFEA),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('Off',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B))),
+                      ),
+                    ],
+                  ],
+                ),
+                if ((item['tags'] as List<String>).isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  ItemTagsLine(tags: item['tags'] as List<String>),
                 ],
               ],
             ),
@@ -1082,6 +1121,8 @@ class _ServicesScreenState extends State<ServicesScreen> {
                 ),
               ],
             ),
+            if ((item['tags'] as List<String>).isNotEmpty)
+              ItemTagsLine(tags: item['tags'] as List<String>),
             Row(
               children: [
                 Container(
@@ -1287,6 +1328,10 @@ class _ServicesScreenState extends State<ServicesScreen> {
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF141A24))),
+                if ((item['tags'] as List<String>).isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  ItemTagsLine(tags: item['tags'] as List<String>),
+                ],
                 const SizedBox(height: 4),
                 Row(
                   children: [

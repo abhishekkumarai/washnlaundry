@@ -3,8 +3,9 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/credit_categories_panel.dart';
-import '../widgets/shop_access_panel.dart';
+// import '../widgets/shop_access_panel.dart';  // Shop access tab hidden for now
 import '../widgets/backup_export_panel.dart';
+import '../widgets/help_support_panel.dart';
 import '../widgets/sidebar_navigation.dart';
 
 /// One entry in Settings' vertical tab list.
@@ -34,18 +35,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const businessProfile = 'business-profile';
   static const backupExport = 'backup-export';
   static const creditCategories = 'credit-categories';
-  static const shopAccess = 'shop-access';
+  // Shop access (members, transfer ownership, close shop) is hidden for now; the
+  // panel is kept in widgets/shop_access_panel.dart. Restore the tab and the
+  // `case` in the body to bring it back.
+  // static const shopAccess = 'shop-access';
 
-  /// Only [businessProfile], [backupExport], and [creditCategories] are built;
-  /// unbuilt tabs show a "Not available yet" panel.
+  static const help = 'help';
+
+  /// Built tabs: [businessProfile], [backupExport], [creditCategories] and
+  /// [help]; an unbuilt tab would show a "Not available yet" panel.
   static const _mainTabs = [
     _SettingsTab(businessProfile, Icons.storefront_outlined, 'Business profile'),
     _SettingsTab(backupExport, Icons.backup_outlined, 'Backup, Data Import & Export'),
     _SettingsTab(creditCategories, Icons.savings_outlined, 'Credit categories'),
-    _SettingsTab(shopAccess, Icons.admin_panel_settings_outlined, 'Shop access'),
+    // _SettingsTab(shopAccess, Icons.admin_panel_settings_outlined, 'Shop access'),
   ];
   static const _accountTabs = [
-    _SettingsTab('help', Icons.help_outline_rounded, 'Help & support',
+    _SettingsTab(help, Icons.help_outline_rounded, 'Help & support',
         hasArrow: true),
   ];
   static const _allTabs = [..._mainTabs, ..._accountTabs];
@@ -351,9 +357,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case creditCategories:
         child = const CreditCategoriesPanel();
         break;
-      case shopAccess:
-        child = const ShopAccessPanel();
+      case help:
+        child = const HelpSupportPanel();
         break;
+      // case shopAccess:  (hidden for now, see _mainTabs)
+      //   child = const ShopAccessPanel();
+      //   break;
       default:
         child = _notAvailable(_current);
     }

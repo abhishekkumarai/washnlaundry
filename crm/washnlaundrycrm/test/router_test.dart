@@ -135,9 +135,12 @@ void main() {
 
     testWidgets('every sidebar section renders and sets the matching nav index',
         (tester) async {
+      // A shop with Social Suite and Chat switched on, so every section is reachable.
       final provider = AppProvider(autoLoad: false)
         ..seedForTest(orders: const [], customers: const [], staff: const [],
-            expenses: const [], garments: const [], categories: const []);
+            expenses: const [], garments: const [], categories: const [],
+            shop: const {'name': 'On Wash', 'social_suite_enabled': true,
+                         'chat_enabled': true});
 
       for (final entry in AppProvider.routePaths.entries) {
         await tester.pumpWidget(
@@ -155,6 +158,21 @@ void main() {
         expect(provider.currentNavIndex, entry.key, reason: '${entry.value} nav index');
       }
     });
+
+    for (final path in ['/social', '/chat']) {
+      testWidgets('$path sends a shop without that feature to the dashboard',
+          (tester) async {
+        final provider = AppProvider(autoLoad: false)
+          ..seedForTest(orders: const [], customers: const [], staff: const [],
+              expenses: const [], garments: const [], categories: const [],
+              shop: const {'name': 'Off Wash'});
+        await tester.pumpWidget(
+            host(auth: auth, provider: provider, initialLocation: path));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(provider.currentNavIndex, 0); // Dashboard
+      });
+    }
   });
 
   group('/orders/:id', () {

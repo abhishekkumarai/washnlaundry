@@ -27,6 +27,7 @@ from api.models import (  # noqa: E402
     OrderStatus, PaymentStatus, DeliveryType, OrderSource, PricingUnit,
     ExpenseCategory, PaymentMethod,
 )
+from api.item_tags import category_tags, item_tags  # noqa: E402
 
 PC, KG, SQFT, SET = PricingUnit.PIECE, PricingUnit.KG, PricingUnit.SQFT, PricingUnit.SET
 
@@ -38,30 +39,8 @@ CREATED_BY = {
     OrderSource.AGENT_APP: 'Agent App',
 }
 
-# Keyword -> tag rules for the New Order page's tag chips. Matched against the
-# lower-cased item name; a category may also contribute tags of its own.
-_ITEM_TAG_RULES = [
-    ('male', ('shirt', 'kurta', 'sherwani', 'suit', 'blazer', 'trouser', 'pant', 'jeans', 'shorts', 'overcoat')),
-    ('female', ('saree', 'lehenga', 'blouse', 'dupatta', 'salwar', 'top /', 'kurti', 'dress', 'gown', 'frock',
-                'skirt', 'leggings', 'heels')),
-    ('kids', ('frock', 'school uniform', 'soft toy', 'stroller')),
-]
-_CATEGORY_TAGS = {
-    'Shoe Cleaning': ['shoes'],
-    'Household': ['home'],
-    'Premium': ['premium'],
-}
-
-
-def tags_for(category, name):
-    lowered = name.lower()
-    tags = list(_CATEGORY_TAGS.get(category, []))
-    for tag, words in _ITEM_TAG_RULES:
-        if any(w in lowered for w in words) and tag not in tags:
-            tags.append(tag)
-    if 'bag' in lowered or 'suitcase' in lowered:
-        tags.append('bags')
-    return tags
+# Tags for the New Order page's tag chips come from api/item_tags.py, shared with
+# the default catalogue every new shop gets.
 
 
 CATALOGUE = [
@@ -274,6 +253,54 @@ def clear_all():
     Shop.objects.all().delete()
 
 
+def seed_stress_catalog(shop):
+    """Overflow test data for New Order's tag and category rows (KAN-211/212/213).
+
+    Only Demo Mode sandboxes get this (`stress=True` in api/demo.py); the shops
+    `seed()` creates keep their normal catalogue.
+
+    - 150 extra item tags: 140 two-word ones plus 10 very long ones. Shirt carries
+      30 (shows "+28" in the item rows); the rest are spread one per item.
+    - 100 extra service categories with one item each; every 10th category and
+      item has a very long name.
+    """
+    print('Seeding stress catalogue (150 tags, 100 services)...')
+    tags = [f'tag{i:03d} word' for i in range(140)] + [
+        f'a-very-long-tag-name-number-{i}-that-goes-on-and-on' for i in range(10)
+    ]
+    items = list(GarmentItem.objects.filter(shop=shop).order_by('id'))
+    shirt = next((g for g in items if g.name.lower() == 'shirt'), items[0])
+    rest = [g for g in items if g.pk != shirt.pk]
+    shirt.tags = list(shirt.tags or []) + tags[:30]
+    for i, tag in enumerate(tags[30:]):
+        g = rest[i % len(rest)]
+        g.tags = list(g.tags or []) + [tag]
+    GarmentItem.objects.bulk_update(items, ['tags'])
+
+    base = GarmentCategory.objects.filter(shop=shop).count()
+    categories = GarmentCategory.objects.bulk_create([
+        GarmentCategory(
+            shop=shop,
+            name=(f'Service {i:03d} premium handcrafted delicate fabric care'
+                  if i % 10 == 0 else f'Service {i:03d}'),
+            display_order=base + 1 + i,
+        )
+        for i in range(100)
+    ])
+    GarmentItem.objects.bulk_create([
+        GarmentItem(
+            shop=shop,
+            category=category,
+            name=(f'Item {i:03d} extra long garment name for overflow testing'
+                  if i % 10 == 0 else f'Item {i:03d}'),
+            price=50 + i,
+            display_order=1,
+            tags=[f'svc-tag-{i % 7}'],
+        )
+        for i, category in enumerate(categories)
+    ])
+
+
 def seed_shop(cfg):
     print(f"\n=== Seeding shop: {cfg['shop']['name']} ===")
     shop = Shop.objects.create(currency_symbol='₹', locale='en_IN', **cfg['shop'])
@@ -290,7 +317,7 @@ def seed_shop(cfg):
     for order_index, (cat_name, icon, items) in enumerate(CATALOGUE, start=1):
         category = GarmentCategory.objects.create(
             shop=shop, name=cat_name, icon=icon, display_order=order_index,
-            tags=_CATEGORY_TAGS.get(cat_name, []),
+            tags=category_tags(cat_name),
         )
         categories[cat_name] = category
         for item_index, (name, price, unit) in enumerate(items, start=1):
@@ -298,10 +325,13 @@ def seed_shop(cfg):
                 shop=shop,
                 category=category, name=name, price=round(float(price) * price_mult, 2), unit=unit,
                 display_order=item_index,
-                tags=tags_for(cat_name, name),
+                tags=item_tags(cat_name, name, unit),
                 image_url=ITEM_IMAGES.get(name, ''),
             )
             total_items += 1
+
+    if cfg.get('stress'):
+        seed_stress_catalog(shop)
 
     print('Seeding Service Areas & Time Slots...')
     for area in cfg['areas']:

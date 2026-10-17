@@ -29,6 +29,20 @@ void main() {
   }
 
   group('SettingsScreen tabs (desktop, 1400px)', () {
+    testWidgets('Shop access is hidden, and its link falls back to Business profile',
+        (tester) async {
+      setWidth(tester, 1400);
+      await tester.pumpWidget(
+          host(seeded(), const SettingsScreen(initialTab: 'shop-access')));
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('settings-tab-shop-access')), findsNothing);
+      expect(find.text('Shop access'), findsNothing);
+      expect(find.text('Transfer ownership'), findsNothing);
+      expect(find.byKey(const ValueKey('settings-tab-business-profile')),
+          findsOneWidget);
+    });
+
     testWidgets('lists Credit categories in the vertical tab list',
         (tester) async {
       setWidth(tester, 1400);
@@ -125,7 +139,7 @@ void main() {
       expect(find.text('Save changes'), findsOneWidget);
     });
 
-    testWidgets('unbuilt tabs say so instead of showing the profile form',
+    testWidgets('only built tabs are listed; Help shows its own panel, not the profile form',
         (tester) async {
       setWidth(tester, 1400);
       await tester.pumpWidget(host(seeded(), const SettingsScreen()));
@@ -141,9 +155,34 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('settings-tab-help')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Not available yet.'), findsOneWidget);
+      expect(find.text('Not available yet.'), findsNothing);
+      expect(find.text('Contact support'), findsOneWidget);
       expect(find.text('Save changes'), findsNothing);
       expect(find.text('Store Location'), findsNothing);
+    });
+
+    testWidgets('Help & support: contact options, shop details and FAQ answers',
+        (tester) async {
+      setWidth(tester, 1400);
+      final provider = seeded()
+        ..seedForTest(shop: {'name': 'Sipu Laundry', 'slug': 'sipu-laundry'});
+      await tester.pumpWidget(host(provider, const SettingsScreen(initialTab: 'help')));
+      await tester.pump();
+
+      for (final key in ['help-call', 'help-whatsapp', 'help-email']) {
+        expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+      }
+      expect(find.text('08407 000 048'), findsNWidgets(2)); // call + WhatsApp
+      expect(find.text('support@washnlaundry.com'), findsOneWidget);
+      expect(find.text('sipu-laundry'), findsOneWidget); // shop ID to quote
+
+      // Answers are collapsed until a question is opened.
+      const q = 'I forgot my password.';
+      expect(find.textContaining('works for 1 hour'), findsNothing);
+      await tester.ensureVisible(find.text(q));
+      await tester.tap(find.text(q));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('works for 1 hour'), findsOneWidget);
     });
   });
 

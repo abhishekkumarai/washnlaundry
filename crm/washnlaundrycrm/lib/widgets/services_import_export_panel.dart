@@ -52,7 +52,7 @@ class _ServicesImportExportPanelState extends State<ServicesImportExportPanel> {
     } on ApiException catch (e) {
       _toast(e.message, error: true);
     } catch (e) {
-      _toast('Failed to export Excel: $e', error: true);
+      _toast(friendlyError(e, 'export to Excel'), error: true);
     } finally {
       if (mounted) setState(() => _exportingExcel = false);
     }
@@ -292,7 +292,7 @@ class _ImportServicesDialogState extends State<_ImportServicesDialog> {
     } catch (e) {
       setState(() {
         _loading = false;
-        _error = 'Error parsing preview: $e';
+        _error = friendlyError(e, 'read that file');
       });
     }
   }
@@ -333,7 +333,7 @@ class _ImportServicesDialogState extends State<_ImportServicesDialog> {
     } catch (e) {
       setState(() {
         _loading = false;
-        _error = 'Failed to import services: $e';
+        _error = friendlyError(e, 'import the services');
       });
     }
   }

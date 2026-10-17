@@ -68,6 +68,38 @@ void main() {
     });
   });
 
+  testWidgets('Scan sits right after Orders in the sidebar', (tester) async {
+    await pumpAtWidth(tester, 1400, wrap(AppProvider(autoLoad: false)));
+    double y(String label) => tester.getTopLeft(find.text(label).first).dy;
+    expect(y('Orders') < y('Scan'), isTrue);
+    expect(y('Scan') < y('Customers'), isTrue);
+  });
+
+  group('Social Suite and Chat (switched on per shop, off by default)', () {
+    testWidgets('neither is in the sidebar for a shop without them', (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(shop: {'name': 'Off Wash'});
+      await pumpAtWidth(tester, 1400, wrap(provider));
+      expect(find.text('Social Suite', skipOffstage: false), findsNothing);
+      expect(find.text('Chat', skipOffstage: false), findsNothing);
+      expect(find.text('Settings', skipOffstage: false), findsOneWidget);
+    });
+
+    testWidgets('each shows only when its own switch is on', (tester) async {
+      final provider = AppProvider(autoLoad: false)
+        ..seedForTest(shop: {'name': 'Chat Wash', 'chat_enabled': true});
+      await pumpAtWidth(tester, 1400, wrap(provider));
+      expect(find.text('Chat', skipOffstage: false), findsOneWidget);
+      expect(find.text('Social Suite', skipOffstage: false), findsNothing);
+
+      provider.seedForTest(shop: {'name': 'Both', 'chat_enabled': true,
+          'social_suite_enabled': true});
+      await tester.pump();
+      expect(find.text('Social Suite', skipOffstage: false), findsOneWidget);
+      expect(find.text('Chat', skipOffstage: false), findsOneWidget);
+    });
+  });
+
   group('AppShell below the breakpoint', () {
     testWidgets('shows the hamburger bar and drops the persistent rail',
         (tester) async {

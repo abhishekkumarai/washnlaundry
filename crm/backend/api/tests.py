@@ -925,6 +925,11 @@ class DashboardStatsTests(APITestCase):
         self.assertEqual(self.stats['revenue_series'][-1]['amount'], 700.0)
         self.assertEqual(self.stats['revenue_today'], 700.0)
 
+    def test_revenue_series_carries_daily_expenses(self):
+        # Rent (100) was spent today; earlier days had none.
+        self.assertEqual(self.stats['revenue_series'][-1]['expenses'], 100.0)
+        self.assertEqual(self.stats['revenue_series'][0]['expenses'], 0.0)
+
     def test_revenue_series_ends_today(self):
         self.assertEqual(
             self.stats['revenue_series'][-1]['date'],

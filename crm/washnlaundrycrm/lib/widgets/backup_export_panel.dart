@@ -58,7 +58,7 @@ class _BackupExportPanelState extends State<BackupExportPanel> {
     } on ApiException catch (e) {
       _toast(e.message, error: true);
     } catch (e) {
-      _toast('Failed to download Excel backup: $e', error: true);
+      _toast(friendlyError(e, 'download the Excel backup'), error: true);
     } finally {
       if (mounted) setState(() => _exportingFullXlsx = false);
     }
@@ -80,7 +80,7 @@ class _BackupExportPanelState extends State<BackupExportPanel> {
     } on ApiException catch (e) {
       _toast(e.message, error: true);
     } catch (e) {
-      _toast('Failed to download JSON backup: $e', error: true);
+      _toast(friendlyError(e, 'download the JSON backup'), error: true);
     } finally {
       if (mounted) setState(() => _exportingFullJson = false);
     }
@@ -102,7 +102,7 @@ class _BackupExportPanelState extends State<BackupExportPanel> {
     } on ApiException catch (e) {
       _toast(e.message, error: true);
     } catch (e) {
-      _toast('Failed to export $title: $e', error: true);
+      _toast(friendlyError(e, 'export $title'), error: true);
     } finally {
       if (mounted) setState(() => _exportingSections.remove(lockKey));
     }
@@ -125,7 +125,7 @@ class _BackupExportPanelState extends State<BackupExportPanel> {
     } on ApiException catch (e) {
       _toast(e.message, error: true);
     } catch (e) {
-      _toast('Failed to export $title: $e', error: true);
+      _toast(friendlyError(e, 'export $title'), error: true);
     } finally {
       if (mounted) setState(() => _exportingSections.remove(lockKey));
     }
@@ -196,7 +196,7 @@ class _BackupExportPanelState extends State<BackupExportPanel> {
     } on ApiException catch (e) {
       _toast(e.message, error: true);
     } catch (e) {
-      _toast('Failed to import $title: $e', error: true);
+      _toast(friendlyError(e, 'import $title'), error: true);
     } finally {
       if (mounted) setState(() => _exportingSections.remove(lockKey));
     }

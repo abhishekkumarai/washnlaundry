@@ -140,7 +140,7 @@ class OrderMediaController extends ChangeNotifier {
     } catch (e) {
       draft
         ..status = MediaDraftStatus.failed
-        ..error = 'Upload failed: $e';
+        ..error = friendlyError(e, 'upload the file');
     }
     _notify();
   }

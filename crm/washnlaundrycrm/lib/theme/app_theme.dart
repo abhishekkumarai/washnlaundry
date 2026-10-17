@@ -21,6 +21,9 @@ class AppColors {
   /// Bars in the dashboard revenue chart. Same green as [success], named
   /// separately so the chart can be re-coloured without touching status chips.
   static const chartBar = success;
+
+  /// Expense bars beside the revenue ones: red, as expenses are everywhere else.
+  static const chartExpense = danger;
 }
 
 /// Typography tokens calibrated for mobile viewports and compact tile layouts.

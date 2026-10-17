@@ -77,6 +77,12 @@ class SidebarNavigation extends StatefulWidget {
       'disabled': false
     },
     {
+      'label': 'Scan',
+      'icon': Icons.qr_code_scanner_rounded,
+      'index': 11,
+      'disabled': false
+    },
+    {
       'label': 'Customers',
       'icon': Icons.people_outline_rounded,
       'index': 3,
@@ -122,12 +128,6 @@ class SidebarNavigation extends StatefulWidget {
       'label': 'Reports',
       'icon': Icons.bar_chart_rounded,
       'index': 9,
-      'disabled': false
-    },
-    {
-      'label': 'Scan',
-      'icon': Icons.qr_code_scanner_rounded,
-      'index': 11,
       'disabled': false
     },
     {
@@ -322,6 +322,10 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
     final authRole = context.signedInRole;
     items = items
         .where((i) => !RoleViews.isLabelHidden(authRole, i['label'] as String))
+        // Social Suite (17) and Chat (16) only for a shop that has them switched on
+        // (off by default, set from the backend).
+        .where((i) => provider.socialSuiteEnabled || i['index'] != 17)
+        .where((i) => provider.chatEnabled || i['index'] != 16)
         .toList();
     // Scrollbar so it's discoverable that the rail scrolls when 14 items don't
     // fit a short window.

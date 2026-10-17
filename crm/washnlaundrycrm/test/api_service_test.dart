@@ -86,14 +86,32 @@ void main() {
   });
 
   group('ApiException', () {
-    test('toString includes the status code when present', () {
-      final e = ApiException('boom', statusCode: 404);
-      expect(e.toString(), 'ApiException (404): boom');
+    test('toString is just the message, never "ApiException (403): ..."', () {
+      final e = ApiException('Not allowed.', statusCode: 403);
+      expect(e.toString(), 'Not allowed.');
+      expect('$e', isNot(contains('ApiException')));
+      expect(e.statusCode, 403); // still available to code
+    });
+  });
+
+  group('friendlyError', () {
+    test('uses the server reason, with the action for context', () {
+      final e = ApiException("This isn't available in Demo Mode.", statusCode: 403);
+      expect(friendlyError(e, 'create the shop'),
+          "Couldn't create the shop. This isn't available in Demo Mode.");
+      expect(friendlyError(e), "This isn't available in Demo Mode.");
     });
 
-    test('toString omits the parenthetical when there is no status code', () {
-      final e = ApiException('boom');
-      expect(e.toString(), 'ApiException: boom');
+    test('adds a full stop when the reason has none', () {
+      expect(friendlyError(ApiException('Shop name is required'), 'save'),
+          "Couldn't save. Shop name is required.");
+    });
+
+    test('anything that is not an ApiException gets a generic line, never its text', () {
+      final msg = friendlyError(const FormatException('Unexpected character at 3'), 'load');
+      expect(msg, "Couldn't load. Something went wrong. Please try again.");
+      expect(msg, isNot(contains('FormatException')));
+      expect(friendlyError(StateError('Bad state: x')), 'Something went wrong. Please try again.');
     });
   });
 
@@ -101,7 +119,7 @@ void main() {
     // A raw JSON dump used to reach the SnackBar unparsed — these pin the
     // three DRF error shapes it now turns into an actual sentence, plus the
     // non-JSON fallback.
-    test('a validate_<field> error surfaces as "field: message"', () {
+    test('a validate_<field> error surfaces as "Field label: message"', () {
       // e.g. StaffSerializer.validate_start_date.
       final msg = ApiService.describeError(
         '{"start_date":["This staff member already has attendance recorded '
@@ -109,7 +127,7 @@ void main() {
         '/staff/109/',
       );
       expect(msg,
-          'start_date: This staff member already has attendance recorded before this date.');
+          'Start date: This staff member already has attendance recorded before this date.');
     });
 
     test('a custom @action {"detail": ...} response is used as-is', () {
@@ -139,8 +157,8 @@ void main() {
         '{"name":["This field is required."],"phone":["This field is required."]}',
         '/staff/',
       );
-      expect(msg, contains('name: This field is required.'));
-      expect(msg, contains('phone: This field is required.'));
+      expect(msg, contains('Name: This field is required.'));
+      expect(msg, contains('Phone: This field is required.'));
     });
 
     test('a non-JSON HTML proxy or 502/500 page returns clean generic server failure message',
@@ -160,9 +178,16 @@ void main() {
       expect(msg, 'Our server encountered an issue. Please try again shortly.');
     });
 
-    test('an empty body says so instead of showing nothing', () {
-      final msg = ApiService.describeError('', '/staff/');
-      expect(msg, 'Request to /staff/ failed with no response body.');
+    test('an empty or non-JSON body never shows the path or the raw body', () {
+      expect(ApiService.describeError('', '/staff/'),
+          'Something went wrong. Please try again.');
+      expect(ApiService.describeError('', '/staff/', statusCode: 403),
+          "You don't have permission to do that.");
+      expect(ApiService.describeError('', '/me/', statusCode: 401),
+          'Your session has expired. Please sign in again.');
+      final odd = ApiService.describeError('weird proxy text', '/orders/', statusCode: 418);
+      expect(odd, isNot(contains('/orders/')));
+      expect(odd, isNot(contains('weird proxy text')));
     });
   });
 }

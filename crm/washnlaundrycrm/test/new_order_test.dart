@@ -6,7 +6,12 @@ import 'package:washnlaundrycrm/models/garment_model.dart';
 import 'package:washnlaundrycrm/models/order_model.dart';
 import 'package:washnlaundrycrm/providers/app_provider.dart';
 import 'package:washnlaundrycrm/screens/new_order_screen.dart';
+import 'package:washnlaundrycrm/widgets/category_filter.dart';
 import 'package:washnlaundrycrm/widgets/receipt_dialog.dart';
+
+/// A chip in the category filter row (item rows show category names too).
+Finder _categoryChip(String label) => find.descendant(
+    of: find.byType(CategoryFilterRow), matching: find.text(label));
 
 Widget host(AppProvider provider, Widget child) => ChangeNotifierProvider.value(
       value: provider,
@@ -201,11 +206,11 @@ void main() {
       await tester.pumpWidget(host(provider, const NewOrderScreen()));
       await tester.pump();
 
-      expect(find.widgetWithText(ChoiceChip, 'All'), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, 'Ironing'), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, 'Household'), findsOneWidget);
+      expect(_categoryChip('All'), findsOneWidget);
+      expect(_categoryChip('Ironing'), findsOneWidget);
+      expect(_categoryChip('Household'), findsOneWidget);
       // A category with no items is not offered as a chip at all.
-      expect(find.widgetWithText(ChoiceChip, 'Shoe Cleaning'), findsNothing);
+      expect(_categoryChip('Shoe Cleaning'), findsNothing);
     });
 
     testWidgets('filtering to a category narrows the grid', (tester) async {
@@ -214,7 +219,7 @@ void main() {
       await tester.pumpWidget(host(provider, const NewOrderScreen()));
       await tester.pump();
 
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Household'));
+      await tester.tap(_categoryChip('Household'));
       await tester.pumpAndSettle();
 
       expect(find.text('Curtain'), findsOneWidget);

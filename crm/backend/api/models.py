@@ -123,6 +123,13 @@ class Shop(models.Model):
     # Order numbers are shop-prefixed and sequential, e.g. #WA3P-00001.
     order_prefix = models.CharField(max_length=8, blank=True, default='')
 
+    # Per-shop features, switched on by a superuser (`manage.py shop_feature <slug>
+    # <feature> on`, or the shops API) and off by default while unfinished. Each gates the app's menu
+    # and its API: Social Suite (Meta posts/messages/leads, WhatsApp; see
+    # SocialSuiteEnabled) and the AI support Chat (the /api/rag/chat/ proxy).
+    social_suite_enabled = models.BooleanField(default=False)
+    chat_enabled = models.BooleanField(default=False)
+
     # Minutes before a slot starts after which customers can no longer book it.
     pickup_buffer_minutes = models.IntegerField(default=30)
     delivery_buffer_minutes = models.IntegerField(default=30)

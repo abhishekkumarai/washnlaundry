@@ -8,7 +8,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from api.demo import DEMO_DOMAIN, purge_expired_demos
-from api.models import Customer, Order, Shop
+from api.models import Customer, GarmentCategory, GarmentItem, Order, Shop
 
 User = get_user_model()
 
@@ -38,6 +38,17 @@ class DemoSandboxTests(TestCase):
                                 format='json', **auth)
         self.assertEqual(made.status_code, 201, made.content)
         self.assertTrue(Order.all_objects.filter(shop__slug=body['shop']['slug']).exists())
+
+    def test_demo_has_stress_catalogue(self):
+        # 150 extra tags and 100 extra services, so New Order's overflow
+        # handling is visible in the demo (seed_db.seed_stress_catalog).
+        _, body = self.start()
+        shop = Shop.objects.get(slug=body['shop']['slug'])
+        items = GarmentItem.all_objects.filter(shop=shop)
+        tags = {t for g in items for t in g.tags}
+        self.assertGreaterEqual(len(tags), 150)
+        self.assertGreaterEqual(len(items.get(name='Shirt').tags), 30)
+        self.assertGreaterEqual(GarmentCategory.all_objects.filter(shop=shop).count(), 100)
 
     def test_demo_cannot_reach_real_shop_or_outbound_endpoints(self):
         auth, _ = self.start()

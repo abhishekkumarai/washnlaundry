@@ -85,7 +85,7 @@ class _StaffCredentialsDialogState extends State<StaffCredentialsDialog> {
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
-      if (mounted) setState(() => _error = 'Could not save: $e');
+      if (mounted) setState(() => _error = friendlyError(e, 'save the sign-in'));
     } finally {
       if (mounted && _busy) setState(() => _busy = false);
     }

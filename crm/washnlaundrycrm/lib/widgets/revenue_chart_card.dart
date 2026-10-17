@@ -27,7 +27,9 @@ class RevenueChartCard extends StatelessWidget {
 
     final double peak = series.isEmpty
         ? 0
-        : series.map((p) => p.amount).reduce((a, b) => a > b ? a : b);
+        : series
+            .expand((p) => [p.amount, p.expenses])
+            .reduce((a, b) => a > b ? a : b);
     final double total = series.fold(0.0, (sum, p) => sum + p.amount);
 
     // Headroom above the tallest bar so it never touches the container top.
@@ -76,7 +78,18 @@ class RevenueChartCard extends StatelessWidget {
                 ),
               ),
             )
-          : ClipRect(
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    _LegendDot(color: AppColors.chartBar, label: 'Revenue'),
+                    SizedBox(width: 16),
+                    _LegendDot(color: AppColors.chartExpense, label: 'Expenses'),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ClipRect(
               child: SizedBox(
                 height: 180,
                 child: BarChart(
@@ -143,27 +156,33 @@ class RevenueChartCard extends StatelessWidget {
                     ),
                     borderData: FlBorderData(show: false),
                     barGroups: List.generate(series.length, (index) {
-                      final val = series[index].amount;
+                      final point = series[index];
+                      // A day with nothing still draws a stub, so the axis
+                      // reads as 14 days rather than a gap.
+                      BarChartRodData rod(double val, Color color) =>
+                          BarChartRodData(
+                            toY: val == 0 ? 4 : val,
+                            color: color,
+                            width: 7,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(3),
+                              topRight: Radius.circular(3),
+                            ),
+                          );
                       return BarChartGroupData(
                         x: index,
+                        barsSpace: 2,
                         barRods: [
-                          BarChartRodData(
-                            // A day with no revenue still draws a stub, so the
-                            // axis reads as 14 days rather than a gap.
-                            toY: val == 0 ? 4 : val,
-                            color: AppColors.chartBar,
-                            width: 12,
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(4),
-                              topRight: Radius.circular(4),
-                            ),
-                          ),
+                          rod(point.amount, AppColors.chartBar),
+                          rod(point.expenses, AppColors.chartExpense),
                         ],
                       );
                     }),
                   ),
                 ),
               ),
+            ),
+              ],
             ),
     );
   }
@@ -188,15 +207,43 @@ class RevenueChartCard extends StatelessWidget {
               group.x >= 0 && group.x < series.length ? series[group.x] : null;
           // The rod's height is floored at 4 for empty days, so report the
           // point's real amount rather than reading it back off the bar.
+          // Rod 0 is revenue, rod 1 expenses.
+          final isExpense = rodIndex == 1;
           final label = point == null ? '' : '${point.date}\n';
-          final amount = point?.amount ?? rod.toY;
+          final amount =
+              (isExpense ? point?.expenses : point?.amount) ?? rod.toY;
           return BarTooltipItem(
-            '$label${formatRupees(amount)}',
+            '$label${isExpense ? 'Expenses' : 'Revenue'} ${formatRupees(amount)}',
             const TextStyle(
                 color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
           );
         },
       ),
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _LegendDot({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+              color: color, borderRadius: BorderRadius.circular(2)),
+        ),
+        const SizedBox(width: 6),
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+      ],
     );
   }
 }
