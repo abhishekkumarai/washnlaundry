@@ -8,5 +8,16 @@
   },
   "observability": {
     "enabled": true
+  },
+  "env": {
+    "dev": {
+      "name": "washnlaundry-crm-api-dev",
+      "vars": {
+        "BACKEND_ORIGIN": "https://washnlaundry-backend-dev.onrender.com"
+      },
+      "observability": {
+        "enabled": true
+      }
+    }
   }
 }

@@ -10,5 +10,17 @@
   },
   "observability": {
     "enabled": true
+  },
+  "env": {
+    "dev": {
+      "name": "washnlaundry-web-dev",
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
+      "observability": {
+        "enabled": true
+      }
+    }
   }
 }

@@ -17,6 +17,9 @@ function deploy() {
   }
 
   const PROJECT_NAME = process.env.CLOUDFLARE_PAGES_PROJECT || 'washnlaundrycrm';
+  // 'main' is the production branch; any other value (e.g. 'develop') publishes
+  // a preview deployment at <branch>.<project>.pages.dev.
+  const BRANCH = process.env.CLOUDFLARE_PAGES_BRANCH || 'main';
 
   // _headers / _redirects live in washnlaundrycrm/ (source), not build/web/ —
   // so they are copied into the upload.
@@ -32,7 +35,7 @@ function deploy() {
 
   execFileSync(
     'npx',
-    ['--yes', 'wrangler', 'pages', 'deploy', webDir, '--project-name', PROJECT_NAME, '--branch', 'main', '--commit-dirty=true'],
+    ['--yes', 'wrangler', 'pages', 'deploy', webDir, '--project-name', PROJECT_NAME, '--branch', BRANCH,'--commit-dirty=true'],
     { stdio: 'inherit', cwd: rootDir, shell: true }
   );
 
