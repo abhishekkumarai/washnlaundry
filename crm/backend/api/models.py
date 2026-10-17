@@ -390,6 +390,12 @@ class Order(TenantModel):
     pickup_date = models.DateField(null=True, blank=True)
     pickup_time = models.TimeField(null=True, blank=True)
     address = models.TextField(blank=True, default='')
+    # Customer-address coordinates (OpenStreetMap/Nominatim). Null until geocoded;
+    # the rider dispatch uses them as the pickup/drop point on the customer's side.
+    pickup_lat = models.FloatField(null=True, blank=True)
+    pickup_lng = models.FloatField(null=True, blank=True)
+    drop_lat = models.FloatField(null=True, blank=True)
+    drop_lng = models.FloatField(null=True, blank=True)
     assigned_agent = models.ForeignKey(
         'Staff', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_orders'
     )
@@ -993,3 +999,60 @@ class MetaLead(TenantModel):
     def __str__(self):
         return f"Lead: {self.customer_name} via {self.platform} ({self.status})"
 
+
+
+# ── Rider dispatch & live tracking ────────────────────────────────────────────
+
+class RiderTaskKind(models.TextChoices):
+    PICKUP = 'PICKUP', 'Pickup'
+    DELIVERY = 'DELIVERY', 'Delivery'
+
+
+class RiderTaskStatus(models.TextChoices):
+    ASSIGNED = 'ASSIGNED', 'Assigned'
+    EN_ROUTE = 'EN_ROUTE', 'En route'
+    COMPLETED = 'COMPLETED', 'Completed'
+    CANCELLED = 'CANCELLED', 'Cancelled'
+
+
+class RiderTask(TenantModel):
+    """One trip of one rider for one order: shop -> customer (delivery) or customer -> shop (pickup)."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='rider_tasks', db_index=True)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='rider_tasks')
+    rider = models.ForeignKey('Staff', on_delete=models.SET_NULL, null=True, blank=True, related_name='rider_tasks')
+    kind = models.CharField(max_length=10, choices=RiderTaskKind.choices)
+    status = models.CharField(max_length=12, choices=RiderTaskStatus.choices, default=RiderTaskStatus.ASSIGNED)
+    # Shown to the customer, asked for by the rider app as proof of delivery.
+    otp = models.CharField(max_length=6, blank=True, default='')
+    pickup_lat = models.FloatField()
+    pickup_lng = models.FloatField()
+    drop_lat = models.FloatField()
+    drop_lng = models.FloatField()
+    pod = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    @property
+    def is_active(self):
+        return self.status in (RiderTaskStatus.ASSIGNED, RiderTaskStatus.EN_ROUTE)
+
+    def __str__(self):
+        return f"{self.kind} {self.order_id} [{self.status}]"
+
+
+class RiderLocation(TenantModel):
+    """A GPS ping. Only the most recent `KEEP` per task are retained."""
+    KEEP = 200
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='rider_locations', db_index=True)
+    task = models.ForeignKey(RiderTask, on_delete=models.CASCADE, related_name='locations')
+    lat = models.FloatField()
+    lng = models.FloatField()
+    recorded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-recorded_at', '-id']

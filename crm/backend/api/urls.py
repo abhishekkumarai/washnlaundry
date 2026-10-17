@@ -15,6 +15,9 @@ from .views import (
     neonize_status, neonize_connect, neonize_disconnect,
     export_backup, export_section, import_section,
 )
+from .dispatch_views import (
+    order_dispatch, rider_location, rider_complete_webhook, customer_order_track,
+)
 from .password_auth import signup, verify_email, login, forgot_password, reset_password
 from .role_views import me, link_requests, link_request_approve, link_request_reject
 from .customer_views import (
@@ -53,6 +56,10 @@ urlpatterns = [
     path('meta/', meta, name='meta'),
     path('meta-social/analytics/', meta_social_analytics, name='meta-social-analytics'),
     path('meta-social/sync/', meta_social_sync, name='meta-social-sync'),
+    path('orders/<uuid:order_id>/dispatch/', order_dispatch, name='order-dispatch'),
+    path('rider/location/', rider_location, name='rider-location'),
+    path('rider/webhook/complete/', rider_complete_webhook, name='rider-complete-webhook'),
+    path('customer/orders/<str:order_number>/track/', customer_order_track, name='customer-order-track'),
     path('me/', me, name='me'),
     path('demo/start/', demo_start, name='demo-start'),
     path('demo/end/', demo_end, name='demo-end'),

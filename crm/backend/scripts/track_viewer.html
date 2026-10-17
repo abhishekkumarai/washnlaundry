@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8"><title>Rider tracking viewer (dev)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>body{margin:0;font:14px system-ui}#bar{padding:8px 12px;background:#F8FAFC;border-bottom:1px solid #ddd}
+#map{height:calc(100vh - 38px)}</style>
+<div id="bar">Order <b id="o"></b> · <span id="st">connecting…</span> · OTP <b id="otp">–</b> · pings seen <b id="n">0</b></div>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Dev-only consumer: polls the customer track endpoint exactly as the Flutter screen will.
+const q = new URLSearchParams(location.search);
+const api = q.get('api') || 'http://127.0.0.1:8000/api', order = q.get('order'), token = q.get('token');
+document.getElementById('o').textContent = order;
+const map = L.map('map').setView([25.60, 85.15], 13);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '© OpenStreetMap'}).addTo(map);
+let rider, n = 0, fitted = false, trail = L.polyline([], {color: '#1A4FD6'}).addTo(map);
+async function tick() {
+  try {
+    const r = await fetch(`${api}/customer/orders/${order}/track/`, {headers: {Authorization: 'Bearer ' + token}});
+    const t = await r.json();
+    if (!t.tracking) { st.textContent = 'no active task'; return; }
+    st.textContent = t.status; otp.textContent = t.otp || '–';
+    if (!fitted) { L.marker([t.pickup.lat, t.pickup.lng]).addTo(map).bindTooltip('Shop');
+      L.marker([t.drop.lat, t.drop.lng]).addTo(map).bindTooltip('You');
+      map.fitBounds([[t.pickup.lat, t.pickup.lng], [t.drop.lat, t.drop.lng]], {padding: [40, 40]}); fitted = true; }
+    if (t.location) { const p = [t.location.lat, t.location.lng];
+      rider ? rider.setLatLng(p) : rider = L.circleMarker(p, {radius: 9, color: '#D97706', fillOpacity: .9}).addTo(map);
+      trail.addLatLng(p); n++; document.getElementById('n').textContent = n; window.lastPing = p; }
+  } catch (e) { console.error('track', e); st.textContent = 'error: ' + e.message; }
+}
+setInterval(tick, 1000); tick();
+</script>

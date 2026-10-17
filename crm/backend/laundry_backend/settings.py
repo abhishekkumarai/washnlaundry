@@ -204,6 +204,8 @@ ADMIN_URL = os.environ.get('ADMIN_URL', 'admin/').strip('/') + '/'
 # On by default outside DEBUG (KAN-188); local dev (DEBUG=True) stays open so
 # Demo Mode works. Override with API_AUTH_ENFORCED=True/False explicitly.
 API_AUTH_ENFORCED = os.environ.get('API_AUTH_ENFORCED', str(not DEBUG)) == 'True'
+# Signs the DeliveryBoy completion webhook (HMAC-SHA256). Falls back to SECRET_KEY when unset.
+RIDER_WEBHOOK_SECRET = os.environ.get('RIDER_WEBHOOK_SECRET', '')
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ['api.auth.GoogleTokenAuthentication'],
     'DEFAULT_PERMISSION_CLASSES': ['api.auth.IsStaff'],

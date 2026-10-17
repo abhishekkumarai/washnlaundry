@@ -240,6 +240,12 @@ class ApiService {
         .toList();
   }
 
+  /// GET `/customer/orders/<number>/track/` - the rider's live position for the
+  /// customer's own order. `{tracking: false}` when no rider task exists yet.
+  static Future<Map<String, dynamic>> fetchOrderTrack(String orderNumber) async =>
+      Map<String, dynamic>.from(await _send(
+          'GET', '/customer/orders/${Uri.encodeComponent(orderNumber)}/track/') as Map);
+
   static Future<List<Map<String, dynamic>>> fetchRateCard() async {
     final data = await _send('GET', '/customer/rate-card/') as Map;
     return (data['categories'] as List)

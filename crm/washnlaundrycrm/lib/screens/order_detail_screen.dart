@@ -11,6 +11,7 @@ import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/fulfillment_type_selector.dart';
 import '../widgets/order_media_gallery.dart';
+import '../widgets/order_tracking_card.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../widgets/status_pill.dart';
 import '../widgets/tag_generator_panel.dart';
@@ -102,6 +103,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             if (order.media.isNotEmpty) ...[
                               const SizedBox(height: 20),
                               _mediaCard(order),
+                            ],
+                            if (isCustomer &&
+                                order.deliveryType.startsWith('HOME_')) ...[
+                              const SizedBox(height: 20),
+                              OrderTrackingCard(orderNumber: order.orderNumber),
                             ],
                             const SizedBox(height: 20),
                             _timelineCard(order),
