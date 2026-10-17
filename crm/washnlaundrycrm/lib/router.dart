@@ -105,6 +105,26 @@ Widget _buildOrderDetail(BuildContext c, String id, {required String backTo}) {
   );
 }
 
+/// A section that is switched on per shop (Social Suite, Chat: backend
+/// `Shop.*_enabled`, off by default). Decided here rather than in a route
+/// `redirect`, because a fresh page load reaches this before the shop has
+/// loaded: `watch` re-runs it once the shop arrives, like [_buildOrderDetail].
+Widget _buildShopFeature(BuildContext c, bool Function(AppProvider) enabled,
+    int navIndex, Widget screen) {
+  final provider = c.watch<AppProvider>();
+  if (enabled(provider)) {
+    return _section(c, navIndex, screen);
+  }
+  if (provider.shop == null && provider.isLoading) {
+    return _ordersFrame(const Center(child: CircularProgressIndicator()));
+  }
+  // The shop has loaded and does not have it.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (c.mounted) c.go('/dashboard');
+  });
+  return _ordersFrame(const SizedBox.shrink());
+}
+
 /// The section routes, keyed the same way [AppProvider.routePaths] already
 /// is. go_router owns the URL; `_section` keeps `currentNavIndex` in sync so
 /// every existing read of "which section is active" (chiefly the sidebar's
@@ -190,11 +210,15 @@ List<RouteBase> appRoutes() => [
       ),
       GoRoute(
         path: '/chat',
-        builder: (c, s) => _section(c, 16, const ChatScreen()),
+        // Only for a shop with Chat switched on (off by default).
+        builder: (c, s) => _buildShopFeature(
+            c, (p) => p.chatEnabled, 16, const ChatScreen()),
       ),
       GoRoute(
         path: '/social',
-        builder: (c, s) => _section(c, 17, const SocialSuiteScreen()),
+        // Only for a shop with Social Suite switched on (off by default).
+        builder: (c, s) => _buildShopFeature(
+            c, (p) => p.socialSuiteEnabled, 17, const SocialSuiteScreen()),
       ),
       GoRoute(
         path: '/scan',

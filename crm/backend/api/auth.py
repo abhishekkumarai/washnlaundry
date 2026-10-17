@@ -207,7 +207,6 @@ def sync_staff_user(staff):
 def needs_shop_onboarding(user):
     """settings.SELF_SERVICE_SHOPS: a signed-in account that belongs to no shop yet,
     which the app sends to its "set up your shop" page."""
-    from django.conf import settings
     from .models import ShopMembership
     return bool(settings.SELF_SERVICE_SHOPS and user is not None and not user.is_superuser
                 and not ShopMembership.objects.filter(user=user, is_active=True).exists())
@@ -349,7 +348,6 @@ def resolve_principal(email, shop=None):
     # only sees session users), so resolve it to the caller's own default shop. Only shops
     # they are a member of count, so this never opens anyone else's shop. It runs ahead of
     # the customer lookup, so a shop owner always gets their admin view.
-    from django.conf import settings
     if user and settings.SELF_SERVICE_SHOPS:
         own = ShopMembership.objects.filter(  # Meta ordering: default shop first
             user=user, is_active=True, role__in=[ShopRole.OWNER, ShopRole.STAFF],
@@ -409,7 +407,9 @@ class GoogleTokenAuthentication(BaseAuthentication):
             return None
         from .demo import BLOCKED_PREFIXES, is_demo_email
         if is_demo_email(email) and request.path.startswith(BLOCKED_PREFIXES):
-            raise PermissionDenied('Not available in Demo Mode.')
+            raise PermissionDenied(
+                "This isn't available in Demo Mode. Create a free account to use it "
+                'with your own shop.')
         shop = getattr(request, 'shop', None)
         return resolve_principal(email, shop=shop), None
 
@@ -491,6 +491,19 @@ class CanProvisionShop(BasePermission):
         if not settings.API_AUTH_ENFORCED:
             return True
         return isinstance(request.user, Principal)
+
+
+class SocialSuiteEnabled(BasePermission):
+    """Social Suite endpoints only for a shop with Shop.social_suite_enabled (off by
+    default, switched on per shop by a superuser). Applies whether or not auth is
+    enforced: it is a feature switch, not a role check."""
+
+    message = 'Social Suite is not enabled for this shop.'
+
+    def has_permission(self, request, view):
+        from .tenancy import get_current_tenant
+        shop = getattr(request, 'shop', None) or get_current_tenant()
+        return bool(shop and shop.social_suite_enabled)
 
 
 class IsSignedIn(BasePermission):

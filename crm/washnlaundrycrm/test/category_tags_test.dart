@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:washnlaundrycrm/models/garment_model.dart';
+import 'package:washnlaundrycrm/screens/new_order_screen.dart' show matchesSelectedTags;
 
 GarmentItemModel _item(int id, String category, String name, List<String> tags) =>
     GarmentItemModel.fromJson({
@@ -31,9 +32,8 @@ void main() {
       return items.where((item) {
         final matchesCategory =
             selectedCategory.isEmpty || item.categoryName == selectedCategory;
-        final matchesTags = selectedTags.isEmpty ||
-            selectedTags.every((selTag) => item.tags
-                .any((t) => t.toLowerCase() == selTag.toLowerCase()));
+        // The screen's own tag rule, not a copy of it.
+        final matchesTags = matchesSelectedTags(item.tags, selectedTags);
         final matchesSearch = q.isEmpty ||
             item.name.toLowerCase().contains(q) ||
             item.categoryName.toLowerCase().contains(q) ||
@@ -57,12 +57,18 @@ void main() {
           isNot(contains('Handkerchief')));
     });
 
-    test('multi-select tag filtering returns items matching ALL selected tags', () {
+    test('multi-select tag filtering is OR: items with ANY selected tag', () {
       expect(filter(selectedTags: {'premium'}).map((i) => i.name),
           ['Silk Saree', 'Woolen Coat']);
       expect(filter(selectedTags: {'premium', 'express'}).map((i) => i.name),
-          ['Silk Saree']);
-      expect(filter(selectedTags: {'economy', 'express'}), isEmpty);
+          ['Silk Saree', 'Woolen Coat', 'Linen Shirt']);
+      expect(filter(selectedTags: {'economy', 'express'}).map((i) => i.name),
+          ['Silk Saree', 'Cotton Bedsheet', 'Linen Shirt']);
+      expect(filter(selectedTags: {'nonexistent'}), isEmpty);
+      // Case-insensitive, and an untagged item never matches a selection.
+      expect(filter(selectedTags: {'PREMIUM'}).length, 2);
+      expect(filter(selectedTags: {'express', 'bulk', 'premium', 'daily'})
+          .map((i) => i.name), isNot(contains('Handkerchief')));
     });
 
     test('category filter and tag filter combine correctly', () {

@@ -153,7 +153,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
       });
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = friendlyError(e);
         _loading = false;
       });
     }
@@ -176,7 +176,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
       if (mounted) {
         setState(() => _neonizeLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to initiate pairing: $e')),
+          SnackBar(content: Text(friendlyError(e, 'start WhatsApp pairing'))),
         );
       }
     }
@@ -202,7 +202,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
       if (mounted) {
         setState(() => _neonizeLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to disconnect: $e')),
+          SnackBar(content: Text(friendlyError(e, 'disconnect WhatsApp'))),
         );
       }
     }
@@ -421,7 +421,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sync failed: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(friendlyError(e, 'sync with Meta')), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -497,7 +497,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send reply: $e')),
+          SnackBar(content: Text(friendlyError(e, 'send the reply'))),
         );
       }
     }
@@ -574,7 +574,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
       setState(() => _waMessagesLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send WhatsApp message: $e')),
+          SnackBar(content: Text(friendlyError(e, 'send the WhatsApp message'))),
         );
       }
     }
@@ -692,7 +692,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to initiate WhatsApp chat: $e')),
+                    SnackBar(content: Text(friendlyError(e, 'start the WhatsApp chat'))),
                   );
                 }
               }
@@ -724,7 +724,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save settings: $e')),
+          SnackBar(content: Text(friendlyError(e, 'save the settings'))),
         );
       }
     }
@@ -749,7 +749,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
       setState(() {
         _testingConnection = false;
         _verifySuccess = false;
-        _verifyResultMsg = 'Error: $e';
+        _verifyResultMsg = friendlyError(e, 'verify the connection');
       });
     }
   }
@@ -770,7 +770,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to convert lead: $e')),
+          SnackBar(content: Text(friendlyError(e, 'convert the lead'))),
         );
       }
     }
@@ -855,7 +855,7 @@ class _SocialSuiteScreenState extends State<SocialSuiteScreen>
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to publish post: $e')),
+                      SnackBar(content: Text(friendlyError(e, 'publish the post'))),
                     );
                   }
                 }

@@ -16,7 +16,14 @@ import '../widgets/customer_form_dialog.dart';
 import '../widgets/fulfillment_type_selector.dart';
 import '../widgets/order_media_picker.dart';
 import '../widgets/sidebar_navigation.dart';
+import '../widgets/tag_filter.dart';
 import '../utils/money.dart';
+
+/// The tag chips are a multi-select OR filter: with tags selected, an item shows
+/// when it carries any one of them (case-insensitive). No selection shows all.
+bool matchesSelectedTags(List<String> itemTags, Set<String> selected) =>
+    selected.isEmpty ||
+    itemTags.any((t) => selected.any((s) => s.toLowerCase() == t.toLowerCase()));
 
 class NewOrderScreen extends StatefulWidget {
   final CustomerModel? initialCustomer;
@@ -303,10 +310,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       final matchesCategory =
           selectedCategory.isEmpty || item.categoryName == selectedCategory;
       final tags = item.tags;
-      // AND: an item must carry every selected tag.
-      final matchesTags = _selectedTags.isEmpty ||
-          _selectedTags.every((selTag) =>
-              tags.any((t) => t.toLowerCase() == selTag.toLowerCase()));
+      final matchesTags = matchesSelectedTags(tags, _selectedTags);
       final q = _searchQuery.toLowerCase();
       final matchesSearch = q.isEmpty ||
           item.name.toLowerCase().contains(q) ||
@@ -435,84 +439,15 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     ),
                   ),
 
-                  // Dedicated Multi-Select Tag Chips Row
-                  if (allAvailableTags.isNotEmpty) ...[
+                  // Dedicated Multi-Select Tag Chips Row: one row that fits,
+                  // selected tags pinned first, the rest behind "More tags".
+                  if (allAvailableTags.isNotEmpty ||
+                      _selectedTags.isNotEmpty) ...[
                     const SizedBox(height: 10),
-                    SizedBox(
-                      height: 32,
-                      child: Row(
-                        children: [
-                          const Icon(Icons.tag_rounded,
-                              size: 16, color: Color(0xFF94A3B8)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: allAvailableTags.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 6),
-                              itemBuilder: (context, idx) {
-                                final tag = allAvailableTags[idx];
-                                final isSel = _selectedTags.contains(tag);
-                                return FilterChip(
-                                  label: Text(
-                                    tag,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: isSel
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                      color: isSel
-                                          ? const Color(0xFF1D4ED8)
-                                          : const Color(0xFF475569),
-                                    ),
-                                  ),
-                                  selected: isSel,
-                                  selectedColor: const Color(0xFFDBEAFE),
-                                  backgroundColor: const Color(0xFFF1F5F9),
-                                  checkmarkColor: const Color(0xFF1D4ED8),
-                                  side: BorderSide(
-                                    color: isSel
-                                        ? const Color(0xFF93C5FD)
-                                        : const Color(0xFFE2E8F0),
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  onSelected: (selected) {
-                                    setState(() {
-                                      if (selected) {
-                                        _selectedTags.add(tag);
-                                      } else {
-                                        _selectedTags.remove(tag);
-                                      }
-                                    });
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                          if (_selectedTags.isNotEmpty) ...[
-                            const SizedBox(width: 6),
-                            InkWell(
-                              onTap: () => setState(() => _selectedTags.clear()),
-                              borderRadius: BorderRadius.circular(12),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 4),
-                                child: Text(
-                                  'Clear (${_selectedTags.length})',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFFDC2626),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                    TagFilterRow(
+                      tags: allAvailableTags,
+                      selected: _selectedTags,
+                      onChanged: () => setState(() {}),
                     ),
                   ],
                 ],
@@ -1771,7 +1706,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
         subtitle: _searchQuery.isNotEmpty
             ? 'Nothing matches "$_searchQuery".'
             : _selectedTags.isNotEmpty
-                ? 'No items match selected tag(s): ${_selectedTags.join(", ")}.'
+                ? 'No items have any of these tags: ${_selectedTags.join(", ")}.'
                 : 'This category has no active items yet.',
       );
     }
@@ -1931,16 +1866,21 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     const SizedBox(height: 3),
                     Wrap(
                       spacing: 4,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         for (final t in tags.take(2))
                           Text(
                             '#$t',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w500,
                               color: Color(0xFF2563EB),
                             ),
                           ),
+                        if (tags.length > 2) MoreTagsChip(tags: tags),
                       ],
                     ),
                   ],
@@ -2090,15 +2030,25 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 ),
                 if (tags.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(
-                    tags.map((t) => '#$t').join(' '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF2563EB),
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          tags.take(2).map((t) => '#$t').join(' '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF2563EB),
+                          ),
+                        ),
+                      ),
+                      if (tags.length > 2) ...[
+                        const SizedBox(width: 4),
+                        MoreTagsChip(tags: tags),
+                      ],
+                    ],
                   ),
                 ],
               ],
@@ -2186,6 +2136,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   ),
                   child: Text(
                     '#$t',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w500,
@@ -2193,6 +2145,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                     ),
                   ),
                 ),
+              if (tags.length > 2) MoreTagsChip(tags: tags, fontSize: 9),
             ],
           ),
           const SizedBox(height: 4),

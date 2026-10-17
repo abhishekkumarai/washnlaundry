@@ -18,9 +18,34 @@ class ApiException implements Exception {
 
   ApiException(this.message, {this.statusCode});
 
+  /// Just [message]: it is written for people, and it is what reaches the
+  /// screen if an exception is ever interpolated straight into the UI. The
+  /// status code stays available as [statusCode].
   @override
-  String toString() =>
-      'ApiException${statusCode != null ? ' ($statusCode)' : ''}: $message';
+  String toString() => message;
+}
+
+const _genericError = 'Something went wrong. Please try again.';
+const _offlineError =
+    "Can't reach WashNLaundry right now. Check your internet connection and try again.";
+
+/// What to show a person for any caught error. An [ApiException] carries a
+/// sentence already written for users (the server's own reason, or one of
+/// [ApiService.describeError]'s); anything else (a parsing bug, a type error)
+/// gets a calm generic line and is logged instead of shown. [action] adds the
+/// context, e.g. `friendlyError(e, 'create the shop')` gives
+/// "Couldn't create the shop. This isn't available in Demo Mode. ..."
+/// Never put `$e` / `e.toString()` in UI text; use this.
+String friendlyError(Object error, [String? action]) {
+  String reason;
+  if (error is ApiException && error.message.trim().isNotEmpty) {
+    reason = error.message.trim();
+  } else {
+    debugPrint('Unexpected error: $error');
+    reason = _genericError;
+  }
+  if (!RegExp(r'[.!?]$').hasMatch(reason)) reason = '$reason.';
+  return action == null ? reason : "Couldn't $action. $reason";
 }
 
 /// Generic container for paginated API responses.
@@ -164,7 +189,8 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Could not reach the server ($path): $e');
+      debugPrint('API $method $path failed: $e');
+      throw ApiException(_offlineError);
     }
   }
 
@@ -287,6 +313,9 @@ class ApiService {
   ///
   /// Public (not `_send`'s private detail) and pure — no HTTP client needed —
   /// so the parsing itself is directly unit-testable, unlike `_send`.
+  ///
+  /// Always a sentence fit for the screen: never the path, a status code, raw
+  /// JSON or a traceback (those go to the debug log).
   static String describeError(String body, String path, {int? statusCode}) {
     if (statusCode == 404) {
       return 'The requested resource was not found.';
@@ -294,27 +323,38 @@ class ApiService {
     if (statusCode != null && statusCode >= 500) {
       return 'Our server encountered an issue. Please try again shortly.';
     }
-    if (body.isEmpty) return 'Request to $path failed with no response body.';
     try {
-      final decoded = json.decode(body);
+      final decoded = body.isEmpty ? null : json.decode(body);
       if (decoded is Map) {
         if (decoded['detail'] is String) return decoded['detail'] as String;
         final parts = <String>[];
         decoded.forEach((key, value) {
           final text = value is List ? value.join(' ') : value.toString();
-          parts.add(key == 'non_field_errors' ? text : '$key: $text');
+          parts.add(key == 'non_field_errors' ? text : '${_fieldLabel('$key')}: $text');
         });
         if (parts.isNotEmpty) return parts.join(' ');
       } else if (decoded is List && decoded.isNotEmpty) {
         return decoded.join(' ');
       }
     } catch (_) {
-      // Not JSON — fall through to generic or raw body below.
-      if (body.contains('<html>') || body.contains('<html') || body.contains('502') || body.contains('500')) {
-        return 'Our server encountered an issue. Please try again shortly.';
-      }
+      // Not JSON (an HTML proxy page, a traceback): logged below, never shown.
     }
-    return 'Request to $path failed: $body';
+    debugPrint('API $path failed (${statusCode ?? '-'}): $body');
+    return switch (statusCode) {
+      401 => 'Your session has expired. Please sign in again.',
+      403 => "You don't have permission to do that.",
+      413 => 'That file is too large.',
+      429 => 'Too many attempts. Please wait a moment and try again.',
+      _ => body.contains('<html') || body.contains('502') || body.contains('500')
+          ? 'Our server encountered an issue. Please try again shortly.'
+          : _genericError,
+    };
+  }
+
+  /// `start_date` -> `Start date`, for field-level validation messages.
+  static String _fieldLabel(String key) {
+    final words = key.replaceAll('_', ' ').trim();
+    return words.isEmpty ? words : words[0].toUpperCase() + words.substring(1);
   }
 
   static List<Map<String, dynamic>> _asList(dynamic decoded) {
@@ -429,14 +469,15 @@ class ApiService {
         throw ApiException(
           res.statusCode == 413
               ? 'That file is too large.'
-              : 'Upload failed (${res.statusCode}).',
+              : 'The upload did not finish. Please try again.',
           statusCode: res.statusCode,
         );
       }
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException('Could not upload the file: $e');
+      debugPrint('Upload failed: $e');
+      throw ApiException('The upload did not finish. Check your connection and try again.');
     }
   }
 
@@ -665,8 +706,8 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException(
-          'Could not reach the server (${request.url.path}): $e');
+      debugPrint('API ${request.url.path} failed: $e');
+      throw ApiException(_offlineError);
     }
   }
 
@@ -988,7 +1029,8 @@ class ApiService {
     try {
       response = await http.Client().send(request);
     } catch (e) {
-      throw ApiException('Could not reach the chat service: $e');
+      debugPrint('Chat request failed: $e');
+      throw ApiException("Can't reach the assistant right now. Please try again in a moment.");
     }
 
     if (response.statusCode != 200) {

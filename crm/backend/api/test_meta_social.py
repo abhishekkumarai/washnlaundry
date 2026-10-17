@@ -9,6 +9,8 @@ class MetaSocialTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.shop = Shop.objects.first() or Shop.objects.create(name='Test Wash')
+        Shop.objects.filter(pk=self.shop.pk).update(social_suite_enabled=True)  # off by default
+        self.shop.refresh_from_db()
         self.settings = MetaSettings.objects.create(
             shop=self.shop,
             facebook_page_name='Test Laundry FB',

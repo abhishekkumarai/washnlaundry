@@ -16,7 +16,10 @@ User = get_user_model()
 class SecurityHardeningTests(TestCase):
     def setUp(self):
         cache.clear()
-        self.shop = Shop.objects.create(name='Alpha Wash', slug='alpha')
+        # Social Suite and Chat on, so the Meta/WhatsApp/chat checks below test roles,
+        # origins and limits, not the per-shop switches.
+        self.shop = Shop.objects.create(name='Alpha Wash', slug='alpha', social_suite_enabled=True,
+                                        chat_enabled=True)
         self.owner = User.objects.create_user('owner@x.com', 'owner@x.com', 'pw')
         self.staff = User.objects.create_user('staff@x.com', 'staff@x.com', 'pw')
         ShopMembership.objects.create(user=self.owner, shop=self.shop, role=ShopRole.OWNER, is_default=True)

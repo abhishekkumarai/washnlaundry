@@ -75,7 +75,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         if (assistantMsg.text.isEmpty) _messages.remove(assistantMsg);
         _error =
-            e is ApiException ? e.message : 'Could not reach the assistant: $e';
+            friendlyError(e);
       });
     } finally {
       if (mounted) setState(() => _sending = false);

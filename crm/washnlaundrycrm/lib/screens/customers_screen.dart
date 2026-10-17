@@ -131,7 +131,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       if (!mounted || id != _requestId) return;
       setState(() {
         _loading = false;
-        _loadError = 'Could not load customers: $e';
+        _loadError = friendlyError(e, 'load customers');
       });
     }
   }

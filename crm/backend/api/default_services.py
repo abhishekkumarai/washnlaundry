@@ -5,6 +5,7 @@ standard industry pricing and units. Used when seeding shops and can be
 populated on demand or rendered directly in the CRM when a tenant is brand new.
 """
 
+from .item_tags import category_tags, item_tags
 from .models import PricingUnit
 
 PC = PricingUnit.PIECE
@@ -139,6 +140,7 @@ def populate_default_services_for_shop(shop, overwrite_existing=False):
                 'icon': cat_icon,
                 'display_order': cat_order,
                 'is_active': True,
+                'tags': category_tags(cat_name),
             },
         )
         if created:
@@ -162,6 +164,7 @@ def populate_default_services_for_shop(shop, overwrite_existing=False):
                     'image_url': img,
                     'display_order': item_order,
                     'is_active': True,
+                    'tags': item_tags(cat_name, item_name, unit),
                 },
             )
             if i_created:

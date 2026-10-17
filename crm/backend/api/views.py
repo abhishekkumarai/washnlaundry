@@ -22,7 +22,7 @@ from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 
 from . import customer_import, services_import_export, default_services
-from .auth import CUSTOMER, OWNER_JOB_TITLES, CanProvisionShop, is_last_owner, IsOwner, IsOwnerOrStaffReadOnly, is_shop_owner, normalize_phone
+from .auth import CUSTOMER, OWNER_JOB_TITLES, CanProvisionShop, is_last_owner, IsOwner, IsOwnerOrStaffReadOnly, is_shop_owner, normalize_phone, SocialSuiteEnabled
 from .pagination import StandardPagination
 from .tenancy import fallback_shop, get_current_tenant, require_shop
 from .validators import clean_mobile_10_digit
@@ -53,7 +53,8 @@ class ProvisionThrottle(SimpleRateThrottle):
         return self.cache_format % {'scope': self.scope, 'ident': ident}
 
 
-PROTECTED_SHOP_FIELDS = {'status', 'slug', 'subdomain', 'custom_domain', 'order_prefix'}
+PROTECTED_SHOP_FIELDS = {'status', 'slug', 'subdomain', 'custom_domain', 'order_prefix',
+                         'social_suite_enabled', 'chat_enabled'}
 SLUG_RE = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
 
 
@@ -104,7 +105,8 @@ class ShopViewSet(viewsets.ModelViewSet):
         self._require_owner(serializer.instance)
         if not self._is_superuser() and PROTECTED_SHOP_FIELDS & set(self.request.data.keys()):
             raise PermissionDenied(
-                'Status, slug, subdomain, custom domain and order prefix are managed by support.')
+                'Status, slug, subdomain, custom domain, order prefix, Social Suite and '
+                'Chat access are managed by support.')
         serializer.save()
 
     def destroy(self, request, *args, **kwargs):
@@ -1660,6 +1662,10 @@ def rag_chat(request):
     server-side, so it never reaches the Flutter web bundle. Body:
     {"message": str, "history"?: [{"role": "user"|"assistant", "content": str}]}
     """
+    # Chat is switched on per shop (Shop.chat_enabled, off by default).
+    shop = getattr(request, 'shop', None) or get_current_tenant()
+    if not (shop and shop.chat_enabled):
+        return JsonResponse({'detail': 'Chat is not enabled for this shop.'}, status=403)
     # KAN-192: browsers must come from an allowed origin; each call spends
     # Workers AI quota, so cap per-IP rate and input size.
     origin = request.headers.get('Origin', '')
@@ -1841,8 +1847,10 @@ def process_leads(request):
 from .services.meta_social_service import MetaSocialService
 
 
+# Everything below up to the backup section is the Social Suite: each endpoint also
+# needs the shop's Social Suite switch (SocialSuiteEnabled, off by default).
 class MetaSettingsViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsOwnerOrStaffReadOnly]
+    permission_classes = [IsOwnerOrStaffReadOnly, SocialSuiteEnabled]
     queryset = MetaSettings.objects.all()
     serializer_class = MetaSettingsSerializer
 
@@ -1863,7 +1871,7 @@ class MetaSettingsViewSet(viewsets.ModelViewSet):
 
 
 class MetaPostViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsOwnerOrStaffReadOnly]
+    permission_classes = [IsOwnerOrStaffReadOnly, SocialSuiteEnabled]
     queryset = MetaPost.objects.all().order_by('-created_at')
     serializer_class = MetaPostSerializer
 
@@ -1880,7 +1888,7 @@ class MetaPostViewSet(viewsets.ModelViewSet):
 
 
 class MetaMessageViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsOwnerOrStaffReadOnly]
+    permission_classes = [IsOwnerOrStaffReadOnly, SocialSuiteEnabled]
     queryset = MetaMessage.objects.all().order_by('created_at')
     serializer_class = MetaMessageSerializer
 
@@ -2014,7 +2022,7 @@ class MetaMessageViewSet(viewsets.ModelViewSet):
 
 
 class MetaLeadViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsOwnerOrStaffReadOnly]
+    permission_classes = [IsOwnerOrStaffReadOnly, SocialSuiteEnabled]
     queryset = MetaLead.objects.all().order_by('-created_at')
     serializer_class = MetaLeadSerializer
 
@@ -2046,7 +2054,7 @@ class MetaLeadViewSet(viewsets.ModelViewSet):
 
 
 @api_view(['GET'])
-@permission_classes([IsOwnerOrStaffReadOnly])
+@permission_classes([IsOwnerOrStaffReadOnly, SocialSuiteEnabled])
 def meta_social_analytics(request):
     """GET /api/meta-social/analytics/ — Summary of live reach, followers, posts & leads from Meta."""
     shop = getattr(request, 'shop', None)
@@ -2055,7 +2063,7 @@ def meta_social_analytics(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsOwnerOrStaffReadOnly])
+@permission_classes([IsOwnerOrStaffReadOnly, SocialSuiteEnabled])
 def meta_social_sync(request):
     """POST /api/meta-social/sync/ — Triggers live synchronization of media, reels, and followers from Meta Graph API."""
     shop = getattr(request, 'shop', None)
@@ -2068,7 +2076,7 @@ from .services.neonize_service import NeonizeService
 
 
 @api_view(['GET'])
-@permission_classes([IsOwner])
+@permission_classes([IsOwner, SocialSuiteEnabled])
 def neonize_status(request):
     """GET /api/whatsapp/neonize/status/ — Connection status and live pairing QR code."""
     shop = getattr(request, 'shop', None)
@@ -2077,7 +2085,7 @@ def neonize_status(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsOwner])
+@permission_classes([IsOwner, SocialSuiteEnabled])
 def neonize_connect(request):
     """POST /api/whatsapp/neonize/connect/ — Request new pairing QR code for personal device."""
     shop = getattr(request, 'shop', None)
@@ -2086,7 +2094,7 @@ def neonize_connect(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsOwner])
+@permission_classes([IsOwner, SocialSuiteEnabled])
 def neonize_disconnect(request):
     """POST /api/whatsapp/neonize/disconnect/ — Disconnect personal WhatsApp session."""
     shop = getattr(request, 'shop', None)

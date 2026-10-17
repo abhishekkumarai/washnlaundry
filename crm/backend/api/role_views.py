@@ -29,6 +29,8 @@ def me(request):
             'name': shop.name,
             'slug': shop.slug,
             'currency_symbol': shop.currency_symbol,
+            'social_suite_enabled': shop.social_suite_enabled,
+            'chat_enabled': shop.chat_enabled,
         }
 
     django_user = getattr(user, 'user', None)

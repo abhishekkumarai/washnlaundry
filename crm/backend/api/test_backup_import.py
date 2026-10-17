@@ -27,6 +27,15 @@ class BackupImportTests(TestCase):
             f'/api/backup/import/{section}/?shop={shop.id}',
             {'file': upload(text, name), **extra}, format='multipart')
 
+    def test_export_with_no_active_shop_exports_nothing(self):
+        Staff.objects.create(shop=self.shop, name='Asha', phone='9876543210')
+        Staff.objects.create(shop=self.other, name='Ben', phone='9876543211')
+        # No tenant: never every shop's rows.
+        self.assertEqual(exporter._tenant_filter(Staff.all_objects.all()).count(), 0)
+        with tenant_context(self.shop):
+            names = list(exporter._tenant_filter(Staff.all_objects.all()).values_list('name', flat=True))
+        self.assertEqual(names, ['Asha'])
+
     def test_staff_import_is_per_shop_and_idempotent(self):
         csv_text = ('ID,Name,Role,Phone,Email,Monthly Wage,Status,App Login,Start Date\n'
                     ',Asha,Washer,9876543210,,12000,ACTIVE,Yes,2026-01-05\n')

@@ -71,7 +71,7 @@ class _ShopOnboardingDialogState extends State<ShopOnboardingDialog> {
       if (mounted) {
         setState(() {
           _submitting = false;
-          _error = 'Failed to create shop: $e';
+          _error = friendlyError(e, 'create the shop');
         });
       }
     }
