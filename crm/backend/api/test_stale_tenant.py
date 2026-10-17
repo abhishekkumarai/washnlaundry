@@ -62,8 +62,8 @@ class StaleTenantHeaderTests(TestCase):
         res = self.client.get('/api/customers/', **STALE)
         self.assertEqual(res.status_code, 404)
 
-    def test_a_confirmed_signup_waiting_for_a_link_can_still_sign_in(self):
-        from api.models import Customer
+    def test_a_confirmed_signup_with_no_store_record_can_sign_in_but_is_unlinked(self):
+        from api.models import Customer, EmailLinkRequest
         Customer.all_objects.create(shop=Shop.objects.get(slug='alpha'), name='Existing', phone='9123456780')
         self.client.post('/api/auth/signup/', {'email': 'wait@x.com', 'password': 'Brand-new-1', 'name': 'W',
                                                'phone': '9123456780'}, format='json')
@@ -74,4 +74,7 @@ class StaleTenantHeaderTests(TestCase):
         me = self.client.get('/api/me/', HTTP_AUTHORIZATION=f"Bearer {login.json()['token']}")
         self.assertEqual(me.status_code, 200, me.content)  # used to be a 500
         self.assertEqual(me.json()['role'], 'unlinked')
-        self.assertTrue(me.json()['pending_link'])
+        # Customer self-registration is off: no link request is queued for the store.
+        self.assertFalse(me.json()['pending_link'])
+        self.assertFalse(EmailLinkRequest.objects.exists())
+        self.assertFalse(Customer.all_objects.filter(email='wait@x.com').exists())

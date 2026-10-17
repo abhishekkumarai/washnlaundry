@@ -9,12 +9,30 @@ import 'package:washnlaundrycrm/router.dart';
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  Future<AuthProvider> session({required bool signedIn, String? role}) async {
+  Future<AuthProvider> session(
+      {required bool signedIn, String? role, Map<String, dynamic>? me}) async {
     final auth = AuthProvider();
     await Future<void>.delayed(Duration.zero);
-    auth.setSessionForTest(signedIn: signedIn, role: role);
+    auth.setSessionForTest(signedIn: signedIn, role: role, me: me);
     return auth;
   }
+
+  test('an account with no shop yet is kept on /setup-shop', () async {
+    final auth = await session(
+        signedIn: true, role: 'unlinked', me: {'needs_shop_onboarding': true});
+    expect(authRedirectFor(auth, '/setup-shop'), isNull);
+    for (final p in ['/dashboard', '/orders', '/my/start', '/login', '/']) {
+      expect(authRedirectFor(auth, p), '/setup-shop', reason: p);
+    }
+    expect(authRedirectFor(auth, '/verify'), isNull); // email links still open
+  });
+
+  test('once the account has its shop, /setup-shop sends it home', () async {
+    final auth = await session(
+        signedIn: true, role: 'owner', me: {'needs_shop_onboarding': false});
+    expect(authRedirectFor(auth, '/setup-shop'), '/dashboard');
+    expect(authRedirectFor(auth, '/dashboard'), isNull);
+  });
 
   test('signed out is sent to /login from anywhere', () async {
     final auth = await session(signedIn: false);

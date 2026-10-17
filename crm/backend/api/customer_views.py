@@ -176,30 +176,33 @@ def customer_me(request):
     if request.method == 'PATCH':
         return _update_profile(request)
 
-    email = verified_email(request)
-    if not email:
-        return JsonResponse({'detail': 'Sign in required.'}, status=401)
-    if customer_for_email(email):
-        return JsonResponse({'detail': 'Account already exists.'}, status=409)
-    try:
-        body = json.loads(request.body or b'{}')
-    except json.JSONDecodeError:
-        return JsonResponse({'detail': 'Invalid JSON body.'}, status=400)
-    name = str(body.get('name') or '').strip()[:255]
-    phone = clean_phone(body.get('phone'))
-    if not name or not phone:
-        return JsonResponse({'detail': 'Enter your name and a valid phone number.'}, status=400)
-    try:
-        customer, pending = register_customer(email, name, phone)
-    except ValueError:  # several shops and none to file this customer under
-        return JsonResponse({'detail': 'Sign-up is not available for this store yet. Please call us.'}, status=503)
-    if pending:
-        return JsonResponse({
-            'pending': True,
-            'detail': 'That number is already registered with the store. We have asked the '
-                      'store to link your email; your orders appear once it is approved.'},
-            status=202)
-    return JsonResponse(_me_json(customer), status=201)
+    # Customer self-registration is switched off for now (restore the block below to
+    # re-enable, together with password_auth.verify_email).
+    return JsonResponse({'detail': 'Customer sign-up is not available right now.'}, status=403)
+    # email = verified_email(request)
+    # if not email:
+    #     return JsonResponse({'detail': 'Sign in required.'}, status=401)
+    # if customer_for_email(email):
+    #     return JsonResponse({'detail': 'Account already exists.'}, status=409)
+    # try:
+    #     body = json.loads(request.body or b'{}')
+    # except json.JSONDecodeError:
+    #     return JsonResponse({'detail': 'Invalid JSON body.'}, status=400)
+    # name = str(body.get('name') or '').strip()[:255]
+    # phone = clean_phone(body.get('phone'))
+    # if not name or not phone:
+    #     return JsonResponse({'detail': 'Enter your name and a valid phone number.'}, status=400)
+    # try:
+    #     customer, pending = register_customer(email, name, phone)
+    # except ValueError:  # several shops and none to file this customer under
+    #     return JsonResponse({'detail': 'Sign-up is not available for this store yet. Please call us.'}, status=503)
+    # if pending:
+    #     return JsonResponse({
+    #         'pending': True,
+    #         'detail': 'That number is already registered with the store. We have asked the '
+    #                   'store to link your email; your orders appear once it is approved.'},
+    #         status=202)
+    # return JsonResponse(_me_json(customer), status=201)
 
 
 @require_GET

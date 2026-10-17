@@ -55,11 +55,60 @@ class PasswordAuthTests(APITestCase):
             self.assertEqual(res.status_code, 400, bad)
             self.assertIn('phone', res.json()['detail'].lower())
 
-    def test_verifying_creates_a_customer_from_the_signup_phone(self):
-        from api.models import Customer
-        self.signup_and_verify('newbie@example.com')
-        customer = Customer.objects.get(email='newbie@example.com')
-        self.assertEqual(customer.phone, '9876500001')
+    def test_verifying_does_not_create_a_customer_while_self_registration_is_off(self):
+        from api.models import Customer, EmailLinkRequest
+        token = self.signup_and_verify('newbie@example.com')
+        self.assertFalse(Customer.objects.filter(email='newbie@example.com').exists())
+        self.assertFalse(EmailLinkRequest.objects.exists())
+        # Confirmed and signed in, just not linked to a store record yet.
+        me = self.client.get('/api/me/', **self.bearer(token)).json()
+        self.assertEqual((me['role'], me['email']), ('unlinked', 'newbie@example.com'))
+
+    @override_settings(SELF_SERVICE_SHOPS=True)
+    def test_self_service_each_account_sets_up_and_sees_only_its_own_shop(self):
+        from .models import Shop
+        Shop.objects.create(name='Alpha', slug='alpha')
+
+        # A fresh account has no access and is sent to "set up your shop".
+        anna = self.signup_and_verify('anna@example.com')
+        me = self.client.get('/api/me/', **self.bearer(anna)).json()
+        self.assertEqual((me['role'], me.get('needs_shop_onboarding')), ('unlinked', True))
+        self.assertEqual(self.client.get('/api/customers/', HTTP_X_TENANT_ID='alpha',
+                                         **self.bearer(anna)).status_code, 403)
+
+        made = self.client.post('/api/shops/provision/', {'name': 'Anna Cleaners'}, format='json',
+                                **self.bearer(anna))
+        self.assertEqual(made.status_code, 201, made.content)
+        slug = made.json()['slug']
+        # Owner of her own shop, which /me resolves to with no X-Tenant-ID.
+        me = self.client.get('/api/me/', **self.bearer(anna)).json()
+        self.assertEqual((me['role'], me['shop']['slug'], me['needs_shop_onboarding']),
+                         ('owner', slug, False))
+        self.assertEqual([s['slug'] for s in me['shops']], [slug])
+
+        # A second account gets its own shop and cannot open Anna's.
+        ben = self.signup_and_verify('ben@example.com')
+        self.client.post('/api/shops/provision/', {'name': 'Ben Laundry'}, format='json', **self.bearer(ben))
+        me = self.client.get('/api/me/', **self.bearer(ben)).json()
+        self.assertNotEqual(me['shop']['slug'], slug)
+        self.assertEqual(self.client.get('/api/customers/', HTTP_X_TENANT_ID=slug,
+                                         **self.bearer(ben)).status_code, 403)
+        # The same works after a later password login.
+        again = self.post('login', {'email': 'anna@example.com', 'password': 'correct horse'})
+        self.assertEqual(self.client.get('/api/me/', **self.bearer(again.json()['token'])).json()['role'], 'owner')
+
+    @override_settings(SELF_SERVICE_SHOPS=True)
+    def test_self_service_turns_off_the_customer_view(self):
+        Customer.objects.create(name='Cu', phone='9000000010', email='cust@example.com')
+        token = self.signup_and_verify()
+        me = self.client.get('/api/me/', **self.bearer(token)).json()
+        self.assertEqual((me['role'], me.get('needs_shop_onboarding')), ('unlinked', True))
+
+    def test_self_service_is_off_by_default(self):
+        token = self.signup_and_verify('plain@example.com')
+        me = self.client.get('/api/me/', **self.bearer(token)).json()
+        self.assertEqual(me['role'], 'unlinked')
+        self.assertNotIn('needs_shop_onboarding', me)
 
     def test_signup_requires_verification_before_login(self):
         res = self.post('signup', {'email': 'Cust@Example.com', 'phone': '9876500001', 'password': 'correct horse'})

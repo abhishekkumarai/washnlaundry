@@ -6,6 +6,7 @@ filters, and the catalogue shape.
 """
 
 import io
+import unittest
 from datetime import date, time, timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -2542,6 +2543,15 @@ class CustomerPortalTests(TestCase):
         self.assertEqual(self.client.get('/api/customer/orders/WL-2/', **self.auth).status_code, 404)
         self.assertEqual(self.client.get('/api/customer/orders/WL-1/', **self.auth).status_code, 200)
 
+    def test_customer_signup_is_switched_off(self):
+        self.verify.return_value = {'email': 'new@example.com', 'email_verified': True}
+        res = self.client.post('/api/customer/me/', {'name': 'New', 'phone': '98765 43210'},
+                               content_type='application/json', **self.auth)
+        self.assertEqual(res.status_code, 403)
+        self.assertFalse(Customer.objects.filter(email='new@example.com').exists())
+        self.assertFalse(EmailLinkRequest.objects.exists())
+
+    @unittest.skip('customer self-registration is switched off')
     def test_signup_creates_customer(self):
         self.verify.return_value = {'email': 'new@example.com', 'email_verified': True}
         res = self.client.post('/api/customer/me/', {'name': 'New', 'phone': '98765 43210'},
@@ -2549,6 +2559,7 @@ class CustomerPortalTests(TestCase):
         self.assertEqual(res.status_code, 201)
         self.assertEqual(Customer.objects.get(email='new@example.com').phone, '9876543210')
 
+    @unittest.skip('customer self-registration is switched off')
     def test_signup_refuses_existing_phone_and_bad_input(self):
         self.verify.return_value = {'email': 'new@example.com', 'email_verified': True}
         post = lambda body: self.client.post('/api/customer/me/', body,
@@ -2564,11 +2575,13 @@ class CustomerPortalTests(TestCase):
         post({'name': 'New', 'phone': '9876543210'})  # idempotent
         self.assertEqual(EmailLinkRequest.objects.filter(customer=self.bob).count(), 1)
 
+    @unittest.skip('customer self-registration is switched off')
     def test_signup_existing_account_is_409(self):
         res = self.client.post('/api/customer/me/', {'name': 'A', 'phone': '9999999999'},
                                content_type='application/json', **self.auth)
         self.assertEqual(res.status_code, 409)
 
+    @unittest.skip('customer self-registration is switched off')
     def test_signup_post_works_without_a_csrf_token(self):
         from django.test import Client
         self.verify.return_value = {'email': 'csrf@example.com', 'email_verified': True}

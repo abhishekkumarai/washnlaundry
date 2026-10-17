@@ -215,6 +215,11 @@ REST_FRAMEWORK = {
 # refuses to run on the public default key: anyone could forge a token for the
 # owner's email. Set SECRET_KEY in the environment to enable it.
 PASSWORD_AUTH_ENABLED = SECRET_KEY != _INSECURE_SECRET_KEY
+# Self-service shops: a signed-in account with no shop is sent to a "set up your shop" page,
+# and the shop it creates there (POST /api/shops/provision/) is its own - it sees no other
+# shop's data. A bearer-token request with no X-Tenant-ID resolves to the caller's own default
+# shop. Off by default; on for dev (render.yaml).
+SELF_SERVICE_SHOPS = os.environ.get('SELF_SERVICE_SHOPS', '').strip().lower() in ('1', 'true', 'yes')
 PASSWORD_RESET_TIMEOUT = 3600  # seconds a reset link stays valid
 # Sender for verification / reset emails.
 AUTH_EMAIL_FROM = _clean_from_email(os.environ.get('AUTH_EMAIL_FROM'), default=LEAD_EMAIL_FROM)

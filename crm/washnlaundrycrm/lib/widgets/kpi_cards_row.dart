@@ -173,12 +173,17 @@ class KpiCardsRow extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 3),
+          // The ▲/▼ arrows aren't in IBM Plex Sans, so they render from a fallback
+          // font with a taller line box; the forced strut keeps the line the same
+          // height either way (it overflowed the card by 2px without it).
           Text(
             c['subtext'] as String,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            strutStyle: const StrutStyle(fontSize: 10, height: 1.3, forceStrutHeight: true),
             style: TextStyle(
               fontSize: 10,
+              height: 1.3,
               fontWeight: FontWeight.w600,
               color: c['subtextColor'] as Color,
             ),

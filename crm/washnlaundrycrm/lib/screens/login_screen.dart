@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
@@ -35,6 +36,11 @@ class LoginScreen extends StatefulWidget {
   @visibleForTesting
   static bool showDemoOn(String host) =>
       _allowDemo && !host.toLowerCase().startsWith('customer.');
+
+  /// The phone field takes digits only: a 10-digit Indian mobile starting 6-9
+  /// (the same rule as the backend's `clean_phone`).
+  @visibleForTesting
+  static bool isValidMobile(String raw) => RegExp(r'^[6-9]\d{9}$').hasMatch(raw);
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -78,9 +84,9 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     final signUp = _authTab == 1;
     final phone = _phoneCtrl.text.trim();
-    if (signUp && !RegExp(r'^\+?\d{10,15}$').hasMatch(phone.replaceAll(RegExp(r'[\s-]'), ''))) {
+    if (signUp && !LoginScreen.isValidMobile(phone)) {
       setState(() {
-        _formError = 'Enter a valid phone number (10-15 digits).';
+        _formError = 'Enter a valid 10-digit phone number.';
         _formNotice = null;
       });
       return;
@@ -119,8 +125,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel')),
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
               child: const Text('Send reset link')),
@@ -144,40 +149,49 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7F5),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 380),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _brandMark(),
-                const SizedBox(height: 20),
-                _wordmark(),
-                const SizedBox(height: 6),
-                const Text(
-                  'Sign in to manage your shop',
-                  style: TextStyle(fontSize: 13, color: _muted),
-                ),
-                const SizedBox(height: 32),
-                Container(
-                  width: double.infinity,
+      // The scroll view spans the whole window so its scrollbar sits at the window's
+      // edge, not beside the 380px card; minHeight keeps short content centred.
+      body: LayoutBuilder(
+        builder: (context, viewport) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: viewport.maxHeight),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 380),
+                child: Padding(
                   padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _border),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _brandMark(),
+                      const SizedBox(height: 20),
+                      _wordmark(),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Sign in to manage your shop',
+                        style: TextStyle(fontSize: 13, color: _muted),
+                      ),
+                      const SizedBox(height: 32),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: _border),
+                        ),
+                        child: _body(auth),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'By signing in, you agree to our Terms of Service and Privacy Policy.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 11, color: _muted),
+                      ),
+                    ],
                   ),
-                  child: _body(auth),
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'By signing in, you agree to our Terms of Service and Privacy Policy.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: _muted),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -211,9 +225,11 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
         if (_formError != null)
-          _banner(_formError!, const Color(0xFFFEF2F2), const Color(0xFFDC2626)),
+          _banner(
+              _formError!, const Color(0xFFFEF2F2), const Color(0xFFDC2626)),
         if (_formNotice != null)
-          _banner(_formNotice!, const Color(0xFFECFDF5), const Color(0xFF047857)),
+          _banner(
+              _formNotice!, const Color(0xFFECFDF5), const Color(0xFF047857)),
         // The web GIS button renders itself against `_clientId` and gets
         // stuck on "Getting ready" forever if that's empty — there's no
         // config it can fall back to, so skip it (and the now-pointless "OR"
@@ -252,9 +268,14 @@ class _LoginScreenState extends State<LoginScreen> {
           TextField(
             controller: _phoneCtrl,
             keyboardType: TextInputType.phone,
+            // Digits only, a 10-digit mobile number.
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
             autofillHints: const [AutofillHints.telephoneNumber],
             decoration: _fieldDecoration(
-                hint: '+91 98765 43210', icon: Icons.phone_outlined),
+                hint: '9876543210', icon: Icons.phone_outlined),
           ),
         ],
         const SizedBox(height: 14),
@@ -329,40 +350,43 @@ class _LoginScreenState extends State<LoginScreen> {
               fontSize: 12, color: _disabled, fontWeight: FontWeight.w600),
         ),
         if (_showDemo) ...[
-        const SizedBox(height: 20),
-        Row(
-          children: const [
-            Expanded(child: Divider(color: _border)),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: Text('OR', style: TextStyle(fontSize: 12, color: _muted)),
-            ),
-            Expanded(child: Divider(color: _border)),
-          ],
-        ),
-        const SizedBox(height: 16),
-        // Not part of the real page — the fastest way into this clone
-        // without typing anything, since neither Google nor the
-        // Email/Password form authenticates against a real account here.
-        SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: OutlinedButton.icon(
-            onPressed: auth.signInAsDemo,
-            icon: const Icon(Icons.play_circle_outline_rounded,
-                size: 18, color: _brandBlue),
-            label: const Text(
-              'Try Demo Mode',
-              style: TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w600, color: _brandBlue),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFD9D5CB)),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+          const SizedBox(height: 20),
+          Row(
+            children: const [
+              Expanded(child: Divider(color: _border)),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10),
+                child:
+                    Text('OR', style: TextStyle(fontSize: 12, color: _muted)),
+              ),
+              Expanded(child: Divider(color: _border)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Not part of the real page — the fastest way into this clone
+          // without typing anything, since neither Google nor the
+          // Email/Password form authenticates against a real account here.
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: auth.signInAsDemo,
+              icon: const Icon(Icons.play_circle_outline_rounded,
+                  size: 18, color: _brandBlue),
+              label: const Text(
+                'Try Demo Mode',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _brandBlue),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFD9D5CB)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
             ),
           ),
-        ),
         ],
       ],
     );
