@@ -22,7 +22,7 @@ from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 
 from . import customer_import, services_import_export, default_services
-from .auth import CUSTOMER, OWNER_JOB_TITLES, CanProvisionShop, is_last_owner, IsOwner, IsOwnerOrStaffReadOnly, is_shop_owner, normalize_phone, SocialSuiteEnabled
+from .auth import CUSTOMER, OWNER_JOB_TITLES, CanProvisionShop, is_last_owner, IsOwner, IsOwnerOrStaffReadOnly, is_shop_owner, SocialSuiteEnabled
 from .pagination import StandardPagination
 from .tenancy import fallback_shop, get_current_tenant, require_shop
 from .validators import clean_mobile_10_digit
@@ -724,14 +724,13 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Order.objects.prefetch_related('items', 'media').all().order_by('-created_at')
-        # A signed-in customer only ever sees orders whose phone matches theirs
-        # (last 10 digits, so +91 / spaces / dashes don't matter).
+        # A signed-in customer only ever sees orders linked to their own Customer
+        # row. Never match by phone: the phone is editable, so typing someone
+        # else's number would expose their orders.
         user = self.request.user
-        if getattr(user, 'role', None) == CUSTOMER and user.customer:
-            mine = normalize_phone(user.customer.phone)
-            ids = [pk for pk, phone in Order.objects.values_list('id', 'customer_phone')
-                   if mine and normalize_phone(phone) == mine]
-            qs = qs.filter(id__in=ids)
+        if getattr(user, 'role', None) == CUSTOMER:
+            customer = getattr(user, 'customer', None)
+            qs = qs.filter(customer=customer) if customer else qs.none()
         status_filter = (self.request.query_params.get('status') or '').upper()
         today = timezone.localdate()
 

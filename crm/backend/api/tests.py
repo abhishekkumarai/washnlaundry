@@ -2671,6 +2671,19 @@ class RoleAuthTests(APITestCase):
         res = self.client.get('/api/customer/orders/', **self.auth)
         self.assertEqual([o['order_number'] for o in res.json()['orders']], ['WL-1'])
 
+    @override_settings(API_AUTH_ENFORCED=False)
+    def test_customer_orders_are_scoped_by_fk_not_phone(self):
+        # KAN-220: Bob's order carries Alice's phone (e.g. Alice changed her
+        # number to Bob's); she must still see only her own order.
+        Order.objects.create(order_number='WL-2', customer=self.bob, customer_name='Bob',
+                             customer_phone=self.alice.phone)
+        self.as_('alice@example.com')
+        res = self.client.get('/api/orders/', **self.auth)
+        self.assertEqual(res.status_code, 200, res.content)
+        body = res.json()
+        rows = body['results'] if isinstance(body, dict) else body
+        self.assertEqual([o['order_number'] for o in rows], ['WL-1'])
+
 
     def test_customer_can_edit_own_profile_but_not_phone_or_email(self):
         self.as_('alice@example.com')
