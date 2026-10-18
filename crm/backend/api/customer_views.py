@@ -262,6 +262,14 @@ def _slot_booked(slot, day):
     ).exclude(status=OrderStatus.CANCELLED).count()
 
 
+def _slot_closed(slot, day):
+    """True once `slot` on `day` is past the shop's booking cutoff
+    (Shop.pickup_buffer_minutes before it starts)."""
+    from datetime import datetime
+    starts = timezone.make_aware(datetime.combine(day, slot.start_time))
+    return starts - timedelta(minutes=slot.shop.pickup_buffer_minutes or 0) <= timezone.now()
+
+
 def _served_pincodes(shop):
     return sorted({a.pin_code.strip() for a in ServiceArea.objects.filter(shop=shop, is_active=True)
                    if a.pin_code.strip()})
@@ -281,16 +289,16 @@ def customer_booking_options(request):
                  for i in cat.items.filter(is_active=True)]
         if items:
             categories.append({'id': cat.id, 'name': cat.name, 'items': items})
-    slots = list(TimeSlot.objects.filter(shop=shop, kind=TimeSlot.PICKUP, is_active=True))
+    slots = list(TimeSlot.objects.select_related('shop').filter(
+        shop=shop, kind=TimeSlot.PICKUP, is_active=True))
     today = timezone.localdate()
-    now = timezone.localtime().time()
     days = []
     for offset in range(BOOKING_DAYS):
         day = today + timedelta(days=offset)
         day_slots = []
         for slot in slots:
-            if offset == 0 and slot.start_time <= now:
-                continue  # already started today
+            if _slot_closed(slot, day):
+                continue  # too late to book today
             remaining = None if slot.capacity is None else max(slot.capacity - _slot_booked(slot, day), 0)
             day_slots.append({'id': slot.id, 'label': _slot_label(slot),
                               'start_time': _iso(slot.start_time), 'end_time': _iso(slot.end_time),
@@ -487,8 +495,7 @@ def _create_customer_order(request, customer):
     except (ValueError, TypeError, TimeSlot.DoesNotExist):
         return _bad('Choose a pickup date and time slot.')
     today = timezone.localdate()
-    if not today <= day < today + timedelta(days=BOOKING_DAYS) or (
-            day == today and slot.start_time <= timezone.localtime().time()):
+    if not today <= day < today + timedelta(days=BOOKING_DAYS) or _slot_closed(slot, day):
         return _bad('That pickup slot is not available. Choose another.')
 
     # Address (a saved one by id, or typed in), copied onto the order; the

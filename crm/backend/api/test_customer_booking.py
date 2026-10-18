@@ -189,6 +189,23 @@ class CustomerBookingTests(APITestCase):
         self.assertEqual(self.client.get('/api/orders/changes/', {'since': before},
                                          **self.auth).status_code, 403)
 
+    def test_slot_closes_at_the_shops_buffer_before_it_starts(self):
+        soon = (timezone.localtime() + timedelta(minutes=20)).time().replace(second=0, microsecond=0)
+        if soon < timezone.localtime().time():
+            self.skipTest('Too close to midnight for a same-day slot.')
+        slot = TimeSlot.objects.create(kind=TimeSlot.PICKUP, start_time=soon,
+                                       end_time=time(23, 59), capacity=5)
+        today = timezone.localdate().isoformat()
+        self.shop.pickup_buffer_minutes = 30  # 20 min away is inside the cutoff
+        self.shop.save()
+        self.assertEqual(self.book(pickup_date=today, slot_id=slot.id).status_code, 400)
+        opts = self.client.get('/api/customer/booking-options/', **self.auth).json()
+        todays = next(d for d in opts['days'] if d['date'] == today)
+        self.assertNotIn(slot.id, [s['id'] for s in todays['slots']])
+        self.shop.pickup_buffer_minutes = 10
+        self.shop.save()
+        self.assertEqual(self.book(pickup_date=today, slot_id=slot.id).status_code, 201)
+
     def test_booking_requires_sign_in(self):
         res = self.client.post('/api/customer/orders/', {}, format='json')
         self.assertEqual(res.status_code, 401)
