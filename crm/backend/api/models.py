@@ -933,6 +933,26 @@ class EmailLinkRequest(TenantModel):
         return f"{self.email} -> {self.customer} [{self.status}]"
 
 
+class EmailOtp(models.Model):
+    """A one-time sign-in code sent to an email (customer portal, KAN-216).
+
+    Only a keyed hash of the code is stored. A code is single use, expires, and
+    allows a few wrong guesses before it is burned (see api/otp.py).
+    """
+    email = models.EmailField(db_index=True)
+    code_hash = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    attempts = models.IntegerField(default=0)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.email} code ({'used' if self.used_at else 'open'})"
+
+
 # ── Meta & Social Suite (KAN-Meta) ───────────────────────────────────────────
 
 class MetaSettings(models.Model):

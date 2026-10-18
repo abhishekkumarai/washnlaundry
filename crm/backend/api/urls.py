@@ -17,6 +17,7 @@ from .views import (
 )
 from .password_auth import signup, verify_email, resend_verification, login, forgot_password, reset_password
 from .role_views import me, link_requests, link_request_approve, link_request_reject
+from .otp import email_code_request, email_code_verify
 from .customer_views import (
     customer_address_detail, customer_addresses, customer_booking_options, customer_join,
     customer_me, customer_shop_detail, customer_shop_search, customer_orders, customer_order_detail,
@@ -58,6 +59,8 @@ urlpatterns = [
     path('me/', me, name='me'),
     path('demo/start/', demo_start, name='demo-start'),
     path('demo/end/', demo_end, name='demo-end'),
+    path('auth/email-code/request/', email_code_request, name='auth-email-code-request'),
+    path('auth/email-code/verify/', email_code_verify, name='auth-email-code-verify'),
     path('auth/signup/', signup, name='auth-signup'),
     path('auth/verify-email/', verify_email, name='auth-verify-email'),
     path('auth/resend-verification/', resend_verification, name='auth-resend-verification'),
