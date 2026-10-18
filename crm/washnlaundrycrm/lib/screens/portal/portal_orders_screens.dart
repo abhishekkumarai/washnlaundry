@@ -337,28 +337,38 @@ class _PortalOrderDetailScreenState extends State<PortalOrderDetailScreen> {
         ),
         const SizedBox(height: 12),
         PortalPanel(
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Pickup', style: AppTypography.sectionTitle),
-                const SizedBox(height: 6),
-                Text(_pickupText(o).replaceFirst('Pickup ', '')),
-                if ('${o['address'] ?? ''}'.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                      '${o['address']}${'${o['pin_code'] ?? ''}'.isEmpty ? '' : ' - ${o['pin_code']}'}',
-                      style: const TextStyle(color: AppColors.muted)),
-                ],
-              ]),
-            ),
-            const SizedBox(width: 12),
-            Column(children: [
+          child: Builder(builder: (context) {
+            final pickup = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Pickup', style: AppTypography.sectionTitle),
+              const SizedBox(height: 6),
+              Text(_pickupText(o).replaceFirst('Pickup ', '')),
+              if ('${o['address'] ?? ''}'.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                    '${o['address']}${'${o['pin_code'] ?? ''}'.isEmpty ? '' : ' - ${o['pin_code']}'}',
+                    style: const TextStyle(color: AppColors.muted)),
+              ],
+            ]);
+            final qr = Column(children: [
               QrImageView(data: '${o['order_number']}', size: 96, padding: EdgeInsets.zero),
               const SizedBox(height: 4),
               const Text('Show at the shop',
                   style: TextStyle(fontSize: 11, color: AppColors.muted)),
-            ]),
-          ]),
+            ]);
+            // Beside the address the QR squeezes it into a sliver on a phone.
+            if (MediaQuery.sizeOf(context).width < 420) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                pickup,
+                const Divider(height: 24, color: AppColors.borderSubtle),
+                Center(child: qr),
+              ]);
+            }
+            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: pickup),
+              const SizedBox(width: 12),
+              qr,
+            ]);
+          }),
         ),
         const SizedBox(height: 12),
         TextButton(onPressed: () => context.go('/orders'), child: const Text('All orders')),

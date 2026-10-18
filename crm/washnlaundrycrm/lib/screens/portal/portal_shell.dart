@@ -9,12 +9,16 @@ import '../../theme/app_theme.dart';
 /// Book · Orders · Profile as a bottom bar on phones, a rail on wide screens.
 /// Deliberately not the CRM's sidebar: a customer never sees CRM sections.
 class PortalShell extends StatelessWidget {
-  const PortalShell({super.key, required this.index, required this.child, this.title});
+  const PortalShell(
+      {super.key, required this.index, required this.child, this.title, this.showNav = true});
 
   /// 0 Book, 1 Orders, 2 Profile.
   final int index;
   final Widget child;
   final String? title;
+
+  /// Off for focused flows (booking past its first step), like a checkout.
+  final bool showNav;
 
   static const _paths = ['/book', '/orders', '/profile'];
   static const _wide = 900.0;
@@ -77,7 +81,7 @@ class PortalShell extends StatelessWidget {
               ],
             )
           : body,
-      bottomNavigationBar: wide
+      bottomNavigationBar: wide || !showNav
           ? null
           : NavigationBar(
               selectedIndex: index,

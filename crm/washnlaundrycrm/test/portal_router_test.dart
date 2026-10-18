@@ -108,6 +108,7 @@ void main() {
       child: const MaterialApp(home: JoinShopScreen()),
     ));
     expect(find.text('Join Sunny Laundry'), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'Mobile number'), findsOneWidget);
+    expect(find.text('MOBILE NUMBER'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '10-digit mobile'), findsOneWidget);
   });
 }

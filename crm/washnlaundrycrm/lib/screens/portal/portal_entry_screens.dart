@@ -173,47 +173,51 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
             textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.muted)),
       ];
 
-  List<Widget> _codeStep(AuthProvider auth) => [
-        const Text('CODE', style: _label),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _code,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          textAlign: TextAlign.center,
-          maxLength: 6,
-          autofillHints: const [AutofillHints.oneTimeCode],
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          style: const TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 14,
-              color: AppColors.ink,
-              fontFeatures: [FontFeature.tabularFigures()]),
-          decoration: _field(hint: '000000').copyWith(
-              counterText: '',
-              hintStyle:
-                  const TextStyle(fontSize: 26, letterSpacing: 14, color: Color(0xFFD5D1C8))),
-          // A full code signs in straight away, as autofilled codes do.
-          onChanged: (v) {
-            if (v.length == 6 && !_busy) _verify(auth);
-          },
-          onSubmitted: (_) => _verify(auth),
-        ),
-        const SizedBox(height: 16),
-        _primary(_busy ? 'Signing in…' : 'Sign in', () => _verify(auth)),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('No email?', style: TextStyle(fontSize: 13, color: AppColors.muted)),
-            TextButton(
-              onPressed: _busy || _resendIn > 0 ? null : () => _send(auth, again: true),
-              child: Text(_resendIn > 0 ? 'Send again in ${_resendIn}s' : 'Send again'),
-            ),
-          ],
-        ),
-      ];
+  List<Widget> _codeStep(AuthProvider auth) {
+    // Wide digit spacing reads like a code, but must still fit a small phone.
+    final spacing = MediaQuery.sizeOf(context).width < 380 ? 6.0 : 14.0;
+    return [
+      const Text('CODE', style: _label),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _code,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.center,
+        maxLength: 6,
+        autofillHints: const [AutofillHints.oneTimeCode],
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.w600,
+            letterSpacing: spacing,
+            color: AppColors.ink,
+            fontFeatures: const [FontFeature.tabularFigures()]),
+        decoration: _field(hint: '000000').copyWith(
+            counterText: '',
+            hintStyle:
+                TextStyle(fontSize: 26, letterSpacing: spacing, color: const Color(0xFFD5D1C8))),
+        // A full code signs in straight away, as autofilled codes do.
+        onChanged: (v) {
+          if (v.length == 6 && !_busy) _verify(auth);
+        },
+        onSubmitted: (_) => _verify(auth),
+      ),
+      const SizedBox(height: 16),
+      _primary(_busy ? 'Signing in…' : 'Sign in', () => _verify(auth)),
+      const SizedBox(height: 8),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text('No email?', style: TextStyle(fontSize: 13, color: AppColors.muted)),
+          TextButton(
+            onPressed: _busy || _resendIn > 0 ? null : () => _send(auth, again: true),
+            child: Text(_resendIn > 0 ? 'Send again in ${_resendIn}s' : 'Send again'),
+          ),
+        ],
+      ),
+    ];
+  }
 
   Widget _sentTo() => Wrap(
         crossAxisAlignment: WrapCrossAlignment.center,
@@ -754,33 +758,79 @@ class _JoinShopScreenState extends State<JoinShopScreen> {
         signOut,
       ]);
     }
+    OutlineInputBorder edge(Color c, [double w = 1]) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c, width: w));
+    InputDecoration field(String hint, IconData icon, {String? prefix}) => InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+          prefixIcon: Icon(icon, size: 18, color: AppColors.muted),
+          prefixText: prefix,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          filled: true,
+          fillColor: AppColors.card,
+          border: edge(AppColors.border),
+          enabledBorder: edge(AppColors.border),
+          focusedBorder: edge(AppColors.primary, 1.5),
+        );
     return PortalPage(children: [
-      Text('Join ${portal.shopName}', style: _heading),
-      const SizedBox(height: 8),
-      Text('Signed in as ${auth.userEmail ?? ''}. Tell the shop who you are.', style: _lede),
-      const SizedBox(height: 20),
-      TextField(
-        controller: _name,
-        textCapitalization: TextCapitalization.words,
-        decoration: const InputDecoration(labelText: 'Full name', border: OutlineInputBorder()),
+      const _Brand(),
+      const SizedBox(height: 28),
+      PortalPanel(
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('NEW CUSTOMER', style: _label),
+          const SizedBox(height: 6),
+          Text('Join ${portal.shopName}', style: _heading.copyWith(fontSize: 22)),
+          const SizedBox(height: 6),
+          Text.rich(
+            TextSpan(style: _lede, children: [
+              const TextSpan(text: 'Signed in as '),
+              TextSpan(
+                  text: auth.userEmail ?? '',
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink)),
+              const TextSpan(text: '. The shop uses these to reach you about pickups.'),
+            ]),
+          ),
+          const SizedBox(height: 20),
+          const Text('FULL NAME', style: _label),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _name,
+            textCapitalization: TextCapitalization.words,
+            autofillHints: const [AutofillHints.name],
+            decoration: field('e.g. Priya Sharma', Icons.person_outline),
+          ),
+          const SizedBox(height: 14),
+          const Text('MOBILE NUMBER', style: _label),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _phone,
+            keyboardType: TextInputType.phone,
+            autofillHints: const [AutofillHints.telephoneNumberNational],
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
+            decoration: field('10-digit mobile', Icons.phone_outlined, prefix: '+91 '),
+            onSubmitted: (_) => _join(),
+          ),
+          portalError(_error),
+          const SizedBox(height: 18),
+          FilledButton(
+            onPressed: _busy ? null : _join,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.onPrimary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+            ),
+            child: Text(_busy ? 'Joining…' : 'Join and book'),
+          ),
+        ]),
       ),
-      const SizedBox(height: 12),
-      TextField(
-        controller: _phone,
-        keyboardType: TextInputType.phone,
-        decoration: const InputDecoration(
-            labelText: 'Mobile number', prefixText: '+91 ', border: OutlineInputBorder()),
-        onSubmitted: (_) => _join(),
-      ),
-      portalError(_error),
       const SizedBox(height: 16),
-      FilledButton(
-        onPressed: _busy ? null : _join,
-        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-        child: Text(_busy ? 'Joining…' : 'Continue'),
-      ),
-      change,
-      signOut,
+      Wrap(alignment: WrapAlignment.center, children: [change, signOut]),
     ]);
   }
 }

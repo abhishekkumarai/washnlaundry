@@ -76,7 +76,13 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
       setState(() {
         _options = results[0] as Map<String, dynamic>;
         _addresses = results[1] as List<Map<String, dynamic>>;
-        _addressId ??= _addresses.isEmpty ? null : _addresses.first['id'] as int;
+        // The default address if the shop comes to it, else the first one it
+        // does, else just the first (the step then says why it can't go on).
+        final served = _addresses.where(_serves).toList();
+        final pick = served.where((a) => a['is_default'] == true).firstOrNull ??
+            served.firstOrNull ??
+            _addresses.firstOrNull;
+        _addressId ??= pick?['id'] as int?;
         final days = _days;
         _date ??= days.firstWhere((d) => _openSlots(d).isNotEmpty,
             orElse: () => days.isEmpty ? <String, dynamic>{} : days.first)['date'] as String?;
@@ -115,11 +121,14 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
 
   Map<String, dynamic>? get _address => _addresses.where((a) => a['id'] == _addressId).firstOrNull;
 
-  bool get _pincodeServed {
+  /// Whether the shop picks up from [address]'s pincode (no list: everywhere).
+  bool _serves(Map<String, dynamic>? address) {
     final pins = [for (final p in (_options?['pincodes'] as List? ?? const [])) '$p'];
-    final pin = _address?['pin_code'];
+    final pin = address?['pin_code'];
     return pins.isEmpty || pin == null || pins.contains('$pin');
   }
+
+  bool get _pincodeServed => _serves(_address);
 
   Future<void> _book() async {
     setState(() {
@@ -214,6 +223,7 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
     return PortalShell(
       index: 0,
       title: 'Book a pickup',
+      showNav: _step == 0,
       child: Column(children: [
         _StepBar(
           names: _stepNames,
@@ -251,46 +261,78 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
                           fontSize: 13,
                           color: _error != null ? AppColors.danger : AppColors.muted)),
                 ),
-              Row(children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(
-                        pieces == 0
-                            ? 'Estimated total'
-                            : 'Estimated total · $pieces item${pieces == 1 ? '' : 's'}',
-                        style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-                    Text(money.format(_total), style: AppTypography.kpiHero),
-                  ]),
-                ),
-                if (_step > 0) ...[
-                  OutlinedButton(
-                    onPressed: _busy ? null : () => _goTo(_step - 1),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(88, 48),
-                      side: const BorderSide(color: AppColors.border),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('Back'),
+              // On a phone: a square back arrow, the total and a short "Continue"
+              // on one row; the full labels overflow below ~480px.
+              Builder(builder: (context) {
+                final narrow = MediaQuery.sizeOf(context).width < 480;
+                final total = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(
+                      narrow
+                          ? '$pieces item${pieces == 1 ? '' : 's'}'
+                          : pieces == 0
+                              ? 'Estimated total'
+                              : 'Estimated total · $pieces item${pieces == 1 ? '' : 's'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+                  Text(money.format(_total), style: AppTypography.kpiHero),
+                ]);
+                final back = OutlinedButton(
+                  onPressed: _busy ? null : () => _goTo(_step - 1),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(88, 48),
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  const SizedBox(width: 8),
-                ],
-                FilledButton(
+                  child: const Text('Back'),
+                );
+                final next = FilledButton(
                   onPressed: _busy || blocker != null
                       ? null
                       : last
                           ? _book
                           : () => _goTo(_step + 1),
                   style: FilledButton.styleFrom(
-                    minimumSize: const Size(140, 48),
+                    minimumSize: Size(narrow ? 112 : 140, 48),
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.onPrimary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   child: Text(last
                       ? (_busy ? 'Booking…' : 'Book pickup')
-                      : 'Continue to ${_stepNames[_step + 1].toLowerCase()}'),
-                ),
-              ]),
+                      : narrow
+                          ? 'Continue'
+                          : 'Continue to ${_stepNames[_step + 1].toLowerCase()}'),
+                );
+                if (narrow) {
+                  return Row(children: [
+                    SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: _busy ? null : () => _goTo(_step - 1),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          side: const BorderSide(color: AppColors.border),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Icon(Icons.arrow_back_rounded,
+                            size: 20, color: AppColors.ink, semanticLabel: 'Back'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: total),
+                    const SizedBox(width: 8),
+                    next,
+                  ]);
+                }
+                return Row(children: [
+                  Expanded(child: total),
+                  back,
+                  const SizedBox(width: 8),
+                  next,
+                ]);
+              }),
             ]),
           ),
       ]),
@@ -302,6 +344,19 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
     return [
       const _StepTitle(
           'What needs cleaning?', 'Prices are the shop\'s own. Pick a service, then add items.'),
+      // Said up front, so nobody fills a cart only to hear at the address step
+      // that the shop doesn't come to them.
+      if ((_options?['pincodes'] as List? ?? const []).isNotEmpty) ...[
+        Row(children: [
+          const Icon(Icons.location_on_outlined, size: 16, color: AppColors.muted),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text('Picks up from ${(_options!['pincodes'] as List).join(', ')}',
+                style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
+          ),
+        ]),
+        const SizedBox(height: 14),
+      ],
       if (cats.isEmpty)
         const Text('This shop has not listed its services yet.',
             style: TextStyle(color: AppColors.muted))
@@ -531,6 +586,7 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
                 if (i > 0) const Divider(height: 1, color: AppColors.borderSubtle),
                 _AddressRow(
                   address: _addresses[i],
+                  served: _serves(_addresses[i]),
                   selected: _addresses[i]['id'] == _addressId,
                   onTap: () => _changed(() => _addressId = _addresses[i]['id'] as int),
                 ),
@@ -650,6 +706,41 @@ class _StepBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final narrow = MediaQuery.sizeOf(context).width < 520;
+    if (narrow) {
+      // A phone has no room for four labels: segments, then one caption.
+      return Container(
+        color: AppColors.card,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            for (var i = 0; i < names.length; i++)
+              Expanded(
+                child: GestureDetector(
+                  onTap: i <= reachable && i != current ? () => onTap(i) : null,
+                  child: Container(
+                    height: 4,
+                    margin: EdgeInsets.only(right: i == names.length - 1 ? 0 : 6),
+                    decoration: BoxDecoration(
+                      color: i <= current ? AppColors.primary : AppColors.borderSubtle,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+          ]),
+          const SizedBox(height: 8),
+          Text.rich(TextSpan(children: [
+            TextSpan(
+                text: 'Step ${current + 1} of ${names.length}  ·  ',
+                style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+            TextSpan(
+                text: names[current],
+                style: const TextStyle(
+                    fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.ink)),
+          ])),
+        ]),
+      );
+    }
     return Container(
       color: AppColors.card,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -668,15 +759,14 @@ class _StepBar extends StatelessWidget {
                         color: i <= current ? AppColors.primary : AppColors.muted),
                   ),
                   const SizedBox(width: 6),
-                  if (!narrow || i == current)
-                    Flexible(
-                      child: Text(names[i],
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: i == current ? FontWeight.w600 : FontWeight.w500,
-                              color: i == current ? AppColors.ink : AppColors.muted)),
-                    ),
+                  Flexible(
+                    child: Text(names[i],
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: i == current ? FontWeight.w600 : FontWeight.w500,
+                            color: i == current ? AppColors.ink : AppColors.muted)),
+                  ),
                 ]),
                 const SizedBox(height: 8),
                 Container(
@@ -716,10 +806,12 @@ class _StepTitle extends StatelessWidget {
 
 /// One saved address as a selectable row.
 class _AddressRow extends StatelessWidget {
-  const _AddressRow({required this.address, required this.selected, required this.onTap});
+  const _AddressRow(
+      {required this.address, required this.selected, required this.served, required this.onTap});
 
   final Map<String, dynamic> address;
   final bool selected;
+  final bool served;
   final VoidCallback onTap;
 
   @override
@@ -738,6 +830,12 @@ class _AddressRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(_addressLine(address),
                     style: const TextStyle(fontSize: 13, color: AppColors.muted)),
+                if (!served) ...[
+                  const SizedBox(height: 4),
+                  const Text("Not in this shop's pickup area",
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.danger)),
+                ],
               ]),
             ),
           ]),
