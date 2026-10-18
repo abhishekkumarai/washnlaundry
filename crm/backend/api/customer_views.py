@@ -285,7 +285,8 @@ def customer_booking_options(request):
     shop = customer.shop
     categories = []
     for cat in GarmentCategory.objects.filter(shop=shop, is_active=True).order_by('display_order', 'id'):
-        items = [{'id': i.id, 'name': i.name, 'price': i.price, 'unit': i.unit}
+        items = [{'id': i.id, 'name': i.name, 'price': i.price, 'unit': i.unit,
+                  'image_url': i.image_url}
                  for i in cat.items.filter(is_active=True)]
         if items:
             categories.append({'id': cat.id, 'name': cat.name, 'items': items})

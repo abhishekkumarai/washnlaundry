@@ -10,6 +10,7 @@ import '../providers/auth_provider.dart';
 import '../utils/role_views.dart';
 import '../models/garment_model.dart';
 import '../models/order_model.dart';
+import '../widgets/item_art.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/app_shell.dart';
 import '../widgets/category_filter.dart';
@@ -1426,7 +1427,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
               child: Row(
                 children: [
                   Builder(builder: (_) {
-                    final art = _artFor(item.itemTitle);
+                    final art = itemArtFor(item.itemTitle);
                     return Container(
                       width: 36,
                       height: 36,
@@ -1767,7 +1768,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   Widget _buildItemTableRow(GarmentItemModel item) {
     final qty = _cartQuantities[item.id] ?? 0;
-    final art = _artFor(item.name);
+    final art = itemArtFor(item.name);
     final tags = item.tags;
 
     return Container(
@@ -1939,7 +1940,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   /// fraction of the height.
   Widget _itemRowCompact(GarmentItemModel item) {
     final qty = _cartQuantities[item.id] ?? 0;
-    final art = _artFor(item.name);
+    final art = itemArtFor(item.name);
     final tags = item.tags;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -2014,7 +2015,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
   Widget _itemCard(GarmentItemModel item) {
     final qty = _cartQuantities[item.id] ?? 0;
-    final art = _artFor(item.name);
+    final art = itemArtFor(item.name);
     final tags = item.tags;
 
     return Container(
@@ -2039,7 +2040,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 children: [
                   // Real product photography when the catalogue has it; the
                   // icon treatment is the fallback, not the only option.
-                  // `_artFor` remains a stand-in keyed on the item name — it
+                  // `itemArtFor` remains a stand-in keyed on the item name — it
                   // picks an icon, never a picture, so it cannot go stale the
                   // way the old Unsplash-by-name map did.
                   if (item.imageUrl.isNotEmpty)
@@ -2466,53 +2467,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     context.go(
         '/orders/${created.id.isNotEmpty ? created.id : created.orderNumber}');
   }
-
-  /// Stand-in for the live app's product photography. Known garments get a
-  /// hand-picked icon; anything else falls back to a stable pick derived from
-  /// the name, so a given item always looks the same.
-  static _ItemArt _artFor(String name) {
-    const known = <String, _ItemArt>{
-      'shirt': _ItemArt(Icons.dry_cleaning_rounded, Color(0xFF3B82F6)),
-      't-shirt': _ItemArt(Icons.checkroom_rounded, Color(0xFFF97316)),
-      'kurta': _ItemArt(Icons.strikethrough_s_rounded, Color(0xFF06B6D4)),
-      'pant':
-          _ItemArt(Icons.airline_seat_legroom_extra_rounded, Color(0xFFD97706)),
-      'jeans': _ItemArt(Icons.checkroom_outlined, Color(0xFF2563EB)),
-      'shorts': _ItemArt(Icons.dry_cleaning_outlined, Color(0xFF10B981)),
-      'saree': _ItemArt(Icons.woman_rounded, Color(0xFFEC4899)),
-      'blazer': _ItemArt(Icons.business_center_rounded, Color(0xFF64748B)),
-      'curtain': _ItemArt(Icons.curtains_rounded, Color(0xFF2563EB)),
-      'blanket': _ItemArt(Icons.bed_rounded, Color(0xFF0EA5E9)),
-      'carpet': _ItemArt(Icons.texture_rounded, Color(0xFFA16207)),
-      'shoe': _ItemArt(Icons.ice_skating_rounded, Color(0xFF14B8A6)),
-    };
-
-    final lower = name.toLowerCase();
-    for (final entry in known.entries) {
-      if (lower.contains(entry.key)) return entry.value;
-    }
-
-    const fallbackIcons = [
-      Icons.checkroom_rounded,
-      Icons.dry_cleaning_rounded,
-      Icons.local_laundry_service_rounded,
-      Icons.woman_rounded,
-      Icons.business_center_rounded,
-    ];
-    const fallbackColors = [
-      Color(0xFF3B82F6),
-      Color(0xFFF97316),
-      Color(0xFF10B981),
-      Color(0xFFEC4899),
-      Color(0xFF2563EB),
-      Color(0xFF06B6D4),
-    ];
-    final hash = name.codeUnits.fold<int>(0, (a, b) => a + b);
-    return _ItemArt(
-      fallbackIcons[hash % fallbackIcons.length],
-      fallbackColors[hash % fallbackColors.length],
-    );
-  }
 }
 
 /// One bookable window on the review step, in minutes since midnight —
@@ -2555,12 +2509,6 @@ class _SlotWindow {
 
   @override
   int get hashCode => Object.hash(startMinute, endMinute);
-}
-
-class _ItemArt {
-  final IconData icon;
-  final Color color;
-  const _ItemArt(this.icon, this.color);
 }
 
 /// Search-and-pick over the customers already on file, a walk-in escape

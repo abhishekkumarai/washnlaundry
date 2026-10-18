@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../providers/portal_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/item_art.dart';
 import 'address_editor.dart';
 import 'portal_shell.dart';
 
@@ -232,62 +233,66 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
             },
           ),
         ),
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          decoration: const BoxDecoration(
-            color: AppColors.card,
-            border: Border(top: BorderSide(color: AppColors.border)),
-          ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            if (_error != null || blocker != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(_error ?? blocker!,
-                    style: TextStyle(
-                        fontSize: 13, color: _error != null ? AppColors.danger : AppColors.muted)),
-              ),
-            Row(children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(
-                      pieces == 0
-                          ? 'Estimated total'
-                          : 'Estimated total · $pieces item${pieces == 1 ? '' : 's'}',
-                      style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-                  Text(money.format(_total), style: AppTypography.kpiHero),
-                ]),
-              ),
-              if (_step > 0) ...[
-                OutlinedButton(
-                  onPressed: _busy ? null : () => _goTo(_step - 1),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(88, 48),
-                    side: const BorderSide(color: AppColors.border),
+        if (_step == 0)
+          _cartFooter(money, pieces)
+        else
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: const BoxDecoration(
+              color: AppColors.card,
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              if (_error != null || blocker != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(_error ?? blocker!,
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: _error != null ? AppColors.danger : AppColors.muted)),
+                ),
+              Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(
+                        pieces == 0
+                            ? 'Estimated total'
+                            : 'Estimated total · $pieces item${pieces == 1 ? '' : 's'}',
+                        style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+                    Text(money.format(_total), style: AppTypography.kpiHero),
+                  ]),
+                ),
+                if (_step > 0) ...[
+                  OutlinedButton(
+                    onPressed: _busy ? null : () => _goTo(_step - 1),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(88, 48),
+                      side: const BorderSide(color: AppColors.border),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Back'),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                FilledButton(
+                  onPressed: _busy || blocker != null
+                      ? null
+                      : last
+                          ? _book
+                          : () => _goTo(_step + 1),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(140, 48),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.onPrimary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  child: const Text('Back'),
+                  child: Text(last
+                      ? (_busy ? 'Booking…' : 'Book pickup')
+                      : 'Continue to ${_stepNames[_step + 1].toLowerCase()}'),
                 ),
-                const SizedBox(width: 8),
-              ],
-              FilledButton(
-                onPressed: _busy || blocker != null
-                    ? null
-                    : last
-                        ? _book
-                        : () => _goTo(_step + 1),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(140, 48),
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.onPrimary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: Text(last
-                    ? (_busy ? 'Booking…' : 'Book pickup')
-                    : 'Continue to ${_stepNames[_step + 1].toLowerCase()}'),
-              ),
+              ]),
             ]),
-          ]),
-        ),
+          ),
       ]),
     );
   }
@@ -318,21 +323,187 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
             },
           ),
         ),
-        const SizedBox(height: 10),
-        PortalPanel(
-          padding: EdgeInsets.zero,
-          child: Column(children: [
-            for (final raw in cats[_category.clamp(0, cats.length - 1)]['items'] as List)
-              _ItemRow(
-                item: Map<String, dynamic>.from(raw as Map),
-                quantity: _qty[(raw)['id']] ?? 0,
-                money: money,
-                onChanged: (q) => _changed(() => _qty[raw['id'] as int] = q),
-              ),
-          ]),
-        ),
+        const SizedBox(height: 12),
+        for (final raw in cats[_category.clamp(0, cats.length - 1)]['items'] as List) ...[
+          _ItemRow(
+            item: Map<String, dynamic>.from(raw as Map),
+            quantity: _qty[(raw)['id']] ?? 0,
+            money: money,
+            onAdd: () => _changed(() => _qty[raw['id'] as int] = 1),
+            onOpenCart: () => _openCart(money),
+          ),
+          const SizedBox(height: 8),
+        ],
       ],
     ];
+  }
+
+  /// Items step footer, as on the CRM's phone New Order: nothing to do until
+  /// something is added, then a navy bar with the count and total that opens
+  /// the cart.
+  Widget _cartFooter(NumberFormat money, int pieces) {
+    if (pieces == 0) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: const BoxDecoration(
+          color: AppColors.card,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: const Text('Add items to continue.',
+            textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: AppColors.muted)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      child: Material(
+        key: const Key('portalCartBar'),
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(14),
+        elevation: 4,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _openCart(money),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(children: [
+              const Icon(Icons.shopping_bag_outlined, color: AppColors.onPrimary, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(
+                        text: '$pieces ${pieces == 1 ? 'item' : 'items'}',
+                        style: const TextStyle(
+                            color: AppColors.onPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                    const TextSpan(
+                        text: '  ·  ', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
+                    TextSpan(
+                        text: money.format(_total),
+                        style: const TextStyle(
+                            color: AppColors.onPrimary, fontSize: 15, fontWeight: FontWeight.bold)),
+                  ]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text('View order',
+                  style: TextStyle(
+                      color: AppColors.onPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 2),
+              const Icon(Icons.keyboard_arrow_up_rounded, color: AppColors.onPrimary, size: 20),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The cart slid up over the list: each line with its stepper and remove,
+  /// the total, and the way on to the pickup time.
+  Future<void> _openCart(NumberFormat money) async {
+    final next = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (sheet) => StatefulBuilder(builder: (sheet, setSheet) {
+        void set(int id, int q) {
+          _changed(() => q <= 0 ? _qty.remove(id) : _qty[id] = q);
+          if (_qty.values.every((v) => v == 0)) {
+            Navigator.pop(sheet);
+          } else {
+            setSheet(() {});
+          }
+        }
+
+        final items = _itemsById;
+        final lines = [
+          for (final e in _qty.entries)
+            if (e.value > 0 && items[e.key] != null) (e.key, items[e.key]!, e.value)
+        ];
+        final count = lines.fold<int>(0, (s, l) => s + l.$3);
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * 0.88),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
+              child: Row(children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFD9D5CB), borderRadius: BorderRadius.circular(2)),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Close',
+                  icon: const Icon(Icons.close_rounded, color: AppColors.muted),
+                  onPressed: () => Navigator.pop(sheet),
+                ),
+              ]),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Row(children: [
+                const Expanded(child: Text('Your order', style: AppTypography.title)),
+                Text('$count ${count == 1 ? 'item' : 'items'}',
+                    style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
+              ]),
+            ),
+            const Divider(height: 1, color: AppColors.border),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                itemCount: lines.length,
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: AppColors.borderSubtle),
+                itemBuilder: (_, i) {
+                  final (id, item, q) = lines[i];
+                  return _CartLine(
+                    item: item,
+                    quantity: q,
+                    money: money,
+                    onChanged: (n) => set(id, n),
+                  );
+                },
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AppColors.border)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(children: [
+                  Row(children: [
+                    const Expanded(
+                        child: Text('Estimated total', style: AppTypography.sectionTitle)),
+                    Text(money.format(_total), style: AppTypography.kpiHero),
+                  ]),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(sheet, true),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.onPrimary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Continue to pickup time'),
+                  ),
+                ]),
+              ),
+            ),
+          ]),
+        );
+      }),
+    );
+    if (next == true && mounted) _goTo(1);
   }
 
   List<Widget> _timeStep() => [
@@ -602,8 +773,121 @@ class _ReviewBlock extends StatelessWidget {
       );
 }
 
+const _units = {'PC': 'piece', 'KG': 'kg', 'SQFT': 'sq.ft', 'SET': 'set'};
+
+/// One catalogue item, as the CRM's phone New Order shows it: art or photo,
+/// name and price, and "+ Add to Cart" that turns into "In Cart · n" (which
+/// opens the cart, where the quantity is changed).
 class _ItemRow extends StatelessWidget {
   const _ItemRow(
+      {required this.item,
+      required this.quantity,
+      required this.money,
+      required this.onAdd,
+      required this.onOpenCart});
+
+  final Map<String, dynamic> item;
+  final int quantity;
+  final NumberFormat money;
+  final VoidCallback onAdd;
+  final VoidCallback onOpenCart;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = '${item['name']}';
+    final art = itemArtFor(name);
+    final photo = '${item['image_url'] ?? ''}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: quantity > 0 ? AppColors.primary : AppColors.border),
+      ),
+      child: Row(children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 48,
+            height: 48,
+            color: AppColors.background,
+            child: photo.isNotEmpty
+                ? Image.network(photo,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Icon(art.icon, size: 24, color: art.color))
+                : Icon(art.icon, size: 24, color: art.color),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.ink)),
+            const SizedBox(height: 2),
+            Row(children: [
+              Text(money.format(item['price'] ?? 0),
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primary)),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text('/ ${_units[item['unit']] ?? 'piece'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+              ),
+            ]),
+          ]),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 112,
+          child: quantity == 0
+              ? OutlinedButton(
+                  onPressed: onAdd,
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  child: const Text('+ Add to Cart',
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                )
+              : Material(
+                  color: AppColors.accentSoft,
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: onOpenCart,
+                    child: SizedBox(
+                      height: 38,
+                      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        const Icon(Icons.check_circle_rounded, size: 15, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text('In Cart · $quantity',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary)),
+                        ),
+                      ]),
+                    ),
+                  ),
+                ),
+        ),
+      ]),
+    );
+  }
+}
+
+/// A cart line: name, unit price, a stepper and remove (the CRM's cart line).
+class _CartLine extends StatelessWidget {
+  const _CartLine(
       {required this.item, required this.quantity, required this.money, required this.onChanged});
 
   final Map<String, dynamic> item;
@@ -611,39 +895,56 @@ class _ItemRow extends StatelessWidget {
   final NumberFormat money;
   final ValueChanged<int> onChanged;
 
-  static const _units = {'PC': 'piece', 'KG': 'kg', 'SQFT': 'sq.ft', 'SET': 'set'};
-
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration:
-            const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderSubtle))),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${item['name']}',
-                  style: AppTypography.body.copyWith(fontWeight: FontWeight.w500)),
-              Text('${money.format(item['price'] ?? 0)} / ${_units[item['unit']] ?? 'piece'}',
-                  style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.ink)),
+              Text('${money.format(item['price'] ?? 0)} each',
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.muted)),
             ]),
           ),
-          if (quantity == 0)
-            OutlinedButton(onPressed: () => onChanged(1), child: const Text('Add'))
-          else
-            Row(children: [
+          const SizedBox(width: 8),
+          Container(
+            height: 34,
+            decoration:
+                BoxDecoration(color: AppColors.accentSoft, borderRadius: BorderRadius.circular(8)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
               IconButton(
-                  tooltip: 'Fewer',
-                  onPressed: () => onChanged(quantity - 1),
-                  icon: const Icon(Icons.remove_circle_outline)),
+                tooltip: 'Fewer',
+                icon: const Icon(Icons.remove, size: 15, color: AppColors.primary),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: () => onChanged(quantity - 1),
+              ),
               SizedBox(
-                  width: 28,
-                  child: Text('$quantity',
-                      textAlign: TextAlign.center, style: AppTypography.sectionTitle)),
+                width: 22,
+                child: Text('$quantity',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.primary)),
+              ),
               IconButton(
-                  tooltip: 'More',
-                  onPressed: quantity >= 100 ? null : () => onChanged(quantity + 1),
-                  icon: const Icon(Icons.add_circle_outline)),
+                tooltip: 'More',
+                icon: const Icon(Icons.add, size: 15, color: AppColors.primary),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                onPressed: quantity >= 100 ? null : () => onChanged(quantity + 1),
+              ),
             ]),
+          ),
+          IconButton(
+            tooltip: 'Remove',
+            icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.danger),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            onPressed: () => onChanged(0),
+          ),
         ]),
       );
 }
