@@ -54,8 +54,9 @@ def me(request):
         if django_user and hasattr(django_user, 'shop_memberships'):
             owned_count = django_user.shop_memberships.filter(is_active=True, role='OWNER').count()
         data['needs_shop_onboarding'] = (owned_count == 0)
-    elif needs_shop_onboarding(django_user):
-        # Self-service: a new account with no shop is sent to "set up your shop".
+    elif user.role != CUSTOMER and needs_shop_onboarding(django_user):
+        # Self-service: a new account with no shop is sent to "set up your shop"
+        # (never a shop's customer: they book on the portal instead).
         data['needs_shop_onboarding'] = True
 
     if user.role == CUSTOMER and user.customer is not None:

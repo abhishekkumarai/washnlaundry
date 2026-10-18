@@ -96,7 +96,7 @@ def _order_json(order):
         'pin_code': order.pin_code,
         'latitude': order.latitude,
         'longitude': order.longitude,
-        'notes': order.notes or '',
+        # Not `notes`: staff append their own (status reasons) to it.
         'created_at': _iso(order.created_at),
         'items': [
             {

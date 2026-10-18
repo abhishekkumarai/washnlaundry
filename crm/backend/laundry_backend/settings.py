@@ -143,6 +143,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_HEADERS = list(default_headers) + [
     'x-tenant-id',
+    'idempotency-key',  # customer bookings (POST /api/customer/orders/)
 ]
 CORS_EXPOSE_HEADERS = [
     'x-tenant-id',

@@ -98,11 +98,13 @@ class PasswordAuthTests(APITestCase):
         self.assertEqual(self.client.get('/api/me/', **self.bearer(again.json()['token'])).json()['role'], 'owner')
 
     @override_settings(SELF_SERVICE_SHOPS=True)
-    def test_self_service_turns_off_the_customer_view(self):
+    def test_self_service_keeps_the_customer_view(self):
+        # KAN-217: a shop's customer stays a customer with self-service on, and is
+        # never sent to "set up your shop".
         Customer.objects.create(name='Cu', phone='9000000010', email='cust@example.com')
         token = self.signup_and_verify()
         me = self.client.get('/api/me/', **self.bearer(token)).json()
-        self.assertEqual((me['role'], me.get('needs_shop_onboarding')), ('unlinked', True))
+        self.assertEqual((me['role'], me.get('needs_shop_onboarding')), ('customer', None))
 
     def test_self_service_is_off_by_default(self):
         token = self.signup_and_verify('plain@example.com')

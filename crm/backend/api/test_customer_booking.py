@@ -59,6 +59,7 @@ class CustomerBookingTests(APITestCase):
         self.assertEqual((order.customer, order.customer_name), (self.alice, 'Alice'))
         self.assertEqual(order.items.get().unit_price, 40)
         self.assertEqual((order.pin_code, order.latitude, order.notes), ('560038', 12.97, 'Ring twice'))
+        self.assertNotIn('notes', res.json())  # staff-only on the customer API
         self.assertEqual(order.pickup_time, self.slot.start_time)
         self.assertTrue(order.audit_log.exists())
 
