@@ -609,7 +609,36 @@ def customer_shop_search(request):
     if q:
         shops = shops.filter(Q(name__icontains=q) | Q(city__icontains=q) | Q(pin_code__startswith=q)
                              | Q(service_areas__pin_code=q, service_areas__is_active=True)).distinct()
-    return JsonResponse({'shops': [_public_shop_json(s) for s in shops.order_by('name')[:20]]})
+    here = _point(request.GET.get('lat'), request.GET.get('lng'))
+    if here is None:
+        return JsonResponse({'shops': [_public_shop_json(s) for s in shops.order_by('name')[:20]]})
+    # With the customer's location: nearest first, each with its distance; shops
+    # that have not set a map location go last, by name.
+    rows = []
+    for s in shops.order_by('name')[:200]:
+        row = _public_shop_json(s)
+        if s.latitude is not None and s.longitude is not None:
+            row['distance_km'] = round(_km(here, (s.latitude, s.longitude)), 1)
+        rows.append(row)
+    rows.sort(key=lambda r: (r.get('distance_km') is None, r.get('distance_km') or 0))
+    return JsonResponse({'shops': rows[:20]})
+
+
+def _point(lat, lng):
+    """(lat, lng) from query strings, or None when missing or out of range."""
+    try:
+        lat, lng = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return None
+    return (lat, lng) if -90 <= lat <= 90 and -180 <= lng <= 180 else None
+
+
+def _km(a, b):
+    """Great-circle distance in km (haversine): plenty for "which laundry is near"."""
+    from math import asin, cos, radians, sin, sqrt
+    lat1, lng1, lat2, lng2 = map(radians, (*a, *b))
+    h = sin((lat2 - lat1) / 2) ** 2 + cos(lat1) * cos(lat2) * sin((lng2 - lng1) / 2) ** 2
+    return 2 * 6371 * asin(sqrt(h))
 
 
 @require_GET

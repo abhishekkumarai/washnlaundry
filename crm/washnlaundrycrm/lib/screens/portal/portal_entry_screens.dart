@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/portal_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/geolocation.dart';
 import '../../utils/google_signin_button.dart';
 import '../../widgets/brand_logo.dart';
 import 'portal_shell.dart';
@@ -312,10 +314,24 @@ class _FindShopScreenState extends State<FindShopScreen> {
   String? _error;
   Timer? _debounce;
 
+  /// The customer's position once they agree to share it (remembered, so the
+  /// list opens sorted by distance next time).
+  (double, double)? _here;
+  bool _locating = false;
+  bool _locationFailed = false;
+
+  static const _locationPref = 'portal_use_location';
+
+  /// Laundries within this many km are "Nearby"; the rest follow, still by distance.
+  static const _nearbyKm = 10.0;
+
   @override
   void initState() {
     super.initState();
     _search();
+    SharedPreferences.getInstance().then((p) {
+      if (mounted && p.getBool(_locationPref) == true) _locate();
+    }).catchError((_) {});
   }
 
   @override
@@ -331,12 +347,30 @@ class _FindShopScreenState extends State<FindShopScreen> {
       _error = null;
     });
     try {
-      final shops = await ApiService.searchShops(_q.text.trim());
+      final shops = await ApiService.searchShops(_q.text.trim(), near: _here);
       if (mounted) setState(() => _shops = shops);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     }
     if (mounted) setState(() => _busy = false);
+  }
+
+  Future<void> _locate() async {
+    setState(() {
+      _locating = true;
+      _locationFailed = false;
+    });
+    final here = await currentPosition();
+    if (!mounted) return;
+    setState(() {
+      _locating = false;
+      _here = here;
+      _locationFailed = here == null;
+    });
+    try {
+      (await SharedPreferences.getInstance()).setBool(_locationPref, here != null);
+    } catch (_) {}
+    if (here != null) await _search();
   }
 
   void _onType(String _) {
@@ -363,44 +397,39 @@ class _FindShopScreenState extends State<FindShopScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final current = context.watch<PortalProvider>().shopSlug;
-    final mine = [
-      for (final m in (auth.me?['shops'] as List?) ?? const [])
-        if (m is Map && m['role'] == 'CUSTOMER') Map<String, dynamic>.from(m),
-    ];
-    final mySlugs = {for (final m in mine) m['slug']};
     final all = _shops ?? const <Map<String, dynamic>>[];
-    final others = [
-      for (final s in all)
-        if (!mySlugs.contains(s['slug'])) s
-    ];
     final searching = _q.text.trim().isNotEmpty;
+    final located = _here != null;
+    final nearby = [
+      for (final s in all)
+        if ((s['distance_km'] as num?) != null && (s['distance_km'] as num) <= _nearbyKm) s
+    ];
+    final nearbySlugs = {for (final s in nearby) s['slug']};
+    final rest = [
+      for (final s in all)
+        if (!nearbySlugs.contains(s['slug'])) s
+    ];
     final first = (auth.userName ?? '').trim().split(' ').first;
+
+    _ShopRow row(Map<String, dynamic> s) => _ShopRow(
+          name: '${s['name']}',
+          place: _place(s),
+          distance: (s['distance_km'] as num?)?.toDouble(),
+          badge: s['slug'] == current ? 'Current' : null,
+          busy: _opening == s['slug'],
+          onTap: () => _pick('${s['slug']}'),
+        );
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.card,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        shape: const Border(bottom: BorderSide(color: AppColors.border)),
-        titleSpacing: 16,
-        title: const Row(children: [
-          BrandLogo(size: 28),
-          SizedBox(width: 10),
-          Text.rich(
-            TextSpan(children: [
-              TextSpan(text: 'WashN', style: TextStyle(color: AppColors.ink)),
-              TextSpan(text: 'Laundry', style: TextStyle(color: AppColors.accent)),
-            ]),
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.4),
-          ),
-        ]),
-        actions: [
-          if (current != null)
-            TextButton(onPressed: () => context.go('/book'), child: const Text('Back')),
-          TextButton(onPressed: auth.signOut, child: const Text('Sign out')),
-          const SizedBox(width: 8),
-        ],
+      appBar: PortalNavBar(
+        leading: current == null
+            ? null
+            : IconButton(
+                tooltip: 'Back to booking',
+                icon: const Icon(Icons.arrow_back_rounded, color: AppColors.ink),
+                onPressed: () => context.go('/book'),
+              ),
       ),
       body: RefreshIndicator(
         onRefresh: _search,
@@ -453,28 +482,41 @@ class _FindShopScreenState extends State<FindShopScreen> {
                       ),
                     ),
                     portalError(_error),
-                    if (mine.isNotEmpty && !searching) ...[
+                    if (!searching) ...[
                       const SizedBox(height: 28),
-                      const Text('YOUR LAUNDRIES', style: _label),
-                      const SizedBox(height: 10),
-                      _ShopList(rows: [
-                        for (final m in mine)
-                          _ShopRow(
-                            name: '${m['name']}',
-                            place: _placeOf(all, m['slug']),
-                            badge: m['slug'] == current ? 'Current' : 'Joined',
-                            busy: _opening == m['slug'],
-                            onTap: () => _pick('${m['slug']}'),
+                      Row(children: [
+                        const Expanded(child: Text('NEARBY', style: _label)),
+                        if (located)
+                          TextButton.icon(
+                            onPressed: _locating ? null : _locate,
+                            icon: const Icon(Icons.my_location_rounded, size: 16),
+                            label: const Text('Refresh'),
                           ),
                       ]),
+                      const SizedBox(height: 10),
+                      if (!located)
+                        _LocationPrompt(
+                          busy: _locating,
+                          failed: _locationFailed,
+                          onUse: _locate,
+                        )
+                      else if (nearby.isEmpty && !_busy)
+                        const PortalPanel(
+                          child: Text(
+                              'No laundry within 10 km takes online bookings yet. The ones below '
+                              'are the closest; or search your pincode.',
+                              style: TextStyle(color: AppColors.muted, height: 1.45)),
+                        )
+                      else
+                        _ShopList(rows: [for (final s in nearby) row(s)]),
                     ],
                     const SizedBox(height: 28),
                     Text(
                         searching
                             ? 'RESULTS'
-                            : mine.isEmpty
-                                ? 'LAUNDRIES'
-                                : 'MORE LAUNDRIES',
+                            : located
+                                ? 'MORE LAUNDRIES'
+                                : 'ALL LAUNDRIES',
                         style: _label),
                     const SizedBox(height: 10),
                     if (_busy && _shops == null)
@@ -482,7 +524,7 @@ class _FindShopScreenState extends State<FindShopScreen> {
                         padding: EdgeInsets.symmetric(vertical: 24),
                         child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
                       )
-                    else if ((searching ? all : others).isEmpty)
+                    else if ((searching ? all : rest).isEmpty)
                       PortalPanel(
                         child: Text(
                             searching
@@ -492,16 +534,7 @@ class _FindShopScreenState extends State<FindShopScreen> {
                             style: const TextStyle(color: AppColors.muted, height: 1.45)),
                       )
                     else
-                      _ShopList(rows: [
-                        for (final s in (searching ? all : others))
-                          _ShopRow(
-                            name: '${s['name']}',
-                            place: _place(s),
-                            badge: mySlugs.contains(s['slug']) ? 'Joined' : null,
-                            busy: _opening == s['slug'],
-                            onTap: () => _pick('${s['slug']}'),
-                          ),
-                      ]),
+                      _ShopList(rows: [for (final s in (searching ? all : rest)) row(s)]),
                   ],
                 ),
               ),
@@ -515,15 +548,40 @@ class _FindShopScreenState extends State<FindShopScreen> {
   static String _place(Map<String, dynamic> s) => [s['address'], s['city'], s['pin_code']]
       .where((v) => v != null && '$v'.trim().isNotEmpty)
       .join(' · ');
+}
 
-  /// A joined shop's address, if the public list has it (it won't if the shop
-  /// has since stopped taking online bookings).
-  static String _placeOf(List<Map<String, dynamic>> all, Object? slug) {
-    for (final s in all) {
-      if (s['slug'] == slug) return _place(s);
-    }
-    return '';
-  }
+/// Before the customer shares their location: why it helps, and the button.
+class _LocationPrompt extends StatelessWidget {
+  const _LocationPrompt({required this.busy, required this.failed, required this.onUse});
+
+  final bool busy;
+  final bool failed;
+  final VoidCallback onUse;
+
+  @override
+  Widget build(BuildContext context) => PortalPanel(
+        child: Row(children: [
+          const Icon(Icons.near_me_outlined, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+                failed
+                    ? "Couldn't get your location. Allow it in the browser, or search your pincode."
+                    : 'See the laundries closest to you.',
+                style: TextStyle(
+                    fontSize: 13.5, color: failed ? AppColors.danger : AppColors.ink, height: 1.4)),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: busy ? null : onUse,
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(busy ? 'Locating…' : 'Use my location'),
+          ),
+        ]),
+      );
 }
 
 /// Rows in one bordered block, split by hairlines (a list, not a stack of cards).
@@ -555,10 +613,14 @@ class _ShopRow extends StatelessWidget {
       required this.place,
       required this.onTap,
       this.badge,
+      this.distance,
       this.busy = false});
 
   final String name;
   final String place;
+
+  /// km from the customer, when they shared their location.
+  final double? distance;
   final String? badge;
   final bool busy;
   final VoidCallback onTap;
@@ -607,12 +669,23 @@ class _ShopRow extends StatelessWidget {
                   ),
                 ],
               ]),
-              if (place.isNotEmpty) ...[
+              if (place.isNotEmpty || distance != null) ...[
                 const SizedBox(height: 3),
-                Text(place,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
+                Text.rich(
+                  TextSpan(children: [
+                    if (distance != null)
+                      TextSpan(
+                          text:
+                              '${distance! < 1 ? distance!.toStringAsFixed(1) : distance!.round()} km'
+                              '${place.isEmpty ? '' : '  ·  '}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, color: AppColors.primary)),
+                    TextSpan(text: place),
+                  ]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12.5, color: AppColors.muted),
+                ),
               ],
             ]),
           ),

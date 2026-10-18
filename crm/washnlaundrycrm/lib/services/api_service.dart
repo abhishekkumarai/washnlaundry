@@ -287,8 +287,13 @@ class ApiService {
           auth: false, body: {'email': email, 'code': code}) as Map);
 
   /// "Find your laundry": shops taking online customers, by name/city/pincode.
-  static Future<List<Map<String, dynamic>>> searchShops(String q) async {
-    final data = await _send('GET', '/customer/shops/', auth: false, query: {'q': q}) as Map;
+  /// With [near] (lat, lng) the shops come nearest first, each with `distance_km`.
+  static Future<List<Map<String, dynamic>>> searchShops(String q, {(double, double)? near}) async {
+    final data = await _send('GET', '/customer/shops/', auth: false, query: {
+      'q': q,
+      if (near != null) 'lat': near.$1.toStringAsFixed(5),
+      if (near != null) 'lng': near.$2.toStringAsFixed(5),
+    }) as Map;
     return [for (final s in data['shops'] as List) Map<String, dynamic>.from(s as Map)];
   }
 

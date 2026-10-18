@@ -45,6 +45,21 @@ class CustomerJoinTests(APITestCase):
         self.assertEqual(self.client.get('/api/customer/shops/sunny/').json()['name'], 'Sunny Laundry')
         self.assertEqual(self.client.get('/api/customer/shops/closed/').status_code, 404)
 
+    def test_search_with_a_location_sorts_nearest_first(self):
+        # Indiranagar is ~3 km from the customer, Whitefield ~13 km; Closed never shows.
+        Shop.objects.filter(pk=self.sunny.pk).update(latitude=12.9719, longitude=77.6412)
+        Shop.objects.create(name='Far Wash', slug='far', accepts_online_customers=True,
+                            latitude=12.9698, longitude=77.7500)
+        Shop.objects.create(name='Aaa No Pin', slug='nopin', accepts_online_customers=True)
+        res = self.client.get('/api/customer/shops/', {'lat': '12.9500', 'lng': '77.6600'}).json()
+        self.assertEqual([s['slug'] for s in res['shops']], ['sunny', 'far', 'nopin'])
+        self.assertAlmostEqual(res['shops'][0]['distance_km'], 3.2, delta=0.5)
+        self.assertNotIn('distance_km', res['shops'][2])
+        # Without one (or with junk), alphabetical as before.
+        for params in ({}, {'lat': 'x', 'lng': '77'}):
+            plain = self.client.get('/api/customer/shops/', params).json()['shops']
+            self.assertEqual([s['slug'] for s in plain], ['nopin', 'far', 'sunny'])
+
     def test_join_creates_customer_and_membership_then_resolves_as_customer(self):
         res = self.join(self.sunny)
         self.assertEqual(res.status_code, 201, res.content)

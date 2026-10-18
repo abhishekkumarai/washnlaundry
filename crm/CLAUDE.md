@@ -141,6 +141,12 @@ prefs key `portal_shop`) as `X-Tenant-ID`, so `/api/me/` reports the role *for t
   flutter_map/OpenStreetMap pin and browser geolocation). Owners/staff of the shop are told to use app.
   Signed out, only `/login`, the email links and a shop's `/s/<slug>` link/QR open; the link remembers its
   shop through sign-in and skips the list. Signing out forgets the chosen shop.
+- **Layout:** `PortalNavBar` (`portal_shell.dart`) on every signed-in page: logo, the current laundry (tap to
+  change), Book · Orders links on wide screens, and an account menu with Profile, Change laundry and Sign out.
+  Phones keep Book · Orders as a bottom bar.
+- **Nearby:** `/find` asks once for the browser location (remembered, prefs `portal_use_location`) and sends it as
+  `customer/shops/?lat=&lng=`; the API then sorts nearest first with `distance_km` (haversine on
+  `Shop.latitude/longitude`; shops without a location go last). Within 10 km is "Nearby".
 - **Joining more laundries:** `POST customer/join/` with no name/phone reuses the customer's newest record at
   another shop (name, phone, and its saved addresses are copied); the Join page tries that first and only shows
   the form for a first-ever join (400).
