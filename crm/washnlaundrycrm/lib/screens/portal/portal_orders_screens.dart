@@ -25,7 +25,7 @@ String _pickupText(Map<String, dynamic> o) {
   return 'Pickup ${DateFormat('EEE d MMM').format(d)}${time.isEmpty ? '' : ', $time'}';
 }
 
-/// The customer's own orders in this shop, newest first.
+/// The customer's own orders in this shop, grouped by the day they were booked.
 class PortalOrdersScreen extends StatefulWidget {
   const PortalOrdersScreen({super.key});
 
@@ -77,44 +77,124 @@ class _PortalOrdersScreenState extends State<PortalOrdersScreen> {
         ]),
       );
     } else {
+      final groups = _byDay(orders);
       body = RefreshIndicator(
         onRefresh: _load,
-        child: ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: orders.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemBuilder: (_, i) {
-            final o = orders[i];
-            return InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => context.go('/orders/${Uri.encodeComponent('${o['order_number']}')}'),
-              child: PortalPanel(
-                child: Row(children: [
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('#${o['order_number']}', style: AppTypography.sectionTitle),
-                      const SizedBox(height: 2),
-                      Text(
-                          [
-                            '${(o['items'] as List).length} item${(o['items'] as List).length == 1 ? '' : 's'}',
-                            _pickupText(o),
-                          ].where((s) => s.isNotEmpty).join(' · '),
-                          style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
-                    ]),
-                  ),
-                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text(money.format(o['total_amount'] ?? 0), style: AppTypography.sectionTitle),
-                    const SizedBox(height: 2),
-                    _StatusTag(status: '${o['status']}'),
-                  ]),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            for (final g in groups) ...[
+              _DayHeader(
+                label: _dayLabel(g.day),
+                summary: '${g.orders.length} order${g.orders.length == 1 ? '' : 's'} · '
+                    '${money.format(g.orders.fold<num>(0, (s, o) => s + ((o['total_amount'] as num?) ?? 0)))}',
+              ),
+              PortalPanel(
+                padding: EdgeInsets.zero,
+                child: Column(children: [
+                  for (var i = 0; i < g.orders.length; i++) ...[
+                    if (i > 0) const Divider(height: 1, color: AppColors.borderSubtle),
+                    _OrderRow(order: g.orders[i], money: money),
+                  ],
                 ]),
               ),
-            );
-          },
+            ],
+          ],
         ),
       );
     }
     return PortalShell(index: 1, title: 'Your orders', child: body);
+  }
+}
+
+/// Orders grouped by the local day they were booked, newest day first.
+List<({DateTime? day, List<Map<String, dynamic>> orders})> _byDay(
+    List<Map<String, dynamic>> orders) {
+  final groups = <DateTime?, List<Map<String, dynamic>>>{};
+  for (final o in orders) {
+    final at = DateTime.tryParse('${o['created_at']}')?.toLocal();
+    final day = at == null ? null : DateTime(at.year, at.month, at.day);
+    groups.putIfAbsent(day, () => []).add(o);
+  }
+  final days = groups.keys.toList()
+    ..sort((a, b) => b == null
+        ? -1
+        : a == null
+            ? 1
+            : b.compareTo(a));
+  return [for (final d in days) (day: d, orders: groups[d]!)];
+}
+
+String _dayLabel(DateTime? day) {
+  if (day == null) return 'Earlier';
+  final now = DateTime.now();
+  final diff = DateTime(now.year, now.month, now.day).difference(day).inDays;
+  if (diff == 0) return 'Today';
+  if (diff == 1) return 'Yesterday';
+  return DateFormat(day.year == now.year ? 'EEE d MMM' : 'EEE d MMM y').format(day);
+}
+
+class _DayHeader extends StatelessWidget {
+  const _DayHeader({required this.label, required this.summary});
+
+  final String label;
+  final String summary;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 18, 2, 8),
+        child: Row(children: [
+          Expanded(
+            child: Text(label.toUpperCase(),
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                    color: Color(0xFF475569))),
+          ),
+          Text(summary, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+        ]),
+      );
+}
+
+class _OrderRow extends StatelessWidget {
+  const _OrderRow({required this.order, required this.money});
+
+  final Map<String, dynamic> order;
+  final NumberFormat money;
+
+  @override
+  Widget build(BuildContext context) {
+    final o = order;
+    final count = (o['items'] as List).length;
+    final at = DateTime.tryParse('${o['created_at']}')?.toLocal();
+    return InkWell(
+      onTap: () => context.go('/orders/${Uri.encodeComponent('${o['order_number']}')}'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('#${o['order_number']}', style: AppTypography.sectionTitle),
+              const SizedBox(height: 2),
+              Text(
+                  [
+                    if (at != null) 'Booked ${DateFormat('h:mm a').format(at)}',
+                    '$count item${count == 1 ? '' : 's'}',
+                    _pickupText(o),
+                  ].where((s) => s.isNotEmpty).join(' · '),
+                  style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(money.format(o['total_amount'] ?? 0), style: AppTypography.sectionTitle),
+            const SizedBox(height: 2),
+            _StatusTag(status: '${o['status']}'),
+          ]),
+        ]),
+      ),
+    );
   }
 }
 

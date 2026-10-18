@@ -11,8 +11,8 @@ import '../../theme/app_theme.dart';
 import 'address_editor.dart';
 import 'portal_shell.dart';
 
-/// New Order in customer mode: pick items (the shop's own prices), a pickup
-/// slot with room left, and one of their saved addresses. The server re-prices
+/// New Order in customer mode, one step at a time: items (the shop's own
+/// prices), a pickup slot with room left, an address, then a review. The server re-prices
 /// everything; the total here is only a preview.
 class PortalBookScreen extends StatefulWidget {
   const PortalBookScreen({super.key});
@@ -32,6 +32,7 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
   int? _addressId;
   final _notes = TextEditingController();
   int _category = 0;
+  int _step = 0;
 
   bool _busy = false;
   String? _error;
@@ -119,14 +120,6 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
     return pins.isEmpty || pin == null || pins.contains('$pin');
   }
 
-  String? get _blocker {
-    if (_qty.values.every((q) => q == 0)) return 'Add at least one item.';
-    if (_date == null || _slotId == null) return 'Choose a pickup time.';
-    if (_address == null) return 'Add a pickup address.';
-    if (!_pincodeServed) return 'The shop does not pick up from ${_address!['pin_code']} yet.';
-    return null;
-  }
-
   Future<void> _book() async {
     setState(() {
       _busy = true;
@@ -152,6 +145,7 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
       // A slot that just filled up: show fresh capacity.
       if (e.statusCode == 409) {
         _slotId = null;
+        _step = 1;
         _load();
       }
     }
@@ -166,6 +160,33 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
       _addressId = saved['id'] as int;
     });
   }
+
+  static const _stepNames = ['Items', 'Pickup time', 'Address', 'Review'];
+
+  /// What stops [step] from moving on, or null when it is done.
+  String? _blockerFor(int step) => switch (step) {
+        0 => _qty.values.every((q) => q == 0) ? 'Add at least one item.' : null,
+        1 => _date == null || _slotId == null ? 'Choose a pickup time.' : null,
+        2 => _address == null
+            ? 'Add a pickup address.'
+            : !_pincodeServed
+                ? 'The shop does not pick up from ${_address!['pin_code']} yet.'
+                : null,
+        _ => null,
+      };
+
+  /// The furthest step that can be opened: every step before it is done.
+  int get _reachable {
+    for (var s = 0; s < 3; s++) {
+      if (_blockerFor(s) != null) return s;
+    }
+    return 3;
+  }
+
+  void _goTo(int step) => setState(() {
+        _step = step.clamp(0, _reachable);
+        _error = null;
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -186,98 +207,30 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
         ),
       );
     }
-    final cats = _categories;
-    final blocker = _blocker;
+    final blocker = _blockerFor(_step);
+    final last = _step == _stepNames.length - 1;
+    final pieces = _qty.values.fold<int>(0, (s, q) => s + q);
     return PortalShell(
       index: 0,
       title: 'Book a pickup',
       child: Column(children: [
+        _StepBar(
+          names: _stepNames,
+          current: _step,
+          reachable: _reachable,
+          onTap: _goTo,
+        ),
         Expanded(
-          child: ListView(padding: const EdgeInsets.all(16), children: [
-            const _Step(number: 1, title: 'What needs cleaning'),
-            if (cats.isEmpty)
-              const Text('This shop has not listed its services yet.',
-                  style: TextStyle(color: AppColors.muted))
-            else ...[
-              SizedBox(
-                height: 40,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: cats.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) {
-                    final picked = cats[i]['items'] as List;
-                    final count =
-                        picked.fold<int>(0, (s, it) => s + (_qty[(it as Map)['id']] ?? 0));
-                    return ChoiceChip(
-                      label: Text(count > 0 ? '${cats[i]['name']} · $count' : '${cats[i]['name']}'),
-                      selected: _category == i,
-                      onSelected: (_) => setState(() => _category = i),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 8),
-              PortalPanel(
-                padding: EdgeInsets.zero,
-                child: Column(children: [
-                  for (final raw in cats[_category.clamp(0, cats.length - 1)]['items'] as List)
-                    _ItemRow(
-                      item: Map<String, dynamic>.from(raw as Map),
-                      quantity: _qty[(raw)['id']] ?? 0,
-                      money: money,
-                      onChanged: (q) => _changed(() => _qty[raw['id'] as int] = q),
-                    ),
-                ]),
-              ),
-            ],
-            const SizedBox(height: 24),
-            const _Step(number: 2, title: 'Pickup time'),
-            _PickupPicker(
-              days: _days,
-              openSlots: _openSlots,
-              date: _date,
-              slotId: _slotId,
-              onDate: (d) => _changed(() {
-                _date = d;
-                _slotId = null;
-              }),
-              onSlot: (s) => _changed(() => _slotId = s),
-            ),
-            const SizedBox(height: 24),
-            const _Step(number: 3, title: 'Pickup address'),
-            for (final a in _addresses)
-              RadioListTile<int>(
-                value: a['id'] as int,
-                groupValue: _addressId,
-                onChanged: (v) => _changed(() => _addressId = v),
-                contentPadding: EdgeInsets.zero,
-                title: Text(_labelOf(a), style: AppTypography.sectionTitle),
-                subtitle: Text(
-                    [a['address'], a['landmark'], a['area'], a['pin_code']]
-                        .where((v) => v != null && '$v'.isNotEmpty)
-                        .join(', '),
-                    style: const TextStyle(color: AppColors.muted)),
-              ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _addAddress,
-                icon: const Icon(Icons.add),
-                label: Text(_addresses.isEmpty ? 'Add your address' : 'Add another address'),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _notes,
-              maxLines: 2,
-              maxLength: 300,
-              decoration: const InputDecoration(
-                  labelText: 'Notes for the shop (optional)',
-                  hintText: 'e.g. Ring the bell twice; no starch',
-                  border: OutlineInputBorder()),
-            ),
-          ]),
+          child: ListView(
+            key: PageStorageKey('book-step-$_step'),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+            children: switch (_step) {
+              0 => _itemsStep(money),
+              1 => _timeStep(),
+              2 => _addressStep(),
+              _ => _reviewStep(money),
+            },
+          ),
         ),
         Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -290,20 +243,47 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(_error ?? blocker!,
-                    style: TextStyle(color: _error != null ? AppColors.danger : AppColors.muted)),
+                    style: TextStyle(
+                        fontSize: 13, color: _error != null ? AppColors.danger : AppColors.muted)),
               ),
             Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Estimated total',
-                      style: TextStyle(fontSize: 12, color: AppColors.muted)),
+                  Text(
+                      pieces == 0
+                          ? 'Estimated total'
+                          : 'Estimated total · $pieces item${pieces == 1 ? '' : 's'}',
+                      style: const TextStyle(fontSize: 12, color: AppColors.muted)),
                   Text(money.format(_total), style: AppTypography.kpiHero),
                 ]),
               ),
+              if (_step > 0) ...[
+                OutlinedButton(
+                  onPressed: _busy ? null : () => _goTo(_step - 1),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(88, 48),
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('Back'),
+                ),
+                const SizedBox(width: 8),
+              ],
               FilledButton(
-                onPressed: _busy || blocker != null ? null : _book,
-                style: FilledButton.styleFrom(minimumSize: const Size(160, 48)),
-                child: Text(_busy ? 'Booking…' : 'Book pickup'),
+                onPressed: _busy || blocker != null
+                    ? null
+                    : last
+                        ? _book
+                        : () => _goTo(_step + 1),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(140, 48),
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: Text(last
+                    ? (_busy ? 'Booking…' : 'Book pickup')
+                    : 'Continue to ${_stepNames[_step + 1].toLowerCase()}'),
               ),
             ]),
           ]),
@@ -311,26 +291,313 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
       ]),
     );
   }
+
+  List<Widget> _itemsStep(NumberFormat money) {
+    final cats = _categories;
+    return [
+      const _StepTitle(
+          'What needs cleaning?', 'Prices are the shop\'s own. Pick a service, then add items.'),
+      if (cats.isEmpty)
+        const Text('This shop has not listed its services yet.',
+            style: TextStyle(color: AppColors.muted))
+      else ...[
+        SizedBox(
+          height: 40,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: cats.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, i) {
+              final picked = cats[i]['items'] as List;
+              final count = picked.fold<int>(0, (s, it) => s + (_qty[(it as Map)['id']] ?? 0));
+              return ChoiceChip(
+                label: Text(count > 0 ? '${cats[i]['name']} · $count' : '${cats[i]['name']}'),
+                selected: _category == i,
+                onSelected: (_) => setState(() => _category = i),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
+        PortalPanel(
+          padding: EdgeInsets.zero,
+          child: Column(children: [
+            for (final raw in cats[_category.clamp(0, cats.length - 1)]['items'] as List)
+              _ItemRow(
+                item: Map<String, dynamic>.from(raw as Map),
+                quantity: _qty[(raw)['id']] ?? 0,
+                money: money,
+                onChanged: (q) => _changed(() => _qty[raw['id'] as int] = q),
+              ),
+          ]),
+        ),
+      ],
+    ];
+  }
+
+  List<Widget> _timeStep() => [
+        const _StepTitle('When should we pick up?', 'Slots close a little before they start.'),
+        _PickupPicker(
+          days: _days,
+          openSlots: _openSlots,
+          date: _date,
+          slotId: _slotId,
+          onDate: (d) => _changed(() {
+            _date = d;
+            _slotId = null;
+          }),
+          onSlot: (s) => _changed(() => _slotId = s),
+        ),
+      ];
+
+  List<Widget> _addressStep() => [
+        const _StepTitle('Where should we pick up?', 'Delivery comes back to the same address.'),
+        if (_addresses.isNotEmpty)
+          PortalPanel(
+            padding: EdgeInsets.zero,
+            child: Column(children: [
+              for (var i = 0; i < _addresses.length; i++) ...[
+                if (i > 0) const Divider(height: 1, color: AppColors.borderSubtle),
+                _AddressRow(
+                  address: _addresses[i],
+                  selected: _addresses[i]['id'] == _addressId,
+                  onTap: () => _changed(() => _addressId = _addresses[i]['id'] as int),
+                ),
+              ],
+            ]),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: _addAddress,
+            icon: const Icon(Icons.add),
+            label: Text(_addresses.isEmpty ? 'Add your address' : 'Add another address'),
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _notes,
+          maxLines: 2,
+          maxLength: 300,
+          decoration: const InputDecoration(
+              labelText: 'Notes for the shop (optional)',
+              hintText: 'e.g. Ring the bell twice; no starch',
+              border: OutlineInputBorder()),
+        ),
+      ];
+
+  List<Widget> _reviewStep(NumberFormat money) {
+    final items = _itemsById;
+    final lines = [
+      for (final e in _qty.entries)
+        if (e.value > 0 && items[e.key] != null) (items[e.key]!, e.value)
+    ];
+    final day = _days.where((d) => d['date'] == _date).firstOrNull;
+    final slot = (day?['slots'] as List? ?? const [])
+        .map((s) => Map<String, dynamic>.from(s as Map))
+        .where((s) => s['id'] == _slotId)
+        .firstOrNull;
+    final a = _address;
+    return [
+      const _StepTitle('Check and book', 'You pay when your clothes come back.'),
+      _ReviewBlock(
+        title: 'Items',
+        onEdit: () => _goTo(0),
+        child: Column(children: [
+          for (final (item, q) in lines)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(children: [
+                Expanded(
+                    child: Text('${item['name']} × $q',
+                        style: AppTypography.body.copyWith(fontWeight: FontWeight.w500))),
+                Text(money.format(((item['price'] as num?) ?? 0) * q), style: AppTypography.body),
+              ]),
+            ),
+          const Divider(height: 18, color: AppColors.borderSubtle),
+          Row(children: [
+            const Expanded(child: Text('Estimated total', style: AppTypography.sectionTitle)),
+            Text(money.format(_total), style: AppTypography.sectionTitle),
+          ]),
+        ]),
+      ),
+      const SizedBox(height: 10),
+      _ReviewBlock(
+        title: 'Pickup',
+        onEdit: () => _goTo(1),
+        child: Text(
+            [
+              if (_date != null) _PickupPicker.dayLabel(_date!),
+              if (slot != null) '${slot['label']}'
+            ].join(', '),
+            style: AppTypography.bodyMedium),
+      ),
+      const SizedBox(height: 10),
+      _ReviewBlock(
+        title: 'Address',
+        onEdit: () => _goTo(2),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (a != null) ...[
+            Text(_labelOf(a), style: AppTypography.bodyMedium),
+            const SizedBox(height: 2),
+            Text(_addressLine(a), style: const TextStyle(fontSize: 13, color: AppColors.muted)),
+          ],
+          if (_notes.text.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Note: ${_notes.text.trim()}',
+                style: const TextStyle(fontSize: 13, color: AppColors.ink)),
+          ],
+        ]),
+      ),
+      const SizedBox(height: 12),
+      const Text('The shop confirms the final bill after counting your clothes.',
+          style: TextStyle(fontSize: 12.5, color: AppColors.muted)),
+    ];
+  }
 }
 
 String _labelOf(Map<String, dynamic> a) =>
     const {'HOME': 'Home', 'WORK': 'Work', 'OTHER': 'Other'}[a['label']] ?? 'Address';
 
-class _Step extends StatelessWidget {
-  const _Step({required this.number, required this.title});
+String _addressLine(Map<String, dynamic> a) => [
+      a['address'],
+      a['landmark'],
+      a['area'],
+      a['pin_code']
+    ].where((v) => v != null && '$v'.isNotEmpty).join(', ');
 
-  final int number;
+/// Progress across the booking steps: numbered segments, done ones tappable.
+class _StepBar extends StatelessWidget {
+  const _StepBar(
+      {required this.names, required this.current, required this.reachable, required this.onTap});
+
+  final List<String> names;
+  final int current;
+  final int reachable;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final narrow = MediaQuery.sizeOf(context).width < 520;
+    return Container(
+      color: AppColors.card,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(children: [
+        for (var i = 0; i < names.length; i++)
+          Expanded(
+            child: InkWell(
+              onTap: i <= reachable && i != current ? () => onTap(i) : null,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Text(
+                    i < current ? '✓' : '${i + 1}',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: i <= current ? AppColors.primary : AppColors.muted),
+                  ),
+                  const SizedBox(width: 6),
+                  if (!narrow || i == current)
+                    Flexible(
+                      child: Text(names[i],
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: i == current ? FontWeight.w600 : FontWeight.w500,
+                              color: i == current ? AppColors.ink : AppColors.muted)),
+                    ),
+                ]),
+                const SizedBox(height: 8),
+                Container(
+                  height: 3,
+                  margin: EdgeInsets.only(right: i == names.length - 1 ? 0 : 6),
+                  color: i <= current ? AppColors.primary : AppColors.borderSubtle,
+                ),
+              ]),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+class _StepTitle extends StatelessWidget {
+  const _StepTitle(this.title, this.hint);
+
   final String title;
+  final String hint;
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(children: [
-          Text('$number',
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
               style: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accent)),
-          const SizedBox(width: 10),
-          Text(title, style: AppTypography.title),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
+                  color: AppColors.ink)),
+          const SizedBox(height: 4),
+          Text(hint, style: const TextStyle(fontSize: 13.5, color: AppColors.muted)),
+        ]),
+      );
+}
+
+/// One saved address as a selectable row.
+class _AddressRow extends StatelessWidget {
+  const _AddressRow({required this.address, required this.selected, required this.onTap});
+
+  final Map<String, dynamic> address;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          color: selected ? AppColors.accentSoft : null,
+          child: Row(children: [
+            Icon(selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                size: 20, color: selected ? AppColors.primary : AppColors.muted),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(_labelOf(address), style: AppTypography.sectionTitle),
+                const SizedBox(height: 2),
+                Text(_addressLine(address),
+                    style: const TextStyle(fontSize: 13, color: AppColors.muted)),
+              ]),
+            ),
+          ]),
+        ),
+      );
+}
+
+/// A section of the review step with an Edit link back to its step.
+class _ReviewBlock extends StatelessWidget {
+  const _ReviewBlock({required this.title, required this.onEdit, required this.child});
+
+  final String title;
+  final VoidCallback onEdit;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => PortalPanel(
+        padding: const EdgeInsets.fromLTRB(16, 10, 8, 14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(
+              child: Text(title.toUpperCase(),
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                      color: Color(0xFF475569))),
+            ),
+            TextButton(onPressed: onEdit, child: const Text('Edit')),
+          ]),
+          Padding(padding: const EdgeInsets.only(right: 8), child: child),
         ]),
       );
 }
@@ -398,6 +665,19 @@ class _PickupPicker extends StatelessWidget {
   final ValueChanged<String> onDate;
   final ValueChanged<int> onSlot;
 
+  /// "Today", "Tomorrow", else "Sat 18 Oct".
+  static String dayLabel(String iso) {
+    final d = DateTime.parse(iso);
+    final now = DateTime.now();
+    final diff =
+        DateTime(d.year, d.month, d.day).difference(DateTime(now.year, now.month, now.day)).inDays;
+    return diff == 0
+        ? 'Today'
+        : diff == 1
+            ? 'Tomorrow'
+            : DateFormat('EEE d MMM').format(d);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (days.every((d) => (d['slots'] as List).isEmpty)) {
@@ -405,19 +685,6 @@ class _PickupPicker extends StatelessWidget {
           style: TextStyle(color: AppColors.muted));
     }
     final day = days.where((d) => d['date'] == date).firstOrNull;
-    final today = DateTime.now();
-    String dayLabel(String iso) {
-      final d = DateTime.parse(iso);
-      final diff = DateTime(d.year, d.month, d.day)
-          .difference(DateTime(today.year, today.month, today.day))
-          .inDays;
-      return diff == 0
-          ? 'Today'
-          : diff == 1
-              ? 'Tomorrow'
-              : DateFormat('EEE d MMM').format(d);
-    }
-
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Wrap(spacing: 8, runSpacing: 8, children: [
         for (final d in days)
