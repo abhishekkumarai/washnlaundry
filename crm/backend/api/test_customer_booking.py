@@ -152,6 +152,42 @@ class CustomerBookingTests(APITestCase):
         self.assertEqual(self.book(address_id=theirs.id).status_code, 400)
         self.assertTrue(CustomerAddress.objects.filter(pk=theirs.id, address='Bob St').exists())
 
+    def test_shop_is_emailed_after_commit(self):
+        self.shop.email = 'shop@example.com'
+        self.shop.save()
+        with mock.patch('api.services.email_service.EmailService.send', return_value=(True, None)) as send, \
+                self.captureOnCommitCallbacks(execute=True):
+            res = self.book()
+        self.assertEqual(res.status_code, 201)
+        to, subject, text = send.call_args.args
+        self.assertEqual(to, 'shop@example.com')
+        self.assertIn(res.json()['order_number'], subject)
+        self.assertIn('maps?q=12.97,77.64', text)
+        with mock.patch('api.services.email_service.EmailService.send') as send, \
+                self.captureOnCommitCallbacks(execute=True):
+            self.book(pin_code='110001')  # rejected: no email
+        send.assert_not_called()
+
+    def test_staff_changes_feed_returns_new_orders(self):
+        from django.contrib.auth import get_user_model
+        from .models import ShopMembership, ShopRole
+        before = timezone.now().isoformat()
+        self.book()
+        owner = get_user_model().objects.create_user(username='owner@shop.com', email='owner@shop.com')
+        ShopMembership.objects.create(user=owner, shop=self.shop, role=ShopRole.OWNER)
+        with mock.patch('api.auth.id_token.verify_oauth2_token',
+                        return_value={'email': 'owner@shop.com', 'email_verified': True}):
+            res = self.client.get('/api/orders/changes/', {'since': before}, **self.auth,
+                                  HTTP_X_TENANT_ID=self.shop.slug)
+            self.assertEqual(res.status_code, 200, res.content)
+            self.assertEqual(len(res.json()['orders']), 1)
+            later = self.client.get('/api/orders/changes/', {'since': res.json()['now']}, **self.auth,
+                                    HTTP_X_TENANT_ID=self.shop.slug)
+            self.assertEqual(later.json()['orders'], [])
+        # Customers cannot read the staff feed.
+        self.assertEqual(self.client.get('/api/orders/changes/', {'since': before},
+                                         **self.auth).status_code, 403)
+
     def test_booking_requires_sign_in(self):
         res = self.client.post('/api/customer/orders/', {}, format='json')
         self.assertEqual(res.status_code, 401)

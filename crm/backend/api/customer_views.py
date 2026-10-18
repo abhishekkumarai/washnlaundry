@@ -300,6 +300,30 @@ def customer_booking_options(request):
                          'pincodes': _served_pincodes(shop)})
 
 
+def _alert_shop(order_pk):
+    """Email the shop a new online booking (KAN-224). Best effort: a mail failure is
+    logged and never fails the booking; the CRM's orders/changes poll still shows it."""
+    import logging
+    from .services.email_service import EmailService
+    order = Order.all_objects.select_related('shop').prefetch_related('items').filter(pk=order_pk).first()
+    if order is None or not order.shop.email:
+        return
+    lines = '\n'.join(f'  {i.quantity} x {i.item_title} ({i.service_type}) - {i.total_price:g}'
+                      for i in order.items.all())
+    where = order.address + (f' - {order.pin_code}' if order.pin_code else '')
+    if order.latitude is not None:
+        where += f'\n  Map: https://www.google.com/maps?q={order.latitude},{order.longitude}'
+    text = (f'New online booking {order.order_number} from {order.customer_name} '
+            f'({order.customer_phone}).\n\nPickup: {order.pickup_date:%a %d %b} at '
+            f'{order.pickup_time:%I:%M %p}\nAddress: {where}\n\nItems:\n{lines}\n'
+            f'Total: {order.shop.currency_symbol}{order.total_amount:g}\n'
+            + (f'\nNotes: {order.notes}\n' if order.notes else '')
+            + '\nOpen it in the CRM: https://app.washnlaundry.com/orders')
+    ok, error = EmailService.send(order.shop.email, f'New booking {order.order_number}', text)
+    if not ok:
+        logging.getLogger(__name__).warning('Booking alert for %s not sent: %s', order.order_number, error)
+
+
 def _bad(detail, status=400):
     return JsonResponse({'detail': detail}, status=status)
 
@@ -522,6 +546,8 @@ def _create_customer_order(request, customer):
                 unit_price=item.price, total_price=total)
         order.subtotal = order.total_amount = order.due_amount = round(subtotal, 2)
         order.save(update_fields=['subtotal', 'total_amount', 'due_amount'])
+        # After commit, so a rolled-back booking never emails the shop.
+        transaction.on_commit(lambda pk=order.pk: _alert_shop(pk))
     order = Order.objects.prefetch_related('items').get(pk=order.pk)
     return JsonResponse(_order_json(order), status=201)
 

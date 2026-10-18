@@ -782,6 +782,22 @@ class OrderViewSet(viewsets.ModelViewSet):
         if changes:
             instance.audit_log.create(title='Order Updated', detail='; '.join(changes))
 
+    @action(detail=False, methods=['get'])
+    def changes(self, request):
+        """GET /api/orders/changes/?since=<ISO time> - orders created or updated after
+        `since` in this shop, newest first (max 100), and the server time to send as
+        the next `since`. The open CRM polls this to alert on new online bookings."""
+        from django.utils.dateparse import parse_datetime
+        now = timezone.now()
+        since = parse_datetime(str(request.query_params.get('since') or ''))
+        if since is None:
+            return Response({'orders': [], 'now': now.isoformat()})
+        if timezone.is_naive(since):
+            since = timezone.make_aware(since)
+        qs = Order.objects.prefetch_related('items', 'media').filter(
+            updated_at__gt=since).order_by('-updated_at')[:100]
+        return Response({'orders': self.get_serializer(qs, many=True).data, 'now': now.isoformat()})
+
     @action(detail=True, methods=['post'])
     def status(self, request, pk=None):
         """POST /api/orders/<id>/status/ {"status": "READY", "note": "..."}
