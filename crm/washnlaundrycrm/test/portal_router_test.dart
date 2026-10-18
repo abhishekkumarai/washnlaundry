@@ -26,10 +26,19 @@ void main() {
 
   test('signed out: only the public pages open', () async {
     final (auth, portal) = await session(signedIn: false, shop: sunny);
-    for (final p in ['/find', '/s/sunny', '/verify', '/reset', '/login']) {
+    for (final p in ['/s/sunny', '/verify', '/reset', '/login']) {
       expect(portalRedirectFor(auth, portal, p), isNull, reason: p);
     }
-    for (final p in ['/book', '/orders', '/orders/WL-1', '/profile', '/join', '/dashboard']) {
+    // The laundry list comes after sign-in, never before.
+    for (final p in [
+      '/find',
+      '/book',
+      '/orders',
+      '/orders/WL-1',
+      '/profile',
+      '/join',
+      '/dashboard'
+    ]) {
       expect(portalRedirectFor(auth, portal, p), '/login', reason: p);
     }
   });
@@ -38,6 +47,7 @@ void main() {
     final (auth, portal) = await session(signedIn: true, role: 'unlinked');
     expect(portalRedirectFor(auth, portal, '/book'), '/find');
     expect(portalRedirectFor(auth, portal, '/login'), '/find');
+    expect(portalRedirectFor(auth, portal, '/find'), isNull);
   });
 
   test('not yet a customer of the shop: kept on /join, never /setup-shop', () async {
@@ -61,7 +71,14 @@ void main() {
 
   test('the portal router has no CRM routes', () async {
     final paths = [for (final r in portalRoutes()) (r as dynamic).path as String];
-    for (final crm in ['/dashboard', '/customers', '/staff', '/settings', '/setup-shop', '/new-order']) {
+    for (final crm in [
+      '/dashboard',
+      '/customers',
+      '/staff',
+      '/settings',
+      '/setup-shop',
+      '/new-order'
+    ]) {
       expect(paths, isNot(contains(crm)), reason: crm);
     }
   });

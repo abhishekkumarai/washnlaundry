@@ -90,7 +90,8 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
       ];
 
   List<Map<String, dynamic>> get _days => [
-        for (final d in (_options?['days'] as List? ?? const [])) Map<String, dynamic>.from(d as Map)
+        for (final d in (_options?['days'] as List? ?? const []))
+          Map<String, dynamic>.from(d as Map)
       ];
 
   List<Map<String, dynamic>> _openSlots(Map<String, dynamic> day) => [
@@ -100,7 +101,8 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
 
   Map<int, Map<String, dynamic>> get _itemsById => {
         for (final c in _categories)
-          for (final i in (c['items'] as List)) (i as Map)['id'] as int: Map<String, dynamic>.from(i)
+          for (final i in (c['items'] as List))
+            (i as Map)['id'] as int: Map<String, dynamic>.from(i)
       };
 
   double get _total {
@@ -109,8 +111,7 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
         .fold(0.0, (sum, e) => sum + ((items[e.key]?['price'] as num?) ?? 0) * e.value);
   }
 
-  Map<String, dynamic>? get _address =>
-      _addresses.where((a) => a['id'] == _addressId).firstOrNull;
+  Map<String, dynamic>? get _address => _addresses.where((a) => a['id'] == _addressId).firstOrNull;
 
   bool get _pincodeServed {
     final pins = [for (final p in (_options?['pincodes'] as List? ?? const [])) '$p'];
@@ -206,8 +207,8 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (_, i) {
                     final picked = cats[i]['items'] as List;
-                    final count = picked.fold<int>(
-                        0, (s, it) => s + (_qty[(it as Map)['id']] ?? 0));
+                    final count =
+                        picked.fold<int>(0, (s, it) => s + (_qty[(it as Map)['id']] ?? 0));
                     return ChoiceChip(
                       label: Text(count > 0 ? '${cats[i]['name']} · $count' : '${cats[i]['name']}'),
                       selected: _category == i,
@@ -294,7 +295,8 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
             Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Estimated total', style: TextStyle(fontSize: 12, color: AppColors.muted)),
+                  const Text('Estimated total',
+                      style: TextStyle(fontSize: 12, color: AppColors.muted)),
                   Text(money.format(_total), style: AppTypography.kpiHero),
                 ]),
               ),
@@ -324,8 +326,9 @@ class _Step extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Row(children: [
-          Text('$number', style: const TextStyle(
-              fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accent)),
+          Text('$number',
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accent)),
           const SizedBox(width: 10),
           Text(title, style: AppTypography.title),
         ]),
@@ -346,12 +349,13 @@ class _ItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppColors.borderSubtle))),
+        decoration:
+            const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderSubtle))),
         child: Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${item['name']}', style: AppTypography.body.copyWith(fontWeight: FontWeight.w500)),
+              Text('${item['name']}',
+                  style: AppTypography.body.copyWith(fontWeight: FontWeight.w500)),
               Text('${money.format(item['price'] ?? 0)} / ${_units[item['unit']] ?? 'piece'}',
                   style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
             ]),
@@ -407,7 +411,11 @@ class _PickupPicker extends StatelessWidget {
       final diff = DateTime(d.year, d.month, d.day)
           .difference(DateTime(today.year, today.month, today.day))
           .inDays;
-      return diff == 0 ? 'Today' : diff == 1 ? 'Tomorrow' : DateFormat('EEE d MMM').format(d);
+      return diff == 0
+          ? 'Today'
+          : diff == 1
+              ? 'Tomorrow'
+              : DateFormat('EEE d MMM').format(d);
     }
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

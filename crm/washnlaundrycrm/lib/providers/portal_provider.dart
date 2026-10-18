@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,34 +31,66 @@ class PortalProvider extends ChangeNotifier {
   Map<String, dynamic>? get shop => _shop;
   String get shopName => _shop?['name'] as String? ?? 'washnlaundry';
 
-  Future<void> _restore() async {
-    // A Demo Mode session left over from the CRM in this browser is a throwaway
-    // sandbox owner: never carry it into the portal.
-    void dropDemo() {
-      if (_auth.isDemo) _auth.signOut();
-    }
+  /// Whether the last auth notification found someone signed in, to spot a sign-out.
+  bool _wasSignedIn = false;
 
+  /// Like a delivery app, the shop is chosen *after* sign-in, from a list: a saved
+  /// shop is only kept for a session that is still signed in, and signing out
+  /// forgets it. The exception is a shop's own `/s/<slug>` link, chosen while
+  /// signed out, which carries through the sign-in that follows it.
+  Future<void> _restore() async {
     if (_auth.initializing) {
+      final ready = Completer<void>();
       void once() {
         if (_auth.initializing) return;
         _auth.removeListener(once);
-        dropDemo();
+        ready.complete();
       }
 
       _auth.addListener(once);
-    } else {
-      dropDemo();
+      await ready.future;
     }
+    // A Demo Mode session left over from the CRM in this browser is a throwaway
+    // sandbox owner: never carry it into the portal.
+    if (_auth.isDemo) await _auth.signOut();
+    _wasSignedIn = _auth.isSignedIn;
+    _auth.addListener(_onAuthChanged);
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString(_prefsKey);
-      if (saved != null) await selectShop(saved, refreshRole: false);
+      if (saved != null && _auth.isSignedIn) {
+        await selectShop(saved, refreshRole: false);
+      } else if (saved != null) {
+        await prefs.remove(_prefsKey);
+      }
     } catch (_) {
       // Prefs unavailable: start with no shop.
     } finally {
       _restoring = false;
       notifyListeners();
     }
+  }
+
+  void _onAuthChanged() {
+    final signedIn = _auth.isSignedIn;
+    if (_wasSignedIn && !signedIn && _slug != null) _forget();
+    _wasSignedIn = signedIn;
+  }
+
+  Future<void> _forget() async {
+    _slug = null;
+    _shop = null;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefsKey);
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _auth.removeListener(_onAuthChanged);
+    super.dispose();
   }
 
   /// Makes [slug] the shop being booked with. Returns an error message, or null.

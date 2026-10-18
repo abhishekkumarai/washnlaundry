@@ -114,8 +114,8 @@ Widget _buildOrderDetail(BuildContext c, String id, {required String backTo}) {
 /// `Shop.*_enabled`, off by default). Decided here rather than in a route
 /// `redirect`, because a fresh page load reaches this before the shop has
 /// loaded: `watch` re-runs it once the shop arrives, like [_buildOrderDetail].
-Widget _buildShopFeature(BuildContext c, bool Function(AppProvider) enabled,
-    int navIndex, Widget screen) {
+Widget _buildShopFeature(
+    BuildContext c, bool Function(AppProvider) enabled, int navIndex, Widget screen) {
   final provider = c.watch<AppProvider>();
   if (enabled(provider)) {
     return _section(c, navIndex, screen);
@@ -140,13 +140,11 @@ List<RouteBase> appRoutes() => [
       // Links from the confirmation / password-reset emails (public).
       GoRoute(
         path: '/verify',
-        builder: (_, s) =>
-            VerifyEmailScreen(token: s.uri.queryParameters['token']),
+        builder: (_, s) => VerifyEmailScreen(token: s.uri.queryParameters['token']),
       ),
       GoRoute(
         path: '/reset',
-        builder: (_, s) =>
-            ResetPasswordScreen(token: s.uri.queryParameters['token']),
+        builder: (_, s) => ResetPasswordScreen(token: s.uri.queryParameters['token']),
       ),
       // Sign-up for a Google account with no staff or customer record yet.
       GoRoute(path: '/my/start', builder: (_, __) => const CustomerStartScreen()),
@@ -170,8 +168,7 @@ List<RouteBase> appRoutes() => [
       ),
       GoRoute(
         path: '/orders/:id',
-        builder: (c, s) =>
-            _buildOrderDetail(c, s.pathParameters['id']!, backTo: '/orders'),
+        builder: (c, s) => _buildOrderDetail(c, s.pathParameters['id']!, backTo: '/orders'),
       ),
       GoRoute(
         path: '/customers',
@@ -199,11 +196,8 @@ List<RouteBase> appRoutes() => [
       ),
       GoRoute(
         path: '/settings',
-        builder: (c, s) => _section(
-            c,
-            13,
-            SettingsScreen(
-                initialTab: s.uri.queryParameters['tab'])),
+        builder: (c, s) =>
+            _section(c, 13, SettingsScreen(initialTab: s.uri.queryParameters['tab'])),
       ),
       GoRoute(
         path: '/credits',
@@ -216,14 +210,13 @@ List<RouteBase> appRoutes() => [
       GoRoute(
         path: '/chat',
         // Only for a shop with Chat switched on (off by default).
-        builder: (c, s) => _buildShopFeature(
-            c, (p) => p.chatEnabled, 16, const ChatScreen()),
+        builder: (c, s) => _buildShopFeature(c, (p) => p.chatEnabled, 16, const ChatScreen()),
       ),
       GoRoute(
         path: '/social',
         // Only for a shop with Social Suite switched on (off by default).
-        builder: (c, s) => _buildShopFeature(
-            c, (p) => p.socialSuiteEnabled, 17, const SocialSuiteScreen()),
+        builder: (c, s) =>
+            _buildShopFeature(c, (p) => p.socialSuiteEnabled, 17, const SocialSuiteScreen()),
       ),
       GoRoute(
         path: '/scan',
@@ -252,8 +245,7 @@ String homeFor(String? role) => switch (role) {
 /// owner-only. Mirrors the API's IsOwner permissions in api/auth.py.
 const staffRoutes = ['/new-order', '/orders', '/customers', '/scan', '/profile'];
 
-bool _staffMayOpen(String loc) =>
-    staffRoutes.any((r) => loc == r || loc.startsWith('$r/'));
+bool _staffMayOpen(String loc) => staffRoutes.any((r) => loc == r || loc.startsWith('$r/'));
 
 /// The auth + role gate. Signed-out visits go to `/login`; once the backend
 /// has said who the user is (`AuthProvider.role`), owners get the CRM, staff
@@ -323,18 +315,18 @@ List<RouteBase> portalRoutes() => [
       GoRoute(path: '/profile', builder: (_, __) => const PortalProfileScreen()),
     ];
 
-/// The portal's gate. Public: sign-in, the email links, "Find your laundry" and
-/// a shop's `/s/<slug>` link. Everything else needs a signed-in account, a
-/// chosen shop, and to be that shop's customer (else `/join`). The setup-shop
-/// page never shows here.
+/// The portal's gate. Sign in comes first, as in a delivery app: signed out,
+/// only sign-in, the email links and a shop's own `/s/<slug>` link (which
+/// remembers the shop and goes on to sign-in) open. Signed in, the laundry list
+/// (`/find`) is home until a shop is chosen; everything else needs that shop
+/// and to be its customer (else `/join`). The setup-shop page never shows here.
 @visibleForTesting
 String? portalRedirectFor(AuthProvider auth, PortalProvider portal, String loc) {
   if (auth.initializing || portal.restoring) return null;
-  if (loc == '/verify' || loc == '/reset' || loc == '/find' || loc.startsWith('/s/')) {
-    return null;
-  }
+  if (loc == '/verify' || loc == '/reset' || loc.startsWith('/s/')) return null;
   if (!auth.isSignedIn) return loc == '/login' ? null : '/login';
   if (auth.role == null) return null; // /api/me/ still loading (main.dart shows a spinner)
+  if (loc == '/find') return null;
   if (portal.shopSlug == null) return '/find';
   if (auth.serverRole != 'customer') return loc == '/join' ? null : '/join';
   if (loc == '/join' || loc == '/login') return '/book';
@@ -355,8 +347,7 @@ GoRouter buildRouter(AuthProvider auth, {PortalProvider? portal}) => portal != n
     ? GoRouter(
         initialLocation: '/book',
         refreshListenable: Listenable.merge([auth, portal]),
-        redirect: (context, state) =>
-            portalRedirectFor(auth, portal, state.matchedLocation),
+        redirect: (context, state) => portalRedirectFor(auth, portal, state.matchedLocation),
         errorBuilder: (context, state) => Scaffold(
           backgroundColor: const Color(0xFFF8F7F5),
           body: Center(
@@ -372,20 +363,20 @@ GoRouter buildRouter(AuthProvider auth, {PortalProvider? portal}) => portal != n
         routes: portalRoutes(),
       )
     : GoRouter(
-      initialLocation: '/dashboard',
-      refreshListenable: auth,
-      redirect: (context, state) => authRedirect(auth, state),
-      errorBuilder: (context, state) => Scaffold(
-        backgroundColor: const Color(0xFFF8F7F5),
-        body: Center(
-          child: ErrorState(
-            statusCode: 404,
-            title: 'Page Not Found',
-            message: 'The page "${state.uri.path}" could not be found.',
-            onRetry: () => context.go(homeFor(auth.role)),
-            onHome: () => context.go(homeFor(auth.role)),
+        initialLocation: '/dashboard',
+        refreshListenable: auth,
+        redirect: (context, state) => authRedirect(auth, state),
+        errorBuilder: (context, state) => Scaffold(
+          backgroundColor: const Color(0xFFF8F7F5),
+          body: Center(
+            child: ErrorState(
+              statusCode: 404,
+              title: 'Page Not Found',
+              message: 'The page "${state.uri.path}" could not be found.',
+              onRetry: () => context.go(homeFor(auth.role)),
+              onHome: () => context.go(homeFor(auth.role)),
+            ),
           ),
         ),
-      ),
-      routes: appRoutes(),
-    );
+        routes: appRoutes(),
+      );

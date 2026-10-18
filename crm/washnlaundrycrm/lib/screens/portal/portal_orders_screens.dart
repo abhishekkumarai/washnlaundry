@@ -19,8 +19,8 @@ String _pickupText(Map<String, dynamic> o) {
   if (d == null) return '';
   final t = '${o['pickup_time'] ?? ''}';
   final time = t.length >= 5
-      ? DateFormat('h:mm a').format(DateTime(2000, 1, 1, int.parse(t.substring(0, 2)),
-          int.parse(t.substring(3, 5))))
+      ? DateFormat('h:mm a')
+          .format(DateTime(2000, 1, 1, int.parse(t.substring(0, 2)), int.parse(t.substring(3, 5))))
       : '';
   return 'Pickup ${DateFormat('EEE d MMM').format(d)}${time.isEmpty ? '' : ', $time'}';
 }
@@ -127,7 +127,11 @@ class _StatusTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final done = status == 'DELIVERED';
     final cancelled = status == 'CANCELLED';
-    final color = cancelled ? AppColors.danger : done ? AppColors.success : AppColors.accent;
+    final color = cancelled
+        ? AppColors.danger
+        : done
+            ? AppColors.success
+            : AppColors.accent;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -182,8 +186,7 @@ class _PortalOrderDetailScreenState extends State<PortalOrderDetailScreen> {
       return PortalShell(
         index: 1,
         title: '#${widget.orderNumber}',
-        child: Center(
-            child: _error == null ? const CircularProgressIndicator() : Text(_error!)),
+        child: Center(child: _error == null ? const CircularProgressIndicator() : Text(_error!)),
       );
     }
     final money = _money(context);
@@ -205,7 +208,8 @@ class _PortalOrderDetailScreenState extends State<PortalOrderDetailScreen> {
             const Text('Status', style: AppTypography.sectionTitle),
             const SizedBox(height: 10),
             if (cancelled)
-              Text('Cancelled ${o['cancelled_at'] != null ? fmt.format(DateTime.parse('${o['cancelled_at']}').toLocal()) : ''}',
+              Text(
+                  'Cancelled ${o['cancelled_at'] != null ? fmt.format(DateTime.parse('${o['cancelled_at']}').toLocal()) : ''}',
                   style: const TextStyle(color: AppColors.danger))
             else
               for (final (status, field) in _timeline)
@@ -213,8 +217,7 @@ class _PortalOrderDetailScreenState extends State<PortalOrderDetailScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(children: [
                     Icon(o[field] != null ? Icons.check_circle : Icons.radio_button_unchecked,
-                        size: 18,
-                        color: o[field] != null ? AppColors.success : AppColors.border),
+                        size: 18, color: o[field] != null ? AppColors.success : AppColors.border),
                     const SizedBox(width: 10),
                     Expanded(
                         child: Text(portalStatusLabels[status]!,
@@ -262,7 +265,8 @@ class _PortalOrderDetailScreenState extends State<PortalOrderDetailScreen> {
                 Text(_pickupText(o).replaceFirst('Pickup ', '')),
                 if ('${o['address'] ?? ''}'.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  Text('${o['address']}${'${o['pin_code'] ?? ''}'.isEmpty ? '' : ' - ${o['pin_code']}'}',
+                  Text(
+                      '${o['address']}${'${o['pin_code'] ?? ''}'.isEmpty ? '' : ' - ${o['pin_code']}'}',
                       style: const TextStyle(color: AppColors.muted)),
                 ],
               ]),
@@ -271,7 +275,8 @@ class _PortalOrderDetailScreenState extends State<PortalOrderDetailScreen> {
             Column(children: [
               QrImageView(data: '${o['order_number']}', size: 96, padding: EdgeInsets.zero),
               const SizedBox(height: 4),
-              const Text('Show at the shop', style: TextStyle(fontSize: 11, color: AppColors.muted)),
+              const Text('Show at the shop',
+                  style: TextStyle(fontSize: 11, color: AppColors.muted)),
             ]),
           ]),
         ),

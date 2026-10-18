@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,15 +11,24 @@ import '../../providers/portal_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/google_signin_button.dart';
+import '../../widgets/brand_logo.dart';
 import 'portal_shell.dart';
 
-const _heading = TextStyle(
-    fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.5, color: AppColors.ink);
+const _heading =
+    TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.5, color: AppColors.ink);
 const _lede = TextStyle(fontSize: 14.5, height: 1.45, color: AppColors.muted);
+const _label = TextStyle(
+    fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: Color(0xFF475569));
 
 /// Customer sign-in: Google, or a one-time code emailed to them (no password).
+/// Two steps in one card: the email, then the 6-digit code. Same look as the
+/// CRM login (warm paper, white bordered card, navy). Sign-in comes first; the
+/// laundry list ([FindShopScreen]) follows it.
 class PortalLoginScreen extends StatefulWidget {
   const PortalLoginScreen({super.key});
+
+  /// Seconds before "Send again" is offered, so a slow inbox isn't hammered.
+  static const resendAfter = 30;
 
   @override
   State<PortalLoginScreen> createState() => _PortalLoginScreenState();
@@ -28,9 +40,13 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
   bool _codeSent = false;
   bool _busy = false;
   String? _error;
+  String? _notice;
+  int _resendIn = 0;
+  Timer? _ticker;
 
   @override
   void dispose() {
+    _ticker?.cancel();
     _email.dispose();
     _code.dispose();
     super.dispose();
@@ -40,6 +56,7 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _notice = null;
     });
     final err = await call();
     if (!mounted) return;
@@ -50,89 +67,232 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
     });
   }
 
+  void _startResendTimer() {
+    _ticker?.cancel();
+    _resendIn = PortalLoginScreen.resendAfter;
+    _ticker = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return t.cancel();
+      setState(() => _resendIn--);
+      if (_resendIn <= 0) t.cancel();
+    });
+  }
+
+  void _send(AuthProvider auth, {bool again = false}) {
+    if (!_email.text.contains('@')) {
+      setState(() => _error = 'Enter the email you want your bookings under.');
+      return;
+    }
+    _run(() => auth.requestEmailCode(_email.text), onOk: () {
+      _codeSent = true;
+      _code.clear();
+      if (again) _notice = 'A new code is on its way.';
+      _startResendTimer();
+    });
+  }
+
+  void _verify(AuthProvider auth) {
+    if (_code.text.length != 6) {
+      setState(() => _error = 'The code has 6 digits.');
+      return;
+    }
+    _run(() => auth.signInWithEmailCode(_email.text, _code.text));
+  }
+
+  void _changeEmail() => setState(() {
+        _ticker?.cancel();
+        _codeSent = false;
+        _code.clear();
+        _error = null;
+        _notice = null;
+      });
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final portal = context.watch<PortalProvider>();
+    final error = _error ?? auth.error;
     return PortalPage(children: [
-      Text(portal.shop == null ? 'Sign in' : 'Sign in to book with ${portal.shopName}',
-          style: _heading),
-      const SizedBox(height: 8),
-      const Text('Book pickups and follow your orders. No password needed.', style: _lede),
-      const SizedBox(height: 24),
-      if (AuthProvider.isConfigured) ...[
-        Center(child: googleSignInButton(onPressed: auth.authenticate)),
-        const SizedBox(height: 20),
-        const Row(children: [
-          Expanded(child: Divider(color: AppColors.border)),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: Text('or with email', style: TextStyle(color: AppColors.muted)),
+      const _Brand(),
+      const SizedBox(height: 28),
+      PortalPanel(
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+        child: AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(_codeSent ? 'STEP 2 OF 2' : 'STEP 1 OF 2', style: _label),
+              const SizedBox(height: 6),
+              Text(_codeSent ? 'Check your email' : 'Sign in',
+                  style: _heading.copyWith(fontSize: 22)),
+              const SizedBox(height: 6),
+              if (_codeSent)
+                _sentTo()
+              else
+                const Text('Book pickups and follow your orders. No password needed.',
+                    style: _lede),
+              const SizedBox(height: 20),
+              if (error != null) _banner(error, const Color(0xFFFEF2F2), AppColors.danger),
+              if (_notice != null)
+                _banner(_notice!, const Color(0xFFECFDF5), const Color(0xFF047857)),
+              ...(_codeSent ? _codeStep(auth) : _emailStep(auth)),
+            ],
           ),
-          Expanded(child: Divider(color: AppColors.border)),
-        ]),
-        const SizedBox(height: 20),
-      ],
-      TextField(
-        controller: _email,
-        enabled: !_codeSent,
-        keyboardType: TextInputType.emailAddress,
-        autofillHints: const [AutofillHints.email],
-        decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
-        onSubmitted: (_) => _codeSent ? null : _send(auth),
+        ),
       ),
-      if (_codeSent) ...[
-        const SizedBox(height: 12),
-        Text('We sent a 6-digit code to ${_email.text.trim()}.',
-            style: const TextStyle(color: AppColors.muted)),
-        const SizedBox(height: 8),
+    ]);
+  }
+
+  List<Widget> _emailStep(AuthProvider auth) => [
+        if (AuthProvider.isConfigured) ...[
+          Center(child: googleSignInButton(onPressed: auth.authenticate)),
+          const SizedBox(height: 18),
+          const Row(children: [
+            Expanded(child: Divider(color: AppColors.border)),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child:
+                  Text('or use your email', style: TextStyle(fontSize: 12, color: AppColors.muted)),
+            ),
+            Expanded(child: Divider(color: AppColors.border)),
+          ]),
+          const SizedBox(height: 18),
+        ],
+        const Text('EMAIL', style: _label),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.send,
+          autofillHints: const [AutofillHints.email],
+          decoration: _field(hint: 'you@example.com', icon: Icons.mail_outline),
+          onSubmitted: (_) => _send(auth),
+        ),
+        const SizedBox(height: 16),
+        _primary(_busy ? 'Sending…' : 'Email me a code', () => _send(auth)),
+        const SizedBox(height: 10),
+        const Text('We email you a 6-digit code. It works for 10 minutes.',
+            textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.muted)),
+      ];
+
+  List<Widget> _codeStep(AuthProvider auth) => [
+        const Text('CODE', style: _label),
+        const SizedBox(height: 6),
         TextField(
           controller: _code,
           autofocus: true,
           keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
           maxLength: 6,
           autofillHints: const [AutofillHints.oneTimeCode],
-          decoration: const InputDecoration(
-              labelText: 'Code', border: OutlineInputBorder(), counterText: ''),
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          style: const TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 14,
+              color: AppColors.ink,
+              fontFeatures: [FontFeature.tabularFigures()]),
+          decoration: _field(hint: '000000').copyWith(
+              counterText: '',
+              hintStyle:
+                  const TextStyle(fontSize: 26, letterSpacing: 14, color: Color(0xFFD5D1C8))),
+          // A full code signs in straight away, as autofilled codes do.
+          onChanged: (v) {
+            if (v.length == 6 && !_busy) _verify(auth);
+          },
           onSubmitted: (_) => _verify(auth),
         ),
-      ],
-      portalError(_error ?? auth.error),
-      const SizedBox(height: 16),
-      FilledButton(
-        onPressed: _busy ? null : () => _codeSent ? _verify(auth) : _send(auth),
-        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-        child: Text(_busy
-            ? 'Please wait…'
-            : _codeSent
-                ? 'Sign in'
-                : 'Email me a code'),
-      ),
-      if (_codeSent)
-        TextButton(
-          onPressed: _busy
-              ? null
-              : () => setState(() {
-                    _codeSent = false;
-                    _code.clear();
-                    _error = null;
-                  }),
-          child: const Text('Use a different email'),
+        const SizedBox(height: 16),
+        _primary(_busy ? 'Signing in…' : 'Sign in', () => _verify(auth)),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('No email?', style: TextStyle(fontSize: 13, color: AppColors.muted)),
+            TextButton(
+              onPressed: _busy || _resendIn > 0 ? null : () => _send(auth, again: true),
+              child: Text(_resendIn > 0 ? 'Send again in ${_resendIn}s' : 'Send again'),
+            ),
+          ],
         ),
-      const SizedBox(height: 24),
-      TextButton(
-          onPressed: () => context.go('/find'), child: const Text('Find a laundry near you')),
-    ]);
+      ];
+
+  Widget _sentTo() => Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text.rich(TextSpan(style: _lede, children: [
+            const TextSpan(text: 'We sent a 6-digit code to '),
+            TextSpan(
+                text: _email.text.trim(),
+                style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink)),
+            const TextSpan(text: '.'),
+          ])),
+          TextButton(
+            onPressed: _busy ? null : _changeEmail,
+            style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                minimumSize: const Size(0, 28),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            child: const Text('Change'),
+          ),
+        ],
+      );
+
+  Widget _primary(String text, VoidCallback onPressed) => FilledButton(
+        onPressed: _busy ? null : onPressed,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.onPrimary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+        ),
+        child: Text(text),
+      );
+
+  Widget _banner(String text, Color bg, Color fg) => Container(
+        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+        child: Text(text, style: TextStyle(fontSize: 12.5, color: fg)),
+      );
+
+  InputDecoration _field({required String hint, IconData? icon}) {
+    OutlineInputBorder edge(Color c, [double w = 1]) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c, width: w));
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+      prefixIcon: icon == null ? null : Icon(icon, size: 18, color: AppColors.muted),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      filled: true,
+      fillColor: AppColors.card,
+      border: edge(AppColors.border),
+      enabledBorder: edge(AppColors.border),
+      focusedBorder: edge(AppColors.primary, 1.5),
+    );
   }
-
-  void _send(AuthProvider auth) =>
-      _run(() => auth.requestEmailCode(_email.text), onOk: () => _codeSent = true);
-
-  void _verify(AuthProvider auth) =>
-      _run(() => auth.signInWithEmailCode(_email.text, _code.text));
 }
 
-/// "Find your laundry": search the shops that take online bookings.
+/// Logo and wordmark, as on the CRM login.
+class _Brand extends StatelessWidget {
+  const _Brand();
+
+  @override
+  Widget build(BuildContext context) => const Column(children: [
+        BrandLogo(size: 64),
+        SizedBox(height: 12),
+        Text.rich(
+          TextSpan(children: [
+            TextSpan(text: 'WashN', style: TextStyle(color: AppColors.ink)),
+            TextSpan(text: 'Laundry', style: TextStyle(color: AppColors.accent)),
+          ]),
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+        ),
+      ]);
+}
+
+/// Home after sign-in, until a shop is chosen: the customer's own laundries
+/// first, then every laundry taking online bookings, searchable by name, area
+/// or pincode. Picking one opens booking (or joining) for it.
 class FindShopScreen extends StatefulWidget {
   const FindShopScreen({super.key});
 
@@ -144,7 +304,9 @@ class _FindShopScreenState extends State<FindShopScreen> {
   final _q = TextEditingController();
   List<Map<String, dynamic>>? _shops;
   bool _busy = false;
+  String? _opening;
   String? _error;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -154,6 +316,7 @@ class _FindShopScreenState extends State<FindShopScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _q.dispose();
     super.dispose();
   }
@@ -172,9 +335,19 @@ class _FindShopScreenState extends State<FindShopScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
-  Future<void> _pick(Map<String, dynamic> shop) async {
-    final err = await context.read<PortalProvider>().selectShop(shop['slug'] as String);
+  void _onType(String _) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), _search);
+  }
+
+  Future<void> _pick(String slug) async {
+    setState(() {
+      _opening = slug;
+      _error = null;
+    });
+    final err = await context.read<PortalProvider>().selectShop(slug);
     if (!mounted) return;
+    setState(() => _opening = null);
     if (err != null) {
       setState(() => _error = err);
     } else {
@@ -184,57 +357,275 @@ class _FindShopScreenState extends State<FindShopScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final shops = _shops;
-    return PortalPage(children: [
-      const Text('Find your laundry', style: _heading),
-      const SizedBox(height: 8),
-      const Text('Search by shop name, city or your 6-digit pincode.', style: _lede),
-      const SizedBox(height: 20),
-      TextField(
-        controller: _q,
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          hintText: 'e.g. 560038 or Indiranagar',
-          border: const OutlineInputBorder(),
-          suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: _search),
-        ),
-        onSubmitted: (_) => _search(),
+    final auth = context.watch<AuthProvider>();
+    final current = context.watch<PortalProvider>().shopSlug;
+    final mine = [
+      for (final m in (auth.me?['shops'] as List?) ?? const [])
+        if (m is Map && m['role'] == 'CUSTOMER') Map<String, dynamic>.from(m),
+    ];
+    final mySlugs = {for (final m in mine) m['slug']};
+    final all = _shops ?? const <Map<String, dynamic>>[];
+    final others = [
+      for (final s in all)
+        if (!mySlugs.contains(s['slug'])) s
+    ];
+    final searching = _q.text.trim().isNotEmpty;
+    final first = (auth.userName ?? '').trim().split(' ').first;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.card,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: const Border(bottom: BorderSide(color: AppColors.border)),
+        titleSpacing: 16,
+        title: const Row(children: [
+          BrandLogo(size: 28),
+          SizedBox(width: 10),
+          Text.rich(
+            TextSpan(children: [
+              TextSpan(text: 'WashN', style: TextStyle(color: AppColors.ink)),
+              TextSpan(text: 'Laundry', style: TextStyle(color: AppColors.accent)),
+            ]),
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.4),
+          ),
+        ]),
+        actions: [
+          if (current != null)
+            TextButton(onPressed: () => context.go('/book'), child: const Text('Back')),
+          TextButton(onPressed: auth.signOut, child: const Text('Sign out')),
+          const SizedBox(width: 8),
+        ],
       ),
-      portalError(_error),
-      const SizedBox(height: 16),
-      if (_busy && shops == null) const Center(child: CircularProgressIndicator()),
-      if (shops != null && shops.isEmpty)
-        const Text('No laundry takes online bookings there yet. Try a nearby pincode, '
-            'or ask your laundry for its booking link.',
-            style: TextStyle(color: AppColors.muted)),
-      for (final s in shops ?? const <Map<String, dynamic>>[]) ...[
-        InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () => _pick(s),
-          child: PortalPanel(
-            child: Row(children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${s['name']}', style: AppTypography.sectionTitle),
-                  const SizedBox(height: 4),
-                  Text(
-                      [s['address'], s['city'], s['pin_code']]
-                          .where((v) => v != null && '$v'.isNotEmpty)
-                          .join(', '),
-                      style: const TextStyle(color: AppColors.muted, fontSize: 13)),
-                ]),
+      body: RefreshIndicator(
+        onRefresh: _search,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+          children: [
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(first.isEmpty ? 'Choose your laundry' : 'Hi $first, choose your laundry',
+                        style: _heading),
+                    const SizedBox(height: 6),
+                    const Text('Pickup and delivery from laundries that take online bookings.',
+                        style: _lede),
+                    const SizedBox(height: 18),
+                    TextField(
+                      controller: _q,
+                      textInputAction: TextInputAction.search,
+                      onChanged: _onType,
+                      onSubmitted: (_) => _search(),
+                      decoration: InputDecoration(
+                        hintText: 'Search by name, area or pincode',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                        prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.muted),
+                        suffixIcon: searching
+                            ? IconButton(
+                                tooltip: 'Clear',
+                                icon: const Icon(Icons.close, size: 18),
+                                onPressed: () {
+                                  _q.clear();
+                                  _search();
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: AppColors.card,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: AppColors.border)),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                      ),
+                    ),
+                    portalError(_error),
+                    if (mine.isNotEmpty && !searching) ...[
+                      const SizedBox(height: 28),
+                      const Text('YOUR LAUNDRIES', style: _label),
+                      const SizedBox(height: 10),
+                      _ShopList(rows: [
+                        for (final m in mine)
+                          _ShopRow(
+                            name: '${m['name']}',
+                            place: _placeOf(all, m['slug']),
+                            badge: m['slug'] == current ? 'Current' : 'Joined',
+                            busy: _opening == m['slug'],
+                            onTap: () => _pick('${m['slug']}'),
+                          ),
+                      ]),
+                    ],
+                    const SizedBox(height: 28),
+                    Text(
+                        searching
+                            ? 'RESULTS'
+                            : mine.isEmpty
+                                ? 'LAUNDRIES'
+                                : 'MORE LAUNDRIES',
+                        style: _label),
+                    const SizedBox(height: 10),
+                    if (_busy && _shops == null)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+                      )
+                    else if ((searching ? all : others).isEmpty)
+                      PortalPanel(
+                        child: Text(
+                            searching
+                                ? 'No laundry matches "${_q.text.trim()}". Try a nearby pincode, '
+                                    'or ask your laundry for its booking link.'
+                                : 'No other laundries take online bookings yet.',
+                            style: const TextStyle(color: AppColors.muted, height: 1.45)),
+                      )
+                    else
+                      _ShopList(rows: [
+                        for (final s in (searching ? all : others))
+                          _ShopRow(
+                            name: '${s['name']}',
+                            place: _place(s),
+                            badge: mySlugs.contains(s['slug']) ? 'Joined' : null,
+                            busy: _opening == s['slug'],
+                            onTap: () => _pick('${s['slug']}'),
+                          ),
+                      ]),
+                  ],
+                ),
               ),
-              const Icon(Icons.chevron_right, color: AppColors.muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _place(Map<String, dynamic> s) => [s['address'], s['city'], s['pin_code']]
+      .where((v) => v != null && '$v'.trim().isNotEmpty)
+      .join(' · ');
+
+  /// A joined shop's address, if the public list has it (it won't if the shop
+  /// has since stopped taking online bookings).
+  static String _placeOf(List<Map<String, dynamic>> all, Object? slug) {
+    for (final s in all) {
+      if (s['slug'] == slug) return _place(s);
+    }
+    return '';
+  }
+}
+
+/// Rows in one bordered block, split by hairlines (a list, not a stack of cards).
+class _ShopList extends StatelessWidget {
+  const _ShopList({required this.rows});
+
+  final List<Widget> rows;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const Divider(height: 1, color: AppColors.borderSubtle),
+            rows[i],
+          ],
+        ]),
+      );
+}
+
+class _ShopRow extends StatelessWidget {
+  const _ShopRow(
+      {required this.name,
+      required this.place,
+      required this.onTap,
+      this.badge,
+      this.busy = false});
+
+  final String name;
+  final String place;
+  final String? badge;
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+    return InkWell(
+      onTap: busy ? null : onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Row(children: [
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.mutedFill,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(initial,
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.primary)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Flexible(
+                  child: Text(name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                ),
+                if (badge != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentSoft,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(badge!,
+                        style: const TextStyle(
+                            fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.accent)),
+                  ),
+                ],
+              ]),
+              if (place.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(place,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
+              ],
             ]),
           ),
-        ),
-        const SizedBox(height: 8),
-      ],
-    ]);
+          const SizedBox(width: 8),
+          busy
+              ? const SizedBox(
+                  width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.chevron_right, color: AppColors.muted),
+        ]),
+      ),
+    );
   }
 }
 
 /// `/s/<slug>`: a shop's own booking link (shared on WhatsApp, the QR on receipts).
+/// It remembers the shop and moves on: to sign-in when signed out (the shop is
+/// kept through it), else straight to booking or joining.
 class ShopLinkScreen extends StatefulWidget {
   const ShopLinkScreen({super.key, required this.slug});
 
@@ -246,61 +637,32 @@ class ShopLinkScreen extends StatefulWidget {
 
 class _ShopLinkScreenState extends State<ShopLinkScreen> {
   String? _error;
-  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
     context.read<PortalProvider>().selectShop(widget.slug).then((err) {
       if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = err;
-      });
+      if (err == null) {
+        context.go('/book');
+      } else {
+        setState(() => _error = err);
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final portal = context.watch<PortalProvider>();
-    final shop = portal.shop;
-    if (_loading) {
+    if (_error == null) {
       return const Scaffold(
-          backgroundColor: AppColors.background,
-          body: Center(child: CircularProgressIndicator()));
-    }
-    if (_error != null || shop == null) {
-      return PortalPage(children: [
-        const Text('This link is not taking bookings', style: _heading),
-        const SizedBox(height: 8),
-        Text(_error ?? 'The laundry may have switched online booking off.', style: _lede),
-        const SizedBox(height: 20),
-        FilledButton(
-            onPressed: () => context.go('/find'), child: const Text('Find another laundry')),
-      ]);
+          backgroundColor: AppColors.background, body: Center(child: CircularProgressIndicator()));
     }
     return PortalPage(children: [
-      Text('${shop['name']}', style: _heading),
+      const Text('This link is not taking bookings', style: _heading),
       const SizedBox(height: 8),
-      Text(
-          [shop['address'], shop['city'], shop['pin_code']]
-              .where((v) => v != null && '$v'.isNotEmpty)
-              .join(', '),
-          style: _lede),
-      if ('${shop['phone'] ?? ''}'.isNotEmpty) ...[
-        const SizedBox(height: 4),
-        Text('${shop['phone']}', style: _lede),
-      ],
-      const SizedBox(height: 24),
-      const Text('Home pickup and delivery. Prices are set by the shop and shown before '
-          'you book. Pay when your clothes come back.',
-          style: TextStyle(color: AppColors.ink, height: 1.45)),
-      const SizedBox(height: 24),
-      FilledButton(
-        onPressed: () => context.go('/book'),
-        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-        child: const Text('Book a pickup'),
-      ),
+      Text(_error!, style: _lede),
+      const SizedBox(height: 20),
+      FilledButton(onPressed: () => context.go('/find'), child: const Text('See other laundries')),
     ]);
   }
 }

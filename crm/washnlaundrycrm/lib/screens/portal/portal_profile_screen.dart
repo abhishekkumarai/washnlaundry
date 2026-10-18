@@ -139,7 +139,11 @@ class _PortalProfileScreenState extends State<PortalProfileScreen> {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(
-                        '${const {'HOME': 'Home', 'WORK': 'Work', 'OTHER': 'Other'}[a['label']] ?? 'Address'}'
+                        '${const {
+                              'HOME': 'Home',
+                              'WORK': 'Work',
+                              'OTHER': 'Other'
+                            }[a['label']] ?? 'Address'}'
                         '${a['is_default'] == true ? ' · default' : ''}',
                         style: AppTypography.sectionTitle),
                     const SizedBox(height: 2),
@@ -154,7 +158,9 @@ class _PortalProfileScreenState extends State<PortalProfileScreen> {
                   ]),
                 ),
                 IconButton(
-                    tooltip: 'Edit', onPressed: () => _edit(a), icon: const Icon(Icons.edit_outlined)),
+                    tooltip: 'Edit',
+                    onPressed: () => _edit(a),
+                    icon: const Icon(Icons.edit_outlined)),
                 IconButton(
                     tooltip: 'Delete',
                     onPressed: () => _delete(a),
