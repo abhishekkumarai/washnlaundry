@@ -129,6 +129,9 @@ class Shop(models.Model):
     # SocialSuiteEnabled) and the AI support Chat (the /api/rag/chat/ proxy).
     social_suite_enabled = models.BooleanField(default=False)
     chat_enabled = models.BooleanField(default=False)
+    # Customer portal: the shop is listed in "Find your laundry" and customers can
+    # join and book through its /s/<slug> link. The owner switches it on.
+    accepts_online_customers = models.BooleanField(default=False)
 
     # Minutes before a slot starts after which customers can no longer book it.
     pickup_buffer_minutes = models.IntegerField(default=30)
@@ -911,7 +914,16 @@ class EmailLinkRequest(TenantModel):
             return False
         if self.customer.email and self.customer.email.lower() != self.email.lower():
             return False
-        Customer.objects.filter(pk=self.customer_id).update(email=self.email.lower())
+        Customer.all_objects.filter(pk=self.customer_id).update(email=self.email.lower())
+        # A portal customer (KAN-217) also becomes a member of the shop, so they
+        # resolve to it without an X-Tenant-ID header.
+        from django.contrib.auth import get_user_model
+        user = get_user_model().objects.filter(username__iexact=self.email).first()
+        if user and self.shop_id:
+            ShopMembership.objects.get_or_create(
+                user=user, shop_id=self.shop_id,
+                defaults={'role': ShopRole.CUSTOMER, 'is_active': True,
+                          'is_default': not ShopMembership.objects.filter(user=user).exists()})
         self.status = self.APPROVED
         self.resolved_at = timezone.now()
         self.save(update_fields=['status', 'resolved_at'])

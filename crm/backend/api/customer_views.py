@@ -12,6 +12,7 @@ from datetime import date, timedelta
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -22,7 +23,7 @@ from google.oauth2 import id_token  # noqa: F401  (tests patch api.customer_view
 from .auth import customer_for_email, normalize_phone, verified_email
 from .models import (
     Customer, CustomerAddress, DeliveryType, EmailLinkRequest, GarmentCategory, GarmentItem, Order, OrderItem,
-    OrderSource, OrderStatus, PaymentStatus, ServiceArea, TimeSlot,
+    OrderSource, OrderStatus, PaymentStatus, ServiceArea, Shop, ShopMembership, ShopRole, TimeSlot,
 )
 
 _STATUS_TIMESTAMPS = (
@@ -31,12 +32,30 @@ _STATUS_TIMESTAMPS = (
 )
 
 
+def shop_customer(email, shop=None):
+    """The Customer row `email` acts as. With a shop (the active tenant), only that
+    shop's row; without one, the shop of their default CUSTOMER membership, falling
+    back to the oldest matching row (single-shop deployments)."""
+    from .tenancy import get_current_tenant
+    shop = shop or get_current_tenant()
+    if shop:
+        return Customer.all_objects.filter(shop=shop, email__iexact=email).order_by('created_at').first()
+    m = ShopMembership.objects.filter(
+        user__username__iexact=email, role=ShopRole.CUSTOMER, is_active=True,
+        shop__status='ACTIVE').select_related('shop').first()  # Meta ordering: default first
+    if m:
+        found = Customer.all_objects.filter(shop=m.shop, email__iexact=email).order_by('created_at').first()
+        if found:
+            return found
+    return customer_for_email(email)
+
+
 def _customer_for(request):
     """(customer, error_response). Exactly one is None."""
     email = verified_email(request)
     if not email:
         return None, JsonResponse({'detail': 'Sign in required.'}, status=401)
-    customer = customer_for_email(email)
+    customer = shop_customer(email)
     if customer is None:
         pending = EmailLinkRequest.objects.filter(
             email__iexact=email, status=EmailLinkRequest.PENDING).exists()
@@ -530,6 +549,110 @@ def customer_order_detail(request, order_number):
     if order is None:
         return JsonResponse({'detail': 'Order not found.'}, status=404)
     return JsonResponse(_order_json(order))
+
+
+def _public_shop_json(shop):
+    return {'id': shop.id, 'slug': shop.slug, 'name': shop.name, 'address': shop.address,
+            'city': shop.city, 'pin_code': shop.pin_code, 'phone': shop.phone,
+            'currency_symbol': shop.currency_symbol,
+            'accepts_online_customers': shop.accepts_online_customers}
+
+
+def _online_shops():
+    """Shops a customer can find and join: opted in, active, not a demo sandbox."""
+    return Shop.objects.filter(accepts_online_customers=True, status='ACTIVE') \
+        .exclude(slug__startswith='demo-')
+
+
+@require_GET
+def customer_shop_search(request):
+    """GET /api/customer/shops/?q= - public "Find your laundry": by name, city or pincode."""
+    from .password_auth import _client_ip, _throttled
+    if _throttled(f'shop-search:{_client_ip(request)}', limit=120, window=3600):
+        return _bad('Too many searches. Please try again later.', status=429)
+    q = str(request.GET.get('q') or '').strip()[:60]
+    shops = _online_shops()
+    if q:
+        shops = shops.filter(Q(name__icontains=q) | Q(city__icontains=q) | Q(pin_code__startswith=q)
+                             | Q(service_areas__pin_code=q, service_areas__is_active=True)).distinct()
+    return JsonResponse({'shops': [_public_shop_json(s) for s in shops.order_by('name')[:20]]})
+
+
+@require_GET
+def customer_shop_detail(request, slug):
+    """GET /api/customer/shops/<slug>/ - the shop behind a /s/<slug> booking link."""
+    shop = _online_shops().filter(slug__iexact=slug).first()
+    if shop is None:
+        return _bad('This laundry is not taking online bookings.', status=404)
+    return JsonResponse(_public_shop_json(shop))
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def customer_join(request):
+    """POST /api/customer/join/ {name, phone} with X-Tenant-ID: join that shop as a customer.
+
+    New phone for the shop: a Customer + CUSTOMER membership are created (201). A
+    phone the shop already has queues an EmailLinkRequest for the owner (202):
+    without a phone OTP, linking directly would let anyone claim a stranger's orders.
+    """
+    from django.contrib.auth import get_user_model
+    from .password_auth import _throttled
+    from .tenancy import get_current_tenant
+
+    email = verified_email(request)
+    if not email:
+        return _bad('Sign in required.', status=401)
+    shop = get_current_tenant()
+    if shop is None or not _online_shops().filter(pk=shop.pk).exists():
+        return _bad('This laundry is not taking online bookings.', status=404)
+    if _throttled(f'customer-join:{email}', limit=10, window=3600):
+        return _bad('Too many attempts. Please try again later.', status=429)
+    body, err = _read_json(request)
+    if err:
+        return err
+    name = str(body.get('name') or '').strip()[:255]
+    phone = clean_phone(body.get('phone'))
+    if not name or not phone:
+        return _bad('Enter your name and a valid 10-digit mobile number.')
+
+    User = get_user_model()
+    user = User.objects.filter(username__iexact=email).first()
+    if user is None:  # first Google sign-in: the token already proved the email
+        user = User.objects.create_user(username=email, email=email, first_name=name[:150])
+        user.set_unusable_password()
+        user.save(update_fields=['password'])
+
+    with transaction.atomic():
+        existing = shop_customer(email, shop)
+        if existing:
+            _ensure_customer_membership(user, shop)
+            return JsonResponse(_me_json(existing), status=200)
+        by_phone = Customer.all_objects.filter(shop=shop, phone__endswith=phone).first()
+        if by_phone:
+            EmailLinkRequest.objects.get_or_create(
+                shop=shop, customer=by_phone, email=email, status=EmailLinkRequest.PENDING)
+            return JsonResponse({
+                'pending': True,
+                'detail': f'That number is already registered with {shop.name}. We have asked '
+                          'them to confirm it is you; your orders appear once they approve.'},
+                status=202)
+        customer = Customer.objects.create(shop=shop, name=name, phone=phone, email=email)
+        _ensure_customer_membership(user, shop)
+    return JsonResponse(_me_json(customer), status=201)
+
+
+def _ensure_customer_membership(user, shop):
+    """Give `user` an active CUSTOMER membership of `shop`, never downgrading an
+    owner/staff membership they already have there."""
+    m, created = ShopMembership.objects.get_or_create(
+        user=user, shop=shop,
+        defaults={'role': ShopRole.CUSTOMER, 'is_active': True,
+                  'is_default': not ShopMembership.objects.filter(user=user).exists()})
+    if not created and m.role == ShopRole.CUSTOMER and not m.is_active:
+        m.is_active = True
+        m.save(update_fields=['is_active'])
+    return m
 
 
 @require_GET

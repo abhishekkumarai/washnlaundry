@@ -335,7 +335,7 @@ def resolve_principal(email, shop=None):
         if is_staff_email(email, shop=shop):
             return Principal(email, STAFF, user=user, shop=shop)
         shop_cust = Customer.objects.filter(email__iexact=email, shop=shop).order_by('created_at').first()
-        if shop_cust and not settings.SELF_SERVICE_SHOPS:  # the customer view is off then
+        if shop_cust:
             return Principal(email, CUSTOMER, customer=shop_cust, user=user, shop=shop)
 
     # With a tenant active, only the checks above count. Groups and Customer
@@ -355,8 +355,16 @@ def resolve_principal(email, shop=None):
         if own:
             role = OWNER if own.role == ShopRole.OWNER else STAFF
             return Principal(email, role, user=user, shop=own.shop)
-        # No shop yet: no access to anything (the customer view is off too) until they
-        # set up their own shop.
+        # A customer who joined a shop on the portal: their default CUSTOMER membership.
+        joined = ShopMembership.objects.filter(
+            user=user, is_active=True, role=ShopRole.CUSTOMER,
+        ).exclude(shop__status='ARCHIVED').select_related('shop').first()
+        if joined:
+            c = Customer.all_objects.filter(
+                email__iexact=email, shop=joined.shop).order_by('created_at').first()
+            if c:
+                return Principal(email, CUSTOMER, customer=c, user=user, shop=joined.shop)
+        # No shop yet: nothing until they set up a shop (app host) or join one (portal).
         return Principal(email, UNLINKED, user=user, shop=None)
 
     # 3. No tenant (e.g. /api/me/): global group checks / fallback
