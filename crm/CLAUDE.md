@@ -136,9 +136,11 @@ data loading in `main.dart` does not run; the portal sends its own chosen shop (
 prefs key `portal_shop`) as `X-Tenant-ID`, so `/api/me/` reports the role *for that shop*
 (`AuthProvider.serverRole`, not the host-narrowed `role`).
 
-- **Flow:** `/s/<slug>` (shop's link/QR) or `/find` (search) → sign in (Google, or an emailed 6-digit code:
-  `api/otp.py`) → `/join` (name + mobile) → `/book` · `/orders` · `/orders/:no` · `/profile` (+ addresses with a
+- **Flow:** sign in first, as in a delivery app (Google, or an emailed 6-digit code: `api/otp.py`) →
+  `/find`, the signed-in home (joined laundries, then the rest with search) → `/join` (name + mobile) → `/book` · `/orders` · `/orders/:no` · `/profile` (+ addresses with a
   flutter_map/OpenStreetMap pin and browser geolocation). Owners/staff of the shop are told to use app.
+  Signed out, only `/login`, the email links and a shop's `/s/<slug>` link/QR open; the link remembers its
+  shop through sign-in and skips the list. Signing out forgets the chosen shop.
 - **Opt-in:** `Shop.accepts_online_customers` (default off), toggled in CRM Settings → **Online booking**,
   which also shows the link + QR and the **online sign-ups** to approve (a joiner whose phone the shop already
   has gets an `EmailLinkRequest`, never an auto-link: no phone OTP yet).
