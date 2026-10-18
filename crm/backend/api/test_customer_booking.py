@@ -217,3 +217,23 @@ class CustomerBookingTests(APITestCase):
     def test_booking_requires_sign_in(self):
         res = self.client.post('/api/customer/orders/', {}, format='json')
         self.assertEqual(res.status_code, 401)
+
+    def test_history_calendar_date_filter_and_pages(self):
+        from datetime import datetime
+        tz = timezone.get_current_timezone()
+        stamps = [datetime(2026, 9, 30, 23, 0), datetime(2026, 10, 3, 9, 0),
+                  datetime(2026, 10, 3, 18, 0), datetime(2026, 10, 3, 23, 30)] + \
+                 [datetime(2026, 10, 9, h, 0) for h in range(8, 16)]
+        for at in stamps:
+            o = Order.objects.create(customer=self.alice, customer_name='Alice',
+                                     customer_phone=self.alice.phone, total_amount=10)
+            Order.objects.filter(pk=o.pk).update(created_at=timezone.make_aware(at, tz))
+        get = lambda **q: self.client.get('/api/customer/orders/', q, **self.auth)
+        # Days are the shop's local days: 23:30 IST on the 3rd is still the 3rd.
+        self.assertEqual(get(calendar='2026-10').json()['days'], {'2026-10-03': 3, '2026-10-09': 8})
+        self.assertEqual(len(get(date='2026-10-03').json()['orders']), 3)
+        page = get(page='2', page_size='5').json()
+        self.assertEqual((page['page'], page['pages'], page['total'], len(page['orders'])), (2, 3, 12, 5))
+        self.assertEqual(get(page='9', page_size='5').json()['page'], 3)  # clamped to the last page
+        self.assertEqual(len(get().json()['orders']), 12)  # no page: everything, as before
+        self.assertEqual(get(calendar='Oct').status_code, 400)

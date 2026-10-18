@@ -91,20 +91,31 @@ class _PortalProfileScreenState extends State<PortalProfileScreen> {
         PortalPanel(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const Text('Your details', style: AppTypography.sectionTitle),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
+            const Text('FULL NAME', style: portalFieldLabel),
+            const SizedBox(height: 6),
             TextField(
                 controller: _name,
-                decoration:
-                    const InputDecoration(labelText: 'Full name', border: OutlineInputBorder())),
-            const SizedBox(height: 10),
+                textCapitalization: TextCapitalization.words,
+                decoration: portalField('Your name', icon: Icons.person_outline)),
+            const SizedBox(height: 14),
+            const Text('MOBILE NUMBER', style: portalFieldLabel),
+            const SizedBox(height: 6),
             TextField(
                 controller: _phone,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                    labelText: 'Mobile number', prefixText: '+91 ', border: OutlineInputBorder())),
-            const SizedBox(height: 10),
-            Text('Email: ${_auth.userEmail ?? ''} (your sign-in)',
-                style: const TextStyle(color: AppColors.muted)),
+                decoration:
+                    portalField('10-digit mobile', icon: Icons.phone_outlined, prefix: '+91 ')),
+            const SizedBox(height: 12),
+            Text.rich(
+              TextSpan(children: [
+                const TextSpan(text: 'Signed in as '),
+                TextSpan(
+                    text: _auth.userEmail ?? '',
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink)),
+              ]),
+              style: const TextStyle(fontSize: 13, color: AppColors.muted),
+            ),
             portalError(_error),
             if (_saved != null)
               Padding(
@@ -116,6 +127,12 @@ class _PortalProfileScreenState extends State<PortalProfileScreen> {
               alignment: Alignment.centerLeft,
               child: FilledButton(
                   onPressed: _saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.onPrimary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                   child: Text(_saving ? 'Saving…' : 'Save details')),
             ),
           ]),
@@ -169,8 +186,6 @@ class _PortalProfileScreenState extends State<PortalProfileScreen> {
             ),
             const SizedBox(height: 8),
           ],
-        const SizedBox(height: 24),
-        OutlinedButton(onPressed: _auth.signOut, child: const Text('Sign out')),
       ]),
     );
   }

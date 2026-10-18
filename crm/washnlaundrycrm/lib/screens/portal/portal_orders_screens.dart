@@ -25,7 +25,8 @@ String _pickupText(Map<String, dynamic> o) {
   return 'Pickup ${DateFormat('EEE d MMM').format(d)}${time.isEmpty ? '' : ', $time'}';
 }
 
-/// The customer's own orders in this shop, grouped by the day they were booked.
+/// The customer's own orders in this shop: a month calendar to jump to a day,
+/// the list grouped by the day they were booked, and pages of 10.
 class PortalOrdersScreen extends StatefulWidget {
   const PortalOrdersScreen({super.key});
 
@@ -34,76 +35,392 @@ class PortalOrdersScreen extends StatefulWidget {
 }
 
 class _PortalOrdersScreenState extends State<PortalOrdersScreen> {
+  static const _pageSize = 10;
+
   List<Map<String, dynamic>>? _orders;
+  int _page = 1;
+  int _pages = 1;
+  int _total = 0;
   String? _error;
+
+  /// The calendar's month (its first day), the orders per day in it, and the
+  /// day the list is narrowed to, if any.
+  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  Map<String, int> _days = const {};
+  DateTime? _day;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadMonth();
   }
 
-  Future<void> _load() async {
+  static String _iso(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
+
+  Future<void> _load({int page = 1}) async {
     setState(() => _error = null);
     try {
-      final orders = await ApiService.fetchMyOrders();
-      if (mounted) setState(() => _orders = orders);
+      final res = await ApiService.fetchMyOrdersPage(
+          page: page, pageSize: _pageSize, date: _day == null ? null : _iso(_day!));
+      if (!mounted) return;
+      setState(() {
+        _orders = [for (final o in res['orders'] as List) Map<String, dynamic>.from(o as Map)];
+        _page = res['page'] as int? ?? 1;
+        _pages = res['pages'] as int? ?? 1;
+        _total = res['total'] as int? ?? _orders!.length;
+      });
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     }
+  }
+
+  Future<void> _loadMonth() async {
+    try {
+      final days = await ApiService.fetchOrderCalendar(DateFormat('yyyy-MM').format(_month));
+      if (mounted) setState(() => _days = days);
+    } on ApiException {
+      // The list still works without the dots.
+    }
+  }
+
+  void _shiftMonth(int by) {
+    setState(() {
+      _month = DateTime(_month.year, _month.month + by);
+      _days = const {};
+    });
+    _loadMonth();
+  }
+
+  void _pickDay(DateTime? day) {
+    setState(() => _day = day);
+    _load();
   }
 
   @override
   Widget build(BuildContext context) {
     final orders = _orders;
     final money = _money(context);
-    Widget body;
+    final List<Widget> list;
     if (orders == null) {
-      body = Center(
-        child: _error == null
-            ? const CircularProgressIndicator()
-            : Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(_error!),
-                const SizedBox(height: 12),
-                FilledButton(onPressed: _load, child: const Text('Try again')),
-              ]),
-      );
+      list = [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 32),
+          child: Center(
+            child: _error == null
+                ? const CircularProgressIndicator(strokeWidth: 2.5)
+                : Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_error!),
+                    const SizedBox(height: 12),
+                    FilledButton(onPressed: _load, child: const Text('Try again')),
+                  ]),
+          ),
+        ),
+      ];
+    } else if (orders.isEmpty && _day == null) {
+      list = [_noOrders(context)];
     } else if (orders.isEmpty) {
-      body = Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('No orders yet.', style: AppTypography.title),
-          const SizedBox(height: 12),
-          FilledButton(onPressed: () => context.go('/book'), child: const Text('Book a pickup')),
-        ]),
-      );
+      list = [
+        PortalPanel(
+          child: Text('No orders booked on ${DateFormat('EEE d MMM').format(_day!)}.',
+              style: const TextStyle(color: AppColors.muted)),
+        ),
+      ];
     } else {
-      final groups = _byDay(orders);
-      body = RefreshIndicator(
-        onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            for (final g in groups) ...[
-              _DayHeader(
-                label: _dayLabel(g.day),
-                summary: '${g.orders.length} order${g.orders.length == 1 ? '' : 's'} · '
-                    '${money.format(g.orders.fold<num>(0, (s, o) => s + ((o['total_amount'] as num?) ?? 0)))}',
+      list = [
+        for (final g in _byDay(orders)) ...[
+          _DayHeader(
+            label: _dayLabel(g.day),
+            summary: '${g.orders.length} order${g.orders.length == 1 ? '' : 's'} · '
+                '${money.format(g.orders.fold<num>(0, (s, o) => s + ((o['total_amount'] as num?) ?? 0)))}',
+          ),
+          PortalPanel(
+            padding: EdgeInsets.zero,
+            child: Column(children: [
+              for (var i = 0; i < g.orders.length; i++) ...[
+                if (i > 0) const Divider(height: 1, color: AppColors.borderSubtle),
+                _OrderRow(order: g.orders[i], money: money),
+              ],
+            ]),
+          ),
+        ],
+        if (_pages > 1) ...[
+          const SizedBox(height: 16),
+          _Pager(
+            page: _page,
+            pages: _pages,
+            total: _total,
+            onPage: (p) => _load(page: p),
+          ),
+        ],
+      ];
+    }
+    return PortalShell(
+      index: 1,
+      title: 'Your orders',
+      child: RefreshIndicator(
+        onRefresh: () async {
+          await Future.wait([_load(page: _page), _loadMonth()]);
+        },
+        child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
+          _HistoryCalendar(
+            month: _month,
+            counts: _days,
+            selected: _day,
+            onMonth: _shiftMonth,
+            onDay: (d) => _pickDay(_day != null && _iso(_day!) == _iso(d) ? null : d),
+          ),
+          if (_day != null) ...[
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(
+                child: Text(
+                    'Showing ${DateFormat('EEE d MMM').format(_day!)}'
+                    '${orders == null ? '' : ' · $_total order${_total == 1 ? '' : 's'}'}',
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink)),
               ),
-              PortalPanel(
-                padding: EdgeInsets.zero,
-                child: Column(children: [
-                  for (var i = 0; i < g.orders.length; i++) ...[
-                    if (i > 0) const Divider(height: 1, color: AppColors.borderSubtle),
-                    _OrderRow(order: g.orders[i], money: money),
-                  ],
-                ]),
-              ),
-            ],
+              TextButton(onPressed: () => _pickDay(null), child: const Text('All dates')),
+            ]),
           ],
+          const SizedBox(height: 4),
+          ...list,
+        ]),
+      ),
+    );
+  }
+
+  Widget _noOrders(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: PortalPanel(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('No orders with ${context.watch<PortalProvider>().shopName} yet',
+                style: AppTypography.sectionTitle),
+            const SizedBox(height: 4),
+            const Text('Book a pickup and it shows up here, with its status as it moves.',
+                style: TextStyle(fontSize: 13, color: AppColors.muted, height: 1.4)),
+            const SizedBox(height: 14),
+            FilledButton(
+              onPressed: () => context.go('/book'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 44),
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Book a pickup'),
+            ),
+          ]),
         ),
       );
-    }
-    return PortalShell(index: 1, title: 'Your orders', child: body);
+}
+
+/// A month of the customer's history: a dot under each day with orders; tap
+/// a day to list just that day (tap again to clear). Weeks start on Monday.
+class _HistoryCalendar extends StatelessWidget {
+  const _HistoryCalendar({
+    required this.month,
+    required this.counts,
+    required this.selected,
+    required this.onMonth,
+    required this.onDay,
+  });
+
+  final DateTime month;
+  final Map<String, int> counts;
+  final DateTime? selected;
+  final ValueChanged<int> onMonth;
+  final ValueChanged<DateTime> onDay;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final lead = month.weekday - 1; // blanks before the 1st
+    final days = DateTime(month.year, month.month + 1, 0).day;
+    final isCurrent = month.year == now.year && month.month == now.month;
+    final booked = counts.values.fold<int>(0, (a, b) => a + b);
+    String iso(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
+
+    return PortalPanel(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+      child: Column(children: [
+        Row(children: [
+          IconButton(
+            tooltip: 'Previous month',
+            onPressed: () => onMonth(-1),
+            icon: const Icon(Icons.chevron_left_rounded, color: AppColors.ink),
+          ),
+          Expanded(
+            child: Column(children: [
+              Text(DateFormat('MMMM y').format(month),
+                  style: AppTypography.sectionTitle
+                      .copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
+              Text(booked == 0 ? 'No orders' : '$booked order${booked == 1 ? '' : 's'}',
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.muted)),
+            ]),
+          ),
+          IconButton(
+            tooltip: 'Next month',
+            // Nothing is booked in the future.
+            onPressed: isCurrent ? null : () => onMonth(1),
+            icon: const Icon(Icons.chevron_right_rounded),
+          ),
+        ]),
+        const SizedBox(height: 6),
+        Row(children: [
+          for (final w in const ['M', 'T', 'W', 'T', 'F', 'S', 'S'])
+            Expanded(
+              child: Text(w,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted)),
+            ),
+        ]),
+        const SizedBox(height: 4),
+        for (var row = 0; row * 7 < lead + days; row++)
+          Row(children: [
+            for (var col = 0; col < 7; col++)
+              Expanded(
+                child: Builder(builder: (context) {
+                  final n = row * 7 + col - lead + 1;
+                  if (n < 1 || n > days) return const SizedBox(height: 40);
+                  final d = DateTime(month.year, month.month, n);
+                  final count = counts[iso(d)] ?? 0;
+                  final picked = selected != null && iso(selected!) == iso(d);
+                  final future = d.isAfter(today);
+                  return _DayCell(
+                    day: n,
+                    count: count,
+                    picked: picked,
+                    today: d == today,
+                    muted: future,
+                    onTap: future ? null : () => onDay(d),
+                  );
+                }),
+              ),
+          ]),
+      ]),
+    );
+  }
+}
+
+class _DayCell extends StatelessWidget {
+  const _DayCell({
+    required this.day,
+    required this.count,
+    required this.picked,
+    required this.today,
+    required this.muted,
+    required this.onTap,
+  });
+
+  final int day;
+  final int count;
+  final bool picked;
+  final bool today;
+  final bool muted;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = picked
+        ? AppColors.onPrimary
+        : muted
+            ? const Color(0xFFC4C0B8)
+            : AppColors.ink;
+    return Semantics(
+      button: onTap != null,
+      label: '$day${count == 0 ? '' : ', $count order${count == 1 ? '' : 's'}'}',
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          height: 40,
+          child: Center(
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: picked ? AppColors.primary : null,
+                border: today && !picked ? Border.all(color: AppColors.primary) : null,
+              ),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Text('$day',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: count > 0 || today ? FontWeight.w700 : FontWeight.w400,
+                        color: fg,
+                        fontFeatures: const [FontFeature.tabularFigures()])),
+                Container(
+                  width: 4,
+                  height: 4,
+                  margin: const EdgeInsets.only(top: 2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: count == 0
+                        ? Colors.transparent
+                        : picked
+                            ? AppColors.onPrimary
+                            : AppColors.accent,
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Newer · "Page 2 of 3" · Older, under the list.
+class _Pager extends StatelessWidget {
+  const _Pager(
+      {required this.page, required this.pages, required this.total, required this.onPage});
+
+  final int page;
+  final int pages;
+  final int total;
+  final ValueChanged<int> onPage;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = OutlinedButton.styleFrom(
+      minimumSize: const Size(0, 40),
+      side: const BorderSide(color: AppColors.border),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    );
+    return Row(children: [
+      OutlinedButton.icon(
+        onPressed: page > 1 ? () => onPage(page - 1) : null,
+        style: style,
+        icon: const Icon(Icons.chevron_left_rounded, size: 18),
+        label: const Text('Newer'),
+      ),
+      Expanded(
+        child: Column(children: [
+          Text('Page $page of $pages',
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ink,
+                  fontFeatures: [FontFeature.tabularFigures()])),
+          Text('$total orders', style: const TextStyle(fontSize: 11.5, color: AppColors.muted)),
+        ]),
+      ),
+      OutlinedButton(
+        onPressed: page < pages ? () => onPage(page + 1) : null,
+        style: style,
+        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+          Text('Older'),
+          SizedBox(width: 4),
+          Icon(Icons.chevron_right_rounded, size: 18),
+        ]),
+      ),
+    ]);
   }
 }
 

@@ -263,6 +263,24 @@ class ApiService {
     return (data['orders'] as List).map((o) => Map<String, dynamic>.from(o as Map)).toList();
   }
 
+  /// One page of the customer's orders (newest first), optionally only those
+  /// booked on [date] (yyyy-MM-dd): `{orders, page, pages, total}`.
+  static Future<Map<String, dynamic>> fetchMyOrdersPage(
+          {int page = 1, int pageSize = 10, String? date}) async =>
+      Map<String, dynamic>.from(await _send('GET', '/customer/orders/', query: {
+        'page': '$page',
+        'page_size': '$pageSize',
+        if (date != null) 'date': date,
+      }) as Map);
+
+  /// Orders booked on each day of [month] (yyyy-MM), keyed yyyy-MM-dd.
+  static Future<Map<String, int>> fetchOrderCalendar(String month) async {
+    final data = await _send('GET', '/customer/orders/', query: {'calendar': month}) as Map;
+    return {
+      for (final e in (data['days'] as Map).entries) '${e.key}': (e.value as num).toInt(),
+    };
+  }
+
   static Future<List<Map<String, dynamic>>> fetchRateCard() async {
     final data = await _send('GET', '/customer/rate-card/') as Map;
     return (data['categories'] as List).map((c) => Map<String, dynamic>.from(c as Map)).toList();

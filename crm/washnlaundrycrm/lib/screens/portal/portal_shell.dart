@@ -79,13 +79,17 @@ class PortalShell extends StatelessWidget {
 /// booked with (tap to change), Book · Orders links on wide screens, and an
 /// account menu with Profile and Sign out.
 class PortalNavBar extends StatelessWidget implements PreferredSizeWidget {
-  const PortalNavBar({super.key, this.index, this.leading});
+  const PortalNavBar({super.key, this.index, this.leading, this.choosingShop = false});
 
   /// The active section (0 Book, 1 Orders, 2 Profile), or null off-section.
   final int? index;
 
   /// Shown before the logo, e.g. a back arrow.
   final Widget? leading;
+
+  /// On the laundry list itself: no laundry switcher, links or "Change
+  /// laundry" (the page is the switcher; its back arrow returns to booking).
+  final bool choosingShop;
 
   static const height = 60.0;
 
@@ -96,7 +100,7 @@ class PortalNavBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final portal = context.watch<PortalProvider>();
     final wide = MediaQuery.sizeOf(context).width >= PortalShell.wide;
-    final hasShop = portal.shopSlug != null;
+    final hasShop = portal.shopSlug != null && !choosingShop;
     return Material(
       color: AppColors.card,
       child: SafeArea(
@@ -168,7 +172,7 @@ class PortalNavBar extends StatelessWidget implements PreferredSizeWidget {
                 _NavLink(label: 'Orders', active: index == 1, onTap: () => context.go('/orders')),
               ],
             ])),
-            const _AccountMenu(),
+            _AccountMenu(choosingShop: choosingShop),
           ]),
         ),
       ),
@@ -206,7 +210,9 @@ class _NavLink extends StatelessWidget {
 
 /// The signed-in customer's menu: who they are, Profile, Change laundry, Sign out.
 class _AccountMenu extends StatelessWidget {
-  const _AccountMenu();
+  const _AccountMenu({required this.choosingShop});
+
+  final bool choosingShop;
 
   @override
   Widget build(BuildContext context) {
@@ -253,10 +259,11 @@ class _AccountMenu extends StatelessWidget {
             value: 'profile',
             child: _MenuRow(icon: Icons.person_outline, label: 'Profile'),
           ),
-        const PopupMenuItem(
-          value: 'change',
-          child: _MenuRow(icon: Icons.storefront_outlined, label: 'Change laundry'),
-        ),
+        if (!choosingShop)
+          const PopupMenuItem(
+            value: 'change',
+            child: _MenuRow(icon: Icons.storefront_outlined, label: 'Change laundry'),
+          ),
         const PopupMenuDivider(),
         const PopupMenuItem(
           value: 'signout',
@@ -353,6 +360,28 @@ class PortalPage extends StatelessWidget {
           ),
         ),
       );
+}
+
+/// Small caps label over a form field (the portal's field labels).
+const portalFieldLabel = TextStyle(
+    fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: Color(0xFF475569));
+
+/// The portal's text field: white, hairline border, navy when focused.
+InputDecoration portalField(String hint, {IconData? icon, String? prefix}) {
+  OutlineInputBorder edge(Color c, [double w = 1]) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c, width: w));
+  return InputDecoration(
+    hintText: hint,
+    hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+    prefixIcon: icon == null ? null : Icon(icon, size: 18, color: AppColors.muted),
+    prefixText: prefix,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    filled: true,
+    fillColor: AppColors.card,
+    border: edge(AppColors.border),
+    enabledBorder: edge(AppColors.border),
+    focusedBorder: edge(AppColors.primary, 1.5),
+  );
 }
 
 /// Error text in the portal's danger colour, or nothing.

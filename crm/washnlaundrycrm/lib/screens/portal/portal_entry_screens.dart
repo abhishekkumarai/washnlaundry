@@ -330,7 +330,7 @@ class _FindShopScreenState extends State<FindShopScreen> {
     super.initState();
     _search();
     SharedPreferences.getInstance().then((p) {
-      if (mounted && p.getBool(_locationPref) == true) _locate();
+      if (mounted && p.getBool(_locationPref) == true) _locate(quiet: true);
     }).catchError((_) {});
   }
 
@@ -355,7 +355,8 @@ class _FindShopScreenState extends State<FindShopScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
-  Future<void> _locate() async {
+  /// [quiet]: the remembered retry on open; if it fails, just offer the button.
+  Future<void> _locate({bool quiet = false}) async {
     setState(() {
       _locating = true;
       _locationFailed = false;
@@ -365,10 +366,12 @@ class _FindShopScreenState extends State<FindShopScreen> {
     setState(() {
       _locating = false;
       _here = here;
-      _locationFailed = here == null;
+      _locationFailed = here == null && !quiet;
     });
     try {
-      (await SharedPreferences.getInstance()).setBool(_locationPref, here != null);
+      if (!quiet || here != null) {
+        (await SharedPreferences.getInstance()).setBool(_locationPref, here != null);
+      }
     } catch (_) {}
     if (here != null) await _search();
   }
@@ -423,6 +426,7 @@ class _FindShopScreenState extends State<FindShopScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: PortalNavBar(
+        choosingShop: true,
         leading: current == null
             ? null
             : IconButton(
@@ -559,29 +563,39 @@ class _LocationPrompt extends StatelessWidget {
   final VoidCallback onUse;
 
   @override
-  Widget build(BuildContext context) => PortalPanel(
-        child: Row(children: [
-          const Icon(Icons.near_me_outlined, color: AppColors.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-                failed
-                    ? "Couldn't get your location. Allow it in the browser, or search your pincode."
-                    : 'See the laundries closest to you.',
-                style: TextStyle(
-                    fontSize: 13.5, color: failed ? AppColors.danger : AppColors.ink, height: 1.4)),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton(
-            onPressed: busy ? null : onUse,
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.border),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: Text(busy ? 'Locating…' : 'Use my location'),
-          ),
-        ]),
-      );
+  Widget build(BuildContext context) {
+    final message = Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(failed ? Icons.location_off_outlined : Icons.near_me_outlined,
+          size: 20, color: failed ? AppColors.danger : AppColors.primary),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Text(
+            failed
+                ? 'Location is off. Allow it for this site, or search your pincode above.'
+                : 'Share your location to see the laundries closest to you.',
+            style: const TextStyle(fontSize: 13.5, color: AppColors.ink, height: 1.4)),
+      ),
+    ]);
+    final button = OutlinedButton.icon(
+      onPressed: busy ? null : onUse,
+      icon: const Icon(Icons.my_location_rounded, size: 16),
+      label: Text(busy ? 'Locating…' : 'Use my location'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 40),
+        side: const BorderSide(color: AppColors.border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+    return PortalPanel(
+      child: MediaQuery.sizeOf(context).width < 480
+          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              message,
+              const SizedBox(height: 12),
+              button,
+            ])
+          : Row(children: [Expanded(child: message), const SizedBox(width: 12), button]),
+    );
+  }
 }
 
 /// Rows in one bordered block, split by hairlines (a list, not a stack of cards).

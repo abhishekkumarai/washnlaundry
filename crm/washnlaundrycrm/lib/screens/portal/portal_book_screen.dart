@@ -77,11 +77,9 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
         _options = results[0] as Map<String, dynamic>;
         _addresses = results[1] as List<Map<String, dynamic>>;
         // The default address if the shop comes to it, else the first one it
-        // does, else just the first (the step then says why it can't go on).
+        // does; none when it comes to none (the step then says so).
         final served = _addresses.where(_serves).toList();
-        final pick = served.where((a) => a['is_default'] == true).firstOrNull ??
-            served.firstOrNull ??
-            _addresses.firstOrNull;
+        final pick = served.where((a) => a['is_default'] == true).firstOrNull ?? served.firstOrNull;
         _addressId ??= pick?['id'] as int?;
         final days = _days;
         _date ??= days.firstWhere((d) => _openSlots(d).isNotEmpty,
@@ -178,12 +176,24 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
         0 => _qty.values.every((q) => q == 0) ? 'Add at least one item.' : null,
         1 => _date == null || _slotId == null ? 'Choose a pickup time.' : null,
         2 => _address == null
-            ? 'Add a pickup address.'
+            ? (_addresses.isEmpty ? 'Add a pickup address.' : 'Pick an address in the pickup area.')
             : !_pincodeServed
                 ? 'The shop does not pick up from ${_address!['pin_code']} yet.'
                 : null,
         _ => null,
       };
+
+  /// "Tomorrow, 9–11 AM" once a day and slot are picked.
+  String? get _pickedSlotText {
+    if (_date == null || _slotId == null) return null;
+    final day = _days.where((d) => d['date'] == _date).firstOrNull;
+    final slot = (day?['slots'] as List? ?? const [])
+        .map((s) => Map<String, dynamic>.from(s as Map))
+        .where((s) => s['id'] == _slotId)
+        .firstOrNull;
+    if (slot == null) return null;
+    return '${_PickupPicker.dayLabel(_date!)}, ${_PickupPicker.shortSlot('${slot['label']}')}';
+  }
 
   /// The furthest step that can be opened: every step before it is done.
   int get _reachable {
@@ -265,13 +275,16 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
               // on one row; the full labels overflow below ~480px.
               Builder(builder: (context) {
                 final narrow = MediaQuery.sizeOf(context).width < 480;
+                // On the time step the footer echoes the pick ("Tomorrow, 9–11 AM").
+                final picked = _step == 1 ? _pickedSlotText : null;
                 final total = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(
-                      narrow
-                          ? '$pieces item${pieces == 1 ? '' : 's'}'
-                          : pieces == 0
-                              ? 'Estimated total'
-                              : 'Estimated total · $pieces item${pieces == 1 ? '' : 's'}',
+                      picked ??
+                          (narrow
+                              ? '$pieces item${pieces == 1 ? '' : 's'}'
+                              : pieces == 0
+                                  ? 'Estimated total'
+                                  : 'Estimated total · $pieces item${pieces == 1 ? '' : 's'}'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 12, color: AppColors.muted)),
@@ -343,7 +356,8 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
     final cats = _categories;
     return [
       const _StepTitle(
-          'What needs cleaning?', 'Prices are the shop\'s own. Pick a service, then add items.'),
+          'What needs cleaning?', 'Prices are the shop\'s own. Pick a service, then add items.',
+          hintOnPhones: false),
       // Said up front, so nobody fills a cart only to hear at the address step
       // that the shop doesn't come to them.
       if ((_options?['pincodes'] as List? ?? const []).isNotEmpty) ...[
@@ -393,22 +407,11 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
     ];
   }
 
-  /// Items step footer, as on the CRM's phone New Order: nothing to do until
+  /// Items step footer, as on the CRM's phone New Order: nothing until
   /// something is added, then a navy bar with the count and total that opens
   /// the cart.
   Widget _cartFooter(NumberFormat money, int pieces) {
-    if (pieces == 0) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        decoration: const BoxDecoration(
-          color: AppColors.card,
-          border: Border(top: BorderSide(color: AppColors.border)),
-        ),
-        child: const Text('Add items to continue.',
-            textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: AppColors.muted)),
-      );
-    }
+    if (pieces == 0) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
       child: Material(
@@ -578,6 +581,14 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
 
   List<Widget> _addressStep() => [
         const _StepTitle('Where should we pick up?', 'Delivery comes back to the same address.'),
+        if (_addresses.isNotEmpty && !_addresses.any(_serves)) ...[
+          _NoServedAddress(
+            shop: context.read<PortalProvider>().shopName,
+            pincodes: [for (final p in (_options?['pincodes'] as List? ?? const [])) '$p'],
+            onAdd: _addAddress,
+          ),
+          const SizedBox(height: 12),
+        ],
         if (_addresses.isNotEmpty)
           PortalPanel(
             padding: EdgeInsets.zero,
@@ -655,7 +666,7 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
         child: Text(
             [
               if (_date != null) _PickupPicker.dayLabel(_date!),
-              if (slot != null) '${slot['label']}'
+              if (slot != null) _PickupPicker.shortSlot('${slot['label']}')
             ].join(', '),
             style: AppTypography.bodyMedium),
       ),
@@ -783,10 +794,13 @@ class _StepBar extends StatelessWidget {
 }
 
 class _StepTitle extends StatelessWidget {
-  const _StepTitle(this.title, this.hint);
+  const _StepTitle(this.title, this.hint, {this.hintOnPhones = true});
 
   final String title;
   final String hint;
+
+  /// False where the line costs more room than it earns on a small screen.
+  final bool hintOnPhones;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -798,8 +812,10 @@ class _StepTitle extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.4,
                   color: AppColors.ink)),
-          const SizedBox(height: 4),
-          Text(hint, style: const TextStyle(fontSize: 13.5, color: AppColors.muted)),
+          if (hintOnPhones || MediaQuery.sizeOf(context).width >= 480) ...[
+            const SizedBox(height: 4),
+            Text(hint, style: const TextStyle(fontSize: 13.5, color: AppColors.muted)),
+          ],
         ]),
       );
 }
@@ -816,20 +832,30 @@ class _AddressRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
+        // An address the shop doesn't come to can't be picked.
+        onTap: served ? onTap : null,
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          color: selected ? AppColors.accentSoft : null,
+          color: selected && served ? AppColors.accentSoft : null,
           child: Row(children: [
-            Icon(selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                size: 20, color: selected ? AppColors.primary : AppColors.muted),
+            Icon(
+                !served
+                    ? Icons.block_rounded
+                    : selected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                size: 20,
+                color: selected && served ? AppColors.primary : const Color(0xFFB4B0A8)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(_labelOf(address), style: AppTypography.sectionTitle),
+                Text(_labelOf(address),
+                    style: AppTypography.sectionTitle
+                        .copyWith(color: served ? AppColors.ink : AppColors.muted)),
                 const SizedBox(height: 2),
                 Text(_addressLine(address),
-                    style: const TextStyle(fontSize: 13, color: AppColors.muted)),
+                    style: TextStyle(
+                        fontSize: 13, color: served ? AppColors.muted : const Color(0xFFB4B0A8))),
                 if (!served) ...[
                   const SizedBox(height: 4),
                   const Text("Not in this shop's pickup area",
@@ -840,6 +866,37 @@ class _AddressRow extends StatelessWidget {
             ),
           ]),
         ),
+      );
+}
+
+/// None of the customer's addresses is in the shop's pickup area: say so, and
+/// offer the two ways out.
+class _NoServedAddress extends StatelessWidget {
+  const _NoServedAddress({required this.shop, required this.pincodes, required this.onAdd});
+
+  final String shop;
+  final List<String> pincodes;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFDE68A)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+              '$shop picks up from ${pincodes.join(', ')} only, and none of your addresses '
+              'is there.',
+              style: const TextStyle(fontSize: 13.5, color: Color(0xFF78350F), height: 1.4)),
+          Wrap(spacing: 4, children: [
+            TextButton(onPressed: onAdd, child: const Text('Add an address there')),
+            TextButton(
+                onPressed: () => context.go('/find'), child: const Text('Choose another laundry')),
+          ]),
+        ]),
       );
 }
 
@@ -1064,17 +1121,65 @@ class _PickupPicker extends StatelessWidget {
   final ValueChanged<String> onDate;
   final ValueChanged<int> onSlot;
 
+  static int _offset(DateTime d) {
+    final now = DateTime.now();
+    return DateTime(d.year, d.month, d.day)
+        .difference(DateTime(now.year, now.month, now.day))
+        .inDays;
+  }
+
   /// "Today", "Tomorrow", else "Sat 18 Oct".
   static String dayLabel(String iso) {
     final d = DateTime.parse(iso);
-    final now = DateTime.now();
-    final diff =
-        DateTime(d.year, d.month, d.day).difference(DateTime(now.year, now.month, now.day)).inDays;
+    final diff = _offset(d);
     return diff == 0
         ? 'Today'
         : diff == 1
             ? 'Tomorrow'
             : DateFormat('EEE d MMM').format(d);
+  }
+
+  static final _slotRe = RegExp(r'^(\d{1,2}):(\d{2})\s*([AP]M)\s*-\s*(\d{1,2}):(\d{2})\s*([AP]M)$',
+      caseSensitive: false);
+
+  /// Start hour (0-23) of a slot label like "09:00 AM - 11:00 AM", or null.
+  static int? startHour(String label) {
+    final m = _slotRe.firstMatch(label.trim());
+    if (m == null) return null;
+    final h = int.parse(m[1]!) % 12;
+    return m[3]!.toUpperCase() == 'PM' ? h + 12 : h;
+  }
+
+  /// Slots under Morning (before noon), Afternoon (to 5 PM) and Evening; empty
+  /// parts are left out, and labels it can't read go under "Times".
+  static List<(String, List<Map<String, dynamic>>)> _parts(List<Map<String, dynamic>> slots) {
+    final parts = <String, List<Map<String, dynamic>>>{};
+    for (final s in slots) {
+      final h = startHour('${s['label']}');
+      final name = h == null
+          ? 'Times'
+          : h < 12
+              ? 'Morning'
+              : h < 17
+                  ? 'Afternoon'
+                  : 'Evening';
+      parts.putIfAbsent(name, () => []).add(s);
+    }
+    return [
+      for (final n in const ['Morning', 'Afternoon', 'Evening', 'Times'])
+        if (parts[n] != null) (n, parts[n]!)
+    ];
+  }
+
+  /// "09:00 AM - 11:00 AM" -> "9–11 AM"; "11:00 AM - 01:00 PM" -> "11 AM–1 PM".
+  /// Anything it does not recognise is shown as the shop wrote it.
+  static String shortSlot(String label) {
+    final m = _slotRe.firstMatch(label.trim());
+    if (m == null) return label;
+    String t(String h, String min) => '${int.parse(h)}${min == '00' ? '' : ':$min'}';
+    final a = t(m[1]!, m[2]!), b = t(m[4]!, m[5]!);
+    final am = m[3]!.toUpperCase(), bm = m[6]!.toUpperCase();
+    return am == bm ? '$a–$b $bm' : '$a $am–$b $bm';
   }
 
   @override
@@ -1084,29 +1189,138 @@ class _PickupPicker extends StatelessWidget {
           style: TextStyle(color: AppColors.muted));
     }
     final day = days.where((d) => d['date'] == date).firstOrNull;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        for (final d in days)
-          ChoiceChip(
-            label: Text(dayLabel(d['date'] as String)),
-            selected: d['date'] == date,
-            onSelected: openSlots(d).isEmpty ? null : (_) => onDate(d['date'] as String),
-          ),
-      ]),
-      const SizedBox(height: 12),
+    final slots = [
+      for (final s in (day?['slots'] as List? ?? const [])) Map<String, dynamic>.from(s as Map)
+    ];
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      // A strip of day tiles, scrolled sideways, as delivery apps do.
+      SizedBox(
+        height: 62,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: days.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (_, i) {
+            final d = days[i];
+            final iso = d['date'] as String;
+            final when = DateTime.parse(iso);
+            final off = _offset(when);
+            final open = openSlots(d).isNotEmpty;
+            final picked = iso == date;
+            return _Tile(
+              width: 68,
+              selected: picked,
+              enabled: open,
+              onTap: () => onDate(iso),
+              top: off == 0
+                  ? 'Today'
+                  : off == 1
+                      ? 'Tmrw'
+                      : DateFormat('EEE').format(when),
+              bottom: DateFormat('d MMM').format(when),
+            );
+          },
+        ),
+      ),
+      const SizedBox(height: 20),
       if (day != null)
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          for (final s in (day['slots'] as List).map((s) => Map<String, dynamic>.from(s as Map)))
-            ChoiceChip(
-              label: Text(s['remaining'] == 0
-                  ? '${s['label']} · full'
-                  : s['remaining'] != null && (s['remaining'] as int) <= 2
-                      ? '${s['label']} · ${s['remaining']} left'
-                      : '${s['label']}'),
-              selected: s['id'] == slotId,
-              onSelected: s['remaining'] == 0 ? null : (_) => onSlot(s['id'] as int),
-            ),
-        ]),
+        for (final part in _parts(slots)) ...[
+          Text(part.$1.toUpperCase(), style: _sectionLabel),
+          const SizedBox(height: 8),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 3.0,
+            children: [
+              for (final s in part.$2)
+                _Tile(
+                  selected: s['id'] == slotId,
+                  enabled: s['remaining'] != 0,
+                  onTap: () => onSlot(s['id'] as int),
+                  top: shortSlot('${s['label']}'),
+                  bottom: s['remaining'] == 0
+                      ? 'Full'
+                      : s['remaining'] != null && (s['remaining'] as int) <= 2
+                          ? '${s['remaining']} left'
+                          : null,
+                  warn: s['remaining'] != null && (s['remaining'] as int) <= 2,
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
     ]);
+  }
+}
+
+const _sectionLabel = TextStyle(
+    fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: Color(0xFF475569));
+
+/// A bordered choice tile (a pickup day or time): navy outline and tint when picked.
+class _Tile extends StatelessWidget {
+  const _Tile({
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+    required this.top,
+    this.bottom,
+    this.width,
+    this.warn = false,
+  });
+
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+  final String top;
+  final String? bottom;
+  final double? width;
+  final bool warn;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = !enabled
+        ? const Color(0xFFB4B0A8)
+        : selected
+            ? AppColors.primary
+            : AppColors.ink;
+    return Material(
+      color: !enabled
+          ? AppColors.mutedFill
+          : selected
+              ? AppColors.accentSoft
+              : AppColors.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+            color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.5 : 1),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: enabled ? onTap : null,
+        child: SizedBox(
+          width: width,
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Text(top,
+                style: TextStyle(
+                    fontSize: width == null ? 14 : 12,
+                    fontWeight: width == null ? FontWeight.w600 : FontWeight.w500,
+                    color: width == null ? fg : (selected ? AppColors.primary : AppColors.muted))),
+            if (bottom != null) ...[
+              const SizedBox(height: 2),
+              Text(bottom!,
+                  style: TextStyle(
+                      fontSize: width == null ? 11.5 : 14,
+                      fontWeight: width == null ? FontWeight.w500 : FontWeight.w700,
+                      color: width == null
+                          ? (warn && enabled ? const Color(0xFFB45309) : AppColors.muted)
+                          : fg)),
+            ],
+          ]),
+        ),
+      ),
+    );
   }
 }

@@ -12,7 +12,8 @@ from datetime import date, timedelta
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Count, Q
+from django.db.models.functions import TruncDate
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -570,6 +571,42 @@ def customer_orders(request):
     if request.method == 'POST':
         return _create_customer_order(request, customer)
     orders = customer.orders.prefetch_related('items').order_by('-created_at')
+    params = request.GET
+
+    # ?calendar=YYYY-MM: orders booked on each day of that month (the history
+    # calendar's dots), in the shop's time zone.
+    if params.get('calendar'):
+        try:
+            year, month = (int(x) for x in str(params['calendar']).split('-'))
+            first = date(year, month, 1)
+        except (TypeError, ValueError):
+            return _bad('calendar must be YYYY-MM.')
+        nxt = date(year + month // 12, month % 12 + 1, 1)
+        counts = orders.filter(created_at__date__gte=first, created_at__date__lt=nxt)             .order_by().annotate(day=TruncDate('created_at')).values('day').annotate(n=Count('id'))
+        return JsonResponse({'month': first.strftime('%Y-%m'),
+                             'days': {str(r['day']): r['n'] for r in counts}})
+
+    # ?date=YYYY-MM-DD: only orders booked that day.
+    if params.get('date'):
+        try:
+            day = date.fromisoformat(str(params['date']))
+        except ValueError:
+            return _bad('date must be YYYY-MM-DD.')
+        orders = orders.filter(created_at__date=day)
+
+    # ?page=N[&page_size=M]: one page plus totals; without it, everything (as before).
+    if params.get('page'):
+        try:
+            page = max(1, int(params['page']))
+            size = min(50, max(1, int(params.get('page_size') or 10)))
+        except ValueError:
+            return _bad('page and page_size must be numbers.')
+        total = orders.count()
+        pages = max(1, -(-total // size))
+        page = min(page, pages)
+        rows = orders[(page - 1) * size:page * size]
+        return JsonResponse({'orders': [_order_json(o) for o in rows], 'page': page,
+                             'pages': pages, 'total': total})
     return JsonResponse({'orders': [_order_json(o) for o in orders]})
 
 
