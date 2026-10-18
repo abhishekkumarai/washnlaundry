@@ -405,7 +405,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                 if (provider.role == 'customer' && !_hasActiveFilter) ...[
                                   const SizedBox(height: 16),
                                   FilledButton.icon(
-                                    onPressed: () => context.go('/my/book'),
+                                    onPressed: openPortalBooking,
                                     icon: const Icon(Icons.calendar_today_outlined, size: 16),
                                     label: const Text('Book a pickup'),
                                     style: FilledButton.styleFrom(
@@ -429,9 +429,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               final order = pagedOrders[idx];
                               final isCustomer = provider.role == 'customer';
                               if (narrow) return _orderCard(order, isCustomer: isCustomer);
-                              final targetPath = isCustomer
-                                  ? '/my/orders/${order.orderNumber.isNotEmpty ? order.orderNumber : order.id}'
-                                  : '/orders/${order.id}';
+                              final targetPath = '/orders/${order.id}';
                               return InkWell(
                                 onTap: () => context.go(targetPath),
                                 child: Padding(
@@ -684,9 +682,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   Widget _orderCard(OrderModel order, {bool isCustomer = false}) {
     final initial =
         order.customerName.isEmpty ? '?' : order.customerName[0].toUpperCase();
-    final targetPath = isCustomer
-        ? '/my/orders/${order.orderNumber.isNotEmpty ? order.orderNumber : order.id}'
-        : '/orders/${order.id}';
+    final targetPath = '/orders/${order.id}';
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: () => context.go(targetPath),
@@ -1100,7 +1096,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     final label = isCustomer ? 'Book Pickup' : 'New Order';
     final icon = isCustomer ? Icons.calendar_today_outlined : Icons.add;
     final VoidCallback onTap = isCustomer
-        ? () => context.go('/my/book')
+        ? openPortalBooking
         : () => context.goSection(1);
 
     if (iconOnly) {
