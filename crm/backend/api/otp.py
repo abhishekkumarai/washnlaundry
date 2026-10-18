@@ -68,9 +68,19 @@ def issue_code(email):
     return code
 
 
+def _dev_code_matches(email, code):
+    """Local testing: settings.DEV_LOGIN_CODE signs in the DEV_LOGIN_EMAILS (both
+    empty unless DEBUG; see settings.py)."""
+    dev = getattr(settings, 'DEV_LOGIN_CODE', '')
+    return bool(dev) and settings.DEBUG and email.lower() in getattr(settings, 'DEV_LOGIN_EMAILS', ()) \
+        and hmac.compare_digest(str(code), dev)
+
+
 def check_code(email, code):
     """True if `code` is the open, unexpired code for `email`; burns it either way
     once MAX_ATTEMPTS wrong guesses have been made."""
+    if _dev_code_matches(email, code):
+        return True
     now = timezone.now()
     with transaction.atomic():
         otp = EmailOtp.objects.select_for_update().filter(

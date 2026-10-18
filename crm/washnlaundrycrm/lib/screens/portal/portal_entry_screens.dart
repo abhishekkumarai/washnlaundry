@@ -685,6 +685,10 @@ class _JoinShopScreenState extends State<JoinShopScreen> {
   final _phone = TextEditingController();
   bool _busy = false;
   bool _pending = false;
+
+  /// First try joining with the details given to another laundry; the form
+  /// only shows when there are none (a first-ever join).
+  bool _autoJoining = true;
   String? _error;
 
   @override
@@ -693,6 +697,29 @@ class _JoinShopScreenState extends State<JoinShopScreen> {
     final auth = context.read<AuthProvider>();
     _pending = auth.me?['pending_link'] == true;
     _name.text = auth.userName ?? '';
+    if (_pending || auth.serverRole == 'owner' || auth.serverRole == 'staff') {
+      _autoJoining = false;
+    } else {
+      _autoJoin();
+    }
+  }
+
+  Future<void> _autoJoin() async {
+    final auth = context.read<AuthProvider>();
+    try {
+      final res = await ApiService.joinShop();
+      if (res['pending'] == true) {
+        _pending = true;
+      } else {
+        await auth.refreshRole(); // now `customer`: the router moves on to /book
+      }
+    } on ApiException catch (e) {
+      // 400: nothing to reuse, so ask. Anything else is a real error to show.
+      if (e.statusCode != 400) _error = e.message;
+    } catch (_) {
+      // Offline or similar: fall back to the form rather than spin forever.
+    }
+    if (mounted) setState(() => _autoJoining = false);
   }
 
   @override
@@ -743,6 +770,18 @@ class _JoinShopScreenState extends State<JoinShopScreen> {
         change,
         signOut,
       ]);
+    }
+    if (_autoJoining) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const CircularProgressIndicator(strokeWidth: 2.5),
+            const SizedBox(height: 16),
+            Text('Joining ${portal.shopName}…', style: _lede),
+          ]),
+        ),
+      );
     }
     if (_pending) {
       return PortalPage(children: [

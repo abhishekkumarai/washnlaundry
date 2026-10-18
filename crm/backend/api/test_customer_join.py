@@ -6,7 +6,7 @@ from django.core.cache import cache
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from .models import Customer, EmailLinkRequest, Shop, ShopMembership, ShopRole
+from .models import Customer, CustomerAddress, EmailLinkRequest, Shop, ShopMembership, ShopRole
 
 
 @override_settings(GOOGLE_CLIENT_ID='c', API_AUTH_ENFORCED=True)
@@ -103,6 +103,24 @@ class CustomerJoinTests(APITestCase):
         other = Shop.objects.create(name='Other', slug='other', accepts_online_customers=True)
         self.assertEqual(self.client.get('/api/me/', **self.auth(other)).json()['role'], 'unlinked')
         self.assertEqual(self.client.get('/api/customer/orders/', **self.auth(other)).status_code, 404)
+
+    def test_joining_another_shop_reuses_name_phone_and_addresses(self):
+        self.assertEqual(self.join(self.sunny).status_code, 201)
+        first = Customer.all_objects.get(shop=self.sunny, email='new@example.com')
+        CustomerAddress.all_objects.create(shop=self.sunny, customer=first, label='HOME',
+                                           address='12 MG Road', pin_code='560001', is_default=True)
+        other = Shop.objects.create(name='Other', slug='other', accepts_online_customers=True)
+        res = self.client.post('/api/customer/join/', {}, format='json', **self.auth(other))
+        self.assertEqual(res.status_code, 201, res.content)
+        joined = Customer.all_objects.get(shop=other, email='new@example.com')
+        self.assertEqual((joined.name, joined.phone), ('Neha', '9876500002'))
+        copied = CustomerAddress.all_objects.get(customer=joined)
+        self.assertEqual((copied.shop, copied.address, copied.is_default), (other, '12 MG Road', True))
+
+    def test_a_first_join_still_needs_name_and_phone(self):
+        res = self.client.post('/api/customer/join/', {}, format='json', **self.auth(self.sunny))
+        self.assertEqual(res.status_code, 400)
+        self.assertFalse(Customer.all_objects.filter(email='new@example.com').exists())
 
     def test_owner_keeps_owner_role_after_joining_another_shop_as_customer(self):
         owner = get_user_model().objects.create_user(username='new@example.com', email='new@example.com')

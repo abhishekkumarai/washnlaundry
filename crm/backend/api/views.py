@@ -784,9 +784,13 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def changes(self, request):
-        """GET /api/orders/changes/?since=<ISO time> - orders created or updated after
-        `since` in this shop, newest first (max 100), and the server time to send as
-        the next `since`. The open CRM polls this to alert on new online bookings."""
+        """GET /api/orders/changes/?since=<ISO time> - orders created or updated in
+        [since, now) in this shop, newest first (max 100), and `now` to send as the
+        next `since`. The open CRM polls this to alert on new online bookings.
+
+        The window is half-open so consecutive polls tile time exactly: the clock
+        can return the same instant twice (coarse on Windows), and a strict
+        `> since` dropped an order stamped on the very tick of the previous poll."""
         from django.utils.dateparse import parse_datetime
         now = timezone.now()
         since = parse_datetime(str(request.query_params.get('since') or ''))
@@ -795,7 +799,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         if timezone.is_naive(since):
             since = timezone.make_aware(since)
         qs = Order.objects.prefetch_related('items', 'media').filter(
-            updated_at__gt=since).order_by('-updated_at')[:100]
+            updated_at__gte=since, updated_at__lt=now).order_by('-updated_at')[:100]
         return Response({'orders': self.get_serializer(qs, many=True).data, 'now': now.isoformat()})
 
     @action(detail=True, methods=['post'])

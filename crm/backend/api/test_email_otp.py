@@ -83,3 +83,14 @@ class EmailOtpTests(APITestCase):
         with override_settings(PASSWORD_AUTH_ENABLED=False):
             self.assertEqual(self.client.post('/api/auth/email-code/request/', {'email': 'a@b.co'},
                                               format='json').status_code, 503)
+
+    @override_settings(DEBUG=True, DEV_LOGIN_CODE='424242', DEV_LOGIN_EMAILS={'tester@example.com'})
+    def test_dev_login_code_signs_in_listed_test_emails_locally(self):
+        self.assertEqual(self.verify('424242', 'Tester@example.com').status_code, 200)
+        # Not for anyone else, and a wrong code still fails.
+        self.assertEqual(self.verify('424242', 'neha@example.com').status_code, 400)
+        self.assertEqual(self.verify('111111', 'tester@example.com').status_code, 400)
+
+    @override_settings(DEBUG=False, DEV_LOGIN_CODE='424242', DEV_LOGIN_EMAILS={'tester@example.com'})
+    def test_dev_login_code_is_dead_without_debug(self):
+        self.assertEqual(self.verify('424242', 'tester@example.com').status_code, 400)

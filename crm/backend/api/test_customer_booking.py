@@ -172,7 +172,9 @@ class CustomerBookingTests(APITestCase):
     def test_staff_changes_feed_returns_new_orders(self):
         from django.contrib.auth import get_user_model
         from .models import ShopMembership, ShopRole
-        before = timezone.now().isoformat()
+        # A second of slack: the Windows clock can step back a hair between two
+        # reads, stamping the order just before a `before` taken "earlier".
+        before = (timezone.now() - timedelta(seconds=1)).isoformat()
         self.book()
         owner = get_user_model().objects.create_user(username='owner@shop.com', email='owner@shop.com')
         ShopMembership.objects.create(user=owner, shop=self.shop, role=ShopRole.OWNER)
@@ -181,10 +183,16 @@ class CustomerBookingTests(APITestCase):
             res = self.client.get('/api/orders/changes/', {'since': before}, **self.auth,
                                   HTTP_X_TENANT_ID=self.shop.slug)
             self.assertEqual(res.status_code, 200, res.content)
-            self.assertEqual(len(res.json()['orders']), 1)
-            later = self.client.get('/api/orders/changes/', {'since': res.json()['now']}, **self.auth,
-                                    HTTP_X_TENANT_ID=self.shop.slug)
-            self.assertEqual(later.json()['orders'], [])
+            # Consecutive polls tile time: the order shows up exactly once, even
+            # when it is stamped on the same clock tick as a poll boundary.
+            seen = [o['id'] for o in res.json()['orders']]
+            since = res.json()['now']
+            for _ in range(2):
+                page = self.client.get('/api/orders/changes/', {'since': since}, **self.auth,
+                                       HTTP_X_TENANT_ID=self.shop.slug).json()
+                seen += [o['id'] for o in page['orders']]
+                since = page['now']
+            self.assertEqual(len(seen), 1, seen)
         # Customers cannot read the staff feed.
         self.assertEqual(self.client.get('/api/orders/changes/', {'since': before},
                                          **self.auth).status_code, 403)

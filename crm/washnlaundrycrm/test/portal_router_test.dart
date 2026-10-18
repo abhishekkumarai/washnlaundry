@@ -107,6 +107,13 @@ void main() {
       ],
       child: const MaterialApp(home: JoinShopScreen()),
     ));
+    // It first tries joining with details from another laundry; with none
+    // (the server says 400) it asks for them.
+    expect(find.text('Joining Sunny Laundry…'), findsOneWidget);
+    for (var i = 0; i < 20 && find.text('Join Sunny Laundry').evaluate().isEmpty; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump();
+    }
     expect(find.text('Join Sunny Laundry'), findsOneWidget);
     expect(find.text('MOBILE NUMBER'), findsOneWidget);
     expect(find.widgetWithText(TextField, '10-digit mobile'), findsOneWidget);

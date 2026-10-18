@@ -649,8 +649,12 @@ def customer_join(request):
     body, err = _read_json(request)
     if err:
         return err
-    name = str(body.get('name') or '').strip()[:255]
-    phone = clean_phone(body.get('phone'))
+    # A customer of another laundry joins with the details they gave there:
+    # the newest such record supplies whatever the body leaves out.
+    previous = Customer.all_objects.filter(email__iexact=email).exclude(shop=shop) \
+        .order_by('-created_at').first()
+    name = str(body.get('name') or '').strip()[:255] or (previous.name if previous else '')
+    phone = clean_phone(body.get('phone')) or (clean_phone(previous.phone) if previous else None)
     if not name or not phone:
         return _bad('Enter your name and a valid 10-digit mobile number.')
 
@@ -676,8 +680,19 @@ def customer_join(request):
                           'them to confirm it is you; your orders appear once they approve.'},
                 status=202)
         customer = Customer.objects.create(shop=shop, name=name, phone=phone, email=email)
+        if previous:
+            _copy_addresses(previous, customer)
         _ensure_customer_membership(user, shop)
     return JsonResponse(_me_json(customer), status=201)
+
+
+def _copy_addresses(source, customer):
+    """Give a customer joining another laundry the pickup addresses they saved before."""
+    for a in CustomerAddress.all_objects.filter(customer=source).order_by('created_at'):
+        CustomerAddress.all_objects.create(
+            shop=customer.shop, customer=customer, label=a.label, address=a.address,
+            landmark=a.landmark, area=a.area, pin_code=a.pin_code, latitude=a.latitude,
+            longitude=a.longitude, is_default=a.is_default)
 
 
 def _ensure_customer_membership(user, shop):

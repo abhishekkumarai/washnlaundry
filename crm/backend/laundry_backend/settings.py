@@ -21,6 +21,14 @@ SECRET_KEY = os.environ.get('SECRET_KEY', _INSECURE_SECRET_KEY)
 # (put it in your local .env). Everything below that is dev-friendly follows it.
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
+# Local testing only: a fixed sign-in code for the listed test emails, so the
+# customer portal can be tried without reading codes out of the server log.
+# Ignored unless DEBUG is on, so it can never open a deployed site.
+DEV_LOGIN_CODE = os.environ.get('DEV_LOGIN_CODE', '').strip() if DEBUG else ''
+DEV_LOGIN_EMAILS = {
+    e.strip().lower() for e in os.environ.get('DEV_LOGIN_EMAILS', '').split(',') if e.strip()
+} if DEBUG else set()
+
 ALLOWED_HOSTS = [
     h.strip() for h in os.environ.get('ALLOWED_HOSTS', '*' if DEBUG else '').split(',') if h.strip()
 ]

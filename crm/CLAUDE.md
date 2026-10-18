@@ -141,6 +141,11 @@ prefs key `portal_shop`) as `X-Tenant-ID`, so `/api/me/` reports the role *for t
   flutter_map/OpenStreetMap pin and browser geolocation). Owners/staff of the shop are told to use app.
   Signed out, only `/login`, the email links and a shop's `/s/<slug>` link/QR open; the link remembers its
   shop through sign-in and skips the list. Signing out forgets the chosen shop.
+- **Joining more laundries:** `POST customer/join/` with no name/phone reuses the customer's newest record at
+  another shop (name, phone, and its saved addresses are copied); the Join page tries that first and only shows
+  the form for a first-ever join (400).
+- **Local test sign-in:** with `DEBUG=True`, `DEV_LOGIN_CODE` in `crm/.env` signs in the emails listed in
+  `DEV_LOGIN_EMAILS` (request a code, then type that one instead). Both are ignored without `DEBUG`.
 - **Opt-in:** `Shop.accepts_online_customers` (default off), toggled in CRM Settings → **Online booking**,
   which also shows the link + QR and the **online sign-ups** to approve (a joiner whose phone the shop already
   has gets an `EmailLinkRequest`, never an auto-link: no phone OTP yet).

@@ -158,14 +158,12 @@ class ApiService {
           response = await http.get(uri, headers: headers).timeout(_timeout);
           break;
         case 'POST':
-          response = await http
-              .post(uri, headers: headers, body: json.encode(body))
-              .timeout(_timeout);
+          response =
+              await http.post(uri, headers: headers, body: json.encode(body)).timeout(_timeout);
           break;
         case 'PATCH':
-          response = await http
-              .patch(uri, headers: headers, body: json.encode(body))
-              .timeout(_timeout);
+          response =
+              await http.patch(uri, headers: headers, body: json.encode(body)).timeout(_timeout);
           break;
         case 'DELETE':
           response = await http.delete(uri, headers: headers).timeout(_timeout);
@@ -177,11 +175,7 @@ class ApiService {
       if (response.statusCode == 401 && !retried && onUnauthorized != null) {
         if (await onUnauthorized!()) {
           return await _send(method, path,
-              query: query,
-              body: body,
-              retried: true,
-              auth: auth,
-              extraHeaders: extraHeaders);
+              query: query, body: body, retried: true, auth: auth, extraHeaders: extraHeaders);
         }
       }
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -211,8 +205,7 @@ class ApiService {
     }
   }
 
-  static Future<void> signUp(
-          String email, String password, String name, String phone) =>
+  static Future<void> signUp(String email, String password, String name, String phone) =>
       _send('POST', '/auth/signup/', auth: false, body: {
         'email': email,
         'password': password,
@@ -224,8 +217,7 @@ class ApiService {
   /// Starts a private, throwaway Demo Mode sandbox. Returns
   /// `{token, shop: {id, slug, name}, expires_in}`.
   static Future<Map<String, dynamic>> startDemo() async =>
-      Map<String, dynamic>.from(
-          await _send('POST', '/demo/start/', auth: false, body: {}) as Map);
+      Map<String, dynamic>.from(await _send('POST', '/demo/start/', auth: false, body: {}) as Map);
 
   /// Deletes the sandbox behind [token]; failures are ignored (it expires anyway).
   static Future<void> endDemo(String token) async {
@@ -239,9 +231,8 @@ class ApiService {
       Map<String, dynamic>.from(await _send('POST', '/auth/login/',
           auth: false, body: {'email': email, 'password': password}) as Map);
 
-  static Future<Map<String, dynamic>> verifyEmail(String token) async =>
-      Map<String, dynamic>.from(await _send('POST', '/auth/verify-email/',
-          auth: false, body: {'token': token}) as Map);
+  static Future<Map<String, dynamic>> verifyEmail(String token) async => Map<String, dynamic>.from(
+      await _send('POST', '/auth/verify-email/', auth: false, body: {'token': token}) as Map);
 
   /// A fresh confirmation email for an expired link. Returns `{ok: true}` or
   /// `{already_confirmed: true}`.
@@ -249,12 +240,10 @@ class ApiService {
       Map<String, dynamic>.from(await _send('POST', '/auth/resend-verification/',
           auth: false, body: {'token': token, 'return_to': _returnTo}) as Map);
 
-  static Future<void> forgotPassword(String email) =>
-      _send('POST', '/auth/forgot-password/',
-          auth: false, body: {'email': email, 'return_to': _returnTo});
+  static Future<void> forgotPassword(String email) => _send('POST', '/auth/forgot-password/',
+      auth: false, body: {'email': email, 'return_to': _returnTo});
 
-  static Future<Map<String, dynamic>> resetPassword(
-          String token, String password) async =>
+  static Future<Map<String, dynamic>> resetPassword(String token, String password) async =>
       Map<String, dynamic>.from(await _send('POST', '/auth/reset-password/',
           auth: false, body: {'token': token, 'password': password}) as Map);
 
@@ -266,32 +255,25 @@ class ApiService {
 
   /// PATCH `/customer/me/` - the customer's own editable details
   /// (name, address, area, landmark, preference). Phone and email can't change.
-  static Future<Map<String, dynamic>> updateMyProfile(
-          Map<String, String> fields) async =>
-      Map<String, dynamic>.from(
-          await _send('PATCH', '/customer/me/', body: fields) as Map);
+  static Future<Map<String, dynamic>> updateMyProfile(Map<String, String> fields) async =>
+      Map<String, dynamic>.from(await _send('PATCH', '/customer/me/', body: fields) as Map);
 
   static Future<List<Map<String, dynamic>>> fetchMyOrders() async {
     final data = await _send('GET', '/customer/orders/') as Map;
-    return (data['orders'] as List)
-        .map((o) => Map<String, dynamic>.from(o as Map))
-        .toList();
+    return (data['orders'] as List).map((o) => Map<String, dynamic>.from(o as Map)).toList();
   }
 
   static Future<List<Map<String, dynamic>>> fetchRateCard() async {
     final data = await _send('GET', '/customer/rate-card/') as Map;
-    return (data['categories'] as List)
-        .map((c) => Map<String, dynamic>.from(c as Map))
-        .toList();
+    return (data['categories'] as List).map((c) => Map<String, dynamic>.from(c as Map)).toList();
   }
 
   /// First sign-in for an unlinked Google account. A 201 means a Customer was
   /// created; a 202 (`pending: true`) means the phone already belongs to a
   /// customer and staff must approve the email link.
-  static Future<Map<String, dynamic>> customerSignup(
-          String name, String phone) async =>
-      Map<String, dynamic>.from(await _send('POST', '/customer/me/',
-          body: {'name': name, 'phone': phone}) as Map);
+  static Future<Map<String, dynamic>> customerSignup(String name, String phone) async =>
+      Map<String, dynamic>.from(
+          await _send('POST', '/customer/me/', body: {'name': name, 'phone': phone}) as Map);
 
   // ── Customer portal (customer.washnlaundry.com, KAN-214) ───────────────────
 
@@ -300,8 +282,7 @@ class ApiService {
       _send('POST', '/auth/email-code/request/', auth: false, body: {'email': email});
 
   /// Returns `{token, email}`, the same session as password sign-in.
-  static Future<Map<String, dynamic>> verifyEmailCode(
-          String email, String code) async =>
+  static Future<Map<String, dynamic>> verifyEmailCode(String email, String code) async =>
       Map<String, dynamic>.from(await _send('POST', '/auth/email-code/verify/',
           auth: false, body: {'email': email, 'code': code}) as Map);
 
@@ -313,13 +294,17 @@ class ApiService {
 
   /// The shop behind a `/s/<slug>` link; 404 if it is not taking bookings.
   static Future<Map<String, dynamic>> fetchPortalShop(String slug) async =>
-      Map<String, dynamic>.from(await _send(
-          'GET', '/customer/shops/${Uri.encodeComponent(slug)}/', auth: false) as Map);
+      Map<String, dynamic>.from(
+          await _send('GET', '/customer/shops/${Uri.encodeComponent(slug)}/', auth: false) as Map);
 
   /// Joins the active shop (X-Tenant-ID). 201 created, 202 `{pending: true}`.
-  static Future<Map<String, dynamic>> joinShop(String name, String phone) async =>
-      Map<String, dynamic>.from(await _send('POST', '/customer/join/',
-          body: {'name': name, 'phone': phone}) as Map);
+  /// With no name/phone the server reuses the customer's details from another
+  /// laundry they joined (400 if there are none).
+  static Future<Map<String, dynamic>> joinShop([String? name, String? phone]) async =>
+      Map<String, dynamic>.from(await _send('POST', '/customer/join/', body: {
+        if (name != null) 'name': name,
+        if (phone != null) 'phone': phone,
+      }) as Map);
 
   /// `{categories: [{id, name, items: [{id, name, price, unit}]}],
   ///   days: [{date, slots: [{id, label, remaining}]}], pincodes: [...]}`.
@@ -334,28 +319,26 @@ class ApiService {
           body: body, extraHeaders: {'Idempotency-Key': idempotencyKey}) as Map);
 
   static Future<Map<String, dynamic>> fetchMyOrder(String orderNumber) async =>
-      Map<String, dynamic>.from(await _send(
-          'GET', '/customer/orders/${Uri.encodeComponent(orderNumber)}/') as Map);
+      Map<String, dynamic>.from(
+          await _send('GET', '/customer/orders/${Uri.encodeComponent(orderNumber)}/') as Map);
 
   static Future<List<Map<String, dynamic>>> fetchMyAddresses() async {
     final data = await _send('GET', '/customer/addresses/') as Map;
     return [for (final a in data['addresses'] as List) Map<String, dynamic>.from(a as Map)];
   }
 
-  static Future<Map<String, dynamic>> saveMyAddress(Map<String, dynamic> body,
-          {int? id}) async =>
+  static Future<Map<String, dynamic>> saveMyAddress(Map<String, dynamic> body, {int? id}) async =>
       Map<String, dynamic>.from(await (id == null
           ? _send('POST', '/customer/addresses/', body: body)
           : _send('PATCH', '/customer/addresses/$id/', body: body)) as Map);
 
-  static Future<void> deleteMyAddress(int id) =>
-      _send('DELETE', '/customer/addresses/$id/');
+  static Future<void> deleteMyAddress(int id) => _send('DELETE', '/customer/addresses/$id/');
 
   /// Orders created or changed after [since] (ISO time) and the server time to
   /// pass next (KAN-224). [since] null just returns the server time.
   static Future<(List<OrderModel>, String)> fetchOrderChanges(String? since) async {
-    final data = await _send('GET', '/orders/changes/',
-        query: {if (since != null) 'since': since}) as Map;
+    final data =
+        await _send('GET', '/orders/changes/', query: {if (since != null) 'since': since}) as Map;
     return (
       [
         for (final o in data['orders'] as List)
@@ -463,11 +446,9 @@ class ApiService {
 
   // ── Orders ─────────────────────────────────────────────────────────────────
 
-  static Future<List<OrderModel>> fetchOrders(
-      {String? status, String? search}) async {
+  static Future<List<OrderModel>> fetchOrders({String? status, String? search}) async {
     final data = await _send('GET', '/orders/', query: {
-      if (status != null && status.isNotEmpty && status != 'ALL')
-        'status': status,
+      if (status != null && status.isNotEmpty && status != 'ALL') 'status': status,
       if (search != null && search.isNotEmpty) 'search': search,
     });
     return _asList(data).map(OrderModel.fromJson).toList();
@@ -482,8 +463,7 @@ class ApiService {
     final data = await _send('GET', '/orders/', query: {
       'page': '$page',
       'page_size': '$pageSize',
-      if (status != null && status.isNotEmpty && status != 'ALL')
-        'status': status,
+      if (status != null && status.isNotEmpty && status != 'ALL') 'status': status,
       if (search != null && search.isNotEmpty) 'search': search,
     });
     if (data is Map) {
@@ -550,9 +530,8 @@ class ApiService {
       }
     }
     try {
-      final res = await http
-          .put(uri, headers: headers, body: bytes)
-          .timeout(const Duration(minutes: 5));
+      final res =
+          await http.put(uri, headers: headers, body: bytes).timeout(const Duration(minutes: 5));
       if (res.statusCode < 200 || res.statusCode >= 300) {
         throw ApiException(
           res.statusCode == 413
@@ -574,8 +553,7 @@ class ApiService {
     return OrderMediaModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<void> deleteMedia(String id) =>
-      _send('DELETE', '/order-media/$id/');
+  static Future<void> deleteMedia(String id) => _send('DELETE', '/order-media/$id/');
 
   static Future<OrderModel> createOrder(Map<String, dynamic> payload) async {
     final data = await _send('POST', '/orders/', body: payload);
@@ -597,8 +575,7 @@ class ApiService {
   }
 
   /// Edits the order header — customer, fulfilment type, expected date, notes.
-  static Future<OrderModel> updateOrder(
-      String id, Map<String, dynamic> payload) async {
+  static Future<OrderModel> updateOrder(String id, Map<String, dynamic> payload) async {
     final data = await _send('PATCH', '/orders/$id/', body: payload);
     return OrderModel.fromJson((data as Map).cast<String, dynamic>());
   }
@@ -669,11 +646,9 @@ class ApiService {
     return GarmentCategoryModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<void> deleteCategory(String id) =>
-      _send('DELETE', '/categories/$id/');
+  static Future<void> deleteCategory(String id) => _send('DELETE', '/categories/$id/');
 
-  static Future<void> deleteGarmentItem(String id) =>
-      _send('DELETE', '/items/$id/');
+  static Future<void> deleteGarmentItem(String id) => _send('DELETE', '/items/$id/');
 
   // ── Customers ──────────────────────────────────────────────────────────────
 
@@ -724,30 +699,25 @@ class ApiService {
     return CustomerStats.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<CustomerModel> createCustomer(
-      Map<String, dynamic> payload) async {
+  static Future<CustomerModel> createCustomer(Map<String, dynamic> payload) async {
     final data = await _send('POST', '/customers/', body: payload);
     return CustomerModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<CustomerModel> updateCustomer(
-      String id, Map<String, dynamic> payload) async {
+  static Future<CustomerModel> updateCustomer(String id, Map<String, dynamic> payload) async {
     final data = await _send('PATCH', '/customers/$id/', body: payload);
     return CustomerModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<void> deleteCustomer(String id) =>
-      _send('DELETE', '/customers/$id/');
+  static Future<void> deleteCustomer(String id) => _send('DELETE', '/customers/$id/');
 
   /// Step 1 of bulk import: uploads the raw file and gets back its column
   /// names, a few sample rows, and a best-effort field-mapping guess, for
   /// the user to confirm/edit before anything is actually created.
   static Future<Map<String, dynamic>> importCustomersPreview(
       Uint8List bytes, String filename) async {
-    final request =
-        http.MultipartRequest('POST', _uri('/customers/import/preview/'))
-          ..files
-              .add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final request = http.MultipartRequest('POST', _uri('/customers/import/preview/'))
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
     return _sendMultipart(request);
   }
 
@@ -764,17 +734,14 @@ class ApiService {
     Map<String, String> mapping, {
     bool overwriteDuplicates = false,
   }) async {
-    final request =
-        http.MultipartRequest('POST', _uri('/customers/import/commit/'))
-          ..fields['mapping'] = json.encode(mapping)
-          ..fields['overwrite_duplicates'] = overwriteDuplicates.toString()
-          ..files
-              .add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final request = http.MultipartRequest('POST', _uri('/customers/import/commit/'))
+      ..fields['mapping'] = json.encode(mapping)
+      ..fields['overwrite_duplicates'] = overwriteDuplicates.toString()
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
     return _sendMultipart(request);
   }
 
-  static Future<Map<String, dynamic>> _sendMultipart(
-      http.MultipartRequest request) async {
+  static Future<Map<String, dynamic>> _sendMultipart(http.MultipartRequest request) async {
     try {
       final token = await tokenProvider?.call();
       final tenantId = tenantIdProvider?.call();
@@ -841,8 +808,7 @@ class ApiService {
     return StaffModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<StaffModel> updateStaff(
-      String id, Map<String, dynamic> payload) async {
+  static Future<StaffModel> updateStaff(String id, Map<String, dynamic> payload) async {
     final data = await _send('PATCH', '/staff/$id/', body: payload);
     return StaffModel.fromJson((data as Map).cast<String, dynamic>());
   }
@@ -865,8 +831,7 @@ class ApiService {
           String id, String email, String password) =>
       setCredentials('staff', id, email, password);
 
-  static Future<void> revokeStaffCredentials(String id) =>
-      revokeCredentials('staff', id);
+  static Future<void> revokeStaffCredentials(String id) => revokeCredentials('staff', id);
 
   /// Owner-only: switches a revoked staff sign-in back on (same email and password).
   static Future<void> reactivateStaffSignIn(String id) async {
@@ -878,61 +843,52 @@ class ApiService {
     return _asList(data).map(ExpenseModel.fromJson).toList();
   }
 
-  static Future<ExpenseModel> createExpense(
-      Map<String, dynamic> payload) async {
+  static Future<ExpenseModel> createExpense(Map<String, dynamic> payload) async {
     final data = await _send('POST', '/expenses/', body: payload);
     return ExpenseModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<ExpenseModel> updateExpense(
-      String id, Map<String, dynamic> payload) async {
+  static Future<ExpenseModel> updateExpense(String id, Map<String, dynamic> payload) async {
     final data = await _send('PATCH', '/expenses/$id/', body: payload);
     return ExpenseModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<void> deleteExpense(String id) =>
-      _send('DELETE', '/expenses/$id/');
+  static Future<void> deleteExpense(String id) => _send('DELETE', '/expenses/$id/');
 
   static Future<List<CreditModel>> fetchCredits() async {
     final data = await _send('GET', '/credits/');
     return _asList(data).map(CreditModel.fromJson).toList();
   }
 
-  static Future<CreditModel> createCredit(
-      Map<String, dynamic> payload) async {
+  static Future<CreditModel> createCredit(Map<String, dynamic> payload) async {
     final data = await _send('POST', '/credits/', body: payload);
     return CreditModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<CreditModel> updateCredit(
-      String id, Map<String, dynamic> payload) async {
+  static Future<CreditModel> updateCredit(String id, Map<String, dynamic> payload) async {
     final data = await _send('PATCH', '/credits/$id/', body: payload);
     return CreditModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<void> deleteCredit(String id) =>
-      _send('DELETE', '/credits/$id/');
+  static Future<void> deleteCredit(String id) => _send('DELETE', '/credits/$id/');
 
   static Future<List<CreditCategoryModel>> fetchCreditCategories() async {
     final data = await _send('GET', '/credit-categories/');
     return _asList(data).map(CreditCategoryModel.fromJson).toList();
   }
 
-  static Future<CreditCategoryModel> createCreditCategory(
-      Map<String, dynamic> payload) async {
+  static Future<CreditCategoryModel> createCreditCategory(Map<String, dynamic> payload) async {
     final data = await _send('POST', '/credit-categories/', body: payload);
     return CreditCategoryModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
   static Future<CreditCategoryModel> updateCreditCategory(
       String id, Map<String, dynamic> payload) async {
-    final data =
-        await _send('PATCH', '/credit-categories/$id/', body: payload);
+    final data = await _send('PATCH', '/credit-categories/$id/', body: payload);
     return CreditCategoryModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<void> deleteCreditCategory(String id) =>
-      _send('DELETE', '/credit-categories/$id/');
+  static Future<void> deleteCreditCategory(String id) => _send('DELETE', '/credit-categories/$id/');
 
   static Future<List<AttendanceModel>> fetchAttendance({
     String? date,
@@ -966,8 +922,7 @@ class ApiService {
 
   /// [month] is `YYYY-MM`. Wages are derived from the attendance register
   /// server-side, so this is one call rather than staff + attendance + payments.
-  static Future<PayrollSummaryModel> fetchPayroll(
-      {required String month}) async {
+  static Future<PayrollSummaryModel> fetchPayroll({required String month}) async {
     final data = await _send('GET', '/payroll/', query: {'month': month});
     return PayrollSummaryModel.fromJson((data as Map).cast<String, dynamic>());
   }
@@ -981,8 +936,7 @@ class ApiService {
   static Future<List<SalaryPaymentModel>> fetchSalaryPayments({
     required String staffId,
   }) async {
-    final data =
-        await _send('GET', '/salary-payments/', query: {'staff': staffId});
+    final data = await _send('GET', '/salary-payments/', query: {'staff': staffId});
     return _asList(data).map(SalaryPaymentModel.fromJson).toList();
   }
 
@@ -1017,8 +971,7 @@ class ApiService {
     return ServiceAreaModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<void> deleteServiceArea(String id) =>
-      _send('DELETE', '/service-areas/$id/');
+  static Future<void> deleteServiceArea(String id) => _send('DELETE', '/service-areas/$id/');
 
   static Future<List<TimeSlotModel>> fetchTimeSlots({String? kind}) async {
     final data = await _send('GET', '/time-slots/', query: {
@@ -1044,8 +997,7 @@ class ApiService {
     return TimeSlotModel.fromJson((data as Map).cast<String, dynamic>());
   }
 
-  static Future<void> deleteTimeSlot(String id) =>
-      _send('DELETE', '/time-slots/$id/');
+  static Future<void> deleteTimeSlot(String id) => _send('DELETE', '/time-slots/$id/');
 
   // ── Shop ───────────────────────────────────────────────────────────────────
 
@@ -1308,8 +1260,7 @@ class ApiService {
   static Future<void> transferShopOwnership(int id, String email) =>
       _send('POST', '/shops/$id/transfer-ownership/', body: {'email': email});
 
-  static Future<void> setDefaultShop(int id) =>
-      _send('POST', '/shops/$id/set-default/');
+  static Future<void> setDefaultShop(int id) => _send('POST', '/shops/$id/set-default/');
 
   // ── Services Import & Export (KAN-138 / KAN-144 / KAN-145) ─────────────
 
@@ -1317,8 +1268,7 @@ class ApiService {
   static Future<Uint8List> exportServicesXlsx({List<int>? categoryIds}) async {
     final query = <String, String>{
       'export_format': 'xlsx',
-      if (categoryIds != null && categoryIds.isNotEmpty)
-        'category': categoryIds.join(','),
+      if (categoryIds != null && categoryIds.isNotEmpty) 'category': categoryIds.join(','),
     };
     final uri = _uri('/categories/export/', query);
     final token = await tokenProvider?.call();
@@ -1341,8 +1291,7 @@ class ApiService {
   static Future<String> exportServicesCsv({List<int>? categoryIds}) async {
     final query = <String, String>{
       'export_format': 'csv',
-      if (categoryIds != null && categoryIds.isNotEmpty)
-        'category': categoryIds.join(','),
+      if (categoryIds != null && categoryIds.isNotEmpty) 'category': categoryIds.join(','),
     };
     final uri = _uri('/categories/export/', query);
     final token = await tokenProvider?.call();
@@ -1365,8 +1314,7 @@ class ApiService {
   static Future<dynamic> exportServicesJson({List<int>? categoryIds}) async {
     final query = <String, String>{
       'export_format': 'json',
-      if (categoryIds != null && categoryIds.isNotEmpty)
-        'category': categoryIds.join(','),
+      if (categoryIds != null && categoryIds.isNotEmpty) 'category': categoryIds.join(','),
     };
     return _send('GET', '/categories/export/', query: query);
   }
@@ -1374,10 +1322,8 @@ class ApiService {
   /// Uploads CSV/XLSX to preview column headers, sample rows, and suggested mappings.
   static Future<Map<String, dynamic>> importServicesPreview(
       Uint8List bytes, String filename) async {
-    final request =
-        http.MultipartRequest('POST', _uri('/categories/import/preview/'))
-          ..files
-              .add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final request = http.MultipartRequest('POST', _uri('/categories/import/preview/'))
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
     return _sendMultipart(request);
   }
 
@@ -1388,12 +1334,10 @@ class ApiService {
     Map<String, String> mapping, {
     bool overwriteDuplicates = true,
   }) async {
-    final request =
-        http.MultipartRequest('POST', _uri('/categories/import/commit/'))
-          ..fields['mapping'] = json.encode(mapping)
-          ..fields['overwrite_duplicates'] = overwriteDuplicates.toString()
-          ..files
-              .add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final request = http.MultipartRequest('POST', _uri('/categories/import/commit/'))
+      ..fields['mapping'] = json.encode(mapping)
+      ..fields['overwrite_duplicates'] = overwriteDuplicates.toString()
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
     return _sendMultipart(request);
   }
 
@@ -1427,11 +1371,9 @@ class ApiService {
     String filename, {
     bool dryRun = false,
   }) async {
-    final request =
-        http.MultipartRequest('POST', _uri('/backup/import/$section/'))
-          ..fields['dry_run'] = dryRun.toString()
-          ..files.add(
-              http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final request = http.MultipartRequest('POST', _uri('/backup/import/$section/'))
+      ..fields['dry_run'] = dryRun.toString()
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
     return _sendMultipart(request);
   }
 
@@ -1464,5 +1406,3 @@ class ApiService {
     return _send('GET', '/backup/export/$section/', query: {'export_format': 'json'});
   }
 }
-
-
