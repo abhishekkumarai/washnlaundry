@@ -633,9 +633,13 @@ def customer_join(request):
     from .password_auth import _throttled
     from .tenancy import get_current_tenant
 
+    from .demo import is_demo_email
+
     email = verified_email(request)
     if not email:
         return _bad('Sign in required.', status=401)
+    if is_demo_email(email):  # a throwaway sandbox account never joins a real shop
+        return _bad('Sign in with your own account to book.', status=403)
     shop = get_current_tenant()
     if shop is None or not _online_shops().filter(pk=shop.pk).exists():
         return _bad('This laundry is not taking online bookings.', status=404)

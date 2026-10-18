@@ -123,9 +123,36 @@ One Google login for everyone; the backend (`backend/api/auth.py`) verifies the 
 | `unlinked` | valid Google account, no record | `/my/start` to sign up |
 
 - `API_AUTH_ENFORCED` (default False) turns enforcement on in `IsStaff`/`IsOwner`/`IsOwnerOrStaffReadOnly`. Ship the Flutter app first, then flip it on Render. Make sure your own account is a superuser, has an Owner `Staff` row, or has an `OWNER` membership before flipping or nobody can get in. (`STAFF_EMAILS` was removed 2026-10-11; migration `0034` backfilled memberships from login-enabled Staff rows.)
-- A customer typing a phone number the store already has creates an `EmailLinkRequest` (no OTP, so no auto-link); the owner approves in Django admin or `POST /api/link-requests/<id>/approve/`.
+- A customer typing a phone number the store already has creates an `EmailLinkRequest` (no OTP, so no auto-link); the owner approves in Settings → Online booking, Django admin or `POST /api/link-requests/<id>/approve/` (which also grants the CUSTOMER membership). See **Customer portal** below.
 - Flutter: `AuthProvider.role` drives `router.dart`'s `authRedirect`; `ApiService.tokenProvider` attaches the token and refreshes once on 401. Staff form has a "Sign-in email" field (it sets `has_app_login`). Demo Mode is `owner` of its own throwaway sandbox shop (see **Demo Mode sandboxes**), so it works with enforcement on.
 - The same Flutter build serves both app.washnlaundry.com and customer.washnlaundry.com (role decides the view; Demo Mode is hidden on `customer.*`). The old Next.js portal was removed 2026-10-07.
+
+### Customer portal (customer.washnlaundry.com, KAN-214, 2026-10-18)
+
+On a `customer.*` host (or `--dart-define=FORCE_CUSTOMER_HOST=true` locally) `main.dart` builds a
+**separate app**: `PortalProvider` + `portalRoutes()` / `portalRedirectFor` in `router.dart`, screens in
+`lib/screens/portal/`. No CRM route exists there, and `/setup-shop` is never shown. The CRM's tenant and
+data loading in `main.dart` does not run; the portal sends its own chosen shop (`PortalProvider.shopSlug`,
+prefs key `portal_shop`) as `X-Tenant-ID`, so `/api/me/` reports the role *for that shop*
+(`AuthProvider.serverRole`, not the host-narrowed `role`).
+
+- **Flow:** `/s/<slug>` (shop's link/QR) or `/find` (search) → sign in (Google, or an emailed 6-digit code:
+  `api/otp.py`) → `/join` (name + mobile) → `/book` · `/orders` · `/orders/:no` · `/profile` (+ addresses with a
+  flutter_map/OpenStreetMap pin and browser geolocation). Owners/staff of the shop are told to use app.
+- **Opt-in:** `Shop.accepts_online_customers` (default off), toggled in CRM Settings → **Online booking**,
+  which also shows the link + QR and the **online sign-ups** to approve (a joiner whose phone the shop already
+  has gets an `EmailLinkRequest`, never an auto-link: no phone OTP yet).
+- **API** (`api/customer_views.py`): `GET customer/shops/?q=`, `customer/shops/<slug>/` (public);
+  `POST customer/join/`; `GET customer/booking-options/`; `GET/POST customer/orders/` (POST: whitelisted
+  `{items:[{item_id,quantity}], pickup_date, slot_id, address_id | address+pin_code+lat/lng, notes}`,
+  server-priced, slot capacity under a row lock, served-pincode check, `Idempotency-Key` header, 10/hour);
+  `customer/addresses/` CRUD; `PATCH customer/me/` (phone editable, unique per shop);
+  `POST auth/email-code/request|verify/`. Customers can't create orders via `/api/orders/` (it trusted
+  client prices) and only ever see orders by the `Order.customer` FK, never by phone.
+- **Shop alerts:** booking emails `Shop.email` after commit; the open CRM polls `GET /api/orders/changes/?since=`
+  every 30 s (paused while the tab is hidden) and toasts new `MOBILE_APP` orders.
+- **Not yet (Phase 2):** phone OTP (`OtpSender` in `api/otp.py` is the plug), WhatsApp alert to the owner,
+  customer cancellation, status notifications to the customer, PWA.
 
 ### Multi-tenancy and shop lifecycle (2026-10-11)
 

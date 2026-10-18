@@ -5,9 +5,10 @@ The Flutter + Django CRM lives in `crm/` (merged from the old washnlaundrycrm re
 
 # Customer site
 `customer.washnlaundry.com` serves the **same Flutter build as the CRM** (Cloudflare Pages project
-`washnlaundrycrm`, custom domains `app.` and `customer.`). Customers sign in with Google or
-email + password and the backend role puts them on the customer-only `/my/*` screens; staff and
-the owner get the CRM. Demo Mode is hidden on the `customer.*` host. See `crm/CLAUDE.md` ("Roles and
+`washnlaundrycrm`, custom domains `app.` and `customer.`). On the `customer.*` host the build runs
+the separate customer portal (find/join a shop, book pickups, orders, profile; see `crm/CLAUDE.md`
+"Customer portal"); customers sign in with Google or an emailed one-time code. Staff and the owner
+use the CRM on `app.`. Demo Mode is hidden on the `customer.*` host. See `crm/CLAUDE.md` ("Roles and
 auth"). The old Next.js portal (`customer-web/`, Worker `washnlaundry-customer`) was removed on
 2026-10-07. The marketing site's "Log in" links point at `customer.washnlaundry.com/?fresh=1` (same build, role decides the view).
 Needs `GOOGLE_CLIENT_ID` (Render + repo var) for Google sign-in, and `https://customer.washnlaundry.com`

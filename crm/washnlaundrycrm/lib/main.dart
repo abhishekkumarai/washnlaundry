@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/portal_provider.dart';
 import 'router.dart';
 import 'services/api_service.dart';
 import 'theme/app_theme.dart';
@@ -34,6 +35,28 @@ Future<void> main() async {
   usePathUrlStrategy();
   final authProvider = AuthProvider();
   final appProvider = AppProvider(autoLoad: false);
+
+  // customer.washnlaundry.com: the customer portal, with its own routes and its
+  // own shop (the one being booked with), sent as X-Tenant-ID. None of the CRM's
+  // tenant and data loading below runs there.
+  if (RoleViews.isCustomerHost()) {
+    final portal = PortalProvider(authProvider);
+    ApiService.tenantIdProvider = () => portal.shopSlug;
+    runApp(
+      rp.ProviderScope(
+        child: MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: appProvider),
+            ChangeNotifierProvider.value(value: authProvider),
+            ChangeNotifierProvider.value(value: portal),
+          ],
+          child: WashNLaundryCrmApp(router: buildRouter(authProvider, portal: portal)),
+        ),
+      ),
+    );
+    return;
+  }
+
   ApiService.tenantIdProvider = () => appProvider.activeTenantId;
 
   // The shop data is for owner/staff only and the API rejects it without a
@@ -44,6 +67,7 @@ Future<void> main() async {
     // Signed out: drop the previous session's shop so it is never sent to sign-in.
     if (!authProvider.isSignedIn && !authProvider.initializing) {
       if (appProvider.activeTenantId != null) appProvider.clearTenant();
+      appProvider.stopWatchingOrders();
       loadedFor = false;
     }
     final role = authProvider.role;
@@ -107,9 +131,18 @@ Future<void> main() async {
     // (`_loadForCustomer`). Loading the owner's data for them 403s once the API enforces auth.
     if (validRole) appProvider.role = role!;
     if (validRole && !loadedFor) appProvider.loadDataFromBackend();
+    // New customer-portal bookings are announced while the CRM is open (KAN-224).
+    if (role == 'owner' || role == 'staff') appProvider.startWatchingOrders();
     loadedFor = validRole;
   });
   final router = buildRouter(authProvider);
+  appProvider.newOnlineOrders.listen((order) {
+    _messenger.currentState?.showSnackBar(SnackBar(
+      duration: const Duration(seconds: 10),
+      content: Text('New online booking #${order.orderNumber} from ${order.customerName}'),
+      action: SnackBarAction(label: 'Open', onPressed: () => router.go('/orders/${order.id}')),
+    ));
+  });
   runApp(
     rp.ProviderScope(
       child: MultiProvider(
@@ -123,6 +156,9 @@ Future<void> main() async {
   );
 }
 
+/// App-wide SnackBars that are not tied to one screen (new-booking alerts).
+final _messenger = GlobalKey<ScaffoldMessengerState>();
+
 class WashNLaundryCrmApp extends StatelessWidget {
   const WashNLaundryCrmApp({super.key, required this.router});
 
@@ -133,6 +169,7 @@ class WashNLaundryCrmApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'WashNLaundry CRM - Professional Laundry & Dry Cleaning',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: _messenger,
       scrollBehavior: AppScrollBehavior(),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

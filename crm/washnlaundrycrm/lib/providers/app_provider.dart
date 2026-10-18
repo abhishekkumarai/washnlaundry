@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -6,6 +8,7 @@ import '../models/order_model.dart';
 import '../services/api_service.dart';
 import '../services/customer_directory.dart';
 import '../utils/money.dart';
+import '../utils/page_visibility.dart';
 
 class AppProvider extends ChangeNotifier {
   static const Map<int, String> routePaths = {
@@ -1510,6 +1513,68 @@ class AppProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       return e.message;
     }
+  }
+
+  // ── Live order alerts (KAN-224) ────────────────────────────────────────────
+  // While the CRM is open, poll /orders/changes/ so a booking placed on the
+  // customer portal shows up (and is announced) without a reload.
+
+  static const orderPollInterval = Duration(seconds: 30);
+  Timer? _orderPoll;
+  String? _changesSince;
+  bool _polling = false;
+  final _newOnlineOrders = StreamController<OrderModel>.broadcast();
+
+  /// Each new customer-app booking the poll finds, once.
+  Stream<OrderModel> get newOnlineOrders => _newOnlineOrders.stream;
+
+  void startWatchingOrders() {
+    if (_orderPoll != null || role == 'customer') return;
+    _changesSince = null;
+    pollOrderChanges(); // takes the server's clock as the starting point
+    _orderPoll = Timer.periodic(orderPollInterval, (_) {
+      if (!pageHidden()) pollOrderChanges();
+    });
+  }
+
+  void stopWatchingOrders() {
+    _orderPoll?.cancel();
+    _orderPoll = null;
+    _changesSince = null;
+  }
+
+  @visibleForTesting
+  Future<void> pollOrderChanges() async {
+    if (_polling) return;
+    _polling = true;
+    try {
+      final first = _changesSince == null;
+      final (changed, now) = await ApiService.fetchOrderChanges(_changesSince);
+      _changesSince = now;
+      if (first || changed.isEmpty) return;
+      for (final order in changed.reversed) {
+        final known = _orders.any((o) => o.id == order.id);
+        final index = _orders.indexWhere((o) => o.id == order.id);
+        if (index >= 0) {
+          _orders[index] = order;
+        } else {
+          _orders.insert(0, order);
+        }
+        if (!known && order.source == 'MOBILE_APP') _newOnlineOrders.add(order);
+      }
+      notifyListeners();
+    } on ApiException {
+      // Offline or signed out: the next tick tries again.
+    } finally {
+      _polling = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    stopWatchingOrders();
+    _newOnlineOrders.close();
+    super.dispose();
   }
 
   void _replaceOrder(OrderModel updated) {

@@ -6,7 +6,12 @@ import 'package:provider/provider.dart';
 import 'models/order_model.dart';
 import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/portal_provider.dart';
 import 'screens/attendance_screen.dart';
+import 'screens/portal/portal_book_screen.dart';
+import 'screens/portal/portal_entry_screens.dart';
+import 'screens/portal/portal_orders_screens.dart';
+import 'screens/portal/portal_profile_screen.dart';
 import 'screens/auth_link_screens.dart';
 import 'screens/chat_screen.dart';
 import 'screens/credits_screen.dart';
@@ -285,6 +290,57 @@ String? authRedirectFor(AuthProvider auth, String loc) {
   return null;
 }
 
+// ── Customer portal (customer.washnlaundry.com, KAN-221) ─────────────────────
+// That host gets its own routes and gate, decided by host and not only by role,
+// so no CRM screen is reachable there whoever signs in.
+
+List<RouteBase> portalRoutes() => [
+      GoRoute(path: '/', redirect: (_, __) => '/book'),
+      GoRoute(path: '/login', builder: (_, __) => const PortalLoginScreen()),
+      GoRoute(
+        path: '/verify',
+        builder: (_, s) => VerifyEmailScreen(token: s.uri.queryParameters['token']),
+      ),
+      GoRoute(
+        path: '/reset',
+        builder: (_, s) => ResetPasswordScreen(token: s.uri.queryParameters['token']),
+      ),
+      GoRoute(path: '/find', builder: (_, __) => const FindShopScreen()),
+      GoRoute(
+        path: '/s/:slug',
+        builder: (_, s) => ShopLinkScreen(slug: s.pathParameters['slug']!),
+      ),
+      GoRoute(path: '/join', builder: (_, __) => const JoinShopScreen()),
+      GoRoute(path: '/book', builder: (_, __) => const PortalBookScreen()),
+      GoRoute(path: '/orders', builder: (_, __) => const PortalOrdersScreen()),
+      GoRoute(
+        path: '/orders/:no',
+        builder: (_, s) => PortalOrderDetailScreen(
+          orderNumber: s.pathParameters['no']!,
+          justBooked: s.uri.queryParameters['new'] == '1',
+        ),
+      ),
+      GoRoute(path: '/profile', builder: (_, __) => const PortalProfileScreen()),
+    ];
+
+/// The portal's gate. Public: sign-in, the email links, "Find your laundry" and
+/// a shop's `/s/<slug>` link. Everything else needs a signed-in account, a
+/// chosen shop, and to be that shop's customer (else `/join`). The setup-shop
+/// page never shows here.
+@visibleForTesting
+String? portalRedirectFor(AuthProvider auth, PortalProvider portal, String loc) {
+  if (auth.initializing || portal.restoring) return null;
+  if (loc == '/verify' || loc == '/reset' || loc == '/find' || loc.startsWith('/s/')) {
+    return null;
+  }
+  if (!auth.isSignedIn) return loc == '/login' ? null : '/login';
+  if (auth.role == null) return null; // /api/me/ still loading (main.dart shows a spinner)
+  if (portal.shopSlug == null) return '/find';
+  if (auth.serverRole != 'customer') return loc == '/join' ? null : '/join';
+  if (loc == '/join' || loc == '/login') return '/book';
+  return null;
+}
+
 /// The real router, wrapping [appRoutes] with the auth gate.
 ///
 /// `redirect`/`refreshListenable` gate on [AuthProvider.isSignedIn] and
@@ -292,7 +348,30 @@ String? authRedirectFor(AuthProvider auth, String loc) {
 /// both valid ways to sign in (Demo Mode is always `staff`); the gate applies
 /// the same whether or not `GOOGLE_CLIENT_ID` is configured, so Demo Mode
 /// works, and Sign Out, in every local run.
-GoRouter buildRouter(AuthProvider auth) => GoRouter(
+///
+/// With a [portal] (the customer host, see `main.dart`) it serves
+/// [portalRoutes] behind [portalRedirectFor] instead.
+GoRouter buildRouter(AuthProvider auth, {PortalProvider? portal}) => portal != null
+    ? GoRouter(
+        initialLocation: '/book',
+        refreshListenable: Listenable.merge([auth, portal]),
+        redirect: (context, state) =>
+            portalRedirectFor(auth, portal, state.matchedLocation),
+        errorBuilder: (context, state) => Scaffold(
+          backgroundColor: const Color(0xFFF8F7F5),
+          body: Center(
+            child: ErrorState(
+              statusCode: 404,
+              title: 'Page Not Found',
+              message: 'The page "${state.uri.path}" could not be found.',
+              onRetry: () => context.go('/book'),
+              onHome: () => context.go('/book'),
+            ),
+          ),
+        ),
+        routes: portalRoutes(),
+      )
+    : GoRouter(
       initialLocation: '/dashboard',
       refreshListenable: auth,
       redirect: (context, state) => authRedirect(auth, state),

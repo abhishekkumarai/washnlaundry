@@ -45,6 +45,11 @@ class AuthProvider extends ChangeNotifier {
   String? get role => _role;
   Map<String, dynamic>? _me;
   Map<String, dynamic>? get me => _me;
+
+  /// The role `/api/me/` reported for the shop in `X-Tenant-ID`, before
+  /// [RoleViews.effectiveRole] narrows it. The customer portal needs this: an
+  /// owner who has not joined a shop as a customer cannot book there.
+  String? get serverRole => _me?['role'] as String?;
   bool get needsShopOnboarding => _me?['needs_shop_onboarding'] == true;
   bool _roleLoading = false;
   bool get roleLoading => _roleLoading;
@@ -304,6 +309,14 @@ class AuthProvider extends ChangeNotifier {
   Future<String?> signInWithPassword(String email, String password) =>
       _guard(() async => _startPasswordSession(
           await ApiService.logIn(email.trim(), password)));
+
+  /// Customer portal sign-in by a one-time code emailed to [email] (KAN-216).
+  Future<String?> requestEmailCode(String email) =>
+      _guard(() => ApiService.requestEmailCode(email.trim()));
+
+  Future<String?> signInWithEmailCode(String email, String code) =>
+      _guard(() async => _startPasswordSession(
+          await ApiService.verifyEmailCode(email.trim(), code.trim())));
 
   /// On success the account exists but must confirm its email before signing in.
   Future<String?> signUpWithPassword(

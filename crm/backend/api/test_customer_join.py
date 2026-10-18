@@ -86,6 +86,11 @@ class CustomerJoinTests(APITestCase):
         self.assertEqual(self.join(None).status_code, 404)
         self.assertFalse(Customer.all_objects.filter(email='new@example.com').exists())
 
+    def test_demo_accounts_cannot_join_a_real_shop(self):
+        with mock.patch('api.customer_views.verified_email', return_value='abc123@demo.invalid'):
+            self.assertEqual(self.join(self.sunny).status_code, 403)
+        self.assertFalse(Customer.all_objects.filter(email='abc123@demo.invalid').exists())
+
     def test_join_validates_and_requires_sign_in(self):
         self.assertEqual(self.join(self.sunny, phone='12345').status_code, 400)
         self.assertEqual(self.join(self.sunny, name=' ').status_code, 400)

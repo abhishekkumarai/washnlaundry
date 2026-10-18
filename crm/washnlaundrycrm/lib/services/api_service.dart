@@ -140,6 +140,7 @@ class ApiService {
     Object? body,
     bool retried = false,
     bool auth = true,
+    Map<String, String>? extraHeaders,
   }) async {
     final uri = _uri(path, query);
     try {
@@ -149,6 +150,7 @@ class ApiService {
         if (method == 'POST' || method == 'PATCH') ..._jsonHeaders,
         if (token != null) 'Authorization': 'Bearer $token',
         if (tenantId != null && tenantId.isNotEmpty) 'X-Tenant-ID': tenantId,
+        ...?extraHeaders,
       };
       late http.Response response;
       switch (method) {
@@ -175,7 +177,11 @@ class ApiService {
       if (response.statusCode == 401 && !retried && onUnauthorized != null) {
         if (await onUnauthorized!()) {
           return await _send(method, path,
-              query: query, body: body, retried: true, auth: auth);
+              query: query,
+              body: body,
+              retried: true,
+              auth: auth,
+              extraHeaders: extraHeaders);
         }
       }
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -286,6 +292,88 @@ class ApiService {
           String name, String phone) async =>
       Map<String, dynamic>.from(await _send('POST', '/customer/me/',
           body: {'name': name, 'phone': phone}) as Map);
+
+  // ── Customer portal (customer.washnlaundry.com, KAN-214) ───────────────────
+
+  /// Emails a 6-digit sign-in code (KAN-216). Always succeeds for a valid email.
+  static Future<void> requestEmailCode(String email) =>
+      _send('POST', '/auth/email-code/request/', auth: false, body: {'email': email});
+
+  /// Returns `{token, email}`, the same session as password sign-in.
+  static Future<Map<String, dynamic>> verifyEmailCode(
+          String email, String code) async =>
+      Map<String, dynamic>.from(await _send('POST', '/auth/email-code/verify/',
+          auth: false, body: {'email': email, 'code': code}) as Map);
+
+  /// "Find your laundry": shops taking online customers, by name/city/pincode.
+  static Future<List<Map<String, dynamic>>> searchShops(String q) async {
+    final data = await _send('GET', '/customer/shops/', auth: false, query: {'q': q}) as Map;
+    return [for (final s in data['shops'] as List) Map<String, dynamic>.from(s as Map)];
+  }
+
+  /// The shop behind a `/s/<slug>` link; 404 if it is not taking bookings.
+  static Future<Map<String, dynamic>> fetchPortalShop(String slug) async =>
+      Map<String, dynamic>.from(await _send(
+          'GET', '/customer/shops/${Uri.encodeComponent(slug)}/', auth: false) as Map);
+
+  /// Joins the active shop (X-Tenant-ID). 201 created, 202 `{pending: true}`.
+  static Future<Map<String, dynamic>> joinShop(String name, String phone) async =>
+      Map<String, dynamic>.from(await _send('POST', '/customer/join/',
+          body: {'name': name, 'phone': phone}) as Map);
+
+  /// `{categories: [{id, name, items: [{id, name, price, unit}]}],
+  ///   days: [{date, slots: [{id, label, remaining}]}], pincodes: [...]}`.
+  static Future<Map<String, dynamic>> fetchBookingOptions() async =>
+      Map<String, dynamic>.from(await _send('GET', '/customer/booking-options/') as Map);
+
+  /// Places a booking. [idempotencyKey] makes a retried submit return the
+  /// first order instead of creating a second one.
+  static Future<Map<String, dynamic>> placeBooking(
+          Map<String, dynamic> body, String idempotencyKey) async =>
+      Map<String, dynamic>.from(await _send('POST', '/customer/orders/',
+          body: body, extraHeaders: {'Idempotency-Key': idempotencyKey}) as Map);
+
+  static Future<Map<String, dynamic>> fetchMyOrder(String orderNumber) async =>
+      Map<String, dynamic>.from(await _send(
+          'GET', '/customer/orders/${Uri.encodeComponent(orderNumber)}/') as Map);
+
+  static Future<List<Map<String, dynamic>>> fetchMyAddresses() async {
+    final data = await _send('GET', '/customer/addresses/') as Map;
+    return [for (final a in data['addresses'] as List) Map<String, dynamic>.from(a as Map)];
+  }
+
+  static Future<Map<String, dynamic>> saveMyAddress(Map<String, dynamic> body,
+          {int? id}) async =>
+      Map<String, dynamic>.from(await (id == null
+          ? _send('POST', '/customer/addresses/', body: body)
+          : _send('PATCH', '/customer/addresses/$id/', body: body)) as Map);
+
+  static Future<void> deleteMyAddress(int id) =>
+      _send('DELETE', '/customer/addresses/$id/');
+
+  /// Orders created or changed after [since] (ISO time) and the server time to
+  /// pass next (KAN-224). [since] null just returns the server time.
+  static Future<(List<OrderModel>, String)> fetchOrderChanges(String? since) async {
+    final data = await _send('GET', '/orders/changes/',
+        query: {if (since != null) 'since': since}) as Map;
+    return (
+      [
+        for (final o in data['orders'] as List)
+          OrderModel.fromJson(Map<String, dynamic>.from(o as Map))
+      ],
+      data['now'] as String,
+    );
+  }
+
+  /// Owner side: pending "this phone is mine" requests from portal sign-ups.
+  static Future<List<Map<String, dynamic>>> fetchLinkRequests() async {
+    final data = await _send('GET', '/link-requests/') as Map;
+    return [for (final r in data['requests'] as List) Map<String, dynamic>.from(r as Map)];
+  }
+
+  /// [approve] true links the email to the customer; false rejects it.
+  static Future<void> resolveLinkRequest(int id, {required bool approve}) =>
+      _send('POST', '/link-requests/$id/${approve ? 'approve' : 'reject'}/', body: {});
 
   static Future<void> requestPickup(
           {required String name,

@@ -34,6 +34,8 @@ dependencies:
   video_player: ^2.14.1
   pdf: ^3.13.1
   printing: ^5.15.1
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:
