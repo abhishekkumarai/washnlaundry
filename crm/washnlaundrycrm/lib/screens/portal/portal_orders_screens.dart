@@ -49,11 +49,27 @@ class _PortalOrdersScreenState extends State<PortalOrdersScreen> {
   Map<String, int> _days = const {};
   DateTime? _day;
 
+  final _scroll = ScrollController();
+
   @override
   void initState() {
     super.initState();
     _load();
     _loadMonth();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Another page starts at the top, not where the pager button was.
+  Future<void> _turnPage(int page) async {
+    await _load(page: page);
+    if (mounted && _scroll.hasClients) {
+      _scroll.animateTo(0, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+    }
   }
 
   static String _iso(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
@@ -150,7 +166,7 @@ class _PortalOrdersScreenState extends State<PortalOrdersScreen> {
             page: _page,
             pages: _pages,
             total: _total,
-            onPage: (p) => _load(page: p),
+            onPage: _turnPage,
           ),
         ],
       ];
@@ -162,30 +178,33 @@ class _PortalOrdersScreenState extends State<PortalOrdersScreen> {
         onRefresh: () async {
           await Future.wait([_load(page: _page), _loadMonth()]);
         },
-        child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
-          _HistoryCalendar(
-            month: _month,
-            counts: _days,
-            selected: _day,
-            onMonth: _shiftMonth,
-            onDay: (d) => _pickDay(_day != null && _iso(_day!) == _iso(d) ? null : d),
-          ),
-          if (_day != null) ...[
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(
-                child: Text(
-                    'Showing ${DateFormat('EEE d MMM').format(_day!)}'
-                    '${orders == null ? '' : ' · $_total order${_total == 1 ? '' : 's'}'}',
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink)),
+        child: ListView(
+            controller: _scroll,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              _HistoryCalendar(
+                month: _month,
+                counts: _days,
+                selected: _day,
+                onMonth: _shiftMonth,
+                onDay: (d) => _pickDay(_day != null && _iso(_day!) == _iso(d) ? null : d),
               ),
-              TextButton(onPressed: () => _pickDay(null), child: const Text('All dates')),
+              if (_day != null) ...[
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                    child: Text(
+                        'Showing ${DateFormat('EEE d MMM').format(_day!)}'
+                        '${orders == null ? '' : ' · $_total order${_total == 1 ? '' : 's'}'}',
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                  ),
+                  TextButton(onPressed: () => _pickDay(null), child: const Text('All dates')),
+                ]),
+              ],
+              const SizedBox(height: 4),
+              ...list,
             ]),
-          ],
-          const SizedBox(height: 4),
-          ...list,
-        ]),
       ),
     );
   }
