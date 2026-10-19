@@ -19,9 +19,14 @@ COPY . .
 # Google setup to work. Pass it (via docker-compose.yml's build args, or
 # `docker compose build --build-arg GOOGLE_CLIENT_ID=...`) to turn Google
 # Sign-In on.
+#
+# FORCE_CUSTOMER_HOST=true builds the customer portal whatever the host name,
+# for docker-compose.yml's `customer` service on its own port.
 ARG GOOGLE_CLIENT_ID=""
+ARG FORCE_CUSTOMER_HOST=false
 RUN flutter build web --release --no-tree-shake-icons \
-    --dart-define=GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+    --dart-define=GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID} \
+    --dart-define=FORCE_CUSTOMER_HOST=${FORCE_CUSTOMER_HOST}
 
 FROM nginx:alpine
 

@@ -19,13 +19,17 @@ import 'portal_shell.dart';
 const _heading =
     TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.5, color: AppColors.ink);
 const _lede = TextStyle(fontSize: 14.5, height: 1.45, color: AppColors.muted);
+const _codeHeading =
+    TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.3, color: AppColors.ink);
 const _label = TextStyle(
     fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: Color(0xFF475569));
 
-/// Customer sign-in: Google, or a one-time code emailed to them (no password).
-/// Two steps in one card: the email, then the 6-digit code. Same look as the
-/// CRM login (warm paper, white bordered card, navy). Sign-in comes first; the
-/// laundry list ([FindShopScreen]) follows it.
+/// Customer sign-in, laid out like the CRM login: Google, then Sign In / Create
+/// Account tabs over email + password (api/password_auth.py; creating an account
+/// emails a confirmation link, "Forgot password?" a reset link). The emailed
+/// one-time code (no password) stays as the secondary way in, for customers who
+/// already sign in that way. Sign-in comes first; the laundry list
+/// ([FindShopScreen]) follows it.
 class PortalLoginScreen extends StatefulWidget {
   const PortalLoginScreen({super.key});
 
@@ -36,9 +40,15 @@ class PortalLoginScreen extends StatefulWidget {
   State<PortalLoginScreen> createState() => _PortalLoginScreenState();
 }
 
+enum _Mode { signIn, signUp, code }
+
 class _PortalLoginScreenState extends State<PortalLoginScreen> {
   final _email = TextEditingController();
+  final _phone = TextEditingController();
+  final _password = TextEditingController();
   final _code = TextEditingController();
+  _Mode _mode = _Mode.signIn;
+  bool _obscure = true;
   bool _codeSent = false;
   bool _busy = false;
   String? _error;
@@ -50,6 +60,8 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
   void dispose() {
     _ticker?.cancel();
     _email.dispose();
+    _phone.dispose();
+    _password.dispose();
     _code.dispose();
     super.dispose();
   }
@@ -67,6 +79,62 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
       _error = err;
       if (err == null) onOk?.call();
     });
+  }
+
+  void _setMode(_Mode mode) => setState(() {
+        _ticker?.cancel();
+        _mode = mode;
+        _codeSent = false;
+        _code.clear();
+        _error = null;
+        _notice = null;
+      });
+
+  void _submit(AuthProvider auth) {
+    final email = _email.text.trim();
+    if (!email.contains('@') || _password.text.isEmpty) {
+      setState(() => _error = 'Enter your email and password.');
+      return;
+    }
+    if (_mode == _Mode.signIn) {
+      _run(() => auth.signInWithPassword(email, _password.text));
+      return;
+    }
+    // A 10-digit Indian mobile starting 6-9, the backend's `clean_phone` rule.
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(_phone.text.trim())) {
+      setState(() => _error = 'Enter a valid 10-digit phone number.');
+      return;
+    }
+    _run(() => auth.signUpWithPassword(email, _password.text, '', _phone.text), onOk: () {
+      _notice = 'Check your inbox: we sent a link to confirm $email. '
+          'Open it to finish creating your account.';
+      _password.clear();
+    });
+  }
+
+  Future<void> _forgotPassword(AuthProvider auth) async {
+    final ctrl = TextEditingController(text: _email.text.trim());
+    final email = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset your password'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(labelText: 'Email'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text('Send reset link')),
+        ],
+      ),
+    );
+    if (email == null || email.isEmpty) return;
+    _run(() => auth.requestPasswordReset(email),
+        onOk: () => _notice = 'If $email has an account, we sent a link to reset the password.');
   }
 
   void _startResendTimer() {
@@ -100,86 +168,146 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
     _run(() => auth.signInWithEmailCode(_email.text, _code.text));
   }
 
-  void _changeEmail() => setState(() {
-        _ticker?.cancel();
-        _codeSent = false;
-        _code.clear();
-        _error = null;
-        _notice = null;
-      });
-
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final error = _error ?? auth.error;
     return PortalPage(children: [
       const _Brand(),
+      const SizedBox(height: 6),
+      const Text('Sign in to book pickups and track your orders',
+          textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: AppColors.muted)),
       const SizedBox(height: 28),
-      PortalPanel(
-        padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
-        child: AutofillGroup(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(_codeSent ? 'STEP 2 OF 2' : 'STEP 1 OF 2', style: _label),
-              const SizedBox(height: 6),
-              Text(_codeSent ? 'Check your email' : 'Sign in',
-                  style: _heading.copyWith(fontSize: 22)),
-              const SizedBox(height: 6),
-              if (_codeSent)
-                _sentTo()
-              else
-                const Text('Book pickups and follow your orders. No password needed.',
-                    style: _lede),
-              const SizedBox(height: 20),
-              if (error != null) _banner(error, const Color(0xFFFEF2F2), AppColors.danger),
-              if (_notice != null)
-                _banner(_notice!, const Color(0xFFECFDF5), const Color(0xFF047857)),
-              ...(_codeSent ? _codeStep(auth) : _emailStep(auth)),
-            ],
-          ),
+      Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
         ),
+        child: auth.initializing
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+              )
+            : AutofillGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (error != null)
+                      _banner(error, const Color(0xFFFEF2F2), AppColors.danger),
+                    if (_notice != null)
+                      _banner(_notice!, const Color(0xFFECFDF5), const Color(0xFF047857)),
+                    ...(_mode == _Mode.code
+                        ? (_codeSent ? _codeStep(auth) : _emailCodeStep(auth))
+                        : _passwordForm(auth)),
+                  ],
+                ),
+              ),
+      ),
+      const SizedBox(height: 16),
+      const Text(
+        'By signing in, you agree to our Terms of Service and Privacy Policy.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 11, color: AppColors.muted),
       ),
     ]);
   }
 
-  List<Widget> _emailStep(AuthProvider auth) => [
-        if (AuthProvider.isConfigured) ...[
-          Center(child: googleSignInButton(onPressed: auth.authenticate)),
-          const SizedBox(height: 18),
-          const Row(children: [
-            Expanded(child: Divider(color: AppColors.border)),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child:
-                  Text('or use your email', style: TextStyle(fontSize: 12, color: AppColors.muted)),
-            ),
-            Expanded(child: Divider(color: AppColors.border)),
-          ]),
-          const SizedBox(height: 18),
-        ],
-        const Text('EMAIL', style: _label),
+  List<Widget> _passwordForm(AuthProvider auth) {
+    final signUp = _mode == _Mode.signUp;
+    return [
+      if (AuthProvider.isConfigured) ...[
+        Center(child: googleSignInButton(onPressed: auth.authenticate)),
+        const SizedBox(height: 16),
+        _divider('OR'),
+        const SizedBox(height: 16),
+      ],
+      _tabs(),
+      const SizedBox(height: 16),
+      _fieldLabel('Email'),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _email,
+        keyboardType: TextInputType.emailAddress,
+        autofillHints: const [AutofillHints.email],
+        decoration: _field(hint: 'you@example.com', icon: Icons.mail_outline_rounded),
+      ),
+      if (signUp) ...[
+        const SizedBox(height: 14),
+        _fieldLabel('Phone number'),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _phone,
+          keyboardType: TextInputType.phone,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(10),
+          ],
+          autofillHints: const [AutofillHints.telephoneNumber],
+          decoration: _field(hint: '9876543210', icon: Icons.phone_outlined),
+        ),
+      ],
+      const SizedBox(height: 14),
+      _fieldLabel('Password'),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _password,
+        obscureText: _obscure,
+        autofillHints: [signUp ? AutofillHints.newPassword : AutofillHints.password],
+        onSubmitted: (_) => _submit(auth),
+        decoration: _field(hint: 'Enter your password', icon: Icons.lock_outline_rounded)
+            .copyWith(
+          suffixIcon: IconButton(
+            icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                size: 18, color: AppColors.muted),
+            onPressed: () => setState(() => _obscure = !_obscure),
+          ),
+        ),
+      ),
+      if (!signUp)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _link('Forgot password?', () => _forgotPassword(auth)),
+        ),
+      const SizedBox(height: 12),
+      _primary(_busy ? 'Please wait…' : (signUp ? 'Create Account' : 'Sign In'),
+          () => _submit(auth)),
+      const SizedBox(height: 10),
+      Center(child: _link('Email me a sign-in code instead', () => _setMode(_Mode.code))),
+    ];
+  }
+
+  List<Widget> _emailCodeStep(AuthProvider auth) => [
+        const Text('Sign in with a code', style: _codeHeading),
+        const SizedBox(height: 6),
+        const Text('We email you a 6-digit code. It works for 10 minutes.', style: _lede),
+        const SizedBox(height: 18),
+        _fieldLabel('Email'),
         const SizedBox(height: 6),
         TextField(
           controller: _email,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.send,
           autofillHints: const [AutofillHints.email],
-          decoration: _field(hint: 'you@example.com', icon: Icons.mail_outline),
+          decoration: _field(hint: 'you@example.com', icon: Icons.mail_outline_rounded),
           onSubmitted: (_) => _send(auth),
         ),
         const SizedBox(height: 16),
         _primary(_busy ? 'Sending…' : 'Email me a code', () => _send(auth)),
         const SizedBox(height: 10),
-        const Text('We email you a 6-digit code. It works for 10 minutes.',
-            textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.muted)),
+        Center(child: _link('Use a password instead', () => _setMode(_Mode.signIn))),
       ];
 
   List<Widget> _codeStep(AuthProvider auth) {
     // Wide digit spacing reads like a code, but must still fit a small phone.
     final spacing = MediaQuery.sizeOf(context).width < 380 ? 6.0 : 14.0;
     return [
-      const Text('CODE', style: _label),
+      const Text('Check your email', style: _codeHeading),
+      const SizedBox(height: 6),
+      _sentTo(),
+      const SizedBox(height: 18),
+      _fieldLabel('Code'),
       const SizedBox(height: 6),
       TextField(
         controller: _code,
@@ -218,6 +346,7 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
           ),
         ],
       ),
+      Center(child: _link('Use a password instead', () => _setMode(_Mode.signIn))),
     ];
   }
 
@@ -232,7 +361,7 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
             const TextSpan(text: '.'),
           ])),
           TextButton(
-            onPressed: _busy ? null : _changeEmail,
+            onPressed: _busy ? null : () => _setMode(_Mode.code),
             style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 minimumSize: const Size(0, 28),
@@ -242,14 +371,84 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
         ],
       );
 
+  /// Sign In / Create Account, the CRM login's segmented switch.
+  Widget _tabs() => Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1EFEA),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(children: [
+          Expanded(child: _tab(_Mode.signIn, 'Sign In')),
+          Expanded(child: _tab(_Mode.signUp, 'Create Account')),
+        ]),
+      );
+
+  Widget _tab(_Mode mode, String label) {
+    final selected = _mode == mode;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _busy ? null : () => _setMode(mode),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1))
+                  ]
+                : null,
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: selected ? AppColors.ink : AppColors.muted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _divider(String text) => Row(children: [
+        const Expanded(child: Divider(color: AppColors.border)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(text, style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+        ),
+        const Expanded(child: Divider(color: AppColors.border)),
+      ]);
+
+  Widget _fieldLabel(String text) => Text(text,
+      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)));
+
+  Widget _link(String text, VoidCallback onTap) => InkWell(
+        onTap: _busy ? null : onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Text(text,
+              style: const TextStyle(
+                  fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
+        ),
+      );
+
   Widget _primary(String text, VoidCallback onPressed) => FilledButton(
         onPressed: _busy ? null : onPressed,
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(48),
+          minimumSize: const Size.fromHeight(46),
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.onPrimary,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          textStyle: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
         ),
         child: Text(text),
       );
@@ -266,14 +465,12 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
         borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c, width: w));
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
       prefixIcon: icon == null ? null : Icon(icon, size: 18, color: AppColors.muted),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      filled: true,
-      fillColor: AppColors.card,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: edge(AppColors.border),
       enabledBorder: edge(AppColors.border),
-      focusedBorder: edge(AppColors.primary, 1.5),
+      focusedBorder: edge(AppColors.primary),
     );
   }
 }

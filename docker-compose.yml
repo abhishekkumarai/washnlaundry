@@ -8,14 +8,22 @@ services:
       - "8000:8000"
     volumes:
       - ./crm/backend:/app
+    # crm/.env supplies SECRET_KEY (password sign-in is off on the default key),
+    # RESEND_API_KEY, DEV_LOGIN_* and DEV_USER_*. `environment` below wins over it,
+    # so keys that live in .env are not repeated there.
+    env_file:
+      - path: ./crm/.env
+        required: false
     environment:
       - PYTHONUNBUFFERED=1
       - DEBUG=True
-      - SECRET_KEY=${SECRET_KEY:-django-insecure-laundrybill-crm-secret-key-super-secure}
-      - RAG_API_KEY=${RAG_API_KEY:-}
-      - RESEND_API_KEY=${RESEND_API_KEY:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - CORS_ALLOW_ALL_ORIGINS=True
+    # Local dev runs in debug: ensure_dev_login gives DEV_USER_EMAIL its password.
+    command: >-
+      sh -c "python manage.py migrate --noinput &&
+      python manage.py ensure_dev_login &&
+      python manage.py runserver 0.0.0.0:8000"
 
   frontend:
     build:
@@ -26,6 +34,21 @@ services:
     container_name: washnlaundry-crm
     ports:
       - "8080:80"
+    depends_on:
+      - backend
+
+  # The customer portal: the same Flutter build, forced into portal mode (as on
+  # customer.washnlaundry.com). nginx.conf proxies /api to `backend` as above.
+  customer:
+    build:
+      context: ./crm/washnlaundrycrm
+      dockerfile: Dockerfile
+      args:
+        GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        FORCE_CUSTOMER_HOST: "true"
+    container_name: washnlaundry-customer
+    ports:
+      - "8081:80"
     depends_on:
       - backend
 

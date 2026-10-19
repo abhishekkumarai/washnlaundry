@@ -43,7 +43,8 @@ VERIFY_SALT = 'email-verify'
 VERIFY_MAX_AGE = 3 * 24 * 3600
 MIN_PASSWORD = 8
 MAX_PASSWORD = 128
-LOCAL_ORIGIN = re.compile(r'^http://(localhost|127\.0\.0\.1)(:\d+)?$')
+# customer.localhost: the portal run locally (the app switches on a customer.* host).
+LOCAL_ORIGIN = re.compile(r'^http://((customer\.)?localhost|127\.0\.0\.1)(:\d+)?$')
 
 _DUMMY_HASH = None
 
