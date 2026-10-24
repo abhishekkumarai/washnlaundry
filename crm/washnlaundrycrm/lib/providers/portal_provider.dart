@@ -31,6 +31,20 @@ class PortalProvider extends ChangeNotifier {
   Map<String, dynamic>? get shop => _shop;
   String get shopName => _shop?['name'] as String? ?? 'washnlaundry';
 
+  /// Where to look for laundries, chosen on `/location` and remembered on this
+  /// device (it outlives sign-out, like a delivery app's saved location):
+  /// either the browser's position ([near]) or a typed PIN code / area ([query]).
+  (double, double)? _near;
+  (double, double)? get near => _near;
+  String? _query;
+  String? get locationQuery => _query;
+  bool get hasLocation => _near != null || (_query ?? '').isNotEmpty;
+
+  /// "Your current location" or the typed PIN code / area.
+  String get locationLabel => _near != null ? 'Your current location' : (_query ?? '');
+
+  static const _latKey = 'portal_loc_lat', _lngKey = 'portal_loc_lng', _queryKey = 'portal_loc_q';
+
   /// Whether the last auth notification found someone signed in, to spot a sign-out.
   bool _wasSignedIn = false;
 
@@ -57,6 +71,9 @@ class PortalProvider extends ChangeNotifier {
     _auth.addListener(_onAuthChanged);
     try {
       final prefs = await SharedPreferences.getInstance();
+      final lat = prefs.getDouble(_latKey), lng = prefs.getDouble(_lngKey);
+      _near = lat != null && lng != null ? (lat, lng) : null;
+      _query = prefs.getString(_queryKey);
       final saved = prefs.getString(_prefsKey);
       if (saved != null && _auth.isSignedIn) {
         await selectShop(saved, refreshRole: false);
@@ -118,6 +135,34 @@ class PortalProvider extends ChangeNotifier {
     await prefs.remove(_prefsKey);
     notifyListeners();
     if (_auth.isSignedIn) await _auth.refreshRole();
+  }
+
+  /// Remembers where to look for laundries: [near] (the browser's position) or
+  /// [query] (a PIN code or area). One replaces the other.
+  Future<void> setLocation({(double, double)? near, String? query}) async {
+    _near = near;
+    _query = near == null ? query?.trim() : null;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_near != null) {
+        await prefs.setDouble(_latKey, _near!.$1);
+        await prefs.setDouble(_lngKey, _near!.$2);
+        await prefs.remove(_queryKey);
+      } else {
+        await prefs.remove(_latKey);
+        await prefs.remove(_lngKey);
+        await prefs.setString(_queryKey, _query ?? '');
+      }
+    } catch (_) {
+      // Prefs unavailable: remembered for this visit only.
+    }
+  }
+
+  @visibleForTesting
+  void setLocationForTest({(double, double)? near, String? query}) {
+    _near = near;
+    _query = query;
   }
 
   @visibleForTesting

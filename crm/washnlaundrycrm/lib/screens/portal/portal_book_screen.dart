@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/portal_provider.dart';
@@ -10,6 +11,7 @@ import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/item_art.dart';
 import 'address_editor.dart';
+import 'portal_addresses_screen.dart';
 import 'portal_shell.dart';
 
 /// New Order in customer mode, one step at a time: items (the shop's own
@@ -145,7 +147,7 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
         'notes': _notes.text.trim(),
       }, _key);
       if (!mounted) return;
-      context.go('/orders/${Uri.encodeComponent('${order['order_number']}')}?new=1');
+      context.go('/orders/${Uri.encodeComponent('${order['order_number']}')}?placed=1');
       return;
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -169,11 +171,11 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
     });
   }
 
-  static const _stepNames = ['Items', 'Pickup time', 'Address', 'Review'];
+  static const _stepNames = ['Services', 'Pickup time', 'Address', 'Review'];
 
   /// What stops [step] from moving on, or null when it is done.
   String? _blockerFor(int step) => switch (step) {
-        0 => _qty.values.every((q) => q == 0) ? 'Add at least one item.' : null,
+        0 => _qty.values.every((q) => q == 0) ? 'Add at least one item to a service.' : null,
         1 => _date == null || _slotId == null ? 'Choose a pickup time.' : null,
         2 => _address == null
             ? (_addresses.isEmpty ? 'Add a pickup address.' : 'Pick an address in the pickup area.')
@@ -214,7 +216,7 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
     final money = NumberFormat.currency(symbol: currency, decimalDigits: 0, locale: 'en_IN');
     if (_options == null) {
       return PortalShell(
-        index: 0,
+        index: PortalSection.book,
         title: 'Book a pickup',
         child: Center(
           child: _loadError == null
@@ -230,11 +232,8 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
     final blocker = _blockerFor(_step);
     final last = _step == _stepNames.length - 1;
     final pieces = _qty.values.fold<int>(0, (s, q) => s + q);
-    return PortalShell(
-      index: 0,
-      title: 'Book a pickup',
-      showNav: _step == 0,
-      child: Column(children: [
+    final wide = MediaQuery.sizeOf(context).width >= PortalShell.wide;
+    final flow = Column(children: [
         _StepBar(
           names: _stepNames,
           current: _step,
@@ -348,6 +347,88 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
               }),
             ]),
           ),
+      ]);
+    return PortalShell(
+      index: PortalSection.book,
+      title: 'Book a pickup',
+      showNav: _step == 0,
+      maxWidth: wide ? 1120 : null,
+      child: wide
+          ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: flow),
+              Container(
+                width: 340,
+                padding: const EdgeInsets.fromLTRB(8, 20, 16, 16),
+                child: _summary(money),
+              ),
+            ])
+          : flow,
+    );
+  }
+
+  /// Wide screens: what the pickup holds so far, beside the steps.
+  Widget _summary(NumberFormat money) {
+    final items = _itemsById;
+    final lines = [
+      for (final e in _qty.entries)
+        if (e.value > 0 && items[e.key] != null) (items[e.key]!, e.value)
+    ];
+    final slot = _pickedSlotText;
+    final address = _address;
+    TextStyle mono([Color? c]) => GoogleFonts.ibmPlexMono(
+        fontSize: 13, color: c ?? AppColors.ink, fontFeatures: const [FontFeature.tabularFigures()]);
+    Widget section(String label, Widget child) => Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: _sectionLabel),
+            const SizedBox(height: 6),
+            child,
+          ]),
+        );
+    const notYet = Text('Not chosen yet', style: TextStyle(fontSize: 13, color: AppColors.muted));
+    return PortalPanel(
+      child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+        const Text('Your pickup', style: AppTypography.sectionTitle),
+        section(
+            'SERVICES',
+            lines.isEmpty
+                ? const Text('Nothing added yet',
+                    style: TextStyle(fontSize: 13, color: AppColors.muted))
+                : Column(children: [
+                    for (final (item, qty) in lines)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(children: [
+                          Expanded(
+                            child: Text('${item['name']} × $qty',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13, color: AppColors.ink)),
+                          ),
+                          Text(money.format(((item['price'] as num?) ?? 0) * qty), style: mono()),
+                        ]),
+                      ),
+                  ])),
+        section('PICKUP', slot == null ? notYet : Text(slot, style: mono())),
+        section(
+            'ADDRESS',
+            address == null
+                ? notYet
+                : Text(portalAddressLine(address),
+                    style: const TextStyle(fontSize: 13, height: 1.4, color: AppColors.ink))),
+        const Divider(height: 28, color: AppColors.border),
+        Row(children: [
+          const Expanded(
+              child: Text('Estimated total', style: TextStyle(fontSize: 13, color: AppColors.muted))),
+          Text(money.format(_total),
+              style: GoogleFonts.ibmPlexMono(
+                  fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.ink)),
+        ]),
+        const SizedBox(height: 4),
+        const Text('Final amount is confirmed after pickup.',
+            style: TextStyle(fontSize: 12, color: AppColors.muted)),
       ]),
     );
   }
@@ -639,7 +720,7 @@ class _PortalBookScreenState extends State<PortalBookScreen> {
     return [
       const _StepTitle('Check and book', 'You pay when your clothes come back.'),
       _ReviewBlock(
-        title: 'Items',
+        title: 'Services',
         onEdit: () => _goTo(0),
         child: Column(children: [
           for (final (item, q) in lines)

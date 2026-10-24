@@ -21,7 +21,7 @@ from .otp import email_code_request, email_code_verify
 from .customer_views import (
     customer_address_detail, customer_addresses, customer_booking_options, customer_join,
     customer_me, customer_shop_detail, customer_shop_search, customer_orders, customer_order_detail,
-    customer_rate_card,
+    customer_order_issues, customer_rate_card,
 )
 
 router = DefaultRouter()
@@ -79,6 +79,7 @@ urlpatterns = [
     path('customer/booking-options/', customer_booking_options, name='customer-booking-options'),
     path('customer/orders/', customer_orders, name='customer-orders'),
     path('customer/orders/<str:order_number>/', customer_order_detail, name='customer-order-detail'),
+    path('customer/orders/<str:order_number>/issues/', customer_order_issues, name='customer-order-issues'),
     path('customer/rate-card/', customer_rate_card, name='customer-rate-card'),
     path('whatsapp/neonize/status/', neonize_status, name='neonize-status'),
     path('whatsapp/neonize/connect/', neonize_connect, name='neonize-connect'),

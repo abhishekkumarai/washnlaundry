@@ -7,15 +7,41 @@ import '../../providers/portal_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/brand_logo.dart';
 
-/// Layout of every signed-in customer portal page: [PortalNavBar] on top
-/// (Profile and Sign out live in its account menu), and Book · Orders as a
-/// bottom bar on phones (links in the navbar on wide screens).
-/// Deliberately not the CRM's sidebar: a customer never sees CRM sections.
+/// Sections of the signed-in portal, as [PortalShell.index] numbers them: the
+/// four tabs (Book · Orders · Help · Profile), plus Addresses under Profile.
+abstract final class PortalSection {
+  static const book = 0;
+  static const orders = 1;
+  static const help = 2;
+  static const profile = 3;
+  static const addresses = 4;
+}
+
+/// The four tabs: section, icon, label, path.
+const _tabs = [
+  (PortalSection.book, Icons.local_laundry_service_outlined, 'Book', '/book'),
+  (PortalSection.orders, Icons.receipt_long_outlined, 'Orders', '/orders'),
+  (PortalSection.help, Icons.support_agent_outlined, 'Help', '/help'),
+  (PortalSection.profile, Icons.person_outline, 'Profile', '/profile'),
+];
+
+/// The tab lit for [index]: Addresses lives under Profile.
+int _tabFor(int index) => index == PortalSection.addresses ? PortalSection.profile : index;
+
+/// Layout of every signed-in customer portal page: [PortalNavBar] on top (with
+/// the four tabs as links on wide screens), a Book · Orders · Help · Profile
+/// bottom bar on phones. No sidebar: it only repeated the tabs
+/// (crm/docs/customer-portal-flow.md). Never the CRM's sections.
 class PortalShell extends StatelessWidget {
   const PortalShell(
-      {super.key, required this.index, required this.child, this.title, this.showNav = true});
+      {super.key,
+      required this.index,
+      required this.child,
+      this.title,
+      this.showNav = true,
+      this.maxWidth});
 
-  /// 0 Book, 1 Orders, 2 Profile.
+  /// A [PortalSection].
   final int index;
   final Widget child;
 
@@ -25,63 +51,76 @@ class PortalShell extends StatelessWidget {
   /// Off for focused flows (booking past its first step), like a checkout.
   final bool showNav;
 
-  static const _paths = ['/book', '/orders'];
+  /// The content column's width on wide screens: 760 by default, 1120 for
+  /// two-column pages (booking with its summary, an order beside its help card).
+  final double? maxWidth;
+
   static const wide = 900.0;
 
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.sizeOf(context).width >= wide;
-    final heading = title != null && index != 0;
-    final body = Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
-        child: heading
-            ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                  child: Text(title!,
-                      style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.4,
-                          color: AppColors.ink)),
-                ),
-                Expanded(child: child),
-              ])
-            : child,
-      ),
+    final heading = title != null && index != PortalSection.book;
+    final page = ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: isWide ? (maxWidth ?? 760) : 640),
+      child: heading
+          ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                child: Text(title!,
+                    style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.4,
+                        color: AppColors.ink)),
+              ),
+              Expanded(child: child),
+            ])
+          : child,
     );
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: PortalNavBar(index: index),
-      body: body,
+      appBar: PortalNavBar(index: showNav ? index : null),
+      body: Align(alignment: Alignment.topCenter, child: page),
       bottomNavigationBar: isWide || !showNav
           ? null
           : NavigationBar(
-              // Profile is in the navbar's menu, so on it neither tab is lit.
-              selectedIndex: index.clamp(0, 1),
-              indicatorColor: index > 1 ? Colors.transparent : null,
-              onDestinationSelected: (i) => context.go(_paths[i]),
+              selectedIndex: _tabFor(index),
+              onDestinationSelected: (i) => context.go(_tabs[i].$4),
               backgroundColor: AppColors.card,
+              indicatorColor: AppColors.accentSoft,
               height: 64,
-              destinations: const [
-                NavigationDestination(
-                    icon: Icon(Icons.local_laundry_service_outlined), label: 'Book'),
-                NavigationDestination(icon: Icon(Icons.receipt_long_outlined), label: 'Orders'),
+              destinations: [
+                for (final (_, icon, label, _) in _tabs)
+                  NavigationDestination(icon: Icon(icon), label: label),
               ],
             ),
     );
   }
 }
 
-/// The portal's top navbar on every signed-in page: logo, the laundry being
-/// booked with (tap to change), Book · Orders links on wide screens, and an
-/// account menu with Profile and Sign out.
+/// A laundry's street address and city on one line, the city left out when
+/// the address already ends with it ("HBR Layout, Bengaluru", not "…, Bengaluru, Bengaluru").
+String portalShopPlace(Map<dynamic, dynamic> shop) {
+  final address = '${shop['address'] ?? ''}'.trim();
+  final city = '${shop['city'] ?? ''}'.trim();
+  if (city.isEmpty || address.toLowerCase().contains(city.toLowerCase())) return address;
+  return address.isEmpty ? city : '$address, $city';
+}
+
+/// Initial for an avatar: the name's, else the email's, else "?".
+String portalInitial(String? name, String? email) {
+  final source = (name ?? '').trim().isNotEmpty ? name!.trim() : (email ?? '').trim();
+  return source.isEmpty ? '?' : source[0].toUpperCase();
+}
+
+/// The portal's top navbar on every signed-in page: logo (home: the account
+/// overview), the laundry being booked with (tap to change), and an account
+/// menu. Sections live in [PortalShell]'s sidebar / bottom bar, not here.
 class PortalNavBar extends StatelessWidget implements PreferredSizeWidget {
   const PortalNavBar({super.key, this.index, this.leading, this.choosingShop = false});
 
-  /// The active section (0 Book, 1 Orders, 2 Profile), or null off-section.
+  /// The active [PortalSection], or null off-section.
   final int? index;
 
   /// Shown before the logo, e.g. a back arrow.
@@ -166,12 +205,15 @@ class PortalNavBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
                 ),
               ],
-              if (hasShop && wide) ...[
-                const SizedBox(width: 24),
-                _NavLink(label: 'Book', active: index == 0, onTap: () => context.go('/book')),
-                _NavLink(label: 'Orders', active: index == 1, onTap: () => context.go('/orders')),
-              ],
             ])),
+            if (wide && hasShop && index != null) ...[
+              for (final (section, _, label, path) in _tabs)
+                _NavLink(
+                    label: label,
+                    active: _tabFor(index!) == section,
+                    onTap: () => context.go(path)),
+              const SizedBox(width: 12),
+            ],
             _AccountMenu(choosingShop: choosingShop),
           ]),
         ),
@@ -180,6 +222,7 @@ class PortalNavBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
+/// A tab as a top-bar link on wide screens: blue underline when active.
 class _NavLink extends StatelessWidget {
   const _NavLink({required this.label, required this.active, required this.onTap});
 
@@ -192,12 +235,12 @@ class _NavLink extends StatelessWidget {
         onTap: onTap,
         child: Container(
           height: PortalNavBar.height,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           alignment: Alignment.center,
           decoration: BoxDecoration(
             border: Border(
-              bottom: BorderSide(color: active ? AppColors.primary : Colors.transparent, width: 2),
-            ),
+                bottom: BorderSide(
+                    color: active ? AppColors.accent : Colors.transparent, width: 2)),
           ),
           child: Text(label,
               style: TextStyle(
@@ -208,7 +251,7 @@ class _NavLink extends StatelessWidget {
       );
 }
 
-/// The signed-in customer's menu: who they are, Profile, Change laundry, Sign out.
+/// The signed-in customer's menu: who they are, Profile, Addresses, Change laundry, Sign out.
 class _AccountMenu extends StatelessWidget {
   const _AccountMenu({required this.choosingShop});
 
@@ -220,9 +263,7 @@ class _AccountMenu extends StatelessWidget {
     final hasShop = context.watch<PortalProvider>().shopSlug != null;
     final email = auth.userEmail ?? '';
     final name = (auth.userName ?? '').trim();
-    final initial = (name.isNotEmpty ? name : email).trim().isEmpty
-        ? '?'
-        : (name.isNotEmpty ? name : email)[0].toUpperCase();
+    final initial = portalInitial(name, email);
     return PopupMenuButton<String>(
       tooltip: 'Account',
       offset: const Offset(0, PortalNavBar.height - 8),
@@ -234,6 +275,8 @@ class _AccountMenu extends StatelessWidget {
       ),
       onSelected: (v) {
         switch (v) {
+          case 'addresses':
+            context.go('/addresses');
           case 'profile':
             context.go('/profile');
           case 'change':
@@ -254,11 +297,16 @@ class _AccountMenu extends StatelessWidget {
           ]),
         ),
         const PopupMenuDivider(),
-        if (hasShop)
-          const PopupMenuItem(
+        if (hasShop) ...const [
+          PopupMenuItem(
             value: 'profile',
             child: _MenuRow(icon: Icons.person_outline, label: 'Profile'),
           ),
+          PopupMenuItem(
+            value: 'addresses',
+            child: _MenuRow(icon: Icons.place_outlined, label: 'Addresses'),
+          ),
+        ],
         if (!choosingShop)
           const PopupMenuItem(
             value: 'change',
@@ -267,7 +315,7 @@ class _AccountMenu extends StatelessWidget {
         const PopupMenuDivider(),
         const PopupMenuItem(
           value: 'signout',
-          child: _MenuRow(icon: Icons.logout_rounded, label: 'Sign out', danger: true),
+          child: _MenuRow(icon: Icons.logout_rounded, label: 'Sign out'),
         ),
       ],
       child: Padding(
@@ -288,21 +336,17 @@ class _AccountMenu extends StatelessWidget {
 }
 
 class _MenuRow extends StatelessWidget {
-  const _MenuRow({required this.icon, required this.label, this.danger = false});
+  const _MenuRow({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
-  final bool danger;
 
   @override
-  Widget build(BuildContext context) {
-    final color = danger ? AppColors.danger : AppColors.ink;
-    return Row(children: [
-      Icon(icon, size: 18, color: danger ? AppColors.danger : AppColors.muted),
-      const SizedBox(width: 12),
-      Text(label, style: TextStyle(fontSize: 14, color: color)),
-    ]);
-  }
+  Widget build(BuildContext context) => Row(children: [
+        Icon(icon, size: 18, color: AppColors.muted),
+        const SizedBox(width: 12),
+        Text(label, style: const TextStyle(fontSize: 14, color: AppColors.ink)),
+      ]);
 }
 
 /// A flat, bordered panel (the portal's card).
@@ -394,8 +438,8 @@ Widget portalError(String? message) => message == null
 
 const portalStatusLabels = {
   'PLACED': 'Booked',
-  'PROCESSING': 'Processing',
-  'IRONING': 'Ironing',
+  'PROCESSING': 'Cleaning',
+  'IRONING': 'Cleaning',
   'READY': 'Ready',
   'OUT_FOR_DELIVERY': 'Out for delivery',
   'DELIVERED': 'Delivered',

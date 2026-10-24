@@ -264,18 +264,22 @@ class ApiService {
   }
 
   /// One page of the customer's orders (newest first), optionally only those
-  /// booked on [date] (yyyy-MM-dd): `{orders, page, pages, total}`.
+  /// booked on [date] (yyyy-MM-dd) and only [state] `current` (still moving) or
+  /// `past` (delivered or cancelled): `{orders, page, pages, total}`.
   static Future<Map<String, dynamic>> fetchMyOrdersPage(
-          {int page = 1, int pageSize = 10, String? date}) async =>
+          {int page = 1, int pageSize = 10, String? date, String? state}) async =>
       Map<String, dynamic>.from(await _send('GET', '/customer/orders/', query: {
         'page': '$page',
         'page_size': '$pageSize',
         if (date != null) 'date': date,
+        if (state != null) 'state': state,
       }) as Map);
 
-  /// Orders booked on each day of [month] (yyyy-MM), keyed yyyy-MM-dd.
-  static Future<Map<String, int>> fetchOrderCalendar(String month) async {
-    final data = await _send('GET', '/customer/orders/', query: {'calendar': month}) as Map;
+  /// Orders booked on each day of [month] (yyyy-MM), keyed yyyy-MM-dd; with
+  /// [state], only those orders (see [fetchMyOrdersPage]).
+  static Future<Map<String, int>> fetchOrderCalendar(String month, {String? state}) async {
+    final data = await _send('GET', '/customer/orders/',
+        query: {'calendar': month, if (state != null) 'state': state}) as Map;
     return {
       for (final e in (data['days'] as Map).entries) '${e.key}': (e.value as num).toInt(),
     };
@@ -344,6 +348,15 @@ class ApiService {
   static Future<Map<String, dynamic>> fetchMyOrder(String orderNumber) async =>
       Map<String, dynamic>.from(
           await _send('GET', '/customer/orders/${Uri.encodeComponent(orderNumber)}/') as Map);
+
+  /// Help → Report an issue: tells the shop (by email) what went wrong with one
+  /// of the customer's own orders. [category] is MISSING, DAMAGED, LATE,
+  /// BILLING, STAIN or OTHER.
+  static Future<Map<String, dynamic>> reportOrderIssue(
+          String orderNumber, String category, String message) async =>
+      Map<String, dynamic>.from(await _send(
+          'POST', '/customer/orders/${Uri.encodeComponent(orderNumber)}/issues/',
+          body: {'category': category, 'message': message}) as Map);
 
   static Future<List<Map<String, dynamic>>> fetchMyAddresses() async {
     final data = await _send('GET', '/customer/addresses/') as Map;

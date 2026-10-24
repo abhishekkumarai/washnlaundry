@@ -8,8 +8,11 @@ import 'providers/app_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/portal_provider.dart';
 import 'screens/attendance_screen.dart';
+import 'screens/portal/portal_addresses_screen.dart';
 import 'screens/portal/portal_book_screen.dart';
 import 'screens/portal/portal_entry_screens.dart';
+import 'screens/portal/portal_help_screens.dart';
+import 'screens/portal/portal_location_screen.dart';
 import 'screens/portal/portal_orders_screens.dart';
 import 'screens/portal/portal_profile_screen.dart';
 import 'screens/auth_link_screens.dart';
@@ -297,37 +300,49 @@ List<RouteBase> portalRoutes() => [
         path: '/reset',
         builder: (_, s) => ResetPasswordScreen(token: s.uri.queryParameters['token']),
       ),
+      GoRoute(path: '/location', builder: (_, __) => const PortalLocationScreen()),
       GoRoute(path: '/find', builder: (_, __) => const FindShopScreen()),
       GoRoute(
         path: '/s/:slug',
         builder: (_, s) => ShopLinkScreen(slug: s.pathParameters['slug']!),
       ),
       GoRoute(path: '/join', builder: (_, __) => const JoinShopScreen()),
+      // The old account overview folded into Profile.
+      GoRoute(path: '/account', redirect: (_, __) => '/profile'),
       GoRoute(path: '/book', builder: (_, __) => const PortalBookScreen()),
       GoRoute(path: '/orders', builder: (_, __) => const PortalOrdersScreen()),
       GoRoute(
         path: '/orders/:no',
         builder: (_, s) => PortalOrderDetailScreen(
           orderNumber: s.pathParameters['no']!,
-          justBooked: s.uri.queryParameters['new'] == '1',
+          justBooked: s.uri.queryParameters['placed'] == '1' || s.uri.queryParameters['new'] == '1',
         ),
       ),
       GoRoute(path: '/profile', builder: (_, __) => const PortalProfileScreen()),
+      GoRoute(path: '/addresses', builder: (_, __) => const PortalAddressesScreen()),
+      GoRoute(path: '/help', builder: (_, __) => const PortalHelpScreen()),
+      GoRoute(
+        path: '/help/report',
+        builder: (_, s) => PortalReportIssueScreen(orderNumber: s.uri.queryParameters['order']),
+      ),
     ];
 
-/// The portal's gate. Sign in comes first, as in a delivery app: signed out,
-/// only sign-in, the email links and a shop's own `/s/<slug>` link (which
-/// remembers the shop and goes on to sign-in) open. Signed in, the laundry list
-/// (`/find`) is home until a shop is chosen; everything else needs that shop
-/// and to be its customer (else `/join`). The setup-shop page never shows here.
+/// The portal's gate, in the order of the flow (crm/docs/customer-portal-flow.md):
+/// sign in → your location → nearby laundries → laundry page / join → booking.
+/// Signed out, only sign-in, the email links and a shop's own `/s/<slug>` link
+/// (which remembers the shop and goes on to sign-in) open. Signed in with no
+/// laundry chosen: `/location` until a location is remembered, then `/find`.
+/// Everything else needs that laundry and to be its customer (else `/join`);
+/// once all that is done, home is `/book`. The setup-shop page never shows here.
 @visibleForTesting
 String? portalRedirectFor(AuthProvider auth, PortalProvider portal, String loc) {
   if (auth.initializing || portal.restoring) return null;
   if (loc == '/verify' || loc == '/reset' || loc.startsWith('/s/')) return null;
   if (!auth.isSignedIn) return loc == '/login' ? null : '/login';
   if (auth.role == null) return null; // /api/me/ still loading (main.dart shows a spinner)
-  if (loc == '/find') return null;
-  if (portal.shopSlug == null) return '/find';
+  if (loc == '/location') return null;
+  if (loc == '/find') return portal.hasLocation ? null : '/location';
+  if (portal.shopSlug == null) return portal.hasLocation ? '/find' : '/location';
   if (auth.serverRole != 'customer') return loc == '/join' ? null : '/join';
   if (loc == '/join' || loc == '/login') return '/book';
   return null;

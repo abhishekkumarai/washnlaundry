@@ -23,8 +23,8 @@ from google.oauth2 import id_token  # noqa: F401  (tests patch api.customer_view
 
 from .auth import customer_for_email, normalize_phone, verified_email
 from .models import (
-    Customer, CustomerAddress, DeliveryType, EmailLinkRequest, GarmentCategory, GarmentItem, Order, OrderItem,
-    OrderSource, OrderStatus, PaymentStatus, ServiceArea, Shop, ShopMembership, ShopRole, TimeSlot,
+    Customer, CustomerAddress, DeliveryType, EmailLinkRequest, GarmentCategory, GarmentItem, Order, OrderIssue,
+    OrderItem, OrderSource, OrderStatus, PaymentStatus, ServiceArea, Shop, ShopMembership, ShopRole, TimeSlot,
 )
 
 _STATUS_TIMESTAMPS = (
@@ -573,6 +573,18 @@ def customer_orders(request):
     orders = customer.orders.prefetch_related('items').order_by('-created_at')
     params = request.GET
 
+    # ?state=current|past: the Orders page's two tabs. Current is anything still
+    # moving; past is delivered or cancelled.
+    state = params.get('state')
+    if state:
+        closed = [OrderStatus.DELIVERED, OrderStatus.CANCELLED]
+        if state == 'current':
+            orders = orders.exclude(status__in=closed)
+        elif state == 'past':
+            orders = orders.filter(status__in=closed)
+        else:
+            return _bad('state must be current or past.')
+
     # ?calendar=YYYY-MM: orders booked on each day of that month (the history
     # calendar's dots), in the shop's time zone.
     if params.get('calendar'):
@@ -622,9 +634,61 @@ def customer_order_detail(request, order_number):
     return JsonResponse(_order_json(order))
 
 
+def _alert_issue(issue_pk):
+    """Email the shop a problem reported on an order. Best effort, like _alert_shop."""
+    import logging
+    from .services.email_service import EmailService
+    issue = OrderIssue.all_objects.select_related('shop', 'order', 'customer').filter(pk=issue_pk).first()
+    if issue is None or not issue.shop or not issue.shop.email:
+        return
+    c = issue.customer
+    text = (f'{c.name} ({c.phone}{", " + c.email if c.email else ""}) reported a problem with '
+            f'order {issue.order.order_number}.\n\n{issue.get_category_display()}:\n{issue.message}\n\n'
+            'Reply to the customer directly. Mark it resolved in admin when done.')
+    ok, error = EmailService.send(issue.shop.email,
+                                  f'Problem reported on {issue.order.order_number}', text)
+    if not ok:
+        logging.getLogger(__name__).warning('Issue alert for %s not sent: %s',
+                                            issue.order.order_number, error)
+
+
+# csrf_exempt: Bearer-token auth, as for customer_me.
+@csrf_exempt
+@require_http_methods(['POST'])
+def customer_order_issues(request, order_number):
+    """POST /api/customer/orders/<no>/issues/ {category, message}: report a problem
+    with one of the caller's own orders (Help → Report an issue)."""
+    from .password_auth import _throttled
+    customer, err = _customer_for(request)
+    if err:
+        return err
+    order = customer.orders.filter(order_number=order_number).first()
+    if order is None:
+        return JsonResponse({'detail': 'Order not found.'}, status=404)
+    body, err = _read_json(request)
+    if err:
+        return err
+    category = str(body.get('category') or '').upper()
+    message = str(body.get('message') or '').strip()
+    if category not in dict(OrderIssue.CATEGORY_CHOICES):
+        return _bad('Pick what went wrong.')
+    if not message:
+        return _bad('Tell the laundry what happened.')
+    if len(message) > 500:
+        return _bad('Keep it under 500 characters.')
+    if _throttled(f'order-issue:{customer.id}', limit=5, window=3600):
+        return _bad('Too many reports. Please try again later.', status=429)
+    issue = OrderIssue.objects.create(order=order, customer=customer, category=category,
+                                      message=message, shop=order.shop)
+    transaction.on_commit(lambda pk=issue.pk: _alert_issue(pk))
+    return JsonResponse({'id': issue.id, 'category': issue.category, 'status': issue.status,
+                         'created_at': _iso(issue.created_at)}, status=201)
+
+
 def _public_shop_json(shop):
     return {'id': shop.id, 'slug': shop.slug, 'name': shop.name, 'address': shop.address,
             'city': shop.city, 'pin_code': shop.pin_code, 'phone': shop.phone,
+            'whatsapp': shop.whatsapp, 'email': shop.email,
             'currency_symbol': shop.currency_symbol,
             'accepts_online_customers': shop.accepts_online_customers}
 
@@ -684,7 +748,14 @@ def customer_shop_detail(request, slug):
     shop = _online_shops().filter(slug__iexact=slug).first()
     if shop is None:
         return _bad('This laundry is not taking online bookings.', status=404)
-    return JsonResponse(_public_shop_json(shop))
+    # The laundry page also lists what it cleans and where it picks up. all_objects:
+    # the caller's X-Tenant-ID may be another laundry they already booked with.
+    services = [c.name for c in GarmentCategory.all_objects.filter(shop=shop, is_active=True)
+                .order_by('display_order', 'id')
+                if GarmentItem.all_objects.filter(category=c, is_active=True).exists()]
+    pincodes = sorted({a.pin_code.strip() for a in ServiceArea.all_objects.filter(shop=shop, is_active=True)
+                       if a.pin_code.strip()})
+    return JsonResponse({**_public_shop_json(shop), 'services': services, 'pincodes': pincodes})
 
 
 @csrf_exempt

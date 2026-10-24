@@ -2548,6 +2548,58 @@ class CustomerPortalTests(TestCase):
         self.assertEqual(self.client.get('/api/customer/orders/WL-2/', **self.auth).status_code, 404)
         self.assertEqual(self.client.get('/api/customer/orders/WL-1/', **self.auth).status_code, 200)
 
+    def test_state_splits_current_and_past_orders(self):
+        Order.objects.create(order_number='WL-3', customer=self.alice, customer_name='Alice',
+                             status=OrderStatus.DELIVERED)
+        Order.objects.create(order_number='WL-4', customer=self.alice, customer_name='Alice',
+                             status=OrderStatus.CANCELLED)
+        get = lambda state: [o['order_number'] for o in self.client.get(
+            '/api/customer/orders/', {'state': state, 'page': 1}, **self.auth).json()['orders']]
+        self.assertEqual(get('current'), ['WL-1'])
+        self.assertEqual(sorted(get('past')), ['WL-3', 'WL-4'])
+        res = self.client.get('/api/customer/orders/', {'state': 'later'}, **self.auth)
+        self.assertEqual(res.status_code, 400)
+
+    def test_report_issue_on_own_order_emails_the_shop(self):
+        from unittest import mock
+        from .models import OrderIssue
+        shop = self.order.shop
+        shop.email = 'shop@example.com'
+        shop.save()
+        url = '/api/customer/orders/WL-1/issues/'
+        post = lambda body: self.client.post(url, body, content_type='application/json', **self.auth)
+        with mock.patch('api.services.email_service.EmailService.send',
+                        return_value=(True, None)) as send, \
+                self.captureOnCommitCallbacks(execute=True):
+            res = post({'category': 'missing', 'message': 'One sock short.'})
+        self.assertEqual(res.status_code, 201)
+        issue = OrderIssue.objects.get()
+        self.assertEqual((issue.order, issue.customer, issue.category, issue.status),
+                         (self.order, self.alice, 'MISSING', 'OPEN'))
+        self.assertEqual(send.call_args[0][0], 'shop@example.com')
+        self.assertIn('One sock short.', send.call_args[0][2])
+        # Bad input.
+        self.assertEqual(post({'category': 'nope', 'message': 'x'}).status_code, 400)
+        self.assertEqual(post({'category': 'BILLING', 'message': '  '}).status_code, 400)
+        self.assertEqual(post({'category': 'BILLING', 'message': 'x' * 501}).status_code, 400)
+
+    def test_report_issue_on_someone_elses_order_is_404(self):
+        from .models import OrderIssue
+        res = self.client.post('/api/customer/orders/WL-2/issues/',
+                               {'category': 'DAMAGED', 'message': 'Torn.'},
+                               content_type='application/json', **self.auth)
+        self.assertEqual(res.status_code, 404)
+        self.assertFalse(OrderIssue.objects.exists())
+
+    def test_report_issue_is_throttled(self):
+        from django.core.cache import cache
+        cache.clear()
+        post = lambda: self.client.post('/api/customer/orders/WL-1/issues/',
+                                        {'category': 'LATE', 'message': 'Still waiting.'},
+                                        content_type='application/json', **self.auth)
+        codes = [post().status_code for _ in range(6)]
+        self.assertEqual(codes, [201] * 5 + [429])
+
     def test_customer_signup_is_switched_off(self):
         self.verify.return_value = {'email': 'new@example.com', 'email_verified': True}
         res = self.client.post('/api/customer/me/', {'name': 'New', 'phone': '98765 43210'},

@@ -339,6 +339,37 @@ class CustomerAddress(TenantModel):
         return f"{self.get_label_display()}: {self.address[:40]}"
 
 
+class OrderIssue(TenantModel):
+    """A problem a customer reported on one of their orders from the portal's Help
+    page (missing item, damage...). The shop is emailed; it is handled in Django
+    admin for now (no CRM screen yet)."""
+    MISSING, DAMAGED, LATE, BILLING, STAIN, OTHER = 'MISSING', 'DAMAGED', 'LATE', 'BILLING', 'STAIN', 'OTHER'
+    CATEGORY_CHOICES = [(MISSING, 'Missing item'), (DAMAGED, 'Damaged item'),
+                        (LATE, 'Late pickup or delivery'), (BILLING, 'Billing'),
+                        (STAIN, 'Stain not removed'), (OTHER, 'Something else')]
+    OPEN, RESOLVED = 'OPEN', 'RESOLVED'
+    STATUS_CHOICES = [(OPEN, 'Open'), (RESOLVED, 'Resolved')]
+
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='order_issues', db_index=True)
+    order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='issues')
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='order_issues')
+    category = models.CharField(max_length=10, choices=CATEGORY_CHOICES)
+    message = models.TextField(max_length=500)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=OPEN)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not getattr(self, 'shop_id', None) and getattr(self, 'order_id', None):
+            self.shop = self.order.shop
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.get_category_display()} on {self.order.order_number}"
+
+
 # ── Service catalogue ─────────────────────────────────────────────────────────
 
 class GarmentCategory(TenantModel):

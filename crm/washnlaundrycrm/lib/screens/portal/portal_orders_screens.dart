@@ -8,13 +8,15 @@ import '../../providers/portal_provider.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import 'portal_shell.dart';
+import 'portal_ticket.dart';
 
 NumberFormat _money(BuildContext context) => NumberFormat.currency(
     symbol: context.read<PortalProvider>().shop?['currency_symbol'] as String? ?? '₹',
     decimalDigits: 0,
     locale: 'en_IN');
 
-String _pickupText(Map<String, dynamic> o) {
+/// "Pickup Tue 21 Oct, 10:00 AM" for an order, or empty without a date.
+String portalPickupText(Map<String, dynamic> o) {
   final d = DateTime.tryParse('${o['pickup_date']}');
   if (d == null) return '';
   final t = '${o['pickup_time'] ?? ''}';
@@ -49,13 +51,33 @@ class _PortalOrdersScreenState extends State<PortalOrdersScreen> {
   Map<String, int> _days = const {};
   DateTime? _day;
 
+  /// 0: Current (orders still moving, as claim tickets), 1: Past (the calendar
+  /// and pages of delivered and cancelled orders).
+  int _tab = 0;
+  List<Map<String, dynamic>>? _current;
+  String? _currentError;
+
   final _scroll = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    _loadCurrent();
     _load();
     _loadMonth();
+  }
+
+  Future<void> _loadCurrent() async {
+    setState(() => _currentError = null);
+    try {
+      final res = await ApiService.fetchMyOrdersPage(pageSize: 50, state: 'current');
+      if (!mounted) return;
+      setState(() => _current = [
+            for (final o in res['orders'] as List) Map<String, dynamic>.from(o as Map)
+          ]);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _currentError = e.message);
+    }
   }
 
   @override
@@ -78,7 +100,7 @@ class _PortalOrdersScreenState extends State<PortalOrdersScreen> {
     setState(() => _error = null);
     try {
       final res = await ApiService.fetchMyOrdersPage(
-          page: page, pageSize: _pageSize, date: _day == null ? null : _iso(_day!));
+          page: page, pageSize: _pageSize, date: _day == null ? null : _iso(_day!), state: 'past');
       if (!mounted) return;
       setState(() {
         _orders = [for (final o in res['orders'] as List) Map<String, dynamic>.from(o as Map)];
@@ -93,7 +115,8 @@ class _PortalOrdersScreenState extends State<PortalOrdersScreen> {
 
   Future<void> _loadMonth() async {
     try {
-      final days = await ApiService.fetchOrderCalendar(DateFormat('yyyy-MM').format(_month));
+      final days =
+          await ApiService.fetchOrderCalendar(DateFormat('yyyy-MM').format(_month), state: 'past');
       if (mounted) setState(() => _days = days);
     } on ApiException {
       // The list still works without the dots.
@@ -171,54 +194,100 @@ class _PortalOrdersScreenState extends State<PortalOrdersScreen> {
         ],
       ];
     }
+    final current = _current;
+    final List<Widget> currentList;
+    if (current == null) {
+      currentList = [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 32),
+          child: Center(
+            child: _currentError == null
+                ? const CircularProgressIndicator(strokeWidth: 2.5)
+                : Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_currentError!),
+                    const SizedBox(height: 12),
+                    FilledButton(onPressed: _loadCurrent, child: const Text('Try again')),
+                  ]),
+          ),
+        ),
+      ];
+    } else if (current.isEmpty) {
+      currentList = [_noOrders(context, current: true)];
+    } else {
+      currentList = [
+        for (final o in current) ...[
+          _CurrentTicket(order: o, money: money),
+          const SizedBox(height: 12),
+        ],
+      ];
+    }
     return PortalShell(
-      index: 1,
-      title: 'Your orders',
+      index: PortalSection.orders,
+      title: 'Orders',
       child: RefreshIndicator(
         onRefresh: () async {
-          await Future.wait([_load(page: _page), _loadMonth()]);
+          await Future.wait([_loadCurrent(), _load(page: _page), _loadMonth()]);
         },
         child: ListView(
             controller: _scroll,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
-              _HistoryCalendar(
-                month: _month,
-                counts: _days,
-                selected: _day,
-                onMonth: _shiftMonth,
-                onDay: (d) => _pickDay(_day != null && _iso(_day!) == _iso(d) ? null : d),
+              _Segments(
+                labels: [
+                  current == null || current.isEmpty ? 'Current' : 'Current · ${current.length}',
+                  'Past',
+                ],
+                selected: _tab,
+                onSelect: (i) => setState(() => _tab = i),
               ),
-              if (_day != null) ...[
-                const SizedBox(height: 10),
-                Row(children: [
-                  Expanded(
-                    child: Text(
-                        'Showing ${DateFormat('EEE d MMM').format(_day!)}'
-                        '${orders == null ? '' : ' · $_total order${_total == 1 ? '' : 's'}'}',
-                        style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink)),
-                  ),
-                  TextButton(onPressed: () => _pickDay(null), child: const Text('All dates')),
-                ]),
+              const SizedBox(height: 16),
+              if (_tab == 0)
+                ...currentList
+              else ...[
+                _HistoryCalendar(
+                  month: _month,
+                  counts: _days,
+                  selected: _day,
+                  onMonth: _shiftMonth,
+                  onDay: (d) => _pickDay(_day != null && _iso(_day!) == _iso(d) ? null : d),
+                ),
+                if (_day != null) ...[
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(
+                      child: Text(
+                          'Showing ${DateFormat('EEE d MMM').format(_day!)}'
+                          '${orders == null ? '' : ' · $_total order${_total == 1 ? '' : 's'}'}',
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                    ),
+                    TextButton(onPressed: () => _pickDay(null), child: const Text('All dates')),
+                  ]),
+                ],
+                const SizedBox(height: 4),
+                ...list,
               ],
-              const SizedBox(height: 4),
-              ...list,
             ]),
       ),
     );
   }
 
-  Widget _noOrders(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 16),
+  Widget _noOrders(BuildContext context, {bool current = false}) => Padding(
+        padding: const EdgeInsets.only(top: 4),
         child: PortalPanel(
           padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('No orders with ${context.watch<PortalProvider>().shopName} yet',
+            Text(
+                current
+                    ? 'Nothing on the way'
+                    : 'No past orders with ${context.watch<PortalProvider>().shopName} yet',
                 style: AppTypography.sectionTitle),
             const SizedBox(height: 4),
-            const Text('Book a pickup and it shows up here, with its status as it moves.',
-                style: TextStyle(fontSize: 13, color: AppColors.muted, height: 1.4)),
+            Text(
+                current
+                    ? 'Book a pickup and follow it here, step by step.'
+                    : 'Delivered and cancelled orders show up here.',
+                style: const TextStyle(fontSize: 13, color: AppColors.muted, height: 1.4)),
             const SizedBox(height: 14),
             FilledButton(
               onPressed: () => context.go('/book'),
@@ -517,7 +586,7 @@ class _OrderRow extends StatelessWidget {
                   [
                     if (at != null) 'Booked ${DateFormat('h:mm a').format(at)}',
                     '$count item${count == 1 ? '' : 's'}',
-                    _pickupText(o),
+                    portalPickupText(o),
                   ].where((s) => s.isNotEmpty).join(' · '),
                   style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
             ]),
@@ -560,7 +629,103 @@ class _StatusTag extends StatelessWidget {
   }
 }
 
-/// One order: items, amounts, the status timeline and a QR the shop can scan.
+/// Two tabs as a segmented control: white pill on the muted fill.
+class _Segments extends StatelessWidget {
+  const _Segments({required this.labels, required this.selected, required this.onSelect});
+
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: AppColors.mutedFill,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(children: [
+          for (var i = 0; i < labels.length; i++)
+            Expanded(
+              child: Material(
+                color: i == selected ? AppColors.card : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () => onSelect(i),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Text(labels[i],
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: i == selected ? FontWeight.w600 : FontWeight.w500,
+                            color: i == selected ? AppColors.ink : AppColors.muted)),
+                  ),
+                ),
+              ),
+            ),
+        ]),
+      );
+}
+
+/// What an order holds, in a few words: "Wash & fold, Dry clean · 4 pieces".
+String _itemsSummary(Map<String, dynamic> o) {
+  final items = [for (final i in (o['items'] as List? ?? const [])) Map<String, dynamic>.from(i as Map)];
+  final services = {for (final i in items) '${i['service_type']}'}.where((s) => s.isNotEmpty);
+  final pieces = items.fold<num>(0, (s, i) => s + ((i['quantity'] as num?) ?? 0));
+  final count = pieces == pieces.roundToDouble() ? '${pieces.round()}' : '$pieces';
+  return [services.join(', '), '$count piece${pieces == 1 ? '' : 's'}']
+      .where((s) => s.isNotEmpty)
+      .join(' · ');
+}
+
+/// One order still moving, as a claim ticket on the Current tab.
+class _CurrentTicket extends StatelessWidget {
+  const _CurrentTicket({required this.order, required this.money});
+
+  final Map<String, dynamic> order;
+  final NumberFormat money;
+
+  @override
+  Widget build(BuildContext context) {
+    final o = order;
+    final number = '${o['order_number']}';
+    final pickup = portalPickupText(o);
+    return PortalTicket(
+      orderNumber: number,
+      status: '${o['status']}',
+      onTap: () => context.go('/orders/${Uri.encodeComponent(number)}'),
+      body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(
+            child: Text(_itemsSummary(o),
+                style: const TextStyle(fontSize: 14, color: AppColors.ink)),
+          ),
+          Text(money.format(o['total_amount'] ?? 0),
+              style: portalMono(size: 15, weight: FontWeight.w600)),
+        ]),
+        const SizedBox(height: 14),
+        PortalStatusLine(status: '${o['status']}'),
+        if (pickup.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Row(children: [
+            const Icon(Icons.schedule, size: 15, color: AppColors.muted),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(pickup, style: const TextStyle(fontSize: 13, color: AppColors.muted)),
+            ),
+            const Icon(Icons.chevron_right, size: 18, color: AppColors.muted),
+          ]),
+        ],
+      ]),
+    );
+  }
+}
+
+/// One order: the claim ticket with its status line, items, pickup address, a
+/// QR the shop can scan and "Need help with this order?". With [justBooked]
+/// (`?placed=1`, straight after booking) it opens with "Pickup booked".
 class PortalOrderDetailScreen extends StatefulWidget {
   const PortalOrderDetailScreen({super.key, required this.orderNumber, this.justBooked = false});
 
@@ -575,13 +740,14 @@ class _PortalOrderDetailScreenState extends State<PortalOrderDetailScreen> {
   Map<String, dynamic>? _order;
   String? _error;
 
+  /// The customer's five steps and the timestamp that marks each one done
+  /// (Cleaning: whichever of processing / ironing came first).
   static const _timeline = [
-    ('PLACED', 'placed_at'),
-    ('PROCESSING', 'processing_at'),
-    ('IRONING', 'ironing_at'),
-    ('READY', 'ready_at'),
-    ('OUT_FOR_DELIVERY', 'out_for_delivery_at'),
-    ('DELIVERED', 'delivered_at'),
+    ('Booked', ['placed_at']),
+    ('Cleaning', ['processing_at', 'ironing_at']),
+    ('Ready', ['ready_at']),
+    ('Out for delivery', ['out_for_delivery_at']),
+    ('Delivered', ['delivered_at']),
   ];
 
   @override
@@ -594,120 +760,278 @@ class _PortalOrderDetailScreenState extends State<PortalOrderDetailScreen> {
     });
   }
 
+  Widget _backLink(BuildContext context) => Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => context.go('/orders'),
+          icon: const Icon(Icons.arrow_back_rounded, size: 18),
+          label: const Text('Orders'),
+          style: TextButton.styleFrom(foregroundColor: AppColors.ink),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final o = _order;
     final portal = context.watch<PortalProvider>();
     if (o == null) {
       return PortalShell(
-        index: 1,
-        title: '#${widget.orderNumber}',
+        index: PortalSection.orders,
         child: Center(child: _error == null ? const CircularProgressIndicator() : Text(_error!)),
       );
     }
     final money = _money(context);
-    final fmt = DateFormat('d MMM, h:mm a');
-    final cancelled = o['status'] == 'CANCELLED';
-    return PortalShell(
-      index: 1,
-      title: '#${o['order_number']}',
-      child: ListView(padding: const EdgeInsets.all(16), children: [
-        if (widget.justBooked) ...[
-          PortalPanel(
-            child: Text('Booking received by ${portal.shopName}. ${_pickupText(o)}.',
-                style: const TextStyle(color: AppColors.ink, height: 1.4)),
-          ),
-          const SizedBox(height: 12),
-        ],
-        PortalPanel(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Status', style: AppTypography.sectionTitle),
-            const SizedBox(height: 10),
-            if (cancelled)
-              Text(
-                  'Cancelled ${o['cancelled_at'] != null ? fmt.format(DateTime.parse('${o['cancelled_at']}').toLocal()) : ''}',
-                  style: const TextStyle(color: AppColors.danger))
-            else
-              for (final (status, field) in _timeline)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(children: [
-                    Icon(o[field] != null ? Icons.check_circle : Icons.radio_button_unchecked,
-                        size: 18, color: o[field] != null ? AppColors.success : AppColors.border),
-                    const SizedBox(width: 10),
-                    Expanded(
-                        child: Text(portalStatusLabels[status]!,
-                            style: TextStyle(
-                                color: o[field] != null ? AppColors.ink : AppColors.muted))),
-                    if (o[field] != null)
-                      Text(fmt.format(DateTime.parse('${o[field]}').toLocal()),
-                          style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
+    final fmt = DateFormat('EEE d MMM, h:mm a');
+    String? when(String field) {
+      final d = DateTime.tryParse('${o[field] ?? ''}');
+      return d == null ? null : fmt.format(d.toLocal());
+    }
+
+    final number = '${o['order_number']}';
+    final status = '${o['status']}';
+    final cancelled = status == 'CANCELLED';
+    final at = portalStepIndex(status);
+    final booked = when('created_at') ?? when('placed_at');
+
+    final timeline = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (cancelled)
+        Text('Cancelled${when('cancelled_at') == null ? '' : ' ${when('cancelled_at')}'}',
+            style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w600))
+      else
+        for (var i = 0; i < _timeline.length; i++)
+          Builder(builder: (context) {
+            final (label, fields) = _timeline[i];
+            final stamp = fields.map(when).whereType<String>().firstOrNull;
+            final done = i <= at;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(
+                  width: 18,
+                  height: 18,
+                  margin: const EdgeInsets.only(top: 1),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: i < at || (done && i == _timeline.length - 1)
+                        ? AppColors.primary
+                        : AppColors.card,
+                    border: Border.all(
+                        color: done ? AppColors.primary : AppColors.border, width: 2),
+                  ),
+                  child: i < at || (done && i == _timeline.length - 1)
+                      ? const Icon(Icons.check, size: 11, color: AppColors.onPrimary)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: i == at ? FontWeight.w600 : FontWeight.w500,
+                            color: done ? AppColors.ink : AppColors.muted)),
+                    if (stamp != null)
+                      Text(stamp, style: portalMono(size: 12, color: AppColors.muted)),
                   ]),
                 ),
-          ]),
-        ),
-        const SizedBox(height: 12),
-        PortalPanel(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Items', style: AppTypography.sectionTitle),
-            const SizedBox(height: 8),
-            for (final raw in o['items'] as List)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(children: [
-                  Expanded(
-                      child: Text('${(raw as Map)['quantity']} × ${raw['item_title']}'
-                          '  ·  ${raw['service_type']}')),
-                  Text(money.format(raw['total_price'] ?? 0)),
+              ]),
+            );
+          }),
+    ]);
+
+    final ticket = PortalTicket(
+      orderNumber: number,
+      status: status,
+      large: true,
+      caption: booked == null ? null : 'Booked $booked',
+      body: timeline,
+    );
+
+    final items = PortalPanel(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('ITEMS', style: portalFieldLabel),
+        const SizedBox(height: 8),
+        for (final raw in o['items'] as List)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${(raw as Map)['item_title']} × ${raw['quantity']}',
+                      style: const TextStyle(fontSize: 14, color: AppColors.ink)),
+                  Text('${raw['service_type']}',
+                      style: const TextStyle(fontSize: 12.5, color: AppColors.muted)),
                 ]),
               ),
-            const Divider(color: AppColors.border, height: 20),
-            Row(children: [
-              const Expanded(child: Text('Total', style: AppTypography.sectionTitle)),
-              Text(money.format(o['total_amount'] ?? 0), style: AppTypography.sectionTitle),
+              Text(money.format(raw['total_price'] ?? 0), style: portalMono(size: 14)),
             ]),
-            if ((o['due_amount'] as num? ?? 0) > 0)
-              Text('To pay on delivery: ${money.format(o['due_amount'])}',
-                  style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          ),
+        const Divider(color: AppColors.border, height: 20),
+        Row(children: [
+          const Text('Total', style: AppTypography.sectionTitle),
+          if ((o['due_amount'] as num? ?? 0) > 0) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFFFF4E0), borderRadius: BorderRadius.circular(4)),
+              child: const Text('Pay on delivery',
+                  style: TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF9A5B00))),
+            ),
+          ],
+          const Spacer(),
+          Text(money.format(o['total_amount'] ?? 0),
+              style: portalMono(size: 16, weight: FontWeight.w600)),
+        ]),
+      ]),
+    );
+
+    final address =
+        '${o['address'] ?? ''}${'${o['pin_code'] ?? ''}'.isEmpty ? '' : ' - ${o['pin_code']}'}';
+    final pickup = PortalPanel(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('PICKUP & DELIVERY', style: portalFieldLabel),
+        const SizedBox(height: 10),
+        if (portalPickupText(o).isNotEmpty)
+          Row(children: [
+            const Icon(Icons.schedule, size: 16, color: AppColors.muted),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(portalPickupText(o).replaceFirst('Pickup ', ''),
+                  style: portalMono(size: 14)),
+            ),
+          ]),
+        if (address.trim().isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.place_outlined, size: 16, color: AppColors.muted),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text(address, style: const TextStyle(fontSize: 14, color: AppColors.ink))),
+          ]),
+        ],
+        const Divider(height: 24, color: AppColors.borderSubtle),
+        Row(children: [
+          QrImageView(data: number, size: 72, padding: EdgeInsets.zero),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text('Show this at the shop to find your order quickly.',
+                style: TextStyle(fontSize: 12.5, height: 1.4, color: AppColors.muted)),
+          ),
+        ]),
+      ]),
+    );
+
+    final help = Material(
+      color: AppColors.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => context.go('/help/report?order=${Uri.encodeComponent(number)}'),
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(children: [
+            Icon(Icons.support_agent_outlined, size: 20, color: AppColors.primary),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Need help with this order?',
+                    style: TextStyle(
+                        fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.ink)),
+                SizedBox(height: 2),
+                Text('Missing item, damage, delay or billing',
+                    style: TextStyle(fontSize: 12.5, color: AppColors.muted)),
+              ]),
+            ),
+            Icon(Icons.chevron_right, color: AppColors.muted),
           ]),
         ),
-        const SizedBox(height: 12),
-        PortalPanel(
-          child: Builder(builder: (context) {
-            final pickup = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Pickup', style: AppTypography.sectionTitle),
-              const SizedBox(height: 6),
-              Text(_pickupText(o).replaceFirst('Pickup ', '')),
-              if ('${o['address'] ?? ''}'.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                    '${o['address']}${'${o['pin_code'] ?? ''}'.isEmpty ? '' : ' - ${o['pin_code']}'}',
-                    style: const TextStyle(color: AppColors.muted)),
-              ],
-            ]);
-            final qr = Column(children: [
-              QrImageView(data: '${o['order_number']}', size: 96, padding: EdgeInsets.zero),
-              const SizedBox(height: 4),
-              const Text('Show at the shop',
-                  style: TextStyle(fontSize: 11, color: AppColors.muted)),
-            ]);
-            // Beside the address the QR squeezes it into a sliver on a phone.
-            if (MediaQuery.sizeOf(context).width < 420) {
-              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      ),
+    );
+
+    final placed = widget.justBooked
+        ? [
+            const Text('Pickup booked',
+                style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.6,
+                    color: AppColors.ink)),
+            const SizedBox(height: 4),
+            Text('${portal.shopName} has your booking. Follow it here as it moves.',
+                style: const TextStyle(fontSize: 14.5, height: 1.45, color: AppColors.muted)),
+            const SizedBox(height: 16),
+          ]
+        : const <Widget>[];
+
+    final placedActions = widget.justBooked
+        ? [
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () => context.go('/orders'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Track in Orders'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: () => context.go('/book'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                foregroundColor: AppColors.ink,
+                side: const BorderSide(color: AppColors.border),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Book another pickup'),
+            ),
+          ]
+        : const <Widget>[];
+
+    final wide = MediaQuery.sizeOf(context).width >= PortalShell.wide;
+    return PortalShell(
+      index: PortalSection.orders,
+      maxWidth: 1120,
+      child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
+        if (!widget.justBooked) _backLink(context) else const SizedBox(height: 16),
+        ...placed,
+        if (wide)
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                ticket,
+                const SizedBox(height: 16),
+                items,
+              ]),
+            ),
+            const SizedBox(width: 24),
+            SizedBox(
+              width: 360,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 pickup,
-                const Divider(height: 24, color: AppColors.borderSubtle),
-                Center(child: qr),
-              ]);
-            }
-            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: pickup),
-              const SizedBox(width: 12),
-              qr,
-            ]);
-          }),
-        ),
-        const SizedBox(height: 12),
-        TextButton(onPressed: () => context.go('/orders'), child: const Text('All orders')),
+                const SizedBox(height: 16),
+                help,
+                ...placedActions,
+              ]),
+            ),
+          ])
+        else ...[
+          ticket,
+          const SizedBox(height: 12),
+          items,
+          const SizedBox(height: 12),
+          pickup,
+          const SizedBox(height: 12),
+          help,
+          ...placedActions,
+        ],
       ]),
     );
   }

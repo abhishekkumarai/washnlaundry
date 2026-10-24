@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import EmailLinkRequest
+from .models import EmailLinkRequest, OrderIssue
+
+
+@admin.register(OrderIssue)
+class OrderIssueAdmin(admin.ModelAdmin):
+    list_display = ('order', 'category', 'customer', 'shop', 'status', 'created_at')
+    list_filter = ('status', 'category')
+    search_fields = ('order__order_number', 'customer__name', 'message')
+    raw_id_fields = ('order', 'customer')
 
 
 @admin.register(EmailLinkRequest)

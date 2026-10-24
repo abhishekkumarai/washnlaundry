@@ -136,17 +136,29 @@ data loading in `main.dart` does not run; the portal sends its own chosen shop (
 prefs key `portal_shop`) as `X-Tenant-ID`, so `/api/me/` reports the role *for that shop*
 (`AuthProvider.serverRole`, not the host-narrowed `role`).
 
-- **Flow:** sign in first, as in a delivery app (Google, or an emailed 6-digit code: `api/otp.py`) →
-  `/find`, the signed-in home (joined laundries, then the rest with search) → `/join` (name + mobile) → `/book` · `/orders` · `/orders/:no` · `/profile` (+ addresses with a
-  flutter_map/OpenStreetMap pin and browser geolocation). Owners/staff of the shop are told to use app.
-  Signed out, only `/login`, the email links and a shop's `/s/<slug>` link/QR open; the link remembers its
-  shop through sign-in and skips the list. Signing out forgets the chosen shop.
-- **Layout:** `PortalNavBar` (`portal_shell.dart`) on every signed-in page: logo, the current laundry (tap to
-  change), Book · Orders links on wide screens, and an account menu with Profile, Change laundry and Sign out.
-  Phones keep Book · Orders as a bottom bar.
-- **Nearby:** `/find` asks once for the browser location (remembered, prefs `portal_use_location`) and sends it as
-  `customer/shops/?lat=&lng=`; the API then sorts nearest first with `distance_km` (haversine on
-  `Shop.latitude/longitude`; shops without a location go last). Within 10 km is "Nearby".
+- **Flow (design spec: `crm/docs/customer-portal-flow.md`, Stitch mockups linked there):** sign in first, as in
+  a delivery app (Google, email + password, or an emailed 6-digit code: `api/otp.py`) → `/location` (browser
+  position or a typed PIN code / area, remembered on the device in `PortalProvider`, prefs `portal_loc_*`;
+  skipped once a laundry is chosen) → `/find` Nearby laundries → `/s/<slug>` laundry page (services, pickup
+  PIN codes; Book a pickup, or Join → `/join`) → `/book` (Services · Pickup time · Address · Review) →
+  `/orders/:no?placed=1` ("Pickup booked"). Owners/staff of the shop are told to use app. Signed out, only
+  `/login`, the email links and a shop's `/s/<slug>` link/QR open; the link remembers its shop through sign-in
+  and skips the list. Signing out forgets the chosen shop (not the location). `/account` redirects to `/profile`.
+- **Layout:** four tabs, Book · Orders · Help · Profile (`PortalSection`, `portal_shell.dart`): a bottom
+  `NavigationBar` on phones, links in `PortalNavBar` at ≥ 900 px. No sidebar. `PortalShell(maxWidth: 1120)` for
+  two-column pages (booking with its "Your pickup" summary, order page, Help). Orders are drawn as claim tickets
+  (`PortalTicket` + `PortalStatusLine` in `portal_ticket.dart`; IBM Plex Mono via `portalMono` for numbers).
+  The status line has five steps, Booked · Cleaning (Processing or Ironing) · Ready · Out for delivery · Delivered.
+- **Orders:** Current (open orders as tickets) | Past (month calendar + pages), via `customer/orders/?state=current|past`
+  (also honoured with `?calendar=`).
+- **Help:** contact the laundry (tel / wa.me / mailto from `Shop.phone/whatsapp/email`), FAQ, and Report an issue
+  (`/help/report?order=<no>`, also from the order page): `POST customer/orders/<no>/issues/` `{category, message}`
+  (own orders only, ≤ 500 chars, 5/hour) saves an `OrderIssue` and emails `Shop.email` after commit. Issues are
+  handled in Django admin only for now (no CRM screen yet).
+- **Nearby:** `/find` sends the remembered position as `customer/shops/?lat=&lng=`; the API then sorts nearest
+  first with `distance_km` (haversine on `Shop.latitude/longitude`; shops without a location go last). Within
+  10 km is "Nearby". A typed PIN code / area is sent as `?q=` instead. `customer/shops/<slug>/` also returns the
+  laundry's `services` (active categories with items) and `pincodes`.
 - **Joining more laundries:** `POST customer/join/` with no name/phone reuses the customer's newest record at
   another shop (name, phone, and its saved addresses are copied); the Join page tries that first and only shows
   the form for a first-ever join (400).
@@ -159,7 +171,7 @@ prefs key `portal_shop`) as `X-Tenant-ID`, so `/api/me/` reports the role *for t
   `POST customer/join/`; `GET customer/booking-options/`; `GET/POST customer/orders/` (POST: whitelisted
   `{items:[{item_id,quantity}], pickup_date, slot_id, address_id | address+pin_code+lat/lng, notes}`,
   server-priced, slot capacity under a row lock, served-pincode check, `Idempotency-Key` header, 10/hour);
-  `customer/addresses/` CRUD; `PATCH customer/me/` (phone editable, unique per shop);
+  `customer/addresses/` CRUD; `POST customer/orders/<no>/issues/`; `PATCH customer/me/` (phone editable, unique per shop);
   `POST auth/email-code/request|verify/`. Customers can't create orders via `/api/orders/` (it trusted
   client prices) and only ever see orders by the `Order.customer` FK, never by phone.
 - **Shop alerts:** booking emails `Shop.email` after commit; the open CRM polls `GET /api/orders/changes/?since=`
